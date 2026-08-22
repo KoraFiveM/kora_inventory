@@ -53,6 +53,12 @@ button { color: inherit; }
 
 .inventory-layout { min-height: 0; display: grid; grid-template-columns: minmax(310px, 1fr) 230px minmax(310px, 1fr); gap: 12px; }
 .inventory-panel, .item-detail { min-height: 0; overflow: auto; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--surface-raised)); }
+.inventory-panel, .item-detail { scrollbar-width: thin; scrollbar-color: hsl(var(--border-strong)) transparent; }
+.inventory-panel::-webkit-scrollbar, .item-detail::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
+.inventory-panel::-webkit-scrollbar-track, .item-detail::-webkit-scrollbar-track { background: transparent; border: 0; }
+.inventory-panel::-webkit-scrollbar-thumb, .item-detail::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: hsl(var(--border-strong)); background-clip: padding-box; }
+.inventory-panel::-webkit-scrollbar-thumb:hover, .item-detail::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary)); background-clip: padding-box; }
+.inventory-panel::-webkit-scrollbar-button, .item-detail::-webkit-scrollbar-button, .inventory-panel::-webkit-scrollbar-corner, .item-detail::-webkit-scrollbar-corner { display: none; }
 .inventory-panel { padding: 12px; }
 .panel-header { display: grid; grid-template-columns: 1fr minmax(110px, 145px); align-items: center; gap: 12px; margin: 0 0 12px; }
 .eyebrow { margin: 0 0 3px; color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
