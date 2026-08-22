@@ -241,7 +241,8 @@ add after payment is refunded by the server.
 `config/shops/ammunation.lua` defines one finite-stock `ammunation` shop and
 the approved world counters. Its stock is intentionally declarative
 `{ name, amount, price }` data: qbinventory must build each canonical item view
-from qbcore's registry, rather than accepting labels, images, weights or other
+from qbcore's registry, rather than accepting labels, local `image` filenames,
+remote `imageUrl` fields, weights or other
 item fields from configuration or a client.
 
 `client/shops/ammunation.lua` creates qblib interaction zones and map blips as

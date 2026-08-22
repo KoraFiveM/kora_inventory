@@ -45,6 +45,12 @@ interface Selection {
     item: InventoryItem
 }
 
+function ItemArtwork({ item, className }: { item: InventoryItem; className: string }) {
+    const [failed, setFailed] = useState(false)
+    const source = !failed && item.imageUrl?.startsWith("https://") ? item.imageUrl : undefined
+    return <span className={className}>{source ? <img src={source} alt="" onError={() => setFailed(true)} /> : (item.label ?? item.name).slice(0, 1)}</span>
+}
+
 function InventorySlot({ item, index, selected, moveTarget, showPrice, onSelect, onPointerStart, onPointerEnd, onTarget, onClearTarget }: SlotProps) {
     return <button
         className={`slot${item ? " slot-filled" : ""}${selected ? " slot-selected" : ""}${moveTarget ? " slot-move-target" : ""}`}
@@ -70,7 +76,7 @@ function InventorySlot({ item, index, selected, moveTarget, showPrice, onSelect,
     >
         <span className="slot-number">{index}</span>
         {item && <>
-            <span className="item-art" aria-hidden="true">{(item.label ?? item.name).slice(0, 1)}</span>
+            <ItemArtwork item={item} className="item-art" />
             <span className="item-label">{item.label ?? item.name}</span>
             <span className="item-amount">×{item.amount}</span>
             {showPrice && typeof item.price === "number" && <span className="item-price">${item.price.toLocaleString()}</span>}
@@ -215,7 +221,7 @@ function App() {
         <div className="inventory-layout">
             <InventoryPanel inventory={session.player} selected={selected} moveTarget={moveTarget} onSelect={selectSlot} onPointerStart={startPointer} onPointerEnd={finishPointer} onTarget={setTarget} onClearTarget={clearTarget} />
             <aside className={`item-detail${filteredSelected ? "" : " item-detail-empty"}`}>{filteredSelected ? <>
-                <div className="detail-art">{(filteredSelected.item.label ?? filteredSelected.item.name).slice(0, 1)}</div>
+                <ItemArtwork item={filteredSelected.item} className="detail-art" />
                 <p className="eyebrow">{filteredSelected.inventory.type === "shop" ? "shop item" : `slot ${filteredSelected.item.slot}`}</p>
                 <h1>{filteredSelected.item.label ?? filteredSelected.item.name}</h1>
                 <p>{filteredSelected.item.description ?? "No item description available."}</p>

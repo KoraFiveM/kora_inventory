@@ -47,7 +47,7 @@ local function buildItem(name, amount, slot, metadata)
     return {
         slot = slot, name = def.name or tostring(name):lower(), amount = amount, info = I.copy(metadata or {}),
         metadata = I.copy(metadata or {}), type = def.type or 'item', unique = def.unique or false,
-        useable = def.useable or false, image = def.image, label = def.label or name,
+        useable = def.useable or false, image = def.image, imageUrl = def.imageUrl, label = def.label or name,
         weight = def.weight or 0, shouldClose = def.shouldClose, description = def.description,
         created = os.time(),
     }
@@ -192,10 +192,21 @@ end
 local function view(k)
     local inv = getInventory(k)
     if not inv then return nil end
+    local items = I.copy(inv.items)
+    -- Older player records predate `imageUrl`. Resolve presentation fields from
+    -- the current core registry at render time so no player-inventory migration
+    -- is needed merely to adopt the remote artwork catalogue.
+    for _, item in pairs(items) do
+        local def = item and itemDef(item.name)
+        if def then
+            item.image = def.image or item.image
+            item.imageUrl = def.imageUrl or item.imageUrl
+        end
+    end
     return {
         id = inv.id, key = inv.key, type = inv.type, label = inv.label, slots = inv.slots,
         maxWeight = inv.maxWeight, weight = I.totalWeight(inv.items), revision = revision(k),
-        items = I.copy(inv.items), stock = inv.stock and I.copy(inv.stock) or nil,
+        items = items, stock = inv.stock and I.copy(inv.stock) or nil,
     }
 end
 
@@ -772,7 +783,7 @@ function setItems(src, newItems)
         for field, value in pairs(item) do
             if field ~= 'slot' and field ~= 'name' and field ~= 'amount' and field ~= 'count'
                 and field ~= 'info' and field ~= 'metadata' and field ~= 'weight' and field ~= 'type'
-                and field ~= 'unique' and field ~= 'useable' and field ~= 'label' and field ~= 'image'
+                and field ~= 'unique' and field ~= 'useable' and field ~= 'label' and field ~= 'image' and field ~= 'imageUrl'
                 and field ~= 'shouldClose' then
                 built[field] = I.copy(value)
             end
@@ -1045,7 +1056,7 @@ local function setInventoryItems(reference, items)
         for field, value in pairs(rawItem) do
             if field ~= 'slot' and field ~= 'name' and field ~= 'amount' and field ~= 'count'
                 and field ~= 'info' and field ~= 'metadata' and field ~= 'weight' and field ~= 'type'
-                and field ~= 'unique' and field ~= 'useable' and field ~= 'label' and field ~= 'image'
+                and field ~= 'unique' and field ~= 'useable' and field ~= 'label' and field ~= 'image' and field ~= 'imageUrl'
                 and field ~= 'shouldClose' then
                 built[field] = I.copy(value)
             end

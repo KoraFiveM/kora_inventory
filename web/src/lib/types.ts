@@ -13,6 +13,7 @@ export interface InventoryItem {
     weight?: number
     description?: string
     image?: string
+    imageUrl?: string
     metadata?: Record<string, unknown>
     durability?: number
     price?: number
