@@ -14,6 +14,19 @@ Config.qbinventory = {
     dropDistance = 2.0,
     auditLimit = 1000,
     requireSameBucket = true,
+    -- Physical cash is opt-in. When enabled, the configured qbcore account is
+    -- represented exclusively by this stackable item: it can be given, moved,
+    -- stashed and dropped like any other inventory item. qbcore remains the
+    -- only money API; qbinventory's AddItem/RemoveItem cash compatibility
+    -- calls are routed back through it so no second balance can be minted.
+    -- Enabling/disabling this on an established server is a data migration:
+    -- qbinventory converts ledger cash when it activates and deliberately
+    -- fails closed if its provider is stopped. Do not flip it mid-session.
+    cash = {
+        asItem = false,
+        item = 'cash',
+        account = 'cash',
+    },
     -- Item receipts are owned by qbinventory, never by the resource which
     -- grants an item.  Leave this disabled for a completely silent/headless
     -- inventory, or tune the single presentation policy here for every

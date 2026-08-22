@@ -24,6 +24,24 @@ local function playerData(src) return exports.qbcore:getPlayerData(src) end
 local function playerItems(src) return exports.qbcore:getPlayerData(src, { 'items' }) or {} end
 local function emit(src, name, ...) TriggerClientEvent(name, src, ...) end
 
+-- This policy is intentionally server-only. Cash item operations are never
+-- exposed to a browser or trusted from a resource-provided item payload.
+local cashItemsActive = false
+local function cashPolicy()
+    local policy = C.cash
+    if type(policy) ~= 'table' or policy.asItem ~= true then return nil end
+    local item = type(policy.item) == 'string' and policy.item:lower() or nil
+    local account = type(policy.account) == 'string' and policy.account:lower() or nil
+    if not item or item == '' or not account or account == '' then return nil end
+    local def = itemDef(item)
+    if not def or def.unique then return nil end
+    return { item = item, account = account }
+end
+local function isCashItemName(name)
+    local policy = cashPolicy()
+    return policy and type(name) == 'string' and name:lower() == policy.item
+end
+
 -- qbcore emits its inventory-change event synchronously from setPath. Mark
 -- qbinventory-originated writes so the listener below does not produce partial
 -- live patches or double-bump a transaction's revision.
@@ -345,6 +363,132 @@ local function removePlayer(src, slot, amount)
     local nextItem = I.copy(item); nextItem.amount = nextItem.amount - amount
     local ok, err = playerSetPath(src, { 'items', slot }, nextItem)
     return ok, err, removed
+end
+
+-- These functions are called only by qbcore's money module. They bypass the
+-- public AddItem/RemoveItem compatibility layer deliberately: that layer
+-- redirects physical cash back into qbcore, while these are the one audited
+-- route that changes the actual cash stack.
+local function requireCashAuthority(account)
+    if GetInvokingResource() ~= 'qbcore' then return nil, 'physical cash is restricted to qbcore' end
+    local policy = cashPolicy()
+    if not policy or policy.account ~= account then return nil, 'physical cash is not configured for this account' end
+    return policy
+end
+
+local function physicalCashCanImport(src, account, amount)
+    local policy, err = requireCashAuthority(account)
+    if not policy then return false, err end
+    amount = math.floor(tonumber(amount) or -1)
+    if amount < 0 then return false, 'invalid cash amount' end
+    if amount == 0 then return true end
+    return canCarry(src, policy.item, amount)
+end
+
+local function physicalCashBalance(src, policy)
+    local total = 0
+    for _, item in pairs(playerItems(src)) do
+        if type(item.name) == 'string' and item.name:lower() == policy.item then total = total + (tonumber(item.amount) or 0) end
+    end
+    return total
+end
+
+local function physicalCashCredit(src, policy, account, amount, reason)
+    local ok, addErr = addPlayer(src, policy.item, amount, nil, {}, 'qbcore-cash:' .. tostring(reason or 'add'))
+    if not ok then return false, addErr end
+    bump(playerKey(src)); broadcast(playerKey(src))
+    recordAudit('cash-add', src, { account = account, amount = amount, reason = reason })
+    showItemBox(src, policy.item, amount, 'add')
+    return true
+end
+
+local function physicalCashGet(src, account)
+    local policy, err = requireCashAuthority(account)
+    if not policy then return nil, err end
+    return physicalCashBalance(src, policy)
+end
+
+local function physicalCashAdd(src, account, amount, reason)
+    local policy, err = requireCashAuthority(account)
+    amount = I.amount(amount, 0)
+    if not policy then return false, err end
+    if not amount then return false, 'invalid cash amount' end
+    return physicalCashCredit(src, policy, account, amount, reason)
+end
+
+local function physicalCashDebit(src, policy, account, amount, reason)
+    local items, remaining, planned = playerItems(src), amount, {}
+    for slot = 1, C.playerSlots do
+        local item = items[slot]
+        if item and type(item.name) == 'string' and item.name:lower() == policy.item then
+            local take = math.min(remaining, item.amount)
+            planned[#planned + 1] = { slot = slot, amount = take }
+            remaining = remaining - take
+            if remaining == 0 then break end
+        end
+    end
+    if remaining > 0 then return false, 'insufficient funds' end
+    for _, part in ipairs(planned) do
+        local ok, removeErr = removePlayer(src, part.slot, part.amount)
+        if not ok then return false, removeErr end
+    end
+    bump(playerKey(src)); broadcast(playerKey(src))
+    recordAudit('cash-remove', src, { account = account, amount = amount, reason = reason })
+    return true
+end
+
+local function physicalCashRemove(src, account, amount, reason)
+    local policy, err = requireCashAuthority(account)
+    amount = I.amount(amount, 0)
+    if not policy then return false, err end
+    if not amount then return false, 'invalid cash amount' end
+    return physicalCashDebit(src, policy, account, amount, reason)
+end
+
+local function physicalCashSet(src, account, amount, reason)
+    local policy, err = requireCashAuthority(account)
+    amount = math.floor(tonumber(amount) or -1)
+    if not policy then return false, err end
+    if amount < 0 then return false, 'invalid cash amount' end
+    local current = physicalCashBalance(src, policy)
+    if amount == current then return true end
+    if amount > current then return physicalCashCredit(src, policy, account, amount - current, reason or 'set') end
+    return physicalCashDebit(src, policy, account, current - amount, reason or 'set')
+end
+
+local function physicalCashTransfer(fromSrc, toSrc, account, amount, reason)
+    local policy, err = requireCashAuthority(account)
+    amount = I.amount(amount, 0)
+    if not policy then return false, err end
+    if not amount or fromSrc == toSrc then return false, 'invalid cash transfer' end
+    if not playerData(fromSrc) or not playerData(toSrc) then return false, 'player unavailable' end
+    return lock({ playerKey(fromSrc), playerKey(toSrc) }, function()
+        local current = physicalCashBalance(fromSrc, policy)
+        if current < amount then return false, 'insufficient funds' end
+        local canReceive, carryErr = canCarry(toSrc, policy.item, amount)
+        if not canReceive then return false, carryErr end
+        local removed, removeErr = physicalCashDebit(fromSrc, policy, account, amount, reason or 'transfer')
+        if not removed then return false, removeErr end
+        local added, addErr = physicalCashCredit(toSrc, policy, account, amount, reason or 'transfer')
+        if not added then
+            local rolledBack, rollbackErr = physicalCashCredit(fromSrc, policy, account, amount, 'transfer-rollback')
+            if not rolledBack then print(('^1[qbinventory]^7 physical cash rollback failed: %s'):format(tostring(rollbackErr))) end
+            return false, addErr
+        end
+        recordAudit('cash-transfer', fromSrc, { to = toSrc, account = account, amount = amount, reason = reason })
+        return true
+    end)
+end
+
+local function physicalCashImport(src, account, amount)
+    local policy, err = requireCashAuthority(account)
+    amount = math.floor(tonumber(amount) or -1)
+    if not policy then return false, err end
+    if amount < 0 then return false, 'invalid legacy cash balance' end
+    if amount == 0 then return true end
+    local canImport, importErr = canCarry(src, policy.item, amount)
+    if not canImport then return false, importErr end
+    return physicalCashCredit(src, policy, account, amount, 'legacy-balance-migration')
 end
 
 local function addTo(k, name, amount, slot, metadata, reason)
@@ -716,6 +860,11 @@ function canCarry(src, name, amount)
 end
 function addItem(src, name, amount, slot, info, reason)
     amount = I.amount(amount, 1)
+    if cashItemsActive and isCashItemName(name) then
+        -- Compatibility still works, but monetary accounting and events stay
+        -- in qbcore. Never let an arbitrary resource mutate the cash stack.
+        return exports.qbcore:addMoney(src, cashPolicy().account, amount, reason or 'qbinventory-add-cash')
+    end
     local ok, err = canCarry(src, name, amount); if not ok then return false, err end
     local done, why = addPlayer(src, name, amount, slot, info, reason)
     if done then
@@ -726,6 +875,9 @@ function addItem(src, name, amount, slot, info, reason)
 end
 function removeItem(src, name, amount, slot, reason)
     local items = playerItems(src); amount = I.amount(amount, 1); if not amount then return false, 'invalid amount' end
+    if cashItemsActive and isCashItemName(name) then
+        return exports.qbcore:removeMoney(src, cashPolicy().account, amount, reason or 'qbinventory-remove-cash')
+    end
     if slot then
         if not items[slot] or items[slot].name ~= name then return false, 'item not in slot' end
         local ok, err = removePlayer(src, slot, amount); if ok then bump(playerKey(src)); broadcast(playerKey(src)) end; return ok, err
@@ -803,11 +955,15 @@ function clearInventory(src, keep)
     elseif type(keep) == 'table' then
         for key, value in pairs(keep) do keeps[itemNameKey(type(key) == 'number' and value or key)] = true end
     end
+    if cashItemsActive then keeps[cashPolicy().item] = true end
     for slot, item in pairs(playerItems(src)) do if not keeps[itemNameKey(item.name)] then playerSetPath(src, { 'items', slot }, nil) end end
     bump(playerKey(src)); broadcast(playerKey(src)); return true
 end
 function setItems(src, newItems)
     if type(newItems) ~= 'table' then return false, 'items must be a table' end
+    -- A whole-inventory replacement cannot prove that its proposed cash stack
+    -- matches the ledger. Reject it instead of permitting a mint/burn bypass.
+    if cashItemsActive then return false, 'SetInventory is unavailable while cash is an item' end
     local checked = {}
     for slot, item in pairs(newItems) do
         slot = tonumber(slot); local amount = item and I.amount(item.amount, 1)
@@ -835,6 +991,19 @@ local useables, useableOwners = {}, QB.resources.serverRegistry(function(name) u
 function createUseable(name, handler)
     assert(type(name) == 'string' and type(handler) == 'function', 'name and handler are required')
     local owner = GetInvokingResource() or resource; useables[name] = handler; useableOwners.track(owner, name)
+end
+-- Whether clicking Use on this item would actually do something: either a
+-- registered handler, or (useItem's own container bypass, above/below) a
+-- configured portable-container definition. buildItem() calls this INSTEAD OF
+-- echoing the item/weapon definition's own static `useable` flag, so the NUI
+-- only shows the Use button when it would have an effect. A bare global (like
+-- createUseable/useItem) so buildItem -- defined earlier in this same file,
+-- but only ever CALLED later, once every top-level statement here has run --
+-- can resolve it too.
+function hasUseable(name)
+    if useables[name] then return true end
+    local containers = QbInventory.containers
+    return containers and containers.isPortableItem and containers.isPortableItem({ name = name }) or false
 end
 function useItem(src, slotOrName)
     local item = type(slotOrName) == 'number' and getItemBySlot(src, slotOrName) or getItemByName(src, slotOrName)
@@ -1165,7 +1334,15 @@ local api = {
     RegisterHook = registerHook, RemoveHooks = removeHooks,
     RegisterInspectionAccess = registerInspectionAccess, RemoveInspectionAccess = removeInspectionAccess,
 }
+-- These are qbinventory-private bridge exports for qbcore only. They are not
+-- advertised through qb-inventory/ox_inventory compatibility identities.
+local physicalCashApi = {
+    physicalCashGet = physicalCashGet, physicalCashAdd = physicalCashAdd, physicalCashRemove = physicalCashRemove,
+    physicalCashSet = physicalCashSet, physicalCashTransfer = physicalCashTransfer,
+    physicalCashImport = physicalCashImport, physicalCashCanImport = physicalCashCanImport,
+}
 for name, fn in pairs(api) do exports(name, fn) end
+for name, fn in pairs(physicalCashApi) do exports(name, fn) end
 for _, identity in ipairs({ 'qb-inventory', 'ox_inventory' }) do
     for name, fn in pairs(api) do
         AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCB) setCB(fn) end)
@@ -1237,10 +1414,27 @@ end)
 
 AddEventHandler('playerDropped', function() close(source, 'disconnected') end)
 AddEventHandler('onResourceStop', function(name)
-    if name == resource then for src in pairs(sessions) do close(src, 'resource stopped') end end
+    if name == resource then
+        -- Do not unregister physical cash here. A restart gap must fail closed
+        -- in qbcore rather than silently create a second ledger balance.
+        for src in pairs(sessions) do close(src, 'resource stopped') end
+    end
     if I.vehicles and I.vehicles.cleanupResource then I.vehicles.cleanupResource(name) end
     for eventName, list in pairs(hooks) do for id, hook in pairs(list) do if hook.owner == name then list[id] = nil end end end
     for id, hook in pairs(inspectionHooks) do if hook.owner == name then inspectionHooks[id] = nil end end
+end)
+
+CreateThread(function()
+    Wait(0)
+    local policy = cashPolicy()
+    if not policy then return end
+    local ok, err = exports.qbcore:registerPhysicalCash(policy.account)
+    if not ok then
+        print(('^1[qbinventory]^7 physical cash was not enabled: %s'):format(tostring(err)))
+        return
+    end
+    cashItemsActive = true
+    print(('^2[qbinventory]^7 physical cash enabled for qbcore account %s as item %s.'):format(policy.account, policy.item))
 end)
 
 CreateThread(function()
