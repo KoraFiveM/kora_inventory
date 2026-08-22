@@ -53,6 +53,29 @@ local function buildItem(name, amount, slot, metadata)
     }
 end
 
+-- Presentation is deliberately derived from the canonical item definition,
+-- not from an arbitrary resource's ItemBox payload.  This keeps qbinventory
+-- headless at its API boundary while its optional UI remains consistent and
+-- prevents an external resource from spoofing receipt labels, images or text.
+local function showItemBox(src, name, amount, action)
+    local policy = C.itemBoxes
+    if type(policy) ~= 'table' or policy.enabled ~= true then return end
+    if action == 'add' and policy.showAdditions ~= true then return end
+    if action == 'purchase' and policy.showPurchases ~= true then return end
+
+    local def = itemDef(name)
+    if not def then return end
+    emit(src, 'qbinventory:client:itemBox', {
+        name = def.name or tostring(name):lower(),
+        label = def.label or tostring(name),
+        image = def.image,
+        imageUrl = def.imageUrl,
+        amount = amount,
+        action = action,
+        duration = math.max(750, math.floor(tonumber(policy.duration) or 2600)),
+    })
+end
+
 local function secondary(kind, id, opts)
     local k = key(kind, id)
     local inv = inventories[k]
@@ -657,6 +680,7 @@ local function intentBuy(src, request)
         bump(shopKey); bump(session.primary)
         broadcast(shopKey); broadcast(session.primary)
         recordAudit('purchase', src, { shop = currentShop.id, item = currentItem.name, amount = count, price = price * count })
+        showItemBox(src, currentItem.name, count, 'purchase')
         return true
     end)
 end
@@ -691,9 +715,13 @@ function canCarry(src, name, amount)
     return true
 end
 function addItem(src, name, amount, slot, info, reason)
+    amount = I.amount(amount, 1)
     local ok, err = canCarry(src, name, amount); if not ok then return false, err end
-    local done, why = addPlayer(src, name, I.amount(amount, 1), slot, info, reason)
-    if done then bump(playerKey(src)); broadcast(playerKey(src)); recordAudit('add', src, { item = name, amount = amount, reason = reason }) end
+    local done, why = addPlayer(src, name, amount, slot, info, reason)
+    if done then
+        bump(playerKey(src)); broadcast(playerKey(src)); recordAudit('add', src, { item = name, amount = amount, reason = reason })
+        showItemBox(src, name, amount, 'add')
+    end
     return done, why
 end
 function removeItem(src, name, amount, slot, reason)

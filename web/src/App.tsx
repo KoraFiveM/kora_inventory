@@ -4,7 +4,7 @@ import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd"
 import { TouchBackend } from "react-dnd-touch-backend"
 import { closeSession, sendIntent } from "@/lib/nui"
 import { openDevHarness } from "@/lib/dev"
-import type { InventoryItem, InventoryView, SessionPatch, SessionSnapshot, ThemeTokens } from "@/lib/types"
+import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, ThemeTokens } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
@@ -50,7 +50,7 @@ function findItem(inventory: InventoryView | undefined, slot: number) {
     return inventory && asSlots(inventory.items).find((item) => item.slot === slot)
 }
 
-function ItemArtwork({ item, className }: { item: InventoryItem; className: string }) {
+function ItemArtwork({ item, className }: { item: Pick<InventoryItem, "name" | "label" | "imageUrl">; className: string }) {
     const [failed, setFailed] = useState(false)
     const source = !failed && item.imageUrl?.startsWith("https://") ? item.imageUrl : undefined
     return <span className={className}>{source ? <img src={source} alt="" onError={() => setFailed(true)} /> : (item.label ?? item.name).slice(0, 1)}</span>
@@ -176,6 +176,19 @@ function DragPreview({ session }: { session: SessionSnapshot | null }) {
     </div>
 }
 
+interface ActiveItemBox extends ItemBoxReceipt { id: number }
+
+function ItemBoxStack({ boxes }: { boxes: ActiveItemBox[] }) {
+    if (!boxes.length) return null
+    return <aside className="item-box-stack" aria-live="polite" aria-label="Item receipts">
+        {boxes.map((box) => <div className="item-box" key={box.id}>
+            <ItemArtwork item={box} className="item-box-art" />
+            <div><p>{box.action === "purchase" ? "Purchased" : "Received"}</p><strong>{box.label ?? box.name}</strong></div>
+            <b>+×{box.amount}</b>
+        </div>)}
+    </aside>
+}
+
 function InventoryApp() {
     const [session, setSession] = useState<SessionSnapshot | null>(null)
     const [selected, setSelected] = useState<Selection | undefined>()
@@ -183,7 +196,9 @@ function InventoryApp() {
     const [error, setError] = useState<string>()
     const [giveAvailable, setGiveAvailable] = useState(false)
     const [movePending, setMovePending] = useState(false)
+    const [itemBoxes, setItemBoxes] = useState<ActiveItemBox[]>([])
     const pendingInventories = useRef<Set<string> | undefined>()
+    const nextItemBoxId = useRef(1)
 
     const clearPendingMove = useCallback(() => {
         pendingInventories.current = undefined
@@ -219,6 +234,12 @@ function InventoryApp() {
         setError(reason ?? "Action rejected by inventory")
     })
     useNuiEvent<{ available?: boolean }>("qbinventory:nui:giveAvailability", ({ available }) => setGiveAvailable(available === true))
+    useNuiEvent<ItemBoxReceipt>("qbinventory:nui:itemBox", (receipt) => {
+        if (!receipt || typeof receipt.name !== "string" || !Number.isFinite(receipt.amount) || receipt.amount < 1) return
+        const id = nextItemBoxId.current++
+        setItemBoxes((current) => [...current.slice(-3), { ...receipt, id }])
+        window.setTimeout(() => setItemBoxes((current) => current.filter((box) => box.id !== id)), Math.max(750, receipt.duration ?? 2600))
+    })
 
     const submit = useCallback(async (intent: Parameters<typeof sendIntent>[0]["intent"], payload: Record<string, unknown> = {}, awaitInventories?: string[]) => {
         if (!session || movePending) return false
@@ -312,9 +333,9 @@ function InventoryApp() {
     }, [activateSelected, close, movePending, selected])
 
     const filteredSelected = useMemo(() => selected && (selected.item.label ?? selected.item.name).toLowerCase().includes(query.toLowerCase()) ? selected : undefined, [query, selected])
-    if (!session) return import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null
+    if (!session) return <><ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</>
 
-    return <main className="inventory-shell">
+    return <><ItemBoxStack boxes={itemBoxes} /><main className="inventory-shell">
         <DragPreview session={session} />
         <header className="inventory-topbar"><div className="brand"><PackageOpen size={20} /><span>INVENTORY</span><em>LIVE</em></div><label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search selected item" /></label><button className="close" onClick={close} aria-label="Close inventory"><X size={20} /></button></header>
         {error && <div className="notice" role="alert"><CircleAlert size={16} />{error}</div>}
@@ -337,7 +358,7 @@ function InventoryApp() {
             {session.secondary ? <InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} /> : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section>}
         </div>
         <footer className="shortcut-bar"><span><kbd>Esc</kbd> Close</span><span><kbd>↵</kbd> Use selected</span><span><kbd>Drag</kbd> Move or stack</span><span>{movePending ? "Updating inventory…" : `Revision ${session.revision ?? 0}`}</span></footer>
-    </main>
+    </main></>
 }
 
 export default function App() {

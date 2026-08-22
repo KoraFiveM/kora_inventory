@@ -14,6 +14,16 @@ Config.qbinventory = {
     dropDistance = 2.0,
     auditLimit = 1000,
     requireSameBucket = true,
+    -- Item receipts are owned by qbinventory, never by the resource which
+    -- grants an item.  Leave this disabled for a completely silent/headless
+    -- inventory, or tune the single presentation policy here for every
+    -- compatible AddItem caller and qbinventory shop purchase.
+    itemBoxes = {
+        enabled = true,
+        duration = 2600,
+        showAdditions = true,
+        showPurchases = true,
+    },
     persistence = {
         -- Secondary inventories only. Player items are qbcore-owned and are never
         -- read from or written to this storage layer.

@@ -109,6 +109,13 @@ RegisterNetEvent('qb-inventory:client:updateInventory', function()
     refreshActiveSession()
 end)
 
+-- qbinventory owns item receipt configuration and presentation. Upstream
+-- resources commonly call this immediately after AddItem; accepting it as a
+-- deliberate no-op avoids duplicate receipts and means resources never need
+-- to carry UI data or decide whether boxes are enabled.
+RegisterNetEvent('qb-inventory:client:ItemBox', function()
+end)
+
 -- Older qb scripts used these names before the resource prefix was
 -- standardised. Keep the aliases narrow and subject to the same safe routing.
 RegisterNetEvent('inventory:client:OpenInventory', function(_, other)
@@ -121,6 +128,9 @@ end)
 
 RegisterNetEvent('inventory:client:updateInventory', function()
     refreshActiveSession()
+end)
+
+RegisterNetEvent('inventory:client:ItemBox', function()
 end)
 
 RegisterCommand('inventory', function()

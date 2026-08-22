@@ -56,3 +56,14 @@ export interface IntentPayload {
     intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action"
     payload: Record<string, unknown>
 }
+
+/** Server-authored receipt sent only when Config.qbinventory.itemBoxes allows it. */
+export interface ItemBoxReceipt {
+    name: string
+    label?: string
+    image?: string
+    imageUrl?: string
+    amount: number
+    action: "add" | "purchase"
+    duration?: number
+}

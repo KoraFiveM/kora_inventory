@@ -118,6 +118,13 @@ AddEventHandler('qbinventory:ui:rejected', function(payload)
     send('qbinventory:nui:rejected', { reason = tostring(reason or 'Action rejected') })
 end)
 
+-- This is a local presentation relay for the server-authoritative receipt
+-- payload. It intentionally works without an open inventory session.
+RegisterNetEvent('qbinventory:client:itemBox', function(payload)
+    if type(payload) ~= 'table' or type(payload.name) ~= 'string' then return end
+    send('qbinventory:nui:itemBox', payload)
+end)
+
 -- The target resolver reports presentation state only.  While an in-world
 -- target selection is active, relinquish NUI focus so qbtarget can receive
 -- gameplay input; restore it immediately on resolve or cancellation.
