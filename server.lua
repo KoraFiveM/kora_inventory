@@ -7,6 +7,7 @@ local resource = GetCurrentResourceName()
 
 local inventories, sessions, hooks, audit = {}, {}, {}, {}
 local locks, nextHookId, nextDropId = {}, 1, 1
+local ownPlayerWrites = {}
 
 local function now() return GetGameTimer() end
 local function key(kind, id) return ('%s:%s'):format(kind, tostring(id)) end
@@ -17,6 +18,17 @@ end
 local function playerData(src) return exports.qbcore:getPlayerData(src) end
 local function playerItems(src) return exports.qbcore:getPlayerData(src, { 'items' }) or {} end
 local function emit(src, name, ...) TriggerClientEvent(name, src, ...) end
+
+-- qbcore emits its inventory-change event synchronously from setPath. Mark
+-- qbinventory-originated writes so the listener below does not produce partial
+-- live patches or double-bump a transaction's revision.
+local function playerSetPath(src, path, value)
+    ownPlayerWrites[src] = (ownPlayerWrites[src] or 0) + 1
+    local results = table.pack(exports.qbcore:setPath(src, path, value))
+    ownPlayerWrites[src] = ownPlayerWrites[src] - 1
+    if ownPlayerWrites[src] == 0 then ownPlayerWrites[src] = nil end
+    return table.unpack(results, 1, results.n)
+end
 
 local function recordAudit(action, src, details)
     audit[#audit + 1] = { at = os.time(), action = action, source = src, details = I.copy(details or {}) }
@@ -41,6 +53,26 @@ local function secondary(kind, id, opts)
     local inv = inventories[k]
     if inv then return inv end
     opts = opts or {}
+    -- Hydrate qbinventory-owned storage only after the persistence bootstrap
+    -- has completed. Player inventories are intentionally never read here.
+    local persistence = I.persistence
+    if persistence and persistence.getStatus and persistence.getStatus().ready then
+        local restored, restoreErr = persistence.load(kind, id)
+        if restored then
+            restored.key = k
+            -- Registration-time policy (especially a non-serialisable access
+            -- callback) is authoritative over persisted descriptive state.
+            for _, field in ipairs({ 'label', 'coords', 'distance', 'groups', 'owner', 'access', 'prices', 'currency' }) do
+                if opts[field] ~= nil then restored[field] = I.copy(opts[field]) end
+            end
+            if opts.slots ~= nil then restored.slots = math.floor(tonumber(opts.slots) or restored.slots) end
+            if opts.maxWeight ~= nil or opts.maxweight ~= nil then restored.maxWeight = tonumber(opts.maxWeight or opts.maxweight) or restored.maxWeight end
+            inventories[k] = restored
+            return restored, true
+        elseif restoreErr then
+            print(('^3[qbinventory]^7 could not restore %s: %s'):format(k, tostring(restoreErr)))
+        end
+    end
     inv = {
         key = k, id = id, type = kind, label = opts.label or tostring(id),
         slots = math.floor(tonumber(opts.slots) or C.defaultSlots),
@@ -51,6 +83,7 @@ local function secondary(kind, id, opts)
         prices = opts.prices, currency = opts.currency or 'money', access = opts.access,
     }
     inventories[k] = inv
+    if persistence and persistence.markDirty then persistence.markDirty(inv) end
     return inv
 end
 
@@ -79,6 +112,9 @@ local function bump(k)
     local inv = inventories[k]
     if not inv then inv = { key = k, revision = 0 }; inventories[k] = inv end
     inv.revision = (inv.revision or 0) + 1
+    if inv.type and inv.type ~= 'player' and I.persistence and I.persistence.markDirty then
+        I.persistence.markDirty(inv)
+    end
     return inv.revision
 end
 
@@ -207,13 +243,13 @@ local function addPlayer(src, name, amount, slot, metadata, reason)
         for _ = 1, amount do
             local free = I.firstFreeSlot(items, C.playerSlots)
             if not free then
-                for _, used in ipairs(placed) do exports.qbcore:setPath(src, { 'items', used }, nil) end
+                for _, used in ipairs(placed) do playerSetPath(src, { 'items', used }, nil) end
                 return false, 'no free slot'
             end
             local one = I.copy(item); one.amount = 1; one.slot = free
-            local ok, err = exports.qbcore:setPath(src, { 'items', free }, one)
+            local ok, err = playerSetPath(src, { 'items', free }, one)
             if not ok then
-                for _, used in ipairs(placed) do exports.qbcore:setPath(src, { 'items', used }, nil) end
+                for _, used in ipairs(placed) do playerSetPath(src, { 'items', used }, nil) end
                 return false, err
             end
             items[free] = one; placed[#placed + 1] = free
@@ -223,12 +259,12 @@ local function addPlayer(src, name, amount, slot, metadata, reason)
     local stack = slot and items[slot] and items[slot].name == name and slot or I.stackSlot(items, item)
     if stack then
         local nextItem = I.copy(items[stack]); nextItem.amount = nextItem.amount + amount
-        return exports.qbcore:setPath(src, { 'items', stack }, nextItem)
+        return playerSetPath(src, { 'items', stack }, nextItem)
     end
     slot = slot or I.firstFreeSlot(items, C.playerSlots)
     if not slot or items[slot] then return false, 'no free slot' end
     item.slot = slot
-    return exports.qbcore:setPath(src, { 'items', slot }, item)
+    return playerSetPath(src, { 'items', slot }, item)
 end
 
 local function removePlayer(src, slot, amount)
@@ -239,11 +275,11 @@ local function removePlayer(src, slot, amount)
     if not amount or amount > item.amount then return false, 'not enough of item' end
     local removed = I.copy(item); removed.amount = amount
     if amount == item.amount then
-        local ok, err = exports.qbcore:setPath(src, { 'items', slot }, nil)
+        local ok, err = playerSetPath(src, { 'items', slot }, nil)
         return ok, err, removed
     end
     local nextItem = I.copy(item); nextItem.amount = nextItem.amount - amount
-    local ok, err = exports.qbcore:setPath(src, { 'items', slot }, nextItem)
+    local ok, err = playerSetPath(src, { 'items', slot }, nextItem)
     return ok, err, removed
 end
 
@@ -323,6 +359,8 @@ local function transfer(src, request)
     local fromKey, toKey = request.fromInventory, request.toInventory
     local _, from, to = validSession(src, request.token, fromKey, toKey, request.fromRevision, request.toRevision)
     if not from then return false, to end
+    if from.type == 'shop' then return false, 'shop items must be purchased' end
+    if to.type == 'shop' then return false, 'shop inventory is read only' end
     local fromSlot, toSlot = math.floor(tonumber(request.fromSlot) or 0), tonumber(request.toSlot)
     local item = from.items[fromSlot]
     local amount = I.amount(request.amount, item and item.amount)
@@ -334,8 +372,51 @@ local function transfer(src, request)
     if not hookOK then recordAudit('transfer-rejected', src, { reason = hookErr, item = item.name }); return false, hookErr end
     return lock({ fromKey, toKey }, function()
         -- Revalidate inside the critical section; every external request carries revisions.
-        local session, _, _ = validSession(src, request.token, fromKey, toKey, request.fromRevision, request.toRevision)
+        local session, currentFrom, currentTo = validSession(src, request.token, fromKey, toKey, request.fromRevision, request.toRevision)
         if not session then return false, 'stale session' end
+        local currentItem = currentFrom.items[fromSlot]
+        if not currentItem then return false, 'source item changed' end
+        if fromKey == toKey and toSlot == fromSlot then return true end
+        local target = toSlot and currentTo.items[toSlot] or nil
+        local stacks = target and target.name == currentItem.name and not target.unique and not currentItem.unique
+            and I.sameInfo(target.info, currentItem.info)
+
+        -- An occupied non-stack target is a true slot swap. Partial amounts
+        -- cannot replace an unrelated occupied slot, and each side must still
+        -- respect its own weight cap after the exchange.
+        if target and not stacks then
+            if amount ~= currentItem.amount then return false, 'cannot partially swap occupied slots' end
+            if fromKey ~= toKey then
+                local fromWeight = I.totalWeight(currentFrom.items) - I.itemWeight(currentItem) + I.itemWeight(target)
+                local toWeight = I.totalWeight(currentTo.items) - I.itemWeight(target) + I.itemWeight(currentItem)
+                if fromWeight > currentFrom.maxWeight or toWeight > currentTo.maxWeight then return false, 'over weight' end
+            end
+            local sourceOK, sourceErr, sourceItem = removeFrom(fromKey, fromSlot, currentItem.amount)
+            if not sourceOK then return false, sourceErr end
+            local targetOK, targetErr, targetItem = removeFrom(toKey, toSlot, target.amount)
+            if not targetOK then
+                addTo(fromKey, sourceItem.name, sourceItem.amount, fromSlot, sourceItem.info, 'swap-rollback')
+                return false, targetErr
+            end
+            local placeSource, placeSourceErr = addTo(toKey, sourceItem.name, sourceItem.amount, toSlot, sourceItem.info, 'swap')
+            if not placeSource then
+                addTo(toKey, targetItem.name, targetItem.amount, toSlot, targetItem.info, 'swap-rollback')
+                addTo(fromKey, sourceItem.name, sourceItem.amount, fromSlot, sourceItem.info, 'swap-rollback')
+                return false, placeSourceErr
+            end
+            local placeTarget, placeTargetErr = addTo(fromKey, targetItem.name, targetItem.amount, fromSlot, targetItem.info, 'swap')
+            if not placeTarget then
+                removeFrom(toKey, toSlot, sourceItem.amount)
+                addTo(toKey, targetItem.name, targetItem.amount, toSlot, targetItem.info, 'swap-rollback')
+                addTo(fromKey, sourceItem.name, sourceItem.amount, fromSlot, sourceItem.info, 'swap-rollback')
+                return false, placeTargetErr
+            end
+            bump(fromKey); if toKey ~= fromKey then bump(toKey) end
+            broadcast(fromKey); if toKey ~= fromKey then broadcast(toKey) end
+            recordAudit('swap', src, { from = fromKey, to = toKey, source = sourceItem.name, target = targetItem.name })
+            TriggerEvent('qbinventory:server:itemsMoved', src, payload)
+            return true, { fromRevision = revision(fromKey), toRevision = revision(toKey) }
+        end
         local removedOK, removedErr, removed = removeFrom(fromKey, fromSlot, amount)
         if not removedOK then return false, removedErr end
         local addedOK, addedErr = addTo(toKey, removed.name, amount, toSlot, payload.metadata, 'transfer')
@@ -343,12 +424,103 @@ local function transfer(src, request)
             addTo(fromKey, removed.name, amount, fromSlot, removed.info, 'transfer-rollback')
             return false, addedErr
         end
-        bump(fromKey); bump(toKey)
+        bump(fromKey); if toKey ~= fromKey then bump(toKey) end
         broadcast(fromKey); if toKey ~= fromKey then broadcast(toKey) end
         recordAudit('transfer', src, { from = fromKey, to = toKey, item = removed.name, amount = amount })
         TriggerEvent('qbinventory:server:itemsMoved', src, payload)
         return true, { fromRevision = revision(fromKey), toRevision = revision(toKey) }
     end)
+end
+
+-- UI actions are intentionally narrower than arbitrary exports. Each one
+-- starts from the current server-issued session, derives every inventory key
+-- from it, and checks the revision supplied by the client mirror.
+local function intentUse(src, request)
+    local session = sessions[src]
+    if not session or type(request.payload) ~= 'table' then return false, 'invalid session action' end
+    if request.payload.inventory and request.payload.inventory ~= session.primary then return false, 'items can only be used from your inventory' end
+    local _, primary = validSession(src, request.token, session.primary, session.primary, request.primaryRevision, request.primaryRevision)
+    if not primary then return false, 'stale inventory' end
+    local slot = math.floor(tonumber(request.payload.slot) or 0)
+    if slot < 1 or not primary.items[slot] then return false, 'invalid item slot' end
+    local ok, err = useItem(src, slot)
+    if not ok then return false, err or 'item cannot be used' end
+    recordAudit('use', src, { item = primary.items[slot].name, slot = slot })
+    return true
+end
+
+local function intentDrop(src, request)
+    local session = sessions[src]
+    if not session or type(request.payload) ~= 'table' then return false, 'invalid session action' end
+    if request.payload.inventory and request.payload.inventory ~= session.primary then return false, 'items can only be dropped from your inventory' end
+    local _, primary = validSession(src, request.token, session.primary, session.primary, request.primaryRevision, request.primaryRevision)
+    if not primary then return false, 'stale inventory' end
+    local slot = math.floor(tonumber(request.payload.slot) or 0)
+    local item = primary.items[slot]
+    local amount = I.amount(request.payload.amount, item and item.amount)
+    if not item or not amount or amount > item.amount then return false, 'invalid item amount' end
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 then return false, 'player entity unavailable' end
+
+    return lock({ session.primary }, function()
+        local current = getInventory(session.primary)
+        if not current or revision(session.primary) ~= tonumber(request.primaryRevision) then return false, 'stale inventory' end
+        local removedOK, removedErr, removed = removePlayer(src, slot, amount)
+        if not removedOK then return false, removedErr end
+        removed.slot = 1
+        local id = dropCreate(GetEntityCoords(ped), { [1] = removed })
+        bump(session.primary)
+        broadcast(session.primary)
+        recordAudit('drop', src, { id = id, item = removed.name, amount = amount })
+        return true, id
+    end)
+end
+
+local function intentBuy(src, request)
+    local session = sessions[src]
+    if not session or type(request.payload) ~= 'table' then return false, 'invalid session action' end
+    local shopKey = request.payload.inventory or request.payload.shopInventory or session.secondary
+    if shopKey ~= session.secondary then return false, 'shop is not in this session' end
+    local _, shop, player = validSession(src, request.token, shopKey, session.primary, request.secondaryRevision, request.primaryRevision)
+    if not shop then return false, player end
+    if shop.type ~= 'shop' then return false, 'secondary inventory is not a shop' end
+    local slot = math.floor(tonumber(request.payload.slot) or 0)
+    local count = I.amount(request.payload.amount, 1)
+    local item = (shop.stock or shop.items)[slot]
+    if not item or not count or item.amount < count then return false, 'out of stock' end
+    local price = tonumber(item.price or (shop.prices and shop.prices[item.name])) or 0
+    local hookOK, hookErr = runHooks('buyItem', src, { shopId = shop.id, itemName = item.name, count = count, totalPrice = price * count })
+    if not hookOK then return false, hookErr end
+
+    return lock({ shopKey, session.primary }, function()
+        local _, currentShop, currentPlayer = validSession(src, request.token, shopKey, session.primary, request.secondaryRevision, request.primaryRevision)
+        if not currentShop then return false, currentPlayer end
+        local currentItem = (currentShop.stock or currentShop.items)[slot]
+        if not currentItem or currentItem.amount < count then return false, 'out of stock' end
+        if price > 0 then
+            local paid, payErr = exports.qbcore:removeMoney(src, currentShop.currency == 'money' and 'cash' or currentShop.currency, price * count, 'qbinventory-shop')
+            if not paid then return false, payErr end
+        end
+        local added, addErr = addPlayer(src, currentItem.name, count, nil, currentItem.info, 'purchase')
+        if not added then
+            if price > 0 then exports.qbcore:addMoney(src, currentShop.currency == 'money' and 'cash' or currentShop.currency, price * count, 'qbinventory-refund') end
+            return false, addErr
+        end
+        currentItem.amount = currentItem.amount - count
+        if currentItem.amount == 0 then currentShop.items[slot] = nil; if currentShop.stock then currentShop.stock[slot] = nil end end
+        bump(shopKey); bump(session.primary)
+        broadcast(shopKey); broadcast(session.primary)
+        recordAudit('purchase', src, { shop = currentShop.id, item = currentItem.name, amount = count, price = price * count })
+        return true
+    end)
+end
+
+local function handleIntent(src, request)
+    if type(request) ~= 'table' or type(request.action) ~= 'string' or type(request.token) ~= 'string' then return false, 'invalid request' end
+    if request.action == 'use' then return intentUse(src, request) end
+    if request.action == 'drop' then return intentDrop(src, request) end
+    if request.action == 'buy' then return intentBuy(src, request) end
+    return false, 'unsupported intent'
 end
 
 -- Public headless core -------------------------------------------------------
@@ -420,7 +592,7 @@ function moveItem(src, fromSlot, toSlot, amount)
 end
 function clearInventory(src, keep)
     local keeps = {}; for _, name in ipairs(keep or {}) do keeps[name] = true end
-    for slot, item in pairs(playerItems(src)) do if not keeps[item.name] then exports.qbcore:setPath(src, { 'items', slot }, nil) end end
+    for slot, item in pairs(playerItems(src)) do if not keeps[item.name] then playerSetPath(src, { 'items', slot }, nil) end end
     bump(playerKey(src)); broadcast(playerKey(src)); return true
 end
 function setItems(src, newItems)
@@ -431,7 +603,7 @@ function setItems(src, newItems)
         if not slot or slot < 1 or slot > C.playerSlots or not item or not itemDef(item.name) or not amount then return false, 'invalid item table' end
         local built = buildItem(item.name, amount, slot, item.info or item.metadata); checked[slot] = built
     end
-    exports.qbcore:setPath(src, { 'items' }, checked); bump(playerKey(src)); broadcast(playerKey(src)); return true
+    playerSetPath(src, { 'items' }, checked); bump(playerKey(src)); broadcast(playerKey(src)); return true
 end
 
 local useables, useableOwners = {}, QB.resources.serverRegistry(function(name) useables[name] = nil end)
@@ -462,7 +634,12 @@ function dropTake(src, id, slot, amount)
     local ok, payload = open(src, inv.key); if not ok then return false, payload end
     local s = sessions[src]
     local result, err = transfer(src, { token = s.token, fromInventory = inv.key, toInventory = playerKey(src), fromSlot = slot, amount = amount, fromRevision = revision(inv.key), toRevision = revision(playerKey(src)) })
-    if result and not next(inv.items) then inventories[inv.key] = nil; TriggerClientEvent('qbinventory:client:dropRemoved', -1, id); close(src, 'drop empty') end
+    if result and not next(inv.items) then
+        if I.persistence and I.persistence.delete then I.persistence.delete(inv.type, inv.id) end
+        inventories[inv.key] = nil
+        TriggerClientEvent('qbinventory:client:dropRemoved', -1, id)
+        close(src, 'drop empty')
+    end
     return result, err
 end
 
@@ -472,9 +649,17 @@ function registerStash(id, label, slots, maxWeight, owner, groups, coords)
 end
 function createTemporaryStash(properties) properties = properties or {}; properties.temporary = true; local inv = secondary('temporary', properties.id or ('tmp-%d'):format(now()), properties); return inv.key end
 function registerShop(id, data)
-    data = data or {}; local inv = secondary('shop', id, data); inv.stock = I.copy(data.inventory or data.items or {})
-    inv.items = inv.stock -- a shop is rendered as an inventory; stock is its authoritative slot table.
-    inv.prices = data.prices or {}; return inv.key
+    data = data or {}
+    local inv, restored = secondary('shop', id, data)
+    if not restored then
+        inv.stock = I.copy(data.inventory or data.items or {})
+        inv.items = inv.stock -- a shop is rendered as an inventory; stock is its authoritative slot table.
+    else
+        inv.stock = inv.stock or inv.items
+    end
+    inv.prices = data.prices or inv.prices or {}
+    if I.persistence and I.persistence.markDirty then I.persistence.markDirty(inv) end
+    return inv.key
 end
 function openInventory(src, invType, data)
     local k
@@ -552,14 +737,59 @@ RegisterNetEvent('qbinventory:server:transfer', function(request)
     local ok, result = transfer(source, request)
     if not ok then emit(source, 'qbinventory:client:rejected', result) end
 end)
+RegisterNetEvent('qbinventory:server:intent', function(request)
+    local ok, result = handleIntent(source, request)
+    if not ok then emit(source, 'qbinventory:client:rejected', result) end
+end)
 QB.callback.register('qbinventory:server:open', function(src, invType, data)
     return openInventory(src, invType, data)
 end)
 QB.callback.register('qbinventory:server:transfer', function(src, request)
     return transfer(src, request)
 end)
-RegisterNetEvent('QBCore:Server:UseItem', function(item) if type(item) == 'table' and item.name then useItem(source, item.slot or item.name) end end)
-RegisterNetEvent('inventory:server:SetInventoryData', function(items) setItems(source, items) end)
+QB.callback.register('qbinventory:server:intent', function(src, request)
+    return handleIntent(src, request)
+end)
+-- Legacy hotbar event: never trust the transmitted item record. The only
+-- accepted slot is resolved again from qbcore-owned PlayerData before use.
+RegisterNetEvent('QBCore:Server:UseItem', function(item)
+    if type(item) ~= 'table' then return end
+    local slot = math.floor(tonumber(item.slot) or 0)
+    local owned = slot > 0 and getItemBySlot(source, slot) or nil
+    if owned and owned.name == item.name then useItem(source, slot) end
+end)
+
+-- Persistence is deliberately a secondary-store concern. Hydrating happens
+-- only after its qbsql migration succeeds; malformed rows remain quarantined
+-- by that module instead of being silently loaded into live state.
+AddEventHandler('qbinventory:server:persistenceReady', function()
+    local persistence = I.persistence
+    if not persistence or not persistence.restoreAll then return end
+    local restored, rejected = persistence.restoreAll()
+    if not restored then
+        print(('^1[qbinventory]^7 secondary inventory restore failed: %s'):format(tostring(rejected)))
+        return
+    end
+    for _, inv in ipairs(restored) do
+        inv.key = key(inv.type, inv.id)
+        inventories[inv.key] = inv
+    end
+    for _, bad in ipairs(rejected or {}) do
+        print(('^3[qbinventory]^7 ignored malformed persisted %s:%s (%s)'):format(bad.type, bad.id, bad.reason))
+        TriggerEvent('qbinventory:server:persistenceRejected', I.copy(bad))
+    end
+    print(('^2[qbinventory]^7 restored %d secondary inventories.'):format(#restored))
+end)
+
+-- Writes made by another server resource through qbcore's public mutation
+-- funnel remain qbcore-owned. We only advance the session revision and push a
+-- replacement view, so an open shared panel cannot overwrite that change.
+AddEventHandler('qbcore:server:inventoryChanged', function(src)
+    if ownPlayerWrites[src] then return end
+    if not getInventory(playerKey(src)) then return end
+    bump(playerKey(src))
+    broadcast(playerKey(src))
+end)
 
 AddEventHandler('playerDropped', function() close(source, 'disconnected') end)
 AddEventHandler('onResourceStop', function(name)

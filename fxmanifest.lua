@@ -5,12 +5,13 @@ lua54 'yes'
 name 'qbinventory'
 author 'qbcore2'
 version '0.1.0'
-description 'Server-authoritative inventory with bundled NUI plus qb-inventory and ox_inventory compatibility'
+description 'Server-authoritative inventory with bundled NUI'
 
 -- The NUI is only a renderer. `server.lua` remains the sole inventory authority
 -- and client/ui.lua may only submit validated intents through client.lua.
-provide 'qb-inventory'
-provide 'ox_inventory'
+-- Do not advertise qb-inventory or ox_inventory identities until their exact
+-- upstream contracts are implemented and contract-tested. Calling a partial
+-- provider by either name is more dangerous than a clear missing dependency.
 
 dependency 'qblib'
 dependency 'qbsql'
@@ -24,7 +25,12 @@ shared_scripts {
     'shared.lua',
 }
 
-server_script 'server.lua'
+server_scripts {
+    -- Owns secondary-inventory schema, persistence and non-destructive legacy
+    -- import. It is deliberately loaded before the inventory authority.
+    'server/persistence.lua',
+    'server.lua',
+}
 
 client_scripts {
     'client.lua',

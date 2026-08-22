@@ -52,6 +52,16 @@ function submitIntent(intent)
     if intent.token and intent.token ~= session.token then return false, 'stale session' end
     local action, payload = intent.intent or intent.action or 'transfer', intent.payload or intent
     if action == 'close' then closeInventory(); return true end
+    if action == 'use' or action == 'drop' or action == 'buy' then
+        TriggerServerEvent('qbinventory:server:intent', {
+            token = session.token,
+            action = action,
+            payload = payload,
+            primaryRevision = session.primary and session.primary.revision,
+            secondaryRevision = session.secondary and session.secondary.revision,
+        })
+        return true
+    end
     if action ~= 'move' and action ~= 'split' and action ~= 'transfer' and action ~= 'swapItems' then
         TriggerEvent('qbinventory:ui:rejected', { reason = 'unsupported intent' })
         return false, 'unsupported intent'

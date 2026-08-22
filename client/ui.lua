@@ -105,6 +105,11 @@ AddEventHandler('qbinventory:ui:sessionClosed', function(payload, legacyReason)
     closeSession(type(payload) == 'table' and payload.reason or legacyReason)
 end)
 
+AddEventHandler('qbinventory:ui:rejected', function(payload)
+    local reason = type(payload) == 'table' and payload.reason or payload
+    send('qbinventory:nui:rejected', { reason = tostring(reason or 'Action rejected') })
+end)
+
 -- qblib computes the tokens in Lua, so this bridge does not duplicate the
 -- design-system HSL math in TypeScript. qbinventory can trigger this local
 -- event after a live theme change without involving inventory authority.

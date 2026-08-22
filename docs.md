@@ -1,8 +1,9 @@
 # qbinventory
 
-`qbinventory` is the headless, server-authoritative inventory provider. It
-provides both `qb-inventory` and `ox_inventory` resource identities so a server
-can migrate consumers without running either upstream inventory beside it.
+`qbinventory` is the server-authoritative inventory provider. Its direct API is
+production work in progress; it deliberately does **not** yet advertise the
+`qb-inventory` or `ox_inventory` provider identities because their exact
+upstream contracts are not complete or contract-tested.
 
 ## Ownership and startup
 
@@ -12,6 +13,31 @@ qbinventory makes player mutations only through qbcore's `setPath` funnel, so
 replication and persistence remain single-writer. qbinventory owns secondary
 inventory state (stashes, temporary stashes, drops, and shops), sessions,
 revisions, locks, hook registration, and audit events.
+
+## Durable secondary storage and migration
+
+`server/persistence.lua` owns durable storage exclusively for secondary
+inventories: stashes, trunks, gloveboxes, containers, shops and optional drops.
+It never reads or writes `PlayerData.items` or `players.inventory`; those remain
+qbcore's canonical player store.
+
+The qbsql migration creates `qbinventory_inventories` (items, properties and
+revision), `qbinventory_shop_stock`, audit, migration-state/row and quarantine
+tables. Legacy rows are copied, never deleted or updated. An already imported
+row with the same checksum is skipped; a changed legacy row is reported rather
+than overwriting a possibly-live qbinventory record. Malformed JSON/item slots
+are retained in `qbinventory_quarantine` for operator review.
+
+Run these from the server console (or grant `command.qbinventory`):
+
+- `qbinventory-migrate dry-run` — inspect import eligibility without writing.
+- `qbinventory-migrate run` — idempotently import eligible legacy data.
+- `qbinventory-migrate verify` — validate stored item JSON and print migration state.
+- `qbinventory-migrate retry` — revisit only previously failed/quarantined rows.
+
+The importer inspects, when present, `inventories`, `stashitems`, `trunkitems`,
+and `gloveboxitems`. It accepts common identifier/slot/weight column spellings
+and preserves original item metadata.
 
 Start it after `qbcore`. The bundled `web/` NUI starts with qbinventory, while
 the server API and client session transport remain usable by another renderer.
