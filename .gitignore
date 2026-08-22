@@ -1,0 +1,6 @@
+# Local JavaScript toolchain; the committed Vite build is the runtime artifact.
+web/node_modules/
+
+# Local FiveM/runtime state.
+.fxdk/
+*.log
