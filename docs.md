@@ -74,6 +74,26 @@ distance immediately before mutation. Viewers of a shared inventory receive a
 revisioned replacement view after each committed change; stale actions are
 rejected rather than merged.
 
+## Security guardrails
+
+There is deliberately no client event, callback, or NUI endpoint that accepts
+a complete inventory table for replacement. Browser and client payloads are
+limited to an action intent plus slots and amounts; qbinventory resolves item
+records, inventory identifiers, prices, permissions, and revisions again on
+the server.
+
+Shops are read-only in the generic transfer path. A shop item can only leave
+through the dedicated `buy` intent, which revalidates the open session, shop
+type, stock, both revisions, access/distance, and server-side payment before
+adding the server-resolved item to the qbcore-owned player inventory. A failed
+add after payment is refunded by the server.
+
+The NUI bridge is separated from the inventory transport: only `client/ui.lua`
+uses browser callbacks, focus, or `SendNUIMessage`; it hands a restricted
+envelope to the local `qbinventory:client:submitIntent` event. `client.lua`
+then attaches the current server-issued token and revisions before forwarding
+an allowed action. `server.lua` contains no NUI calls or callbacks.
+
 ## Headless boundary
 
 `server.lua` must not gain a NUI callback, `SendNUIMessage`, or focus call.

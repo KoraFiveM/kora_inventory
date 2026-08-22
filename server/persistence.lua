@@ -196,13 +196,20 @@ function P.load(kind, id)
     local items, itemErr = P.normaliseItems(row.items)
     if not items then return nil, ('stored inventory is malformed: %s'):format(itemErr) end
     local properties = decode(row.properties or '{}') or {}
+    local stock = nil
+    if properties.stock then
+        local stockErr
+        stock, stockErr = P.normaliseItems(properties.stock)
+        if not stock then return nil, ('stored shop stock is malformed: %s'):format(stockErr) end
+    end
     return {
         type = row.inventory_type, id = row.inventory_id, label = row.label,
         slots = tonumber(row.slots), maxWeight = tonumber(row.max_weight),
         revision = tonumber(row.revision) or 0, items = items,
         coords = properties.coords, distance = properties.distance, groups = properties.groups,
         owner = properties.owner, temporary = properties.temporary == true,
-        stock = properties.stock, prices = properties.prices, currency = properties.currency,
+        stock = row.inventory_type == 'shop' and (stock or items) or nil,
+        prices = properties.prices, currency = properties.currency,
     }
 end
 
