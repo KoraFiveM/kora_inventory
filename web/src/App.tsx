@@ -152,6 +152,14 @@ function App() {
     }, [session, submit])
     const selectSlot = useCallback((inventory: InventoryView, item: InventoryItem | undefined, slot: number) => {
         if (selected) {
+            // Shop stock is read-only. A second click in that same panel means
+            // “inspect this product”, never “move the previously inspected
+            // product into another shop slot”.
+            if (selected.inventory.type === "shop" && inventory.id === selected.inventory.id) {
+                setSelected(item ? { inventory, item } : undefined)
+                setMoveTarget(undefined)
+                return
+            }
             if (selected.inventory.id === inventory.id && selected.item.slot === slot) {
                 setSelected(undefined)
                 setMoveTarget(undefined)
