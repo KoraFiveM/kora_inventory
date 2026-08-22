@@ -14,7 +14,13 @@ interface SlotTarget { inventoryId: string; slot: number }
 interface Selection { inventory: InventoryView; item: InventoryItem }
 
 function asSlots(items: InventoryView["items"]): InventoryItem[] {
-    return Array.isArray(items) ? items : Object.values(items ?? {})
+    // FiveM JSON serialises a sparse Lua slot table as an array with `null`
+    // holes (e.g. item in slot 1, nothing in slots 2-4, item in slot 5).
+    // Never let an empty slot enter a render/map pass that reads `.slot`.
+    const values = Array.isArray(items) ? items : Object.values(items ?? {})
+    return values.filter((item): item is InventoryItem =>
+        item !== null && typeof item === "object" && Number.isInteger(item.slot) && item.slot > 0,
+    )
 }
 
 function mergeInventory(current: InventoryView | undefined, patch: Partial<InventoryView> | null | undefined) {
@@ -82,8 +88,9 @@ function InventorySlot({ item, index, inventory, selected, busy, canDropSlot, on
     }), [busy, index, inventory.id, item, onDragEnd])
     const [{ isOver, canDrop }, dropRef] = useDrop<DragSlot, SlotTarget, { isOver: boolean; canDrop: boolean }>(() => ({
         accept: SLOT_DRAG_TYPE,
-        canDrop: (source) => !busy && canDropSlot(source, target),
+        canDrop: (source) => Boolean(source) && !busy && canDropSlot(source, target),
         drop: (source) => {
+            if (!source) return undefined
             onDrop(source, target)
             return target
         },
@@ -256,7 +263,7 @@ function InventoryApp() {
     }, [session, submit])
 
     const canDropSlot = useCallback((source: DragSlot, target: SlotTarget) => {
-        if (!session || movePending || (source.inventoryId === target.inventoryId && source.slot === target.slot)) return false
+        if (!source || !session || movePending || (source.inventoryId === target.inventoryId && source.slot === target.slot)) return false
         const sourceInventory = findInventory(session, source.inventoryId)
         const targetInventory = findInventory(session, target.inventoryId)
         if (!findItem(sourceInventory, source.slot) || !targetInventory) return false
@@ -264,7 +271,7 @@ function InventoryApp() {
         return targetInventory.type !== "shop"
     }, [movePending, session])
     const dropSlot = useCallback((source: DragSlot, target: SlotTarget) => {
-        if (!session || !canDropSlot(source, target)) return
+        if (!source || !session || !canDropSlot(source, target)) return
         const sourceInventory = findInventory(session, source.inventoryId)
         const targetInventory = findInventory(session, target.inventoryId)
         if (sourceInventory && targetInventory) move(sourceInventory, source.slot, targetInventory, target.slot)
