@@ -30,12 +30,13 @@ function applyPatch(current: SessionSnapshot, patch: SessionPatch): SessionSnaps
 interface SlotProps {
     item?: InventoryItem
     index: number
+    inventoryId: string
     selected: boolean
     moveTarget: boolean
     showPrice: boolean
     onSelect: (item?: InventoryItem) => void
     onPointerStart: (item: InventoryItem | undefined, pointerId: number) => void
-    onPointerEnd: (item: InventoryItem | undefined, pointerId: number) => void
+    onPointerEnd: (item: InventoryItem | undefined, pointerId: number, clientX: number, clientY: number) => void
     onTarget: () => void
     onClearTarget: () => void
 }
@@ -51,19 +52,23 @@ function ItemArtwork({ item, className }: { item: InventoryItem; className: stri
     return <span className={className}>{source ? <img src={source} alt="" onError={() => setFailed(true)} /> : (item.label ?? item.name).slice(0, 1)}</span>
 }
 
-function InventorySlot({ item, index, selected, moveTarget, showPrice, onSelect, onPointerStart, onPointerEnd, onTarget, onClearTarget }: SlotProps) {
+function InventorySlot({ item, index, inventoryId, selected, moveTarget, showPrice, onSelect, onPointerStart, onPointerEnd, onTarget, onClearTarget }: SlotProps) {
     return <button
         className={`slot${item ? " slot-filled" : ""}${selected ? " slot-selected" : ""}${moveTarget ? " slot-move-target" : ""}`}
+        data-inventory-id={inventoryId}
+        data-inventory-slot={index}
         aria-label={item ? `${item.label ?? item.name}, slot ${index}` : `Empty slot ${index}`}
         aria-pressed={selected || undefined}
         onPointerDown={(event) => {
             if (event.pointerType === "mouse" && event.button !== 0) return
+            event.currentTarget.setPointerCapture(event.pointerId)
             onPointerStart(item, event.pointerId)
         }}
         onPointerUp={(event) => {
             if (event.pointerType === "mouse" && event.button !== 0) return
             event.preventDefault()
-            onPointerEnd(item, event.pointerId)
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+            onPointerEnd(item, event.pointerId, event.clientX, event.clientY)
         }}
         onPointerEnter={onTarget}
         onPointerLeave={onClearTarget}
@@ -86,7 +91,7 @@ function InventorySlot({ item, index, selected, moveTarget, showPrice, onSelect,
 }
 
 function InventoryPanel({ inventory, selected, moveTarget, onSelect, onPointerStart, onPointerEnd, onTarget, onClearTarget }: {
-    inventory: InventoryView; selected?: Selection; moveTarget?: SlotTarget; onSelect: (inventory: InventoryView, item: InventoryItem | undefined, slot: number) => void; onPointerStart: (inventory: InventoryView, item: InventoryItem | undefined, pointerId: number) => void; onPointerEnd: (inventory: InventoryView, item: InventoryItem | undefined, slot: number, pointerId: number) => void; onTarget: (inventory: InventoryView, slot: number) => void; onClearTarget: () => void
+    inventory: InventoryView; selected?: Selection; moveTarget?: SlotTarget; onSelect: (inventory: InventoryView, item: InventoryItem | undefined, slot: number) => void; onPointerStart: (inventory: InventoryView, item: InventoryItem | undefined, pointerId: number) => void; onPointerEnd: (inventory: InventoryView, item: InventoryItem | undefined, slot: number, pointerId: number, clientX: number, clientY: number) => void; onTarget: (inventory: InventoryView, slot: number) => void; onClearTarget: () => void
 }) {
     const items = asSlots(inventory.items)
     const bySlot = new Map(items.map((item) => [item.slot, item]))
@@ -99,7 +104,7 @@ function InventoryPanel({ inventory, selected, moveTarget, onSelect, onPointerSt
         <div className="slot-grid">
             {Array.from({ length: inventory.slots }, (_, offset) => {
                 const slot = offset + 1
-                return <InventorySlot key={slot} index={slot} item={bySlot.get(slot)} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} moveTarget={moveTarget?.inventory.id === inventory.id && moveTarget.slot === slot} showPrice={inventory.type === "shop"} onSelect={(item) => onSelect(inventory, item, slot)} onPointerStart={(item, pointerId) => onPointerStart(inventory, item, pointerId)} onPointerEnd={(item, pointerId) => onPointerEnd(inventory, item, slot, pointerId)} onTarget={() => onTarget(inventory, slot)} onClearTarget={onClearTarget} />
+                return <InventorySlot key={slot} index={slot} inventoryId={inventory.id} item={bySlot.get(slot)} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} moveTarget={moveTarget?.inventory.id === inventory.id && moveTarget.slot === slot} showPrice={inventory.type === "shop"} onSelect={(item) => onSelect(inventory, item, slot)} onPointerStart={(item, pointerId) => onPointerStart(inventory, item, pointerId)} onPointerEnd={(item, pointerId, clientX, clientY) => onPointerEnd(inventory, item, slot, pointerId, clientX, clientY)} onTarget={() => onTarget(inventory, slot)} onClearTarget={onClearTarget} />
             })}
         </div>
     </section>
@@ -142,13 +147,22 @@ function App() {
     }, [session])
 
     const move = useCallback((from: InventoryView, fromSlot: number, to: InventoryView, toSlot: number) => {
+        const item = asSlots(from.items).find((candidate) => candidate.slot === fromSlot)
+        if (!item || !Number.isFinite(item.amount) || item.amount < 1) {
+            setError("That item is no longer available")
+            return
+        }
         if (from.type === "shop") {
             if (to.id !== session?.player.id) { setError("Shop items can only be purchased into your inventory"); return }
             void submit("buy", { inventory: from.id, slot: fromSlot, amount: 1 })
             return
         }
         if (to.type === "shop") { setError("Shop inventory is read only"); return }
-        void submit("move", { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, revision: session?.revision, secondaryRevision: session?.secondaryRevision })
+        // Always state the intended whole-stack amount.  The server still
+        // derives and validates the authoritative source item, but this keeps
+        // the browser/client contract explicit and avoids a zero/nil amount
+        // being interpreted as an invalid transfer by any transport bridge.
+        void submit("move", { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount: item.amount, revision: session?.revision, secondaryRevision: session?.secondaryRevision })
     }, [session, submit])
     const selectSlot = useCallback((inventory: InventoryView, item: InventoryItem | undefined, slot: number) => {
         if (selected) {
@@ -165,32 +179,44 @@ function App() {
                 setMoveTarget(undefined)
                 return
             }
-            move(selected.inventory, selected.item.slot, inventory, slot)
-            setSelected(undefined)
+            // Clicking another occupied slot changes inspection. Moving or
+            // swapping occupied slots is a physical pointer drag so normal
+            // item browsing never looks like a double-click action.
+            if (item) setSelected({ inventory, item })
+            else {
+                move(selected.inventory, selected.item.slot, inventory, slot)
+                setSelected(undefined)
+            }
             setMoveTarget(undefined)
             return
         }
         if (item) setSelected({ inventory, item })
     }, [move, selected])
     const startPointer = useCallback((inventory: InventoryView, item: InventoryItem | undefined, pointerId: number) => {
-        if (!item || selected) return
+        if (!item) return
         const selection = { inventory, item }
         pointerSource.current = { pointerId, selection }
         setSelected(selection)
         setMoveTarget(undefined)
-    }, [selected])
-    const finishPointer = useCallback((inventory: InventoryView, item: InventoryItem | undefined, slot: number, pointerId: number) => {
+    }, [])
+    const finishPointer = useCallback((inventory: InventoryView, item: InventoryItem | undefined, slot: number, pointerId: number, clientX: number, clientY: number) => {
         const source = pointerSource.current
         if (source?.pointerId === pointerId) pointerSource.current = undefined
-        if (source && (source.selection.inventory.id !== inventory.id || source.selection.item.slot !== slot)) {
-            move(source.selection.inventory, source.selection.item.slot, inventory, slot)
+        if (!session) return
+        const targetElement = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>("[data-inventory-id][data-inventory-slot]")
+        const targetId = targetElement?.dataset.inventoryId
+        const targetSlot = Number(targetElement?.dataset.inventorySlot)
+        const targetInventory = targetId === session.player.id ? session.player : targetId === session.secondary?.id ? (session.secondary ?? inventory) : inventory
+        const resolvedSlot = Number.isInteger(targetSlot) && targetSlot > 0 ? targetSlot : slot
+        if (source && (source.selection.inventory.id !== targetInventory.id || source.selection.item.slot !== resolvedSlot)) {
+            move(source.selection.inventory, source.selection.item.slot, targetInventory, resolvedSlot)
             setSelected(undefined)
             setMoveTarget(undefined)
             return
         }
         if (source) return
         selectSlot(inventory, item, slot)
-    }, [move, selectSlot])
+    }, [move, selectSlot, session])
     const setTarget = useCallback((inventory: InventoryView, slot: number) => {
         const source = selected ?? pointerSource.current?.selection
         if (!source || (source.inventory.id === inventory.id && source.item.slot === slot)) return
