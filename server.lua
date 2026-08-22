@@ -520,6 +520,88 @@ local function intentDrop(src, request)
     end)
 end
 
+-- Giving is deliberately a separate intent from an inventory transfer.  The
+-- recipient is never made a browser-visible inventory: the client resolves a
+-- nearby ped locally, then the server verifies that player again immediately
+-- before committing a two-player transaction.
+local function intentGive(src, request)
+    local session = sessions[src]
+    if not session or type(request.payload) ~= 'table' then return false, 'invalid session action' end
+    if request.payload.inventory and request.payload.inventory ~= session.primary then
+        return false, 'items can only be given from your inventory'
+    end
+
+    local target = math.floor(tonumber(request.payload.target) or 0)
+    if target < 1 or target == src or not playerData(target) then return false, 'invalid give recipient' end
+    if not sameBucket(src, target) then return false, 'different routing bucket' end
+    local targetPed = GetPlayerPed(target)
+    if not targetPed or targetPed == 0 or not QB.distance.player(src, GetEntityCoords(targetPed), C.interactionDistance) then
+        return false, 'recipient is too far away'
+    end
+
+    local _, primary = validSession(src, request.token, session.primary, session.primary, request.primaryRevision, request.primaryRevision)
+    if not primary then return false, 'stale inventory' end
+    local slot = math.floor(tonumber(request.payload.slot) or 0)
+    local item = primary.items[slot]
+    local amount = I.amount(request.payload.amount, item and item.amount)
+    if not item or not amount or amount > item.amount then return false, 'invalid item amount' end
+
+    local recipientKey = playerKey(target)
+    local function recipientCanReceive(inv, sourceItem)
+        local incoming = I.copy(sourceItem)
+        incoming.amount = amount
+        if I.totalWeight(inv.items) + I.itemWeight(incoming) > inv.maxWeight then return false, 'recipient is over weight' end
+        if incoming.unique then
+            local free = 0
+            for candidate = 1, inv.slots do if not inv.items[candidate] then free = free + 1 end end
+            if free < amount then return false, 'recipient has no free slot' end
+        elseif not I.stackSlot(inv.items, incoming) and not I.firstFreeSlot(inv.items, inv.slots) then
+            return false, 'recipient has no free slot'
+        end
+        return true
+    end
+    return lock({ session.primary, recipientKey }, function()
+        -- The session and source revision are checked a second time inside the
+        -- lock.  The target's live bucket, entity and distance are likewise
+        -- re-read so an old local target selection cannot transfer remotely.
+        local _, current = validSession(src, request.token, session.primary, session.primary, request.primaryRevision, request.primaryRevision)
+        if not current then return false, 'stale inventory' end
+        if not playerData(target) or not sameBucket(src, target) then return false, 'recipient unavailable' end
+        local currentTargetPed = GetPlayerPed(target)
+        if not currentTargetPed or currentTargetPed == 0
+            or not QB.distance.player(src, GetEntityCoords(currentTargetPed), C.interactionDistance) then
+            return false, 'recipient is too far away'
+        end
+        local currentItem = current.items[slot]
+        if not currentItem or currentItem.name ~= item.name or currentItem.amount < amount then return false, 'source item changed' end
+        local recipient = getInventory(recipientKey)
+        if not recipient then return false, 'recipient unavailable' end
+        local canReceive, receiveErr = recipientCanReceive(recipient, currentItem)
+        if not canReceive then return false, receiveErr end
+
+        local removedOK, removedErr, removed = removePlayer(src, slot, amount)
+        if not removedOK then return false, removedErr end
+        local addedOK, addedErr = addPlayer(target, removed.name, amount, nil, removed.info, 'give')
+        if not addedOK then
+            local rollbackOK, rollbackErr = addPlayer(src, removed.name, amount, slot, removed.info, 'give-rollback')
+            if not rollbackOK then
+                print(('^1[qbinventory]^7 give rollback failed for %s: %s'):format(session.primary, tostring(rollbackErr)))
+            end
+            return false, addedErr
+        end
+
+        bump(session.primary); bump(recipientKey)
+        broadcast(session.primary); broadcast(recipientKey)
+        recordAudit('give', src, { to = target, item = removed.name, amount = amount, slot = slot })
+        TriggerEvent('qbinventory:server:itemsMoved', src, {
+            action = 'give', fromInventory = session.primary, toInventory = recipientKey,
+            fromType = 'player', toType = 'player', fromSlot = slot, itemName = removed.name,
+            count = amount, metadata = I.copy(removed.info),
+        })
+        return true, { fromRevision = revision(session.primary), toRevision = revision(recipientKey) }
+    end)
+end
+
 local function intentBuy(src, request)
     local session = sessions[src]
     if not session or type(request.payload) ~= 'table' then return false, 'invalid session action' end
@@ -563,6 +645,7 @@ local function handleIntent(src, request)
     if type(request) ~= 'table' or type(request.action) ~= 'string' or type(request.token) ~= 'string' then return false, 'invalid request' end
     if request.action == 'use' then return intentUse(src, request) end
     if request.action == 'drop' then return intentDrop(src, request) end
+    if request.action == 'give' then return intentGive(src, request) end
     if request.action == 'buy' then return intentBuy(src, request) end
     return false, 'unsupported intent'
 end

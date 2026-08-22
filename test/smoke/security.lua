@@ -30,6 +30,7 @@ H.ok(server:find("if type(request) ~= 'table'", 1, true), 'server rejects malfor
 H.ok(server:find("if from.type == 'shop' then return false, 'shop items must be purchased' end", 1, true), 'shop cannot be source of generic transfer')
 H.ok(server:find("if to.type == 'shop' then return false, 'shop inventory is read only' end", 1, true), 'shop cannot be target of generic transfer')
 H.ok(server:find("if request.action == 'buy' then return intentBuy(src, request) end", 1, true), 'buy uses dedicated server intent')
+H.ok(server:find("if request.action == 'give' then return intentGive(src, request) end", 1, true), 'give uses a dedicated server intent')
 H.ok(server:find("if shop.type ~= 'shop' then return false, 'secondary inventory is not a shop' end", 1, true), 'buy verifies target is a shop')
 H.ok(server:find('exports.qbcore:removeMoney', 1, true), 'purchase takes server-side payment')
 H.ok(server:find("'qbinventory-refund'", 1, true), 'failed purchase is refunded server-side')
@@ -49,6 +50,14 @@ H.ok(server:find('return lock({ fromKey, toKey }, function()', 1, true), 'transf
 H.ok(server:find('local session, currentFrom, currentTo = validSession', 1, true), 'transfer revalidates inside lock')
 H.ok(server:find("if not sameBucket(src, inv.source)", 1, true), 'player inspection checks routing bucket')
 H.ok(server:find("'too far away'", 1, true), 'access path rejects distance failures')
+H.ok(server:find("local function intentGive(src, request)", 1, true), 'giving has an isolated server authority path')
+H.ok(server:find("if target < 1 or target == src or not playerData(target)", 1, true), 'give rejects invalid recipients')
+H.ok(server:find("if not sameBucket(src, target)", 1, true), 'give validates recipient routing bucket')
+H.ok(server:find("QB.distance.player(src, GetEntityCoords(targetPed), C.interactionDistance)", 1, true), 'give validates recipient distance')
+H.ok(server:find("return lock({ session.primary, recipientKey }, function()", 1, true), 'give locks both player inventories')
+H.ok(server:find("local currentTargetPed = GetPlayerPed(target)", 1, true), 'give revalidates recipient entity inside lock')
+H.ok(server:find("local function recipientCanReceive(inv, sourceItem)", 1, true), 'give verifies recipient capacity before source removal')
+H.ok(server:find("recordAudit('give'", 1, true), 'give is audited')
 
 -- qbcore remains the sole player data owner. Secondary persistence has a
 -- separate schema and operational, non-destructive migration path.
@@ -70,6 +79,8 @@ H.ok(not bridge:find('TriggerServerEvent', 1, true), 'NUI bridge cannot mutate s
 H.ok(bridge:find("TriggerEvent('qbinventory:client:submitIntent'", 1, true), 'NUI bridge hands intents to headless client transport')
 H.ok(client:find("if intent.token and intent.token ~= session.token then return false, 'stale session' end", 1, true), 'client rejects stale NUI token')
 H.ok(client:find("TriggerServerEvent('qbinventory:server:intent'", 1, true), 'client forwards only approved server intent actions')
+H.ok(client:find("TriggerEvent('qbinventory:client:requestGiveTarget'", 1, true), 'client resolves a give recipient locally before server intent')
+H.ok(client:find("action = 'give'", 1, true), 'client submits only the resolved give recipient')
 H.ok(manifest:find("'client/ui.lua'", 1, true) and manifest:find("ui_page 'web/build/index.html'", 1, true), 'bundled UI is isolated to its client bridge')
 
 H.finish()

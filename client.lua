@@ -2,6 +2,8 @@
 -- client/ui.lua and subscribes to the local session events below.
 
 local session
+local pendingGive
+local nextGiveRequestId = 0
 
 RegisterNetEvent('qbinventory:client:sessionOpened', function(payload)
     if type(payload) ~= 'table' or type(payload.token) ~= 'string' then return end
@@ -25,6 +27,7 @@ RegisterNetEvent('qbinventory:client:sessionClosed', function(token, reason)
     if not session or token ~= session.token then return end
     local closed = session
     session = nil
+    pendingGive = nil
     TriggerEvent('qbinventory:ui:sessionClosed', { token = token, reason = reason })
 end)
 
@@ -52,6 +55,27 @@ function submitIntent(intent)
     if intent.token and intent.token ~= session.token then return false, 'stale session' end
     local action, payload = intent.intent or intent.action or 'transfer', intent.payload or intent
     if action == 'close' then closeInventory(); return true end
+    if action == 'give' then
+        if payload.inventory and payload.inventory ~= session.primary.key then
+            TriggerEvent('qbinventory:ui:rejected', { reason = 'items can only be given from your inventory' })
+            return false, 'invalid give inventory'
+        end
+        local slot = math.floor(tonumber(payload.slot) or 0)
+        local item = session.primary.items and session.primary.items[slot]
+        local amount = QbInventory.amount(payload.amount, 1)
+        if not item or not amount or amount > item.amount then
+            TriggerEvent('qbinventory:ui:rejected', { reason = 'invalid item amount' })
+            return false, 'invalid item amount'
+        end
+        nextGiveRequestId = nextGiveRequestId + 1
+        pendingGive = {
+            id = nextGiveRequestId, slot = slot, amount = amount,
+            primaryRevision = session.primary.revision,
+            secondaryRevision = session.secondary and session.secondary.revision,
+        }
+        TriggerEvent('qbinventory:client:requestGiveTarget', pendingGive.id)
+        return true
+    end
     if action == 'use' or action == 'drop' or action == 'buy' then
         TriggerServerEvent('qbinventory:server:intent', {
             token = session.token,
@@ -78,6 +102,27 @@ function submitIntent(intent)
     })
     return true
 end
+
+-- Recipient ids are deliberately resolved only between local client modules.
+-- The browser never receives a nearby-player list, a name, a ped, or a server
+-- id; it can only request the give action for a selected own-inventory slot.
+AddEventHandler('qbinventory:client:giveTargetResolved', function(result)
+    if type(result) ~= 'table' or not pendingGive or result.requestId ~= pendingGive.id then return end
+    local request = pendingGive
+    pendingGive = nil
+    if result.cancelled or type(result.target) ~= 'number' then
+        if result.reason and result.reason ~= 'cancelled' then TriggerEvent('qbinventory:ui:rejected', { reason = result.reason }) end
+        return
+    end
+    if not session then return end
+    TriggerServerEvent('qbinventory:server:intent', {
+        token = session.token,
+        action = 'give',
+        payload = { slot = request.slot, amount = request.amount, target = result.target },
+        primaryRevision = request.primaryRevision,
+        secondaryRevision = request.secondaryRevision,
+    })
+end)
 
 -- Local public API for renderer resources. It is intentionally an in-VM event,
 -- not a server mutation endpoint: submitIntent still routes to the validated
@@ -118,5 +163,8 @@ for _, identity in ipairs({ 'qb-inventory', 'ox_inventory' }) do
 end
 
 AddEventHandler('onClientResourceStop', function(name)
-    if name == GetCurrentResourceName() then closeInventory() end
+    if name == GetCurrentResourceName() then
+        pendingGive = nil
+        closeInventory()
+    end
 end)

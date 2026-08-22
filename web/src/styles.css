@@ -61,18 +61,23 @@ h2 { margin-bottom: 0; font-size: 15px; }
 .weight { display: grid; gap: 5px; color: hsl(var(--muted-foreground)); text-align: right; font-size: 10px; }
 .weight i, .durability { height: 4px; overflow: hidden; border-radius: 3px; background: hsl(var(--muted)); }
 .weight b, .durability i { display: block; height: 100%; border-radius: inherit; background: hsl(var(--primary)); }
-.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(71px, 1fr)); gap: 7px; align-content: start; }
-.slot { position: relative; aspect-ratio: 1 / 1.08; padding: 5px; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: 7px; color: hsl(var(--muted-foreground)); background: hsl(var(--background)); cursor: pointer; text-align: left; display: grid; grid-template-rows: 1fr auto auto; gap: 2px; }
-.slot:hover, .slot:focus-visible, .slot-selected { outline: 0; border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft)); }
+.slot-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; align-content: start; }
+.slot { position: relative; aspect-ratio: 1 / 1.08; padding: 5px; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: 7px; color: hsl(var(--muted-foreground)); background: hsl(var(--background)); cursor: pointer; text-align: left; display: grid; grid-template-rows: 1fr auto auto; gap: 2px; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.slot:hover, .slot:focus-visible { outline: 0; border-color: hsl(var(--brand-border)); }
+.slot-selected { border-color: hsl(var(--primary)); background: hsl(var(--brand-soft)); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
+.slot-move-target { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft) / .58); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
+.slot-selected.slot-move-target { border-color: hsl(var(--primary)); }
 .slot-filled { color: hsl(var(--foreground)); }
 .slot-number { position: absolute; top: 4px; left: 5px; color: hsl(var(--muted-foreground)); font-size: 9px; }
 .item-art, .detail-art { display: grid; place-items: center; color: hsl(var(--primary)); font-weight: 800; background: hsl(var(--brand-soft)); }
 .item-art { width: 33px; height: 33px; align-self: center; justify-self: center; border: 1px solid hsl(var(--brand-border)); border-radius: 6px; font-size: 16px; }
 .item-label { overflow: hidden; font-size: 10px; font-weight: 650; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
 .item-amount { position: absolute; right: 5px; bottom: 4px; border-radius: 3px; padding: 1px 3px; background: hsl(var(--background) / .82); color: hsl(var(--foreground)); font-size: 9px; }
+.item-price { position: absolute; top: 4px; right: 5px; color: hsl(var(--primary)); font-size: 9px; font-weight: 750; }
 .durability { position: absolute; right: 5px; bottom: 0; left: 5px; }
 
 .item-detail { padding: 15px; display: grid; align-content: start; gap: 10px; }
+.item-detail-empty { align-content: center; }
 .item-detail h1 { margin-bottom: 0; font-size: 18px; line-height: 1.08; }
 .item-detail p:not(.eyebrow) { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.45; }
 .detail-art { width: 54px; height: 54px; border: 1px solid hsl(var(--brand-border)); border-radius: 8px; font-size: 26px; }
@@ -81,7 +86,7 @@ dd { margin: 0; color: hsl(var(--foreground)); font-weight: 650; }
 .primary-action, .quiet-action { min-height: 34px; padding: 7px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
 .primary-action { border: 1px solid hsl(var(--primary)); border-radius: 7px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
 .primary-action:hover { filter: brightness(1.08); }
-.empty-detail { padding-top: 48px; color: hsl(var(--muted-foreground)); text-align: center; display: grid; justify-items: center; gap: 8px; }
+.empty-detail { color: hsl(var(--muted-foreground)); text-align: center; display: grid; justify-items: center; gap: 8px; }
 .empty-detail svg { color: hsl(var(--primary)); }
 .secondary-empty { color: hsl(var(--muted-foreground)); text-align: center; display: grid; align-content: center; justify-items: center; gap: 8px; }
 .secondary-empty svg { color: hsl(var(--primary)); }

@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/contract.lua
 "${LUA:-lua}" test/smoke/persistence.lua
 "${LUA:-lua}" test/smoke/client_compat.lua
+"${LUA:-lua}" test/smoke/give_target.lua
 "${LUA:-lua}" test/smoke/security.lua
 "${LUA:-lua}" test/smoke/access_policy.lua
 "${LUA:-lua}" test/smoke/vehicles.lua

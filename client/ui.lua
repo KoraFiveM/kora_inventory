@@ -70,6 +70,7 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     pushTheme()
     send('qbinventory:nui:sessionOpened', wire)
     SetNuiFocus(true, true)
+    TriggerEvent('qbinventory:client:requestGiveAvailability')
 end)
 
 -- Patches must carry the session id so delayed traffic cannot change a later
@@ -108,6 +109,21 @@ end)
 AddEventHandler('qbinventory:ui:rejected', function(payload)
     local reason = type(payload) == 'table' and payload.reason or payload
     send('qbinventory:nui:rejected', { reason = tostring(reason or 'Action rejected') })
+end)
+
+-- The target resolver reports presentation state only.  While an in-world
+-- target selection is active, relinquish NUI focus so qbtarget can receive
+-- gameplay input; restore it immediately on resolve or cancellation.
+AddEventHandler('qbinventory:ui:giveTargeting', function(payload)
+    if not activeSession or type(payload) ~= 'table' then return end
+    SetNuiFocus(payload.active ~= true, payload.active ~= true)
+end)
+
+-- Only a boolean crosses this presentation boundary.  Player identities and
+-- recipient server ids stay in client/give_target.lua and client.lua.
+AddEventHandler('qbinventory:ui:giveAvailability', function(payload)
+    if not activeSession or type(payload) ~= 'table' then return end
+    send('qbinventory:nui:giveAvailability', { available = payload.available == true })
 end)
 
 -- qblib computes the tokens in Lua, so this bridge does not duplicate the

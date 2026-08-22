@@ -15,6 +15,7 @@ export interface InventoryItem {
     image?: string
     metadata?: Record<string, unknown>
     durability?: number
+    price?: number
     stack?: boolean
 }
 

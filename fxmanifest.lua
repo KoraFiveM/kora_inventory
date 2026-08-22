@@ -43,6 +43,8 @@ server_scripts {
 
 client_scripts {
     'client.lua',
+    -- Resolves nearby recipients locally; it never exposes them to the NUI.
+    'client/give_target.lua',
     'client/shops/ammunation.lua',
     -- Legacy qb-inventory event/command adapter. It has no NUI authority and
     -- only routes requested targets through client.lua's validated transport.
