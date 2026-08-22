@@ -22,6 +22,7 @@ shared_scripts {
     '@qbsql/init.lua',
     '@qbcore/init.lua',
     'config.lua',
+    'config/shops/ammunation.lua',
     'shared.lua',
 }
 
@@ -33,6 +34,7 @@ server_scripts {
     'server/vehicles.lua',
     'server/containers.lua',
     'server/crafting.lua',
+    'server/shops/ammunation.lua',
     -- Direct, server-only compatibility helpers. Provider identities remain
     -- intentionally disabled until full upstream contracts are verified.
     'server/compat/qb.lua',
@@ -41,6 +43,7 @@ server_scripts {
 
 client_scripts {
     'client.lua',
+    'client/shops/ammunation.lua',
     -- Legacy qb-inventory event/command adapter. It has no NUI authority and
     -- only routes requested targets through client.lua's validated transport.
     'client/compat.lua',

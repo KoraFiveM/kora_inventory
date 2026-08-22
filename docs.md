@@ -236,6 +236,28 @@ type, stock, both revisions, access/distance, and server-side payment before
 adding the server-resolved item to the qbcore-owned player inventory. A failed
 add after payment is refunded by the server.
 
+### Bundled Ammu-Nation
+
+`config/shops/ammunation.lua` defines one finite-stock `ammunation` shop and
+the approved world counters. Its stock is intentionally declarative
+`{ name, amount, price }` data: qbinventory must build each canonical item view
+from qbcore's registry, rather than accepting labels, images, weights or other
+item fields from configuration or a client.
+
+`client/shops/ammunation.lua` creates qblib interaction zones and map blips as
+presentation only. Selecting a zone sends the fixed shop identifier through
+the normal inventory open request; it does not send a location, price, stock
+row or item data. `server/shops/ammunation.lua` registers the shop with an
+access callback that independently reads the player's server ped coordinates
+and routing bucket, and permits the open only inside a configured counter. A
+forged shop-ID request away from a counter or in another bucket is denied.
+
+The initial catalog includes standard qbcore weapons and the registered
+`pistol_ammo`, `smg_ammo`, `shotgun_ammo`, `rifle_ammo`, `mg_ammo`, and
+`snp_ammo` packs. Load the three Ammu-Nation files after
+`config.lua`/`server.lua`/`client.lua` respectively in the manifest; the shop
+files do not add a generic client-to-server shop event.
+
 The NUI bridge is separated from the inventory transport: only `client/ui.lua`
 uses browser callbacks, focus, or `SendNUIMessage`; it hands a restricted
 envelope to the local `qbinventory:client:submitIntent` event. `client.lua`

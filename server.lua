@@ -766,11 +766,40 @@ function registerStash(id, label, slots, maxWeight, owner, groups, coords)
     local inv = secondary('stash', id, opts); return inv.key
 end
 function createTemporaryStash(properties) properties = properties or {}; properties.temporary = true; local inv = secondary('temporary', properties.id or ('tmp-%d'):format(now()), properties); return inv.key end
+
+-- Shop configuration is trusted server data, but it still passes through the
+-- same item-definition builder as every other inventory. That keeps the NUI
+-- view (label, image, weight, unique/type) canonical and stops a misspelled
+-- stock row becoming an unbuyable or misleading item at runtime.
+local function normaliseShopStock(rows, slots)
+    if rows == nil then return {} end
+    if type(rows) ~= 'table' then return nil, 'shop inventory must be a table' end
+    local entries = {}
+    for rawSlot, row in pairs(rows) do
+        if type(row) ~= 'table' then return nil, 'invalid shop item' end
+        local slot = math.floor(tonumber(row.slot or rawSlot) or 0)
+        if slot < 1 or slot > slots or entries[slot] then return nil, 'invalid or duplicate shop slot' end
+        local amount = I.amount(row.amount or row.count, 1)
+        local price = tonumber(row.price)
+        if not amount or not price or price < 0 then return nil, 'invalid shop amount or price' end
+        local item, err = buildItem(row.name, amount, slot, row.info or row.metadata)
+        if not item then return nil, ('invalid shop item in slot %d: %s'):format(slot, tostring(err)) end
+        item.price = price
+        entries[slot] = item
+    end
+    return entries
+end
+
 function registerShop(id, data)
     data = data or {}
+    local slots = math.floor(tonumber(data.slots) or C.defaultSlots)
+    if slots < 1 then return nil, 'invalid shop slots' end
+    local initial, stockErr = normaliseShopStock(data.inventory or data.items, slots)
+    if not initial then return nil, stockErr end
+    data.slots = slots
     local inv, restored = secondary('shop', id, data)
     if not restored then
-        inv.stock = I.copy(data.inventory or data.items or {})
+        inv.stock = initial
         inv.items = inv.stock -- a shop is rendered as an inventory; stock is its authoritative slot table.
     else
         inv.stock = inv.stock or inv.items

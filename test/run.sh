@@ -12,3 +12,4 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/qb_compat.lua
 "${LUA:-lua}" test/smoke/ox_adapter.lua
 "${LUA:-lua}" test/smoke/crafting.lua
+"${LUA:-lua}" test/smoke/ammunation.lua

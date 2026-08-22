@@ -33,6 +33,9 @@ H.ok(server:find("if request.action == 'buy' then return intentBuy(src, request)
 H.ok(server:find("if shop.type ~= 'shop' then return false, 'secondary inventory is not a shop' end", 1, true), 'buy verifies target is a shop')
 H.ok(server:find('exports.qbcore:removeMoney', 1, true), 'purchase takes server-side payment')
 H.ok(server:find("'qbinventory-refund'", 1, true), 'failed purchase is refunded server-side')
+H.ok(server:find('local function normaliseShopStock(rows, slots)', 1, true), 'configured shop stock is normalised server-side')
+H.ok(server:find('local item, err = buildItem(row.name, amount, slot, row.info or row.metadata)', 1, true), 'shop stock uses canonical shared item definitions')
+H.ok(server:find("if not amount or not price or price < 0 then return nil, 'invalid shop amount or price' end", 1, true), 'shop stock rejects invalid prices and counts')
 
 -- A lease grants access to exactly two server-resolved inventories. Both
 -- revisions are checked before and again inside the lock, so stale viewers do
