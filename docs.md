@@ -74,6 +74,25 @@ distance immediately before mutation. Viewers of a shared inventory receive a
 revisioned replacement view after each committed change; stale actions are
 rejected rather than merged.
 
+### qb-inventory client bridge
+
+`client/compat.lua` keeps the conventional client-facing qb-inventory surface
+safe during migration. It listens for `qb-inventory:client:openInventory`,
+`closeInv`, and `updateInventory` (plus the narrowly equivalent old
+`inventory:client:*` aliases), the `inventory`, `openInv`, and `closeInv`
+commands, and the default `openInv`/`TAB` key mapping.
+
+Legacy item tables, slot counts, labels, weights and metadata are never read.
+An open event contributes only a validated identifier request; qbinventory's
+server then resolves the inventory, checks access/distance/bucket rules and
+returns its own session snapshot. `updateInventory` re-opens the current
+server-issued target to obtain a fresh authoritative snapshot. No vehicle or
+entity discovery happens client-side.
+
+`LocalPlayer.state.inv_busy` is set only while a qbinventory UI session is
+open, and released on the matching session-close event or resource stop. NUI
+focus remains exclusively owned by `client/ui.lua`.
+
 ## Security guardrails
 
 There is deliberately no client event, callback, or NUI endpoint that accepts

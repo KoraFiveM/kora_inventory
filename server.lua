@@ -340,6 +340,21 @@ local function open(src, secondaryKey, opts)
     return true, payload
 end
 
+-- A player opening their own inventory is a one-panel session. Treating the
+-- primary player view as its own secondary would render it twice and would
+-- accidentally make self-transfers look like cross-inventory operations.
+local function openSelf(src)
+    close(src, 'replaced')
+    local primary = playerKey(src)
+    if not getInventory(primary) then return false, 'player inventory not found' end
+    local token = ('%s:%d:%d'):format(src, now(), math.random(100000, 999999))
+    sessions[src] = { token = token, primary = primary, secondary = nil, expires = now() + C.sessionTtl }
+    local payload = { token = token, primary = view(primary), secondary = nil, expires = sessions[src].expires }
+    emit(src, 'qbinventory:client:sessionOpened', payload)
+    TriggerEvent('qbinventory:server:sessionOpened', src, payload)
+    return true, payload
+end
+
 local function validSession(src, token, fromKey, toKey, expectedFrom, expectedTo)
     local session = sessions[src]
     if not session or token ~= session.token then return nil, 'invalid session' end
@@ -700,7 +715,10 @@ function registerShop(id, data)
 end
 function openInventory(src, invType, data)
     local k
-    if invType == 'player' then k = playerKey(tonumber(data) or src)
+    if invType == 'player' then
+        local target = tonumber(data) or src
+        if target == src then return openSelf(src) end
+        k = playerKey(target)
     elseif type(data) == 'table' and data.key then k = data.key
     else k = key(invType, type(data) == 'table' and data.id or data) end
     return open(src, k, type(data) == 'table' and data or nil)

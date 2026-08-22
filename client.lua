@@ -17,7 +17,7 @@ RegisterNetEvent('qbinventory:client:sessionPatched', function(token, patch)
     if not session or token ~= session.token or type(patch) ~= 'table' then return end
     -- Authoritative server snapshots replace the corresponding local panel.
     if patch.inventory and patch.key == session.primary.key then session.primary = patch.inventory end
-    if patch.inventory and patch.key == session.secondary.key then session.secondary = patch.inventory end
+    if patch.inventory and session.secondary and patch.key == session.secondary.key then session.secondary = patch.inventory end
     TriggerEvent('qbinventory:ui:sessionPatched', { token = token, patch = patch })
 end)
 
@@ -66,8 +66,9 @@ function submitIntent(intent)
         TriggerEvent('qbinventory:ui:rejected', { reason = 'unsupported intent' })
         return false, 'unsupported intent'
     end
-    local from = payload.fromInventory or (payload.fromSecondary and session.secondary.key or session.primary.key)
-    local to = payload.toInventory or (payload.toSecondary and session.secondary.key or session.primary.key)
+    local secondaryKey = session.secondary and session.secondary.key
+    local from = payload.fromInventory or (payload.fromSecondary and secondaryKey or session.primary.key)
+    local to = payload.toInventory or (payload.toSecondary and secondaryKey or session.primary.key)
     local fromView = from == session.primary.key and session.primary or session.secondary
     local toView = to == session.primary.key and session.primary or session.secondary
     TriggerServerEvent('qbinventory:server:transfer', {
