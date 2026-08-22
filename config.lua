@@ -69,6 +69,19 @@ Config.qbinventory = {
         defaultSlots = 12,
         defaultMaxWeight = 30000,
         maxIdentifierLength = 96,
+        -- Portable containers are opened by using the corresponding item in a
+        -- player's own inventory. The first use binds a generated containerId
+        -- to that exact unique item; subsequent opens prove present possession
+        -- server-side. Keep `allowNested` false unless a resource has a clear
+        -- policy for recursive-capacity and self-containment edge cases.
+        items = {
+            backpack = {
+                label = 'Backpack',
+                slots = 20,
+                maxWeight = 60000,
+                allowNested = false,
+            },
+        },
         evidence = {
             slots = 100,
             maxWeight = 150000,

@@ -18,6 +18,7 @@ export interface InventoryItem {
     durability?: number
     price?: number
     stack?: boolean
+    container?: boolean
 }
 
 export interface InventoryView {

@@ -7,7 +7,10 @@ dofile('shared.lua')
 local state, opened, broadcasts = {
     ['player:10'] = {
         key = 'player:10', type = 'player', id = 10, slots = 8, maxWeight = 1000,
-        items = { [1] = { slot = 1, name = 'briefcase', amount = 1, weight = 10, info = {} } },
+        items = {
+            [1] = { slot = 1, name = 'briefcase', amount = 1, weight = 10, info = {} },
+            [3] = { slot = 3, name = 'backpack', amount = 1, weight = 10, info = {} },
+        },
     },
     ['player:20'] = {
         key = 'player:20', type = 'player', id = 20, slots = 8, maxWeight = 1000,
@@ -87,6 +90,18 @@ H.equal(state['player:10'].items[1].info.containerId, id, 'binding is written th
 H.equal(Containers.openItem(10, 1), true, 'only current server item binding opens container')
 H.equal(opened[#opened].key, 'container:' .. id, 'open uses derived container key')
 H.equal(Containers.openItem(10, 2), false, 'empty item slot cannot name a container')
+
+local portable, portableView = Containers.openConfiguredItem(10, 3)
+H.equal(portable, true, 'configured backpack opens from its authoritative player slot')
+local backpackId = state['player:10'].items[3].info.containerId
+local backpackInventory = state['container:' .. backpackId]
+H.ok(backpackId:match('^item%-'), 'configured backpack receives a server-generated binding')
+H.equal(backpackInventory.owner, nil, 'portable backpack access is not pinned to its first holder')
+H.equal(backpackInventory.access(10, backpackInventory), true, 'portable policy proves current first holder possession')
+state['player:10'].items[3] = nil
+state['player:20'].items[3] = { slot = 3, name = 'backpack', amount = 1, weight = 10, info = { containerId = backpackId } }
+H.equal(backpackInventory.access(10, backpackInventory), false, 'former holder loses portable-container access after transfer')
+H.equal(backpackInventory.access(20, backpackInventory), true, 'new holder gains access only with the exact bound item')
 
 H.equal(Evidence.open(10, 'case-1'), false, 'evidence remains default deny without trusted policy')
 Config.qbinventory.containers.evidence.access = function(source, action, context)

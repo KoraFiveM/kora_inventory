@@ -47,7 +47,7 @@ local function buildItem(name, amount, slot, metadata)
     return {
         slot = slot, name = def.name or tostring(name):lower(), amount = amount, info = I.copy(metadata or {}),
         metadata = I.copy(metadata or {}), type = def.type or 'item', unique = def.unique or false,
-        useable = def.useable or false, image = def.image, imageUrl = def.imageUrl, label = def.label or name,
+        useable = def.useable or false, container = def.container == true, image = def.image, imageUrl = def.imageUrl, label = def.label or name,
         weight = def.weight or 0, shouldClose = def.shouldClose, description = def.description,
         created = os.time(),
     }
@@ -201,6 +201,7 @@ local function view(k)
         if def then
             item.image = def.image or item.image
             item.imageUrl = def.imageUrl or item.imageUrl
+            item.container = def.container == true
         end
     end
     return {
@@ -421,6 +422,14 @@ local function transfer(src, request)
     local amount = I.amount(request.amount, item and item.amount)
     if not item or not amount or amount > item.amount then return false, 'invalid item amount' end
     if toSlot then toSlot = math.floor(toSlot); if toSlot < 1 or toSlot > to.slots then return false, 'invalid target slot' end end
+    local containerApi = QbInventory.containers
+    if to.type == 'container' and containerApi and containerApi.isPortableItem and containerApi.isPortableItem(item) then
+        local info = item.info or item.metadata or {}
+        if info.containerId and tostring(info.containerId) == tostring(to.id) then
+            return false, 'a container cannot be stored inside itself'
+        end
+        if not containerApi.allowNested(item) then return false, 'portable containers cannot be stored in another container' end
+    end
     local payload = { action = 'swapItems', fromInventory = fromKey, toInventory = toKey, fromType = from.type,
         toType = to.type, fromSlot = fromSlot, toSlot = toSlot, itemName = item.name, count = amount, metadata = I.copy(item.info) }
     local hookOK, hookErr = runHooks('swapItems', src, payload)
@@ -804,6 +813,15 @@ function useItem(src, slotOrName)
     if not item then return false, 'item not found' end
     local allowed, err = runHooks('usingItem', src, { itemName = item.name, item = I.copy(item), inventoryId = playerKey(src), inventoryType = 'player' })
     if not allowed then return false, err end
+    local containers = QbInventory.containers
+    if type(slotOrName) == 'number' and containers and containers.isPortableItem and containers.isPortableItem(item) then
+        local ok, result = containers.openConfiguredItem(src, slotOrName)
+        if ok then
+            TriggerEvent('qbinventory:server:openedContainer', src, item.name, item)
+            return true
+        end
+        return false, result
+    end
     local handler = useables[item.name]
     if handler then local ok, result = pcall(handler, src, I.copy(item)); if not ok then return false, result end; TriggerEvent('qbinventory:server:usedItem', src, item.name, item); return result ~= false end
     TriggerEvent('QBCore:Server:UseItem', src, item); return false, 'no useable registered'

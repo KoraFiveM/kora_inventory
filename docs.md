@@ -115,6 +115,16 @@ identifier server-side, and writes `info.containerId` through qbcore's mutation
 funnel. `openItem(source, slot)` then reads that same current server slot. It
 does not accept a browser/client item table, owner, or container identifier.
 
+`Config.qbinventory.containers.items` promotes named unique items into
+first-class portable containers. The shipped `backpack` definition is a 20-slot,
+60 kg container: using it from the player's own inventory binds a generated ID
+on first use and opens it thereafter. Its access policy proves current
+possession of that exact bound item on every open/transfer validation, so giving
+the backpack transfers access without exposing a container ID to the client.
+Portable containers cannot be stored in another container by default (and can
+never be stored inside themselves); set `allowNested = true` only with an
+explicit server policy for recursive capacity.
+
 Evidence and confiscation share `QbInventory.evidence` (also exposed as
 `QbInventory.confiscation`):
 

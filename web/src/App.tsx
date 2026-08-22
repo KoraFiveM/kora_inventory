@@ -261,7 +261,7 @@ function App() {
                 <p>{filteredSelected.item.description ?? "No item description available."}</p>
                 <dl><dt>Amount</dt><dd>×{filteredSelected.item.amount}</dd><dt>Weight</dt><dd>{filteredSelected.item.weight ?? 0} g</dd>{filteredSelected.inventory.type === "shop" && <><dt>Price</dt><dd>${(filteredSelected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
                 {filteredSelected.inventory.type === "shop" ? <button className="primary-action" onClick={() => buy(filteredSelected.inventory, filteredSelected.item)}>Buy one · ${(filteredSelected.item.price ?? 0).toLocaleString()}</button> : <>
-                    <button className="primary-action" onClick={() => use(filteredSelected.inventory, filteredSelected.item)}>Use item</button>
+                    <button className="primary-action" onClick={() => use(filteredSelected.inventory, filteredSelected.item)}>{filteredSelected.item.container ? `Open ${filteredSelected.item.label ?? "container"}` : "Use item"}</button>
                     {filteredSelected.inventory.id === session.player.id && <>
                         <button className="quiet-action" onClick={() => void submit("drop", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: 1 })}>Drop one</button>
                         {giveAvailable && <button className="quiet-action" onClick={() => void submit("give", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: 1 })}>Give one</button>}

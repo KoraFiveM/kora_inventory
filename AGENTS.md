@@ -33,7 +33,11 @@ server before calling the bounded API.
 Generic containers require an owner derived from `ownerSource`, a trusted
 access/group policy, or a fixed coordinate boundary. Portable containers bind a
 server-generated `info.containerId` to a real qbcore-owned player item through
-the mutation funnel. Evidence/confiscation is default-deny and must retain its
+the mutation funnel. Configured portable item types (`containers.items`) are
+opened only through the existing validated `use` intent: resolve the real slot,
+item definition, and present-possession policy on the server; never accept a
+container ID from the browser. Keep portable containers out of other containers
+unless an explicit nesting policy is added. Evidence/confiscation is default-deny and must retain its
 server-side access, target entity, range, routing-bucket, slot/amount, capacity
 and deterministic-lock checks. Metadata always comes from the source item.
 

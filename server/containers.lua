@@ -41,6 +41,46 @@ local function currentPlayer(source)
     return inventoryKey, inventory
 end
 
+local function portableDefinition(name)
+    local definitions = C.items
+    local definition = type(definitions) == 'table' and definitions[name] or nil
+    return type(definition) == 'table' and definition or nil
+end
+
+local function itemInfo(item)
+    return type(item) == 'table' and (item.info or item.metadata) or nil
+end
+
+-- Portable access is deliberately possession-based rather than owner-based:
+-- handing a unique backpack to another player transfers the ability to open
+-- it, but a copied/out-of-date item record cannot. This predicate reads the
+-- current qbcore player slots each time core revalidates a session.
+local function carrierHasContainer(source, containerId, expectedName)
+    local _, inventory = currentPlayer(source)
+    if not inventory then return false end
+    for _, item in pairs(inventory.items or {}) do
+        local info = itemInfo(item)
+        if item.name == expectedName and info and cleanId(info.containerId) == containerId then
+            return true
+        end
+    end
+    return false
+end
+
+local function portableOptions(item, definition)
+    return {
+        label = definition.label or item.label or item.name,
+        slots = whole(definition.slots) or C.defaultSlots,
+        maxWeight = tonumber(definition.maxWeight or definition.maxweight) or C.defaultMaxWeight,
+        -- Functions are never persisted. openConfiguredItem restores this
+        -- proof-of-possession policy every time a portable inventory is opened.
+        access = function(source, inventory)
+            return carrierHasContainer(source, inventory.id, item.name)
+        end,
+        portable = true,
+    }
+end
+
 local function policy(action, source, context)
     local callback = C.evidence and C.evidence.access
     if type(callback) ~= 'function' then return false, 'evidence access is not configured' end
@@ -141,21 +181,23 @@ function Containers.bindItem(source, slot, options)
     if not source or not slot then return false, 'invalid item container request' end
     local playerKey, inventory = currentPlayer(source)
     local item = inventory and inventory.items[slot]
+    options = options or {}
+    if type(options) ~= 'table' then return false, 'invalid container options' end
     local owner = citizenId(source)
-    if not item or not owner then return false, 'item or player not found' end
+    if not item or (not owner and options.portable ~= true) then return false, 'item or player not found' end
     local info = item.info or item.metadata or {}
     local bound = cleanId(info.containerId)
     if bound then return true, bound end
 
-    options = options or {}
-    if type(options) ~= 'table' then return false, 'invalid container options' end
     local suffix = ('-%d-%d-%d'):format(slot, GetGameTimer(), math.random(100000, 999999))
-    local ownerPart = owner:gsub('[^%w_%-%.]', '_')
+    local ownerPart = (owner or ('source-%d'):format(source)):gsub('[^%w_%-%.]', '_')
     local available = (tonumber(C.maxIdentifierLength) or 96) - #suffix - #'item-'
     if available < 1 then return false, 'container identifier limit is too small' end
     local generated = ('item-%s%s'):format(ownerPart:sub(1, available), suffix)
     generated = cleanId(generated)
-    local prepared = containerOptions(options, owner)
+    local boundOwner = owner
+    if options.portable == true then boundOwner = nil end
+    local prepared = containerOptions(options, boundOwner)
     local containerKey, container = ensureContainer(generated, prepared)
     if not containerKey then return false, container end
 
@@ -182,6 +224,45 @@ function Containers.openItem(source, slot)
     local id = info and cleanId(info.containerId)
     if not id then return false, 'item has no server-bound container' end
     return Containers.open(source, id)
+end
+
+---Open a configured portable container from a real, current player slot.
+---This is the only item-driven entry point used by qbinventory's use action:
+---the browser provides merely a slot and the definition/access proof is
+---resolved entirely on the server.
+function Containers.openConfiguredItem(source, slot)
+    source, slot = whole(source), whole(slot)
+    if not source or not slot then return false, 'invalid item container request' end
+    local _, inventory = currentPlayer(source)
+    local item = inventory and inventory.items[slot]
+    local definition = item and portableDefinition(item.name)
+    if not item or not definition then return false, 'item is not a portable container' end
+
+    local options = portableOptions(item, definition)
+    local info = itemInfo(item)
+    local id = info and cleanId(info.containerId)
+    if not id then
+        local bound, result = Containers.bindItem(source, slot, options)
+        if not bound then return false, result end
+        id = result
+    end
+
+    local containerKey, container = I.resolveInventory(key('container', id))
+    if not container then return false, 'bound container not found' end
+    -- Reinstall this non-serialisable policy after storage hydration and when
+    -- a backpack changes hands. The policy validates the exact current item.
+    container.access = options.access
+    container.label = options.label
+    return I.open(source, containerKey)
+end
+
+function Containers.isPortableItem(item)
+    return type(item) == 'table' and portableDefinition(item.name) ~= nil
+end
+
+function Containers.allowNested(item)
+    local definition = type(item) == 'table' and portableDefinition(item.name) or nil
+    return definition and definition.allowNested == true or false
 end
 
 local function evidenceOptions()
