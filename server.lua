@@ -8,6 +8,10 @@ local resource = GetCurrentResourceName()
 local inventories, sessions, hooks, audit = {}, {}, {}, {}
 local locks, nextHookId, nextDropId = {}, 1, 1
 local ownPlayerWrites = {}
+local inspectionHooks, nextInspectionHookId = {}, 1
+-- `owner = true` registrations are templates, not one globally shared stash.
+-- The actual secondary record is created lazily per citizen when they open it.
+local ownedStashTemplates = {}
 
 local function now() return GetGameTimer() end
 local function key(kind, id) return ('%s:%s'):format(kind, tostring(id)) end
@@ -138,6 +142,30 @@ local function sameBucket(src, target)
     return not C.requireSameBucket or GetPlayerRoutingBucket(src) == GetPlayerRoutingBucket(target)
 end
 
+local function mayInspectPlayer(src, target)
+    local policy = C.playerInspection or {}
+    local allowed = false
+    local function run(callback)
+        local ok, result, reason = pcall(callback, src, target, I.copy(playerData(src) or {}), I.copy(playerData(target) or {}))
+        if not ok then
+            print(('^3[qbinventory]^7 player inspection policy failed: %s'):format(tostring(result)))
+            return false, 'player inspection policy failed'
+        end
+        if result == false then return false, reason or 'player inspection denied' end
+        if result == true then allowed = true end
+        return true
+    end
+    if type(policy.access) == 'function' then
+        local ok, err = run(policy.access)
+        if not ok then return false, err end
+    end
+    for _, hook in pairs(inspectionHooks) do
+        local ok, err = run(hook.callback)
+        if not ok then return false, err end
+    end
+    return allowed, allowed and nil or 'player inspection not authorised'
+end
+
 local function canAccess(src, inv)
     if not inv then return false, 'inventory not found' end
     if inv.type == 'player' then
@@ -146,7 +174,7 @@ local function canAccess(src, inv)
         if not QB.distance.player(src, GetEntityCoords(GetPlayerPed(inv.source)), C.interactionDistance) then
             return false, 'too far away'
         end
-        return true
+        return mayInspectPlayer(src, inv.source)
     end
     if inv.owner then
         local data = playerData(src)
@@ -653,8 +681,22 @@ function setItems(src, newItems)
     for slot, item in pairs(newItems) do
         slot = tonumber(slot); local amount = item and I.amount(item.amount, 1)
         if not slot or slot < 1 or slot > C.playerSlots or not item or not itemDef(item.name) or not amount then return false, 'invalid item table' end
-        local built = buildItem(item.name, amount, slot, item.info or item.metadata); checked[slot] = built
+        local built = buildItem(item.name, amount, slot, item.info or item.metadata)
+        -- Server integrations legitimately attach qb-compatible fields such
+        -- as `quality`, `description` and weapon serials.  Preserve those on
+        -- a validated replacement; never copy slot/name/count aliases over
+        -- the canonical values derived above.
+        for field, value in pairs(item) do
+            if field ~= 'slot' and field ~= 'name' and field ~= 'amount' and field ~= 'count'
+                and field ~= 'info' and field ~= 'metadata' and field ~= 'weight' and field ~= 'type'
+                and field ~= 'unique' and field ~= 'useable' and field ~= 'label' and field ~= 'image'
+                and field ~= 'shouldClose' then
+                built[field] = I.copy(value)
+            end
+        end
+        checked[slot] = built
     end
+    if I.totalWeight(checked) > C.playerMaxWeight then return false, 'over weight' end
     playerSetPath(src, { 'items' }, checked); bump(playerKey(src)); broadcast(playerKey(src)); return true
 end
 
@@ -673,9 +715,28 @@ function useItem(src, slotOrName)
     TriggerEvent('QBCore:Server:UseItem', src, item); return false, 'no useable registered'
 end
 
+local function ownedStash(src, identifier, opts)
+    local data = playerData(src)
+    if not data or type(data.citizenid) ~= 'string' or data.citizenid == '' then return nil, 'owner identity unavailable' end
+    opts = I.copy(opts or {})
+    opts.owner = data.citizenid
+    -- Namespace durable private storage; never trust a client-chosen owner.
+    return secondary('stash', ('%s:%s'):format(tostring(identifier), data.citizenid), opts)
+end
+
 function stashGet(identifier) local inv = secondary('stash', identifier); return I.copy(inv.items) end
 function stashSet(identifier, items) local inv = secondary('stash', identifier); inv.items = I.copy(items or {}); bump(inv.key); broadcast(inv.key); return true end
-function stashOpen(src, identifier, opts) local inv = secondary('stash', identifier, opts); return open(src, inv.key, opts) end
+function stashOpen(src, identifier, opts)
+    local template = ownedStashTemplates[tostring(identifier)]
+    local inv, err
+    if template or (type(opts) == 'table' and opts.owner == true) then
+        inv, err = ownedStash(src, identifier, template or opts)
+        if not inv then return false, err end
+    else
+        inv = secondary('stash', identifier, opts)
+    end
+    return open(src, inv.key, opts)
+end
 function dropCreate(coords, items)
     local id = nextDropId; nextDropId = nextDropId + 1
     local inv = secondary('drop', id, { label = 'Ground drop', coords = coords, distance = C.dropDistance, slots = C.defaultSlots, items = items, temporary = true })
@@ -697,7 +758,12 @@ end
 
 -- Ox-style inventory constructors and shops.
 function registerStash(id, label, slots, maxWeight, owner, groups, coords)
-    local inv = secondary('stash', id, { label = label, slots = slots, maxWeight = maxWeight, owner = owner, groups = groups, coords = coords }); return inv.key
+    local opts = { label = label, slots = slots, maxWeight = maxWeight, owner = owner, groups = groups, coords = coords }
+    if owner == true then
+        ownedStashTemplates[tostring(id)] = opts
+        return key('stash', id)
+    end
+    local inv = secondary('stash', id, opts); return inv.key
 end
 function createTemporaryStash(properties) properties = properties or {}; properties.temporary = true; local inv = secondary('temporary', properties.id or ('tmp-%d'):format(now()), properties); return inv.key end
 function registerShop(id, data)
@@ -719,6 +785,17 @@ function openInventory(src, invType, data)
         local target = tonumber(data) or src
         if target == src then return openSelf(src) end
         k = playerKey(target)
+    elseif invType == 'trunk' or invType == 'glovebox' then
+        -- Network id is the only client intent accepted for vehicle storage.
+        -- The vehicle domain resolves plate, class, coordinates and access
+        -- server-side before it creates or opens any inventory key.
+        if not I.vehicles or type(I.vehicles.open) ~= 'function' then return false, 'vehicle storage unavailable' end
+        return I.vehicles.open(src, invType, data)
+    elseif invType == 'stash' and ownedStashTemplates[tostring(type(data) == 'table' and data.id or data)] then
+        local identifier = type(data) == 'table' and data.id or data
+        local inv, err = ownedStash(src, identifier, ownedStashTemplates[tostring(identifier)])
+        if not inv then return false, err end
+        k = inv.key
     elseif type(data) == 'table' and data.key then k = data.key
     else k = key(invType, type(data) == 'table' and data.id or data) end
     return open(src, k, type(data) == 'table' and data or nil)
@@ -759,6 +836,148 @@ function registerHook(eventName, callback, options)
 end
 function removeHooks(id) for _, list in pairs(hooks) do list[id] = nil end end
 
+---Grant player inspection only through explicit trusted server policy. The
+---callback receives source, target, and detached player data; it must return
+---true to grant. Returning false rejects the request.
+function registerInspectionAccess(callback)
+    assert(type(callback) == 'function', 'inspection callback is required')
+    local id = nextInspectionHookId; nextInspectionHookId = nextInspectionHookId + 1
+    inspectionHooks[id] = { callback = callback, owner = GetInvokingResource() or resource }
+    return id
+end
+function removeInspectionAccess(id) inspectionHooks[id] = nil end
+
+-- Trusted server-side extension seam. Compatibility/domain modules load after
+-- this authority and may use these helpers, but no client event ever receives
+-- this table. Player writes still route through qbcore; callers must acquire
+-- deterministic locks and call bump/broadcast only after a committed change.
+local function resolveInventoryRef(reference, preferredType)
+    if type(reference) == 'number' then
+        local k = playerKey(reference)
+        return k, getInventory(k)
+    end
+    if type(reference) == 'table' then
+        if reference.key then return resolveInventoryRef(reference.key, preferredType) end
+        if reference.type and reference.id ~= nil then return resolveInventoryRef(key(reference.type, reference.id)) end
+        return nil, nil
+    end
+    if type(reference) ~= 'string' or reference == '' then return nil, nil end
+    local direct = getInventory(reference)
+    if direct then return reference, direct end
+    if preferredType then
+        local typed = key(preferredType, reference)
+        local inv = getInventory(typed)
+        if inv then return typed, inv end
+    end
+    for _, kind in ipairs({ 'stash', 'trunk', 'glovebox', 'container', 'shop', 'temporary', 'drop', 'evidence' }) do
+        local typed = key(kind, reference)
+        local inv = getInventory(typed)
+        if inv then return typed, inv end
+    end
+    return nil, nil
+end
+
+local function canAddToInventory(reference, name, amount, slot, metadata)
+    local k, inv = resolveInventoryRef(reference)
+    local count = I.amount(amount, 1)
+    local item, err
+    if count then item, err = buildItem(name, count, slot, metadata)
+    else err = 'invalid count' end
+    if not k or not inv then return false, 'inventory' end
+    if not item then return false, err or 'item' end
+    if I.totalWeight(inv.items) + I.itemWeight(item) > inv.maxWeight then return false, 'weight' end
+    if item.unique then
+        local free = 0
+        for candidate = 1, inv.slots do if not inv.items[candidate] then free = free + 1 end end
+        if free < item.amount then return false, 'slots' end
+    elseif slot and inv.items[slot] and (inv.items[slot].name ~= item.name or not I.sameInfo(inv.items[slot].info, item.info)) then
+        return false, 'slots'
+    elseif not I.stackSlot(inv.items, item) and not I.firstFreeSlot(inv.items, inv.slots) then
+        return false, 'slots'
+    end
+    return true
+end
+
+local function removeSecondaryInventory(reference)
+    local k, inv = resolveInventoryRef(reference)
+    if not k or not inv then return false, 'inventory not found' end
+    if inv.type == 'player' then return false, 'player inventories are owned by qbcore' end
+
+    inventories[k] = nil
+    if I.persistence and I.persistence.delete then
+        local ok, err = I.persistence.delete(inv.type, inv.id)
+        if not ok and I.persistence.getStatus and I.persistence.getStatus().ready then
+            -- Keep the authoritative in-memory record if deleting durable
+            -- storage failed, so a retry cannot silently resurrect it.
+            inventories[k] = inv
+            return false, err
+        end
+    end
+    return true
+end
+
+local function setInventoryItems(reference, items)
+    local k, inv = resolveInventoryRef(reference)
+    if not k or not inv then return false, 'inventory not found' end
+    if type(items) ~= 'table' then return false, 'items must be a table' end
+    if inv.type == 'player' then return setItems(inv.source, items) end
+    local checked = {}
+    for rawSlot, rawItem in pairs(items) do
+        local slot = math.floor(tonumber(rawSlot) or 0)
+        local amount = rawItem and I.amount(rawItem.amount or rawItem.count, 1)
+        if slot < 1 or slot > inv.slots or not rawItem or not amount or not itemDef(rawItem.name) then
+            return false, 'invalid item table'
+        end
+        local built, err = buildItem(rawItem.name, amount, slot, rawItem.info or rawItem.metadata)
+        if not built then return false, err end
+        for field, value in pairs(rawItem) do
+            if field ~= 'slot' and field ~= 'name' and field ~= 'amount' and field ~= 'count'
+                and field ~= 'info' and field ~= 'metadata' and field ~= 'weight' and field ~= 'type'
+                and field ~= 'unique' and field ~= 'useable' and field ~= 'label' and field ~= 'image'
+                and field ~= 'shouldClose' then
+                built[field] = I.copy(value)
+            end
+        end
+        checked[slot] = built
+    end
+    if I.totalWeight(checked) > inv.maxWeight then return false, 'over weight' end
+    inv.items = checked
+    if inv.type == 'shop' then inv.stock = inv.items end
+    bump(k); broadcast(k)
+    return true
+end
+
+I.internal = {
+    key = key,
+    playerKey = playerKey,
+    getInventory = getInventory,
+    resolveInventory = resolveInventoryRef,
+    createSecondary = secondary,
+    setInventoryItems = setInventoryItems,
+    removeSecondary = removeSecondaryInventory,
+    canAdd = canAddToInventory,
+    addTo = addTo,
+    removeFrom = removeFrom,
+    buildItem = buildItem,
+    itemDef = itemDef,
+    view = view,
+    bump = bump,
+    broadcast = broadcast,
+    lock = lock,
+    open = open,
+    openSelf = openSelf,
+    close = close,
+    canAccess = canAccess,
+    registerInspectionAccess = registerInspectionAccess,
+    removeInspectionAccess = removeInspectionAccess,
+    getRevision = revision,
+    copy = I.copy,
+    totalWeight = I.totalWeight,
+    sameInfo = I.sameInfo,
+    config = C,
+    persistence = I.persistence,
+}
+
 -- Compatibility aliases. The matching __cfx handlers below make these callable
 -- through the qb-inventory and ox_inventory provided identities as well.
 local api = {
@@ -775,6 +994,7 @@ local api = {
     GetStashItems = stashGet, SetStashItems = stashSet, RegisterStash = registerStash,
     CreateTemporaryStash = createTemporaryStash, RegisterShop = registerShop, BuyItem = buyItem,
     RegisterHook = registerHook, RemoveHooks = removeHooks,
+    RegisterInspectionAccess = registerInspectionAccess, RemoveInspectionAccess = removeInspectionAccess,
 }
 for name, fn in pairs(api) do exports(name, fn) end
 for _, identity in ipairs({ 'qb-inventory', 'ox_inventory' }) do
@@ -849,7 +1069,9 @@ end)
 AddEventHandler('playerDropped', function() close(source, 'disconnected') end)
 AddEventHandler('onResourceStop', function(name)
     if name == resource then for src in pairs(sessions) do close(src, 'resource stopped') end end
+    if I.vehicles and I.vehicles.cleanupResource then I.vehicles.cleanupResource(name) end
     for eventName, list in pairs(hooks) do for id, hook in pairs(list) do if hook.owner == name then list[id] = nil end end end
+    for id, hook in pairs(inspectionHooks) do if hook.owner == name then inspectionHooks[id] = nil end end
 end)
 
 CreateThread(function()

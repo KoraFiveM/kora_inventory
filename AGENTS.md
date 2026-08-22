@@ -22,6 +22,21 @@ routing bucket, and distance before touching state. Client data is intent only:
 never trust item records, labels, weights, prices, item definitions, or IDs
 outside the inventory IDs granted by that session.
 
+## Item containers and evidence
+
+`server/containers.lua` is a trusted server-only domain with no NUI or net
+event entry point. Do not add a generic client event that accepts a container
+identifier, evidence case, owner, target player, item record, item metadata,
+or slot as authority. A gameplay resource must resolve its interaction on the
+server before calling the bounded API.
+
+Generic containers require an owner derived from `ownerSource`, a trusted
+access/group policy, or a fixed coordinate boundary. Portable containers bind a
+server-generated `info.containerId` to a real qbcore-owned player item through
+the mutation funnel. Evidence/confiscation is default-deny and must retain its
+server-side access, target entity, range, routing-bucket, slot/amount, capacity
+and deterministic-lock checks. Metadata always comes from the source item.
+
 ## Tests
 
 Keep the plain-Lua smoke tests deterministic and do not require a running

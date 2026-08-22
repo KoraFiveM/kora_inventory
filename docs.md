@@ -14,10 +14,138 @@ replication and persistence remain single-writer. qbinventory owns secondary
 inventory state (stashes, temporary stashes, drops, and shops), sessions,
 revisions, locks, hook registration, and audit events.
 
+`RegisterStash(..., owner = true, ...)` is a private-stash template. It does
+not create a shared stash with a boolean owner flag: on open, qbinventory
+derives the caller's citizen id server-side and uses a separate durable
+`stash:<template>:<citizenid>` record. A caller cannot choose another owner's
+identifier through the client transport.
+
+## Crafting and weapons (server-only foundation)
+
+`server/crafting.lua` is a headless, server-only foundation. It deliberately
+registers no network event or NUI callback. A gameplay resource must complete
+its own server-resolved station, job, proximity, routing-bucket and progression
+checks, then call `CraftItem(source, recipeId, trustedContext)`. Do not forward
+a client recipe, output, item metadata, count or `trustedContext` to this API.
+
+Register a static recipe from its owning server resource:
+
+```lua
+exports.qbinventory:RegisterCraftRecipe('repair_board', {
+  ingredients = { { name = 'wood', amount = 2, metadata = { grade = 'oak' } } },
+  output = { name = 'board', amount = 1, metadata = { quality = 100 } },
+  access = function(source, recipe, context)
+    -- `context` is server-owned station state, never a raw client payload.
+    return true
+  end,
+})
+```
+
+Crafting locks the qbcore-owned player inventory, makes a detached plan,
+validates all recipe ingredients/weight/slots, then commits through
+`qbcore:setPath` via qbinventory's authority seam. A failed recipe changes no
+slots. Hooks can approve/reject a craft but cannot mutate its planned state.
+
+Weapon helpers are also server-only: `PrepareWeaponMetadata`, `GetWeaponState`,
+`SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, and
+`SetWeaponComponents`. New weapon metadata receives a server serial, bounded
+durability and ammo, and only configured components in
+`Config.qbinventory.weapons.components` are accepted. Gameplay weapon-use code
+must invoke durability/ammo changes from validated server actions; do not add a
+generic client event for these exports.
+
+This foundation does not yet supply a crafting UI, station discovery, progress
+timers, GTA weapon-native synchronisation, or ammo-item conversion. Those
+require an explicit server-authoritative integration layer.
+
+Opening another player's inventory is also denied by default: distance and
+routing-bucket checks are necessary but never sufficient. Configure the trusted
+`Config.qbinventory.playerInspection.access(source, target, sourceData,
+targetData)` callback, or register a server-only policy through
+`RegisterInspectionAccess`, and return `true` only for an authorised
+police/admin/consent flow. Policies are removed automatically with their
+resource. Returning `false, reason` or raising an error denies; there is no
+permissive configuration toggle.
+
+## Vehicles and containers
+
+`server/vehicles.lua` is the isolated trunk/glovebox domain. It derives the
+canonical persistent keys `trunk:<NORMALISED_PLATE>` and
+`glovebox:<NORMALISED_PLATE>` from a live **server-resolved** entity. A client
+open request may contain only a network id; qbinventory never accepts a
+client-supplied plate, class, coordinates, capacities, or arbitrary vehicle
+inventory key.
+
+Before an inventory is opened—and again during each active-session access—the
+module verifies entity existence/type, player entity, routing bucket, server
+coordinates/range, native plate, vehicle class and configured capacity. Native
+plates are trimmed, uppercased, whitespace-normalised and restricted to the
+configured GTA plate alphabet before becoming a storage key. Configure slots
+and weight by class in `Config.qbinventory.vehicles.classes`; set a type to
+`false` to disable it for that class.
+
+For ownership/keys/faction policy, set `vehicles.ownerCheck` and/or
+`vehicles.accessCheck` to trusted server callbacks, or register scoped runtime
+checks with `QbInventory.vehicles.registerAccess(callback, options)`. Returning
+`false, reason` denies access. Hooks receive only a server-generated vehicle
+descriptor and can be cleaned with `cleanupResource(resourceName)`.
+
+`server/vehicles.lua` is loaded after the authority and `openInventory` already
+routes trunk/glovebox requests through it. Integrations must pass the network
+id only—never a `plate`, `key`, coordinates, or capacity object.
+
+## Item containers, evidence, and confiscation
+
+`server/containers.lua` is a server-only domain module. It registers no NUI
+callback or client network event: item records, container IDs, owner IDs,
+evidence IDs, target slots, and target players must be resolved by a trusted
+server resource before it calls this API.
+
+`QbInventory.containers.create(id, options)` makes a generic secondary
+`container:<id>`. IDs are strict, bounded server identifiers; a new container
+is rejected unless it has a citizen owner derived from `ownerSource`, a trusted
+access/group policy, or a fixed world coordinate. Initial items are checked by
+the core's normal slot/item/weight validator. `open(source, id)` is for an
+existing container only and still passes the core access/distance checks.
+
+For a portable item container, trusted code calls
+`QbInventory.containers.bindItem(source, slot, options)`. The module reads the
+actual qbcore-owned slot, derives the caller's citizen ID, generates the
+identifier server-side, and writes `info.containerId` through qbcore's mutation
+funnel. `openItem(source, slot)` then reads that same current server slot. It
+does not accept a browser/client item table, owner, or container identifier.
+
+Evidence and confiscation share `QbInventory.evidence` (also exposed as
+`QbInventory.confiscation`):
+
+- `open(source, evidenceId)`
+- `seize(source, targetSource, evidenceId, sourceSlot, amount, evidenceSlot?)`
+- `release(source, targetSource, evidenceId, evidenceSlot, amount, playerSlot?)`
+
+Evidence is default-deny. Configure a trusted
+`Config.qbinventory.containers.evidence.access(source, action, context)` that
+returns `true` only for authorised server-side policy (job/ACE/restraint/case
+ownership). Seize/release resolve both player inventories on the server and
+check target entity existence, routing bucket, range, exact current slot and
+amount, capacity, and the policy again while holding deterministic inventory
+locks. Metadata is carried only from the server item record. A successful move
+emits `qbinventory:server:evidenceMoved` after both revisioned views have been
+broadcast. Never forward raw client identifiers or item data into these calls.
+
+### Integration boundary
+
+The bundled manifest loads this module after the authority. Do **not** add a
+generic `qbinventory:server:openContainer` or `seizeEvidence` net event; a resource
+that wants a player-facing action must first translate its own validated
+server-side interaction into one of the functions above. This preserves the
+headless core boundary and avoids accepting a client-selected evidence case,
+target player, or inventory key.
+
 ## Durable secondary storage and migration
 
 `server/persistence.lua` owns durable storage exclusively for secondary
-inventories: stashes, trunks, gloveboxes, containers, shops and optional drops.
+inventories: stashes, trunks, gloveboxes, containers, evidence, shops and
+optional drops.
 It never reads or writes `PlayerData.items` or `players.inventory`; those remain
 qbcore's canonical player store.
 
@@ -54,8 +182,9 @@ The lower-camel exports are the qbcore gateway surface:
 qb-style aliases are also exported (`AddItem`, `RemoveItem`, `OpenInventory`,
 `GetStashItems`, `RegisterStash`, and so on), alongside ox-style constructors
 `RegisterStash`, `CreateTemporaryStash`, `RegisterShop`, `BuyItem`,
-`RegisterHook`, and `RemoveHooks`. The same aliases are explicitly registered
-under both provided resource identities.
+`RegisterHook`, and `RemoveHooks`. These are direct `qbinventory` exports
+only. Do not enable the `qb-inventory` or `ox_inventory` provider identities
+until their upstream contracts have been completed and contract-tested.
 
 ## Client and renderer contract
 

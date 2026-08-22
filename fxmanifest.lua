@@ -30,6 +30,13 @@ server_scripts {
     -- import. It is deliberately loaded before the inventory authority.
     'server/persistence.lua',
     'server.lua',
+    'server/vehicles.lua',
+    'server/containers.lua',
+    'server/crafting.lua',
+    -- Direct, server-only compatibility helpers. Provider identities remain
+    -- intentionally disabled until full upstream contracts are verified.
+    'server/compat/qb.lua',
+    'server/compat/ox.lua',
 }
 
 client_scripts {

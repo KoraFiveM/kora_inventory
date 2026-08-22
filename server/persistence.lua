@@ -54,6 +54,7 @@ end
 local function isSecondaryType(kind)
     return kind == 'stash' or kind == 'trunk' or kind == 'glovebox'
         or kind == 'container' or kind == 'shop' or kind == 'temporary' or kind == 'drop'
+        or kind == 'evidence'
 end
 
 local function cleanType(kind)
@@ -182,6 +183,7 @@ function P.delete(kind, id)
     local cleanKind, cleanId = cleanType(kind), tostring(id)
     local ok, err = db('DELETE FROM `qbinventory_inventories` WHERE `inventory_type` = ? AND `inventory_id` = ?', { cleanKind, cleanId })
     if not ok then return ok, err end
+    dirty[('%s:%s'):format(cleanKind, cleanId)] = nil
     if cleanKind == 'shop' then return db('DELETE FROM `qbinventory_shop_stock` WHERE `shop_id` = ?', { cleanId }) end
     return true
 end
