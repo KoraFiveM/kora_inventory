@@ -13,7 +13,8 @@ local function now() return GetGameTimer() end
 local function key(kind, id) return ('%s:%s'):format(kind, tostring(id)) end
 local function playerKey(src) return key('player', src) end
 local function itemDef(name)
-    return exports.qbcore:getShared('items', name) or exports.qbcore:getShared('weapons', name)
+    local item = type(name) == 'string' and name:lower() or name
+    return exports.qbcore:getShared('items', item) or exports.qbcore:getShared('weapons', item)
 end
 local function playerData(src) return exports.qbcore:getPlayerData(src) end
 local function playerItems(src) return exports.qbcore:getPlayerData(src, { 'items' }) or {} end
@@ -40,7 +41,7 @@ local function buildItem(name, amount, slot, metadata)
     local def = itemDef(name)
     if not def then return nil, 'unknown item' end
     return {
-        slot = slot, name = name, amount = amount, info = I.copy(metadata or {}),
+        slot = slot, name = def.name or tostring(name):lower(), amount = amount, info = I.copy(metadata or {}),
         metadata = I.copy(metadata or {}), type = def.type or 'item', unique = def.unique or false,
         useable = def.useable or false, image = def.image, label = def.label or name,
         weight = def.weight or 0, shouldClose = def.shouldClose, description = def.description,
@@ -562,13 +563,45 @@ function removeItem(src, name, amount, slot, reason)
     bump(playerKey(src)); broadcast(playerKey(src)); recordAudit('remove', src, { item = name, amount = amount, reason = reason })
     return true
 end
-function getItemByName(src, name) for _, item in pairs(playerItems(src)) do if item.name == name then return item end end end
-function getItemsByName(src, name) local out = {}; for _, item in pairs(playerItems(src)) do if item.name == name then out[#out + 1] = item end end; return out end
+local function itemNameKey(name) return type(name) == 'string' and name:lower() or nil end
+function getItemByName(src, name)
+    local wanted = itemNameKey(name)
+    if not wanted then return nil end
+    for _, item in pairs(playerItems(src)) do if itemNameKey(item.name) == wanted then return item end end
+end
+function getItemsByName(src, name)
+    local wanted, out = itemNameKey(name), {}
+    if not wanted then return out end
+    for _, item in pairs(playerItems(src)) do if itemNameKey(item.name) == wanted then out[#out + 1] = item end end
+    return out
+end
 function getItemBySlot(src, slot) return playerItems(src)[slot] end
-function getItemCount(src, name) local n = 0; for _, item in pairs(playerItems(src)) do if item.name == name then n = n + item.amount end end; return n end
+function getItemCount(src, names)
+    local wanted, total = {}, 0
+    if type(names) == 'string' then wanted[itemNameKey(names)] = true
+    elseif type(names) == 'table' then
+        for _, name in pairs(names) do
+            local key = itemNameKey(name)
+            if key then wanted[key] = true end
+        end
+    else return 0 end
+    for _, item in pairs(playerItems(src)) do if wanted[itemNameKey(item.name)] then total = total + (tonumber(item.amount) or 0) end end
+    return total
+end
 function hasItem(src, names, amount)
-    if type(names) == 'table' then for _, name in ipairs(names) do if getItemCount(src, name) < (amount or 1) then return false end end; return true end
-    return getItemCount(src, names) >= (amount or 1)
+    if type(names) ~= 'table' then return getItemCount(src, names) >= (tonumber(amount) or 1) end
+    local counts = {}
+    for _, item in pairs(playerItems(src)) do
+        local name = itemNameKey(item.name)
+        counts[name] = (counts[name] or 0) + (tonumber(item.amount) or 0)
+    end
+    local isArray = #names > 0
+    for key, value in pairs(names) do
+        local name = itemNameKey(isArray and value or key)
+        local required = isArray and (tonumber(amount) or 1) or (tonumber(value) or 1)
+        if not name or (counts[name] or 0) < required then return false end
+    end
+    return true
 end
 function getFreeSlot(src) return I.firstFreeSlot(playerItems(src), C.playerSlots) end
 function moveItem(src, fromSlot, toSlot, amount)
@@ -591,8 +624,12 @@ function moveItem(src, fromSlot, toSlot, amount)
     end)
 end
 function clearInventory(src, keep)
-    local keeps = {}; for _, name in ipairs(keep or {}) do keeps[name] = true end
-    for slot, item in pairs(playerItems(src)) do if not keeps[item.name] then playerSetPath(src, { 'items', slot }, nil) end end
+    local keeps = {}
+    if type(keep) == 'string' then keeps[itemNameKey(keep)] = true
+    elseif type(keep) == 'table' then
+        for key, value in pairs(keep) do keeps[itemNameKey(type(key) == 'number' and value or key)] = true end
+    end
+    for slot, item in pairs(playerItems(src)) do if not keeps[itemNameKey(item.name)] then playerSetPath(src, { 'items', slot }, nil) end end
     bump(playerKey(src)); broadcast(playerKey(src)); return true
 end
 function setItems(src, newItems)
