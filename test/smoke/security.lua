@@ -82,5 +82,6 @@ H.ok(client:find("TriggerServerEvent('qbinventory:server:intent'", 1, true), 'cl
 H.ok(client:find("TriggerEvent('qbinventory:client:requestGiveTarget'", 1, true), 'client resolves a give recipient locally before server intent')
 H.ok(client:find("action = 'give'", 1, true), 'client submits only the resolved give recipient')
 H.ok(manifest:find("'client/ui.lua'", 1, true) and manifest:find("ui_page 'web/build/index.html'", 1, true), 'bundled UI is isolated to its client bridge')
+H.ok(not manifest:find("'@qbcore/init.lua'", 1, true), 'inventory does not load qbcore\'s unused optional registry mirror')
 
 H.finish()

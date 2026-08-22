@@ -20,7 +20,6 @@ dependency 'qbcore'
 shared_scripts {
     '@qblib/init.lua',
     '@qbsql/init.lua',
-    '@qbcore/init.lua',
     'config.lua',
     'config/shops/ammunation.lua',
     'shared.lua',
