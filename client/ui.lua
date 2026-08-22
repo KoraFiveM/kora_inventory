@@ -77,9 +77,16 @@ end)
 -- session after close/reopen. qbinventory remains authoritative on revisions.
 AddEventHandler('qbinventory:ui:sessionPatched', function(payload, legacyPatch)
     local token, patch
-    if type(payload) == 'string' then token, patch = payload, legacyPatch else
-        patch = payload
-        token = patch and patch.token
+    if type(payload) == 'string' then
+        token, patch = payload, legacyPatch
+    elseif type(payload) == 'table' and type(payload.patch) == 'table' then
+        -- client.lua forwards the authoritative network patch as a wrapper so
+        -- the presentation event keeps its token separate from its payload.
+        -- Unwrap it before normalising, otherwise no inventory patch reaches
+        -- the browser and a pending UI move can never settle.
+        token, patch = payload.token, payload.patch
+    else
+        patch, token = payload, payload and payload.token
     end
     if type(patch) ~= 'table' or token ~= activeToken then return end
 

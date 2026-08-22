@@ -19,6 +19,7 @@ export interface InventoryItem {
     price?: number
     stack?: boolean
     container?: boolean
+    useable?: boolean
 }
 
 export interface InventoryView {
