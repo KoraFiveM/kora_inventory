@@ -6,6 +6,10 @@ local file = assert(io.open('server/compat/ox.lua', 'r'))
 local source = file:read('*a')
 file:close()
 
+local authorityFile = assert(io.open('server.lua', 'r'))
+local authoritySource = authorityFile:read('*a')
+authorityFile:close()
+
 H.ok(source:find("I.compat.ox = Ox", 1, true), 'adapter is namespaced and does not replace authority')
 H.ok(not source:find("exports('", 1, true), 'adapter registers no premature Cfx exports')
 H.ok(not source:find("provide 'ox_inventory'", 1, true), 'adapter does not advertise an incomplete provider')
@@ -22,5 +26,20 @@ H.ok(source:find('function Ox.SetSlotCount', 1, true), 'SetSlotCount adapter exi
 H.ok(source:find('function Ox.SetMaxWeight', 1, true), 'SetMaxWeight adapter exists')
 H.ok(source:find('metadata_weight_not_supported', 1, true), 'unsupported custom metadata weight is explicit')
 H.ok(source:find('player_inventory_dimensions_are_configured_by_qbcore', 1, true), 'player dimension ownership is explicit')
-H.ok(source:find('Ox.unsupported', 1, true), 'unsupported Ox domains are explicit')
+-- AddItem/RemoveItem no longer duplicate the shop read-only guard themselves --
+-- it's enforced once, for every write path, inside the authority's addTo/removeFrom
+-- (server.lua), which AddItem/RemoveItem reach via core.addTo/core.removeFrom.
+H.ok(source:find('core.addTo(currentKey', 1, true), 'AddItem writes through the shared authority write funnel')
+H.ok(source:find('core.removeFrom(currentKey', 1, true), 'RemoveItem writes through the shared authority write funnel')
+H.ok(authoritySource:find("if inv.type == 'shop' then return false, 'shop inventory is read only' end", 1, true), 'addTo rejects writes into shop stock for every caller, including the ox adapter')
+H.ok(authoritySource:find("if inv.type == 'shop' then return false, 'shop items must be purchased' end", 1, true), 'removeFrom rejects taking shop stock for every caller, including the ox adapter')
+for _, name in ipairs({
+    'GetContainerFromSlot', 'RemoveInventory', 'UpdateVehicle', 'SwapSlots',
+    'CanSwapItem', 'CustomDrop', 'CreateDropFromPlayer', 'ConfiscateInventory',
+    'ReturnInventory', 'ClearInventory', 'RegisterStash', 'CreateTemporaryStash',
+    'InspectInventory', 'RegisterShop', 'registerHook', 'removeHooks', 'Items',
+    'ItemList', 'setPlayerInventory', 'forceOpenInventory',
+}) do
+    H.ok(source:find('function Ox.' .. name, 1, true) or source:find('Ox.' .. name .. ' =', 1, true), 'Ox adapter exposes ' .. name)
+end
 H.finish()

@@ -198,10 +198,12 @@ function InventoryApp() {
     const [movePending, setMovePending] = useState(false)
     const [itemBoxes, setItemBoxes] = useState<ActiveItemBox[]>([])
     const pendingInventories = useRef<Set<string> | undefined>()
+    const requestPending = useRef(false)
     const nextItemBoxId = useRef(1)
 
     const clearPendingMove = useCallback(() => {
         pendingInventories.current = undefined
+        requestPending.current = false
         setMovePending(false)
     }, [])
     const settlePatchedInventories = useCallback((patch: SessionPatch) => {
@@ -242,10 +244,11 @@ function InventoryApp() {
     })
 
     const submit = useCallback(async (intent: Parameters<typeof sendIntent>[0]["intent"], payload: Record<string, unknown> = {}, awaitInventories?: string[]) => {
-        if (!session || movePending) return false
+        if (!session || requestPending.current) return false
+        requestPending.current = true
+        setMovePending(true)
         if (awaitInventories?.length) {
             pendingInventories.current = new Set(awaitInventories)
-            setMovePending(true)
         }
         try {
             const response = await sendIntent({ sessionId: session.sessionId, token: session.token, intent, payload })
@@ -257,6 +260,7 @@ function InventoryApp() {
             // The Vite harness has no Lua authority to send a patch back. Keep
             // it usable without weakening the runtime's authoritative lock.
             if (import.meta.env.DEV && awaitInventories?.length) queueMicrotask(clearPendingMove)
+            if (!awaitInventories?.length) clearPendingMove()
             return true
         } catch {
             clearPendingMove()

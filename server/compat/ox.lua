@@ -442,16 +442,141 @@ function Ox.SetMaxWeight(reference, maxWeight)
     return changeInventoryDimensions(reference, 'maxWeight', maxWeight)
 end
 
--- Explicit capability map for consumers that need to branch before the full
--- ox_inventory surface is enabled. This adapter does not emulate vehicle
--- persistence, containers, crafting, weapons, or hook/event contracts.
-Ox.unsupported = {
-    'GetContainerFromSlot', 'RemoveInventory', 'UpdateVehicle', 'SwapSlots',
-    'GetCurrentWeapon', 'CanSwapItem', 'CustomDrop', 'CreateDropFromPlayer',
-    'ConfiscateInventory', 'ReturnInventory', 'ClearInventory', 'RegisterStash',
-    'CreateTemporaryStash', 'InspectInventory', 'RegisterShop', 'registerHook',
-    'removeHooks',
-}
+function Ox.GetItemSlots(reference, item, metadata, strict)
+    local _, inv = resolve(reference)
+    local out = {}
+    for _, entry in ipairs(matchingSlots(inv, item, metadata, strict)) do out[#out + 1] = toOxItem(entry.item) end
+    return out
+end
+
+function Ox.GetContainerFromSlot(reference, slot)
+    local item = Ox.GetSlot(reference, slot)
+    if not item then return nil end
+    local id = itemMetadata(item).containerId
+    return id and Ox.GetInventory('container:' .. tostring(id)) or nil
+end
+
+function Ox.RemoveInventory(reference)
+    local key, inv = resolve(reference)
+    if not key or not inv or inv.type == 'player' then return false end
+    return core.removeSecondary(key)
+end
+
+function Ox.SwapSlots(reference, fromSlot, toSlot)
+    fromSlot, toSlot = math.floor(tonumber(fromSlot) or 0), math.floor(tonumber(toSlot) or 0)
+    if fromSlot < 1 or toSlot < 1 then return false, 'invalid_slot' end
+    return mutateItems(reference, function(_, items)
+        items[fromSlot], items[toSlot] = items[toSlot], items[fromSlot]
+        if items[fromSlot] then items[fromSlot].slot = fromSlot end
+        if items[toSlot] then items[toSlot].slot = toSlot end
+        return true
+    end)
+end
+
+function Ox.CanSwapItem(reference, firstItem, firstCount, secondItem, secondCount)
+    -- The authoritative swap path rechecks slots and capacity. This helper is
+    -- advisory like upstream and must never be used as a mutation grant.
+    return resolve(reference) ~= nil and firstItem ~= nil and secondItem ~= nil
+end
+
+function Ox.ClearInventory(reference, keep)
+    local key, inv = resolve(reference)
+    if not key or not inv then return false end
+    local retained = {}
+    local wanted = type(keep) == 'string' and { [keep] = true } or {}
+    if type(keep) == 'table' then for _, name in ipairs(keep) do wanted[name] = true end end
+    for slot, item in pairs(inv.items or {}) do if wanted[item.name] then retained[slot] = copy(item) end end
+    return core.lock({ key }, function() return core.setInventoryItems(key, retained) end)
+end
+
+function Ox.RegisterStash(id, label, slots, maxWeight, owner, groups, coords)
+    return I.api.RegisterStash(id, label, slots, maxWeight, owner, groups, coords)
+end
+function Ox.CreateTemporaryStash(properties) return I.api.CreateTemporaryStash(properties) end
+function Ox.RegisterShop(shopType, shopDetails)
+    if type(shopDetails) ~= 'table' then return nil end
+    return I.api.RegisterShop(shopType, shopDetails)
+end
+function Ox.CustomDrop(prefix, items, coords, slots, maxWeight, instance, model)
+    local id = tostring(prefix or 'drop') .. ':' .. tostring(os.time())
+    local inv = core.createSecondary('drop', id, { label = tostring(prefix or 'Drop'), items = items or {}, coords = coords, slots = slots, maxWeight = maxWeight, temporary = true, instance = instance, model = model })
+    return inv and inv.id or nil
+end
+function Ox.CreateDropFromPlayer(playerId)
+    local _, inv = resolve(tonumber(playerId))
+    return inv and Ox.CustomDrop('player', inv.items, nil, inv.slots, inv.maxWeight) or nil
+end
+function Ox.GetCurrentWeapon(reference)
+    local _, inv = resolve(reference)
+    if not inv then return nil end
+    for _, item in pairs(inv.items or {}) do
+        if item.type == 'weapon' then return toOxItem(item) end
+    end
+end
+function Ox.UpdateVehicle(oldPlate, newPlate)
+    -- Keys are server-normalised and persistent; renaming storage is only
+    -- permitted through a trusted server caller, never an NUI/client intent.
+    if not I.vehicles then return false end
+    local old = I.vehicles.normalisePlate(oldPlate)
+    local new = I.vehicles.normalisePlate(newPlate)
+    if not old or not new then return false end
+    for _, kind in ipairs({ 'trunk', 'glovebox' }) do
+        local oldKey, newKey = I.vehicles.inventoryKey(kind, old), I.vehicles.inventoryKey(kind, new)
+        local _, inv = resolve(oldKey)
+        if inv then inv.id = new; inv.key = newKey end
+    end
+    return true
+end
+function Ox.InspectInventory(target, source)
+    source = tonumber(source) or 0
+    target = tonumber(target)
+    if not target then return nil end
+    local ok = core.open(source, 'player:' .. tostring(target))
+    return ok and Ox.GetInventory(target) or nil
+end
+function Ox.ConfiscateInventory(source)
+    source = tonumber(source); if not source then return false end
+    local key, inv = resolve(source); if not key or not inv then return false end
+    local stash = core.createSecondary('confiscation', tostring(source), { label = 'Confiscated inventory', items = copy(inv.items), slots = inv.slots, maxWeight = inv.maxWeight })
+    if not stash then return false end
+    return core.setInventoryItems(key, {})
+end
+function Ox.ReturnInventory(source)
+    source = tonumber(source); if not source then return false end
+    local key, inv = resolve(source)
+    local stashKey, stash = resolve('confiscation:' .. tostring(source))
+    if not key or not inv or not stash then return false end
+    local ok = core.setInventoryItems(key, copy(stash.items))
+    if ok then core.removeSecondary(stashKey) end
+    return ok
+end
+function Ox.ConvertItems(_, items)
+    local out, slot = {}, 0
+    for name, count in pairs(items or {}) do
+        slot = slot + 1
+        if type(count) == 'table' then out[slot] = toOxItem(count) else out[slot] = { slot = slot, name = name, count = count, amount = count, metadata = {} } end
+    end
+    return out
+end
+function Ox.Items(name)
+    local shared = exports.qbcore:getShared('Items') or {}
+    return name and copy(shared[name]) or copy(shared)
+end
+Ox.ItemList = Ox.Items
+function Ox.setPlayerInventory(player, data)
+    local source = type(player) == 'table' and player.source or tonumber(player)
+    if not source then return false end
+    return core.setInventoryItems('player:' .. source, copy(data or {}))
+end
+function Ox.forceOpenInventory(source, invType, data) return core.open(source, core.key(invType, type(data) == 'table' and data.id or data)) end
+function Ox.registerHook(event, callback, options) return I.api.registerHook(event, callback, options) end
+function Ox.removeHooks(id) return I.api.removeHooks(id) end
+function Ox.getCash(source) return exports.qbcore:getMoney(source, 'cash') end
+function Ox.addCash(source, amount, reason) return exports.qbcore:addMoney(source, 'cash', amount, reason or 'ox_inventory') end
+function Ox.removeCash(source, amount, reason) return exports.qbcore:removeMoney(source, 'cash', amount, reason or 'ox_inventory') end
+function Ox.getBank(source) return exports.qbcore:getMoney(source, 'bank') end
+function Ox.getCards(_) return {} end
+function Ox.giveCard(...) return false end
 
 I.compat.ox = Ox
 return Ox

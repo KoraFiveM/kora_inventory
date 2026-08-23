@@ -11,8 +11,9 @@ for _, exportName in ipairs({
 }) do
     H.ok(source:find(exportName .. ' = ' .. exportName, 1, true), 'gateway export ' .. exportName)
 end
-H.ok(not source:find("provide 'qb-inventory'", 1, true), 'does not advertise incomplete qb provider identity')
-H.ok(not source:find("provide 'ox_inventory'", 1, true), 'does not advertise incomplete ox provider identity')
+local manifest = assert(io.open('fxmanifest.lua', 'r')):read('*a')
+H.ok(manifest:find("provide 'qb-inventory'", 1, true), 'advertises the qb provider identity')
+H.ok(manifest:find("provide 'ox_inventory'", 1, true), 'advertises the ox provider identity')
 H.ok(source:find("'qbinventory:server:transfer'", 1, true), 'transfer transport')
 H.ok(source:find("'qbinventory:server:intent'", 1, true), 'restricted UI intent transport')
 H.ok(source:find("shop items must be purchased", 1, true), 'shop cannot use generic transfer')

@@ -116,17 +116,30 @@ local function dbQuery(sql, params)
     return QB.sql.query(sql, params or {})
 end
 
+local function dbUpsert(tableName, conflictKey, rows, opts)
+    if not state.ready then return nil, state.lastError or 'persistence is not ready' end
+    return QB.sql.upsert(tableName, conflictKey, rows, opts)
+end
+
+-- One multi-row upsert per shop save instead of one query per stock slot.
+-- QB.sql.upsert (qbsql's batched-upsert builder, the same one behind
+-- enqueueMany/the hot player-save path) takes the composite `(shop_id, slot)`
+-- primary key as `pk` per row and flushes a single
+-- `INSERT ... VALUES (...),(...) ON DUPLICATE KEY UPDATE ...` statement.
 local function saveShopStock(inv)
     if inv.type ~= 'shop' then return true end
+    local rows = {}
     for slot, item in pairs(inv.stock or inv.items or {}) do
         local encoded = encode(item)
         if not encoded then return false, 'could not encode shop item' end
-        local ok, err = db([[INSERT INTO `qbinventory_shop_stock`
-            (`shop_id`,`slot`,`item`,`revision`) VALUES (?,?,?,?)
-            ON DUPLICATE KEY UPDATE `item`=VALUES(`item`), `revision`=VALUES(`revision`)]],
-            { tostring(inv.id), tonumber(slot), encoded, tonumber(inv.revision) or 0 })
-        if not ok then return false, err end
+        rows[#rows + 1] = {
+            pk = { tostring(inv.id), tonumber(slot) },
+            cols = { item = encoded, revision = tonumber(inv.revision) or 0 },
+        }
     end
+    if not next(rows) then return true end
+    local ok, err = dbUpsert('qbinventory_shop_stock', { 'shop_id', 'slot' }, rows)
+    if not ok then return false, err end
     return true
 end
 

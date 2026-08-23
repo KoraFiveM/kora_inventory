@@ -61,6 +61,7 @@ QbInventory.internal.canAdd = function(identifier, name, amount)
 end
 
 dofile('server/compat/qb.lua')
+registered = QbInventory.compat.qb
 
 H.equal(#registered.GetSlotsByItem(state['player:7'].items, 'wAtEr'), 1, 'case-insensitive slot list')
 H.equal(registered.GetSlotsByItem(state['player:7'].items, 'water')[1], 1, 'slot list is numeric and sorted')
@@ -78,11 +79,11 @@ H.equal(next(state['stash:locker'].items), nil, 'stash clear commits empty item 
 registered.CreateInventory('evidence', { label = 'Evidence', slots = 8, maxweight = 80 })
 H.equal(state['stash:evidence'].label, 'Evidence', 'create inventory maps label')
 H.equal(state['stash:evidence'].maxWeight, 80, 'create inventory maps qb maxweight')
-local inventory = registered.GetInventory('evidence')
+local inventory = registered.GetInventoryByIdentifier('evidence')
 H.equal(inventory.maxweight, 80, 'inventory snapshot includes qb maxweight')
 inventory.items[1] = { name = 'tamper' }
 H.equal(state['stash:evidence'].items[1], nil, 'inventory snapshot is detached')
-H.equal(registered.CanAddItem('locker', 'WATER', 2), true, 'can add delegates to authority')
+H.equal(registered.CanAddItemByIdentifier('locker', 'WATER', 2), true, 'can add delegates to authority')
 H.equal(registered.RemoveInventory('evidence'), true, 'remove inventory delegates to authority')
 H.ok(removed['stash:evidence'], 'secondary inventory is removed')
 

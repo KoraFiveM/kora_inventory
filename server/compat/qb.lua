@@ -136,6 +136,14 @@ local function canAddItem(identifier, itemName, amount)
     return internal.canAdd(identifier, wanted, amount)
 end
 
+-- GetInventory/CanAddItem are deliberately NOT exported under those names:
+-- server.lua already registers native exports with the same names
+-- (GetInventory(src) takes a numeric player source; CanAddItem is the native
+-- canCarry signature). Since exports() writes into one flat per-resource
+-- table and this file loads after server.lua in fxmanifest.lua, reusing those
+-- names would silently overwrite the native ones for every other resource
+-- that calls them. Use the ByIdentifier-suffixed names below instead, which
+-- match this module's string-identifier calling convention.
 local api = {
     GetSlotsByItem = slotsByItem,
     GetFirstSlotByItem = firstSlotByItem,
@@ -145,11 +153,38 @@ local api = {
     ClearStash = clearStash,
     CreateInventory = createInventory,
     RemoveInventory = removeInventory,
-    GetInventory = getInventory,
-    CanAddItem = canAddItem,
+    GetInventoryByIdentifier = getInventory,
+    CanAddItemByIdentifier = canAddItem,
 }
+
+-- Full upstream qb-inventory compatibility uses the same authority methods,
+-- but keeps its provider-specific return shapes separate from qbinventory's
+-- native exports (and from ox_inventory's identically named exports).
+-- I.api is installed by server.lua in the live resource. Keeping a blank
+-- fallback permits this transport-free adapter to be unit-tested in isolation.
+local native = I.api or {}
+api.LoadInventory = function(source) return I.copy(native.GetInventory(source) or {}) end
+api.SaveInventory = function(_) return true end -- qbcore persistence owns player writes.
+api.SetInventory = function(source, items) return native.SetInventory(source, items or {}) end
+api.UseItem = function(source, item) return native.useItem(source, type(item) == 'table' and item.slot or item) end
+api.OpenInventoryById = function(source, target) return I.internal.open(source, 'player:' .. tostring(tonumber(target) or -1)) end
+api.CreateShop = function(name, data) return native.RegisterShop(name, data or {}) end
+api.OpenShop = function(source, name) return native.OpenInventory(source, 'shop', name) end
+api.OpenInventory = function(source, identifier, data) return native.OpenInventory(source, identifier, data) end
+api.CloseInventory = native.CloseInventory
+api.GetInventory = function(identifier)
+    local _, inv = resolve(identifier)
+    return inv and I.copy(inv.items or {}) or nil
+end
+api.GetItemBySlot = native.GetItemBySlot
+api.GetItemByName = native.GetItemByName
+api.GetItemsByName = native.GetItemsByName
+api.GetItemCount = native.GetItemCount
+api.GetFreeWeight = native.GetFreeWeight
+api.CanAddItem = native.CanAddItem
+api.ClearInventory = native.ClearInventory
+api.AddItem = native.AddItem
+api.RemoveItem = native.RemoveItem
 
 I.compat = I.compat or {}
 I.compat.qb = api
-
-for name, fn in pairs(api) do exports(name, fn) end

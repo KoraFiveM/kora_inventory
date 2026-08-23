@@ -77,14 +77,15 @@ function submitIntent(intent)
         return true
     end
     if action == 'use' or action == 'drop' or action == 'buy' then
-        TriggerServerEvent('qbinventory:server:intent', {
+        local ok, result = QB.callback.trigger('qbinventory:server:intent', {
             token = session.token,
             action = action,
             payload = payload,
             primaryRevision = session.primary and session.primary.revision,
             secondaryRevision = session.secondary and session.secondary.revision,
         })
-        return true
+        if not ok then TriggerEvent('qbinventory:ui:rejected', { reason = result }) end
+        return ok == true, result
     end
     if action ~= 'move' and action ~= 'split' and action ~= 'transfer' and action ~= 'swapItems' then
         TriggerEvent('qbinventory:ui:rejected', { reason = 'unsupported intent' })
@@ -95,12 +96,13 @@ function submitIntent(intent)
     local to = payload.toInventory or (payload.toSecondary and secondaryKey or session.primary.key)
     local fromView = from == session.primary.key and session.primary or session.secondary
     local toView = to == session.primary.key and session.primary or session.secondary
-    TriggerServerEvent('qbinventory:server:transfer', {
+    local ok, result = QB.callback.trigger('qbinventory:server:transfer', {
         token = session.token, fromInventory = from, toInventory = to,
         fromSlot = payload.fromSlot, toSlot = payload.toSlot, amount = payload.amount,
         fromRevision = fromView and fromView.revision, toRevision = toView and toView.revision,
     })
-    return true
+    if not ok then TriggerEvent('qbinventory:ui:rejected', { reason = result }) end
+    return ok == true, result
 end
 
 -- Recipient ids are deliberately resolved only between local client modules.

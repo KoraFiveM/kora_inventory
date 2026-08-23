@@ -20,6 +20,7 @@ local state, opened, broadcasts = {
 
 exports = {
     qbcore = {
+        getJob = function() return { name = 'unemployed', onduty = false } end,
         getPlayerData = function(_, source)
             if source == 10 then return { citizenid = 'CID-10' } end
             if source == 20 then return { citizenid = 'CID-20' } end

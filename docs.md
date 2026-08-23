@@ -1,9 +1,10 @@
 # qbinventory
 
-`qbinventory` is the server-authoritative inventory provider. Its direct API is
-production work in progress; it deliberately does **not** yet advertise the
-`qb-inventory` or `ox_inventory` provider identities because their exact
-upstream contracts are not complete or contract-tested.
+`qbinventory` is the server-authoritative inventory provider. It provides both
+`qb-inventory` and `ox_inventory` compatibility identities, pinned to the
+contract fixtures in `test/contracts/`. Same-named qb and ox exports retain
+their upstream-specific signatures through separate identity routing. A real
+qb-inventory or ox_inventory resource must not run alongside qbinventory.
 
 ## Ownership and startup
 

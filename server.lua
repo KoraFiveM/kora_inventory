@@ -65,7 +65,7 @@ local function buildItem(name, amount, slot, metadata)
     return {
         slot = slot, name = def.name or tostring(name):lower(), amount = amount, info = I.copy(metadata or {}),
         metadata = I.copy(metadata or {}), type = def.type or 'item', unique = def.unique or false,
-        useable = def.useable or false, container = def.container == true, image = def.image, imageUrl = def.imageUrl, label = def.label or name,
+        useable = def.useable == true or hasUseable(def.name or name), container = def.container == true, image = def.image, imageUrl = def.imageUrl, label = def.label or name,
         weight = def.weight or 0, shouldClose = def.shouldClose, description = def.description,
         created = os.time(),
     }
@@ -267,10 +267,21 @@ end
 
 local function lock(keys, fn)
     table.sort(keys)
-    for _, k in ipairs(keys) do if locks[k] then return false, 'inventory busy' end end
-    for _, k in ipairs(keys) do locks[k] = true end
+    local owner = coroutine.running() or 'main'
+    for _, k in ipairs(keys) do
+        local held = locks[k]
+        if held and held.owner ~= owner then return false, 'inventory busy' end
+    end
+    for _, k in ipairs(keys) do
+        local held = locks[k]
+        if held then held.depth = held.depth + 1 else locks[k] = { owner = owner, depth = 1 } end
+    end
     local result = table.pack(xpcall(fn, debug.traceback))
-    for _, k in ipairs(keys) do locks[k] = nil end
+    for _, k in ipairs(keys) do
+        local held = locks[k]
+        held.depth = held.depth - 1
+        if held.depth == 0 then locks[k] = nil end
+    end
     if not result[1] then print(('^1[qbinventory]^7 transaction failed: %s'):format(result[2])); return false, 'transaction failed' end
     return table.unpack(result, 2, result.n)
 end
@@ -413,7 +424,9 @@ local function physicalCashAdd(src, account, amount, reason)
     amount = I.amount(amount, 0)
     if not policy then return false, err end
     if not amount then return false, 'invalid cash amount' end
-    return physicalCashCredit(src, policy, account, amount, reason)
+    return lock({ playerKey(src) }, function()
+        return physicalCashCredit(src, policy, account, amount, reason)
+    end)
 end
 
 local function physicalCashDebit(src, policy, account, amount, reason)
@@ -442,7 +455,9 @@ local function physicalCashRemove(src, account, amount, reason)
     amount = I.amount(amount, 0)
     if not policy then return false, err end
     if not amount then return false, 'invalid cash amount' end
-    return physicalCashDebit(src, policy, account, amount, reason)
+    return lock({ playerKey(src) }, function()
+        return physicalCashDebit(src, policy, account, amount, reason)
+    end)
 end
 
 local function physicalCashSet(src, account, amount, reason)
@@ -451,9 +466,12 @@ local function physicalCashSet(src, account, amount, reason)
     if not policy then return false, err end
     if amount < 0 then return false, 'invalid cash amount' end
     local current = physicalCashBalance(src, policy)
-    if amount == current then return true end
-    if amount > current then return physicalCashCredit(src, policy, account, amount - current, reason or 'set') end
-    return physicalCashDebit(src, policy, account, current - amount, reason or 'set')
+    return lock({ playerKey(src) }, function()
+        local lockedCurrent = physicalCashBalance(src, policy)
+        if amount == lockedCurrent then return true end
+        if amount > lockedCurrent then return physicalCashCredit(src, policy, account, amount - lockedCurrent, reason or 'set') end
+        return physicalCashDebit(src, policy, account, lockedCurrent - amount, reason or 'set')
+    end)
 end
 
 local function physicalCashTransfer(fromSrc, toSrc, account, amount, reason)
@@ -488,12 +506,20 @@ local function physicalCashImport(src, account, amount)
     if amount == 0 then return true end
     local canImport, importErr = canCarry(src, policy.item, amount)
     if not canImport then return false, importErr end
-    return physicalCashCredit(src, policy, account, amount, 'legacy-balance-migration')
+    return lock({ playerKey(src) }, function()
+        return physicalCashCredit(src, policy, account, amount, 'legacy-balance-migration')
+    end)
 end
 
+-- Shop stock is only ever legitimately mutated by buyItem()'s direct
+-- shop.stock manipulation (paid, price-checked) -- every OTHER write path
+-- (generic transfer, the ox adapter, and anything added later) funnels
+-- through addTo/removeFrom, so the read-only guard lives here once instead
+-- of being re-asserted (and risking drifting error strings) at every caller.
 local function addTo(k, name, amount, slot, metadata, reason)
     local inv = getInventory(k)
     if not inv then return false, 'inventory not found' end
+    if inv.type == 'shop' then return false, 'shop inventory is read only' end
     if inv.type == 'player' then return addPlayer(inv.source, name, amount, slot, metadata, reason) end
     return addSecondary(inv, name, amount, slot, metadata)
 end
@@ -501,6 +527,7 @@ end
 local function removeFrom(k, slot, amount)
     local inv = getInventory(k)
     if not inv then return false, 'inventory not found' end
+    if inv.type == 'shop' then return false, 'shop items must be purchased' end
     if inv.type == 'player' then return removePlayer(inv.source, slot, amount) end
     return removeSecondary(inv, slot, amount)
 end
@@ -512,7 +539,10 @@ local function runHooks(name, src, payload)
             and (not filter.inventoryFilter or filter.inventoryFilter[payload.fromInventory] or filter.inventoryFilter[payload.toInventory])
             and (not filter.typeFilter or filter.typeFilter[payload.fromType] or filter.typeFilter[payload.toType])
         if match then
-            local ok, result = pcall(hook.callback, payload)
+            -- `src` is appended as a SECOND argument (not prepended) so an
+            -- existing single-arg `function(payload)` hook keeps working
+            -- unmodified -- it just never reads the extra parameter.
+            local ok, result = pcall(hook.callback, payload, src)
             if not ok then print(('^3[qbinventory]^7 hook %d failed: %s'):format(hook.id, result))
             elseif result == false then return false, 'action denied by hook'
             elseif type(result) == 'table' then payload.metadata = result end
@@ -674,10 +704,18 @@ local function intentUse(src, request)
     if not primary then return false, 'stale inventory' end
     local slot = math.floor(tonumber(request.payload.slot) or 0)
     if slot < 1 or not primary.items[slot] then return false, 'invalid item slot' end
-    local ok, err = useItem(src, slot)
-    if not ok then return false, err or 'item cannot be used' end
-    recordAudit('use', src, { item = primary.items[slot].name, slot = slot })
-    return true
+    return lock({ session.primary }, function()
+        local currentSession, current = validSession(src, request.token, session.primary, session.primary,
+            request.primaryRevision, request.primaryRevision)
+        if not currentSession or not current then return false, 'stale inventory' end
+        local item = current.items[slot]
+        if not item then return false, 'invalid item slot' end
+        local itemName = item.name
+        local ok, err = useItem(src, slot)
+        if not ok then return false, err or 'item cannot be used' end
+        recordAudit('use', src, { item = itemName, slot = slot })
+        return true
+    end)
 end
 
 local function intentDrop(src, request)
@@ -865,29 +903,34 @@ function addItem(src, name, amount, slot, info, reason)
         -- in qbcore. Never let an arbitrary resource mutate the cash stack.
         return exports.qbcore:addMoney(src, cashPolicy().account, amount, reason or 'qbinventory-add-cash')
     end
-    local ok, err = canCarry(src, name, amount); if not ok then return false, err end
-    local done, why = addPlayer(src, name, amount, slot, info, reason)
-    if done then
-        bump(playerKey(src)); broadcast(playerKey(src)); recordAudit('add', src, { item = name, amount = amount, reason = reason })
-        showItemBox(src, name, amount, 'add')
-    end
-    return done, why
+    return lock({ playerKey(src) }, function()
+        local ok, err = canCarry(src, name, amount); if not ok then return false, err end
+        local done, why = addPlayer(src, name, amount, slot, info, reason)
+        if done then
+            bump(playerKey(src)); broadcast(playerKey(src)); recordAudit('add', src, { item = name, amount = amount, reason = reason })
+            showItemBox(src, name, amount, 'add')
+        end
+        return done, why
+    end)
 end
 function removeItem(src, name, amount, slot, reason)
-    local items = playerItems(src); amount = I.amount(amount, 1); if not amount then return false, 'invalid amount' end
+    amount = I.amount(amount, 1); if not amount then return false, 'invalid amount' end
     if cashItemsActive and isCashItemName(name) then
         return exports.qbcore:removeMoney(src, cashPolicy().account, amount, reason or 'qbinventory-remove-cash')
     end
-    if slot then
-        if not items[slot] or items[slot].name ~= name then return false, 'item not in slot' end
-        local ok, err = removePlayer(src, slot, amount); if ok then bump(playerKey(src)); broadcast(playerKey(src)) end; return ok, err
-    end
-    local remaining, planned = amount, {}
-    for s = 1, C.playerSlots do local item = items[s]; if item and item.name == name then planned[#planned + 1] = { slot = s, amount = math.min(remaining, item.amount) }; remaining = remaining - item.amount; if remaining <= 0 then break end end end
-    if remaining > 0 then return false, 'not enough of item' end
-    for _, part in ipairs(planned) do removePlayer(src, part.slot, part.amount) end
-    bump(playerKey(src)); broadcast(playerKey(src)); recordAudit('remove', src, { item = name, amount = amount, reason = reason })
-    return true
+    return lock({ playerKey(src) }, function()
+        local items = playerItems(src)
+        if slot then
+            if not items[slot] or items[slot].name ~= name then return false, 'item not in slot' end
+            local ok, err = removePlayer(src, slot, amount); if ok then bump(playerKey(src)); broadcast(playerKey(src)) end; return ok, err
+        end
+        local remaining, planned = amount, {}
+        for s = 1, C.playerSlots do local item = items[s]; if item and item.name == name then planned[#planned + 1] = { slot = s, amount = math.min(remaining, item.amount) }; remaining = remaining - item.amount; if remaining <= 0 then break end end end
+        if remaining > 0 then return false, 'not enough of item' end
+        for _, part in ipairs(planned) do removePlayer(src, part.slot, part.amount) end
+        bump(playerKey(src)); broadcast(playerKey(src)); recordAudit('remove', src, { item = name, amount = amount, reason = reason })
+        return true
+    end)
 end
 local function itemNameKey(name) return type(name) == 'string' and name:lower() or nil end
 function getItemByName(src, name)
@@ -956,8 +999,15 @@ function clearInventory(src, keep)
         for key, value in pairs(keep) do keeps[itemNameKey(type(key) == 'number' and value or key)] = true end
     end
     if cashItemsActive then keeps[cashPolicy().item] = true end
-    for slot, item in pairs(playerItems(src)) do if not keeps[itemNameKey(item.name)] then playerSetPath(src, { 'items', slot }, nil) end end
-    bump(playerKey(src)); broadcast(playerKey(src)); return true
+    return lock({ playerKey(src) }, function()
+        for slot, item in pairs(playerItems(src)) do
+            if not keeps[itemNameKey(item.name)] then
+                local ok, err = playerSetPath(src, { 'items', slot }, nil)
+                if not ok then return false, err end
+            end
+        end
+        bump(playerKey(src)); broadcast(playerKey(src)); return true
+    end)
 end
 function setItems(src, newItems)
     if type(newItems) ~= 'table' then return false, 'items must be a table' end
@@ -984,7 +1034,11 @@ function setItems(src, newItems)
         checked[slot] = built
     end
     if I.totalWeight(checked) > C.playerMaxWeight then return false, 'over weight' end
-    playerSetPath(src, { 'items' }, checked); bump(playerKey(src)); broadcast(playerKey(src)); return true
+    return lock({ playerKey(src) }, function()
+        local ok, err = playerSetPath(src, { 'items' }, checked)
+        if not ok then return false, err end
+        bump(playerKey(src)); broadcast(playerKey(src)); return true
+    end)
 end
 
 local useables, useableOwners = {}, QB.resources.serverRegistry(function(name) useables[name] = nil end)
@@ -992,36 +1046,47 @@ function createUseable(name, handler)
     assert(type(name) == 'string' and type(handler) == 'function', 'name and handler are required')
     local owner = GetInvokingResource() or resource; useables[name] = handler; useableOwners.track(owner, name)
 end
--- Whether clicking Use on this item would actually do something: either a
--- registered handler, or (useItem's own container bypass, above/below) a
--- configured portable-container definition. buildItem() calls this INSTEAD OF
--- echoing the item/weapon definition's own static `useable` flag, so the NUI
--- only shows the Use button when it would have an effect. A bare global (like
--- createUseable/useItem) so buildItem -- defined earlier in this same file,
--- but only ever CALLED later, once every top-level statement here has run --
--- can resolve it too.
+-- Whether clicking Use on this item would do something even without a
+-- registered handler: either a portable-container definition (useItem's own
+-- container bypass, above/below), or a dynamically createUseable-registered
+-- handler. buildItem() ORs this with the item/weapon definition's own static
+-- `useable` flag -- a static true (e.g. phone/id_card/lockpick) still shows
+-- the Use button and falls back to the legacy QBCore:Server:UseItem event
+-- for whichever resource handles it (useItem's own fallback, below), same as
+-- real qb-core. A bare global (like createUseable/useItem) so buildItem --
+-- defined earlier in this same file, but only ever CALLED later, once every
+-- top-level statement here has run -- can resolve it too.
 function hasUseable(name)
     if useables[name] then return true end
     local containers = QbInventory.containers
     return containers and containers.isPortableItem and containers.isPortableItem({ name = name }) or false
 end
 function useItem(src, slotOrName)
-    local item = type(slotOrName) == 'number' and getItemBySlot(src, slotOrName) or getItemByName(src, slotOrName)
-    if not item then return false, 'item not found' end
-    local allowed, err = runHooks('usingItem', src, { itemName = item.name, item = I.copy(item), inventoryId = playerKey(src), inventoryType = 'player' })
-    if not allowed then return false, err end
-    local containers = QbInventory.containers
-    if type(slotOrName) == 'number' and containers and containers.isPortableItem and containers.isPortableItem(item) then
-        local ok, result = containers.openConfiguredItem(src, slotOrName)
-        if ok then
-            TriggerEvent('qbinventory:server:openedContainer', src, item.name, item)
+    return lock({ playerKey(src) }, function()
+        local item = type(slotOrName) == 'number' and getItemBySlot(src, slotOrName) or getItemByName(src, slotOrName)
+        if not item then return false, 'item not found' end
+        local allowed, err = runHooks('usingItem', src, { itemName = item.name, item = I.copy(item), inventoryId = playerKey(src), inventoryType = 'player' })
+        if not allowed then return false, err end
+        local containers = QbInventory.containers
+        if type(slotOrName) == 'number' and containers and containers.isPortableItem and containers.isPortableItem(item) then
+            local ok, result = containers.openConfiguredItem(src, slotOrName)
+            if ok then
+                TriggerEvent('qbinventory:server:openedContainer', src, item.name, item)
+                return true
+            end
+            return false, result
+        end
+        local handler = useables[item.name]
+        if handler then
+            local ok, result = pcall(handler, src, I.copy(item))
+            if not ok then return false, result end
+            if result == false then return false, 'item use was rejected' end
+            TriggerEvent('qbinventory:server:usedItem', src, item.name, item)
             return true
         end
-        return false, result
-    end
-    local handler = useables[item.name]
-    if handler then local ok, result = pcall(handler, src, I.copy(item)); if not ok then return false, result end; TriggerEvent('qbinventory:server:usedItem', src, item.name, item); return result ~= false end
-    TriggerEvent('QBCore:Server:UseItem', src, item); return false, 'no useable registered'
+        TriggerEvent('QBCore:Server:UseItem', src, item)
+        return false, 'no useable registered'
+    end)
 end
 
 local function ownedStash(src, identifier, opts)
@@ -1034,7 +1099,12 @@ local function ownedStash(src, identifier, opts)
 end
 
 function stashGet(identifier) local inv = secondary('stash', identifier); return I.copy(inv.items) end
-function stashSet(identifier, items) local inv = secondary('stash', identifier); inv.items = I.copy(items or {}); bump(inv.key); broadcast(inv.key); return true end
+function stashSet(identifier, items)
+    local inv = secondary('stash', identifier)
+    return lock({ inv.key }, function()
+        return setInventoryItems(inv.key, I.copy(items or {}))
+    end)
+end
 function stashOpen(src, identifier, opts)
     local template = ownedStashTemplates[tostring(identifier)]
     local inv, err
@@ -1091,6 +1161,7 @@ local function normaliseShopStock(rows, slots)
         local amount = I.amount(row.amount or row.count, 1)
         local price = tonumber(row.price)
         if not amount or not price or price < 0 then return nil, 'invalid shop amount or price' end
+        if cashItemsActive and isCashItemName(row.name) then return nil, 'physical cash cannot be shop stock' end
         local item, err = buildItem(row.name, amount, slot, row.info or row.metadata)
         if not item then return nil, ('invalid shop item in slot %d: %s'):format(slot, tostring(err)) end
         item.price = price
@@ -1153,6 +1224,10 @@ function buyItem(src, shopId, slot, count)
     local hookOK, hookErr = runHooks('buyItem', src, { shopId = shopId, itemName = item.name, count = count, totalPrice = price * count })
     if not hookOK then return false, hookErr end
     return lock({ shop.key, playerKey(src) }, function()
+        shop = getInventory(key('shop', shopId))
+        item = shop and (shop.stock or shop.items)[slot] or nil
+        if not item or item.amount < count then return false, 'out of stock' end
+        price = tonumber(item.price or (shop.prices and shop.prices[item.name])) or 0
         if price > 0 then
             local paid, payErr = exports.qbcore:removeMoney(src, shop.currency == 'money' and 'cash' or shop.currency, price * count, 'qbinventory-shop')
             if not paid then return false, payErr end
@@ -1332,6 +1407,7 @@ local api = {
     GetStashItems = stashGet, SetStashItems = stashSet, RegisterStash = registerStash,
     CreateTemporaryStash = createTemporaryStash, RegisterShop = registerShop, BuyItem = buyItem,
     RegisterHook = registerHook, RemoveHooks = removeHooks,
+    registerHook = registerHook, removeHooks = removeHooks,
     RegisterInspectionAccess = registerInspectionAccess, RemoveInspectionAccess = removeInspectionAccess,
 }
 -- These are qbinventory-private bridge exports for qbcore only. They are not
@@ -1343,11 +1419,7 @@ local physicalCashApi = {
 }
 for name, fn in pairs(api) do exports(name, fn) end
 for name, fn in pairs(physicalCashApi) do exports(name, fn) end
-for _, identity in ipairs({ 'qb-inventory', 'ox_inventory' }) do
-    for name, fn in pairs(api) do
-        AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCB) setCB(fn) end)
-    end
-end
+I.api = api
 
 RegisterNetEvent('qbinventory:server:open', function(invType, data)
     local ok, result = openInventory(source, invType, data)

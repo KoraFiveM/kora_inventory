@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/contract.lua
 "${LUA:-lua}" test/smoke/persistence.lua
 "${LUA:-lua}" test/smoke/client_compat.lua
+"${LUA:-lua}" test/smoke/ui_bridge.lua
 "${LUA:-lua}" test/smoke/item_boxes.lua
 "${LUA:-lua}" test/smoke/physical_cash.lua
 "${LUA:-lua}" test/smoke/give_target.lua
@@ -16,3 +17,4 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/ox_adapter.lua
 "${LUA:-lua}" test/smoke/crafting.lua
 "${LUA:-lua}" test/smoke/ammunation.lua
+"${LUA:-lua}" test/smoke/export_collisions.lua

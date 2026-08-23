@@ -113,7 +113,23 @@ Config.qbinventory = {
             -- Default deny. This callback is trusted server code and receives
             -- (source, action, context). Return true to grant; false, reason
             -- to deny. It must enforce job/ACE/restraint/consent policy.
-            access = nil,
+            --
+            -- Supplied by qbpolice (resources/[test]/qbpolice) per its own
+            -- design doc: "qbpolice only supplies the access-policy callback
+            -- and the UI wiring" for the evidence/confiscation system already
+            -- built here. Config is a resource-local Lua global with no
+            -- cross-resource setter for this one field (verified: there is no
+            -- exports() registration for it, unlike e.g. RegisterInspectionAccess),
+            -- so this is edited directly rather than injected at runtime.
+            -- On-duty is required, not just job membership, so an officer who
+            -- clocks off loses evidence access immediately.
+            access = function(source, action, context)
+                local job = exports.qbcore:getJob(source)
+                if not job or job.name ~= 'police' or not job.onduty then
+                    return false, 'not an on-duty police officer'
+                end
+                return true
+            end,
         },
     },
     -- Recipes are registered only by server resources. qbinventory has no

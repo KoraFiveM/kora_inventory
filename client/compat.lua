@@ -150,12 +150,17 @@ end, false)
 
 RegisterKeyMapping('openInv', 'Open inventory (qbinventory)', 'keyboard', 'TAB')
 
-AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
+-- RegisterNetEvent, not AddEventHandler: qbcore only ever fires these two over
+-- the wire (TriggerClientEvent in qbcore's modules/player/server.lua). FiveM
+-- SKIPS a net-delivered event whose handler was attached with bare
+-- AddEventHandler -- printing "event ... was not safe for net" -- so these
+-- resets silently never ran on login/logout.
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
     selfOpening = false
     if not getCurrentSession() then setBusy(false) end
 end)
 
-AddEventHandler('QBCore:Client:OnPlayerUnload', function()
+RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
     closeInventory()
     selfOpening = false
     -- Preserve qb-inventory's unload behaviour: callers must not treat an

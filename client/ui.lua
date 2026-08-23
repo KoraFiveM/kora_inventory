@@ -156,15 +156,16 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
         return
     end
 
-    -- This is a local hand-off, not a server RPC. qbinventory validates the
-    -- token, revision, proximity, slots, amount and permissions before acting.
-    TriggerEvent('qbinventory:client:submitIntent', {
+    -- Wait for qbinventory's authoritative callback result. This keeps the
+    -- browser locked until validation and any yielding useable handler finish,
+    -- rather than acknowledging a merely-local hand-off as success.
+    local ok, result = submitIntent({
         sessionId = data.sessionId,
         token = data.token,
         intent = data.intent,
         payload = data.payload,
     })
-    cb({ ok = true })
+    cb({ ok = ok == true, error = ok and nil or result })
 end)
 
 RegisterNUICallback('qbinventory:nui:close', function(data, cb)
