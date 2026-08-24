@@ -843,6 +843,37 @@ function Ox.ConvertItems(_, items)
     return out
 end
 
+-- Upstream: ConvertInventory(inv) is ConvertItems' counterpart for a WHOLE
+-- inventory record rather than a bare items array -- it takes an
+-- id/type/slots/maxWeight table (as third-party migration code and secondary
+-- inventories built outside this authority hand it, in either the name-keyed
+-- shape ConvertItems accepts or an already slot-keyed one) and hands back the
+-- same shape toOxInventory() returns, with items reshaped and weight
+-- recomputed from the real item registry. A bare reference this authority
+-- already knows about (a stash id, a player source, ...) is resolved through
+-- the same resolver every other export here uses, then handed to
+-- toOxInventory() directly -- there is nothing to convert, it is already
+-- stored in ox shape.
+function Ox.ConvertInventory(inv)
+    -- A reference this authority already knows about (a player source, a
+    -- registered stash id, an inventory's own `key`/`type`+`id` pair) always
+    -- wins: it is already stored in ox shape, so there is nothing to convert.
+    local key, resolved = resolve(inv)
+    if resolved then return toOxInventory(key, resolved) end
+    if type(inv) ~= 'table' then return nil end
+    local items = Ox.ConvertItems(nil, inv.items)
+    local weight = 0
+    for _, converted in pairs(items) do
+        local _, definition = canonicalName(converted)
+        weight = weight + (countOf(converted) * (definition and tonumber(definition.weight) or 0))
+    end
+    return {
+        id = inv.id, label = inv.label, type = inv.type or 'stash',
+        slots = inv.slots, maxWeight = inv.maxWeight,
+        weight = weight, items = items,
+    }
+end
+
 -- A single lookup goes through the authority's resolver so weapons and
 -- case-insensitive names behave exactly as they do everywhere else here.
 -- The registry is named 'items' (qbcore modules/registry/server.lua:12) and
@@ -864,6 +895,25 @@ function Ox.setPlayerInventory(player, data)
     local source = type(player) == 'table' and player.source or tonumber(player)
     if not source then return end
     core.setInventoryItems(core.playerKey(source), copy(data or {}))
+end
+
+-- Upstream: useItem(source, slot, cb). This is the SERVER identity's copy of
+-- the same export client/compat/ox.lua already publishes -- it was reachable
+-- on the client and via qbinventory's own native `useItem`, but never on the
+-- ox_inventory SERVER identity, so a third-party server script calling
+-- exports.ox_inventory:useItem(...) resolved to nothing. Delegates to the
+-- exact same use-item funnel qbinventory's own api.useItem calls: handler
+-- dispatch, the portable-container bypass and the QBCore:Server:UseItem
+-- legacy fallback all live there and are never reimplemented here.
+function Ox.useItem(source, slot, cb)
+    source = tonumber(source)
+    if not source then
+        if cb then cb(false, 'invalid_source') end
+        return false, 'invalid_source'
+    end
+    local ok, err = I.api.useItem(source, slot)
+    if cb then cb(ok, err) end
+    return ok, err
 end
 
 function Ox.forceOpenInventory(source, invType, data) return core.open(source, core.key(invType, type(data) == 'table' and data.id or data)) end

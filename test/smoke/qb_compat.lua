@@ -71,6 +71,40 @@ QbInventory.internal.canAdd = function(identifier, name, amount)
     H.equal(amount, 2, 'adapter preserves amount')
     return true
 end
+QbInventory.internal.bump = function() bumps = bumps + 1 end
+QbInventory.internal.broadcast = function() broadcasts = broadcasts + 1 end
+-- Mirrors server.lua's addTo/removeFrom write funnel closely enough to prove
+-- AddToStash/RemoveFromStash route through it rather than mutating items
+-- directly: an explicit slot is honoured, a matching existing slot stacks,
+-- and a fresh placement takes the first free slot.
+QbInventory.internal.addTo = function(k, name, amount, slot, info)
+    local items = state[k].items
+    if slot then
+        local existing = items[slot]
+        if existing and existing.name:lower() ~= name then return false, 'slot occupied by another item' end
+        if existing then existing.amount = existing.amount + amount
+        else items[slot] = { slot = slot, name = name, amount = amount, weight = 10, info = info or {} } end
+        return true, slot
+    end
+    for s, existing in pairs(items) do
+        if existing.name:lower() == name then existing.amount = existing.amount + amount; return true, s end
+    end
+    for s = 1, 20 do
+        if not items[s] then
+            items[s] = { slot = s, name = name, amount = amount, weight = 10, info = info or {} }
+            return true, s
+        end
+    end
+    return false, 'no free slot'
+end
+QbInventory.internal.removeFrom = function(k, slot, amount)
+    local items = state[k].items
+    local existing = items[slot]
+    if not existing or existing.amount < amount then return false, 'not enough of item' end
+    existing.amount = existing.amount - amount
+    if existing.amount <= 0 then items[slot] = nil end
+    return true
+end
 
 -- server.lua installs I.api in the live resource; without a stub here
 -- `local native = I.api or {}` leaves every delegating entry calling a nil
@@ -178,5 +212,44 @@ H.equal(calls.close.src, 7, 'CloseInventory closes the calling player session')
 
 -- LoadInventory accepts (source, citizenid).
 H.ok(registered.LoadInventory(7, 'CID1') ~= nil, 'LoadInventory accepts the upstream citizenid argument')
+
+-- AddToStash / RemoveFromStash were entirely unbound on both realms. They
+-- must route through the addTo/removeFrom write funnel (proven by the
+-- bump/broadcast counters below), not mutate stash items directly.
+-- state['stash:locker'].items is now { [1] = water x1 } after the SetInventory
+-- call above replaced the stash's whole item table.
+bumps, broadcasts = 0, 0
+H.equal(registered.AddToStash('locker', 'bread', 2), true, 'AddToStash accepts an item with no explicit slot')
+H.equal(state['stash:locker'].items[2].name, 'bread', 'AddToStash places the item in the first free slot')
+H.equal(state['stash:locker'].items[2].amount, 2, 'AddToStash writes the requested amount')
+H.equal(bumps, 1, 'a successful AddToStash bumps the inventory revision')
+H.equal(broadcasts, 1, 'a successful AddToStash broadcasts the inventory')
+
+H.equal(registered.AddToStash('locker', 'WATER', 3, 1), true, 'AddToStash accepts an explicit slot and a mixed-case item name')
+H.equal(state['stash:locker'].items[1].amount, 4, 'AddToStash stacks onto the existing slot 1 water')
+
+H.equal(registered.AddToStash('locker', 'bread', 1, 1), false, 'AddToStash refuses a slot already holding a different item')
+H.equal(state['stash:locker'].items[1].amount, 4, 'a refused AddToStash leaves the occupied slot untouched')
+
+H.equal(registered.AddToStash('nope', 'water', 1), false, 'AddToStash is false for an unresolvable stash')
+H.equal(registered.AddToStash('locker', 'water', 0), false, 'AddToStash is false for a non-positive amount')
+
+bumps, broadcasts = 0, 0
+H.equal(registered.RemoveFromStash('locker', 'bread', 1), true, 'RemoveFromStash removes from the matching slot by name')
+H.equal(state['stash:locker'].items[2].amount, 1, 'RemoveFromStash decrements the matched slot')
+H.equal(bumps, 1, 'a successful RemoveFromStash bumps the inventory revision')
+H.equal(broadcasts, 1, 'a successful RemoveFromStash broadcasts the inventory')
+
+H.equal(registered.RemoveFromStash('locker', 'bread', 1, 2), true, 'RemoveFromStash accepts an explicit slot')
+H.equal(state['stash:locker'].items[2], nil, 'removing the last of a slot clears it entirely')
+
+H.equal(registered.RemoveFromStash('locker', 'water', 999), false, 'RemoveFromStash refuses a shortfall across the whole stash')
+H.equal(state['stash:locker'].items[1].amount, 4, 'a refused RemoveFromStash leaves the stash untouched')
+H.equal(registered.RemoveFromStash('locker', 'water', 1, 5), false, 'RemoveFromStash refuses an explicit slot that holds nothing')
+H.equal(state['stash:locker'].items[1].amount, 4, 'a refused slot-targeted RemoveFromStash leaves the stash untouched')
+
+H.equal(registered.RemoveFromStash('nope', 'water', 1), false, 'RemoveFromStash is false for an unresolvable stash')
+H.equal(registered.RemoveFromStash('locker', 'water', 4, 1), true, 'RemoveFromStash can drain a named slot completely')
+H.equal(state['stash:locker'].items[1], nil, 'draining a slot to zero clears it')
 
 H.finish()

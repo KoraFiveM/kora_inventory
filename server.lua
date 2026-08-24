@@ -9,6 +9,10 @@ local inventories, sessions, hooks, audit = {}, {}, {}, {}
 local locks, nextHookId, nextDropId = {}, 1, 1
 local ownPlayerWrites = {}
 local inspectionHooks, nextInspectionHookId = {}, 1
+-- stashSet is declared before the shared write funnel below. Forward-declare
+-- it so the closure captures this local rather than resolving a nonexistent
+-- global when a resource calls SetStashItems during startup.
+local setInventoryItems
 -- `owner = true` registrations are templates, not one globally shared stash.
 -- The actual secondary record is created lazily per citizen when they open it.
 local ownedStashTemplates = {}
@@ -1392,7 +1396,7 @@ local function removeSecondaryInventory(reference)
     return true
 end
 
-local function setInventoryItems(reference, items)
+setInventoryItems = function(reference, items)
     local k, inv = resolveInventoryRef(reference)
     if not k or not inv then return false, 'inventory not found' end
     if type(items) ~= 'table' then return false, 'items must be a table' end

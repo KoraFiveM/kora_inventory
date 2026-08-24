@@ -107,6 +107,15 @@ exports = setmetatable({}, {
                 return function(_, ...)
                     if resourceName == 'qbcore' and exportName == 'allShared' then return {} end
                     if resourceName == 'qbcore' and exportName == 'getPlayerData' then return {} end
+                    if resourceName == 'qbcore' and exportName == 'getShared' then
+                        local registry, name = ...
+                        if registry == 'items' and name == 'water_bottle' then
+                            return {
+                                name = 'water_bottle', label = 'Water Bottle', weight = 500,
+                                type = 'item', unique = false, useable = true,
+                            }
+                        end
+                    end
                     local fn = registered[exportName]
                     if fn then return fn(...) end
                     return nil
@@ -142,5 +151,17 @@ assertContract('server', 'qb-inventory', contract.qbInventory.server, 'qb server
 assertContract('client', 'qb-inventory', contract.qbInventory.client, 'qb client')
 assertContract('server', 'ox_inventory', contract.oxInventory.server, 'ox server')
 assertContract('client', 'ox_inventory', contract.oxInventory.client, 'ox client')
+
+-- qblib-playground initialises its shared locker at resource startup through
+-- RegisterStash + SetStashItems. This regression test exercises that public
+-- path end to end: stashSet is declared above setInventoryItems in server.lua,
+-- so it must close over the forward-declared local instead of a nil global.
+local stashKey = assert(registered.RegisterStash('smoke-stash', 'Smoke stash', 10, 10000, false))
+local stored, storeErr = registered.SetStashItems(stashKey, {
+    [1] = { name = 'water_bottle', amount = 1, slot = 1, info = {} },
+})
+H.ok(stored, 'SetStashItems writes a registered stash without a missing write funnel error: ' .. tostring(storeErr))
+local items = registered.GetStashItems(stashKey)
+H.equal(items[1].name, 'water_bottle', 'SetStashItems commits the supplied item')
 
 H.finish()

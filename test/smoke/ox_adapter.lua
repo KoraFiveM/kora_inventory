@@ -255,6 +255,16 @@ end
 api.RegisterShop = function(shopType, details) api.shop = { shopType = shopType, details = details } end
 api.registerHook = function(event, cb, options) api.hook = { event = event, cb = cb, options = options }; return 7 end
 api.removeHooks = function(id) api.removedHook = id; return true end
+-- Mirrors server.lua's native useItem: locates the item by slot/name, mutates
+-- nothing directly (that lives inside the real lock/hook/handler chain), and
+-- just reports whether a use happened.
+api.useItem = function(src, slotOrName)
+    api.usedItem = { src = src, slotOrName = slotOrName }
+    local inv = state[key('player', src)]
+    local item = type(slotOrName) == 'number' and inv and inv.items[slotOrName] or nil
+    if not item then return false, 'item not found' end
+    return true
+end
 
 exports = setmetatable({}, {
     __call = function() error('the ox compat module must never call exports()', 2) end,
@@ -538,6 +548,48 @@ reset()
 Ox.SetMetadata('player:1', 3, { weight = 5 })
 H.equal(state['player:1'].items[3].metadata.weight, nil, 'a caller-supplied metadata weight is still rejected')
 H.ok(warnings[1] and warnings[1]:find('metadata_weight_not_supported', 1, true), 'the metadata weight rejection is reported')
+
+-- --- useItem is published on the SERVER identity too ------------------------
+--
+-- Previously only client/compat/ox.lua and qbinventory's own native api
+-- carried this name; exports.ox_inventory:useItem(...) on the server
+-- resolved to nothing.
+
+reset()
+local usedOk = Ox.useItem(1, 3)
+H.equal(usedOk, true, 'useItem delegates to the native use-item funnel and reports success')
+H.equal(api.usedItem.src, 1, 'useItem forwards the source')
+H.equal(api.usedItem.slotOrName, 3, 'useItem forwards the slot')
+local failedOk, failedErr = Ox.useItem(1, 99)
+H.equal(failedOk, false, 'useItem reports failure for an empty slot')
+H.equal(failedErr, 'item not found', 'useItem forwards the native funnel\'s error')
+local cbResult, cbErr
+Ox.useItem(1, 3, function(ok, err) cbResult, cbErr = ok, err end)
+H.equal(cbResult, true, 'useItem invokes an optional callback with the result')
+H.equal(Ox.useItem('not-a-number', 1), false, 'useItem refuses a non-numeric source')
+
+-- --- ConvertInventory converts a whole inventory record ---------------------
+
+reset()
+local live = Ox.ConvertInventory('player:1')
+H.equal(live.id, 1, 'ConvertInventory resolves a known reference like GetInventory')
+H.equal(live.items[3].name, 'bread', 'a resolved reference is returned already in ox item shape')
+live.items[3] = nil
+H.ok(state['player:1'].items[3] ~= nil, 'ConvertInventory returns a detached snapshot for a resolved reference')
+
+local raw = Ox.ConvertInventory({
+    id = 'migrated', label = 'Migrated', type = 'stash', slots = 10, maxWeight = 1000,
+    items = { water = 3, bread = { name = 'bread', amount = 2, info = { quality = 50 } } },
+})
+H.equal(raw.id, 'migrated', 'ConvertInventory preserves the id of an unregistered raw payload')
+H.equal(raw.type, 'stash', 'ConvertInventory preserves the type of an unregistered raw payload')
+local rawByName = {}
+for _, it in pairs(raw.items) do rawByName[it.name] = it end
+H.equal(rawByName.water.count, 3, 'a bare name -> count entry converts into a counted ox item')
+H.equal(rawByName.bread.count, 2, 'a name -> item table entry keeps its count')
+H.equal(rawByName.bread.metadata.quality, 50, 'a name -> item table entry keeps its metadata')
+H.equal(raw.weight, (3 * 10) + (2 * 20), 'ConvertInventory recomputes weight from the real item registry')
+H.equal(Ox.ConvertInventory('no-such-reference'), nil, 'an unresolvable string reference with no items table converts to nil')
 
 print = realPrint
 H.finish()

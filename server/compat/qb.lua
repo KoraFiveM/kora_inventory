@@ -136,6 +136,69 @@ local function canAddItem(identifier, itemName, amount)
     return internal.canAdd(identifier, wanted, amount)
 end
 
+---Upstream: AddToStash(stashId, itemName, amount, slot, info) writes the item
+---straight into the named stash. An explicit slot is honoured as-is; without
+---one the authority's own addTo funnel picks a stack/free slot the same way
+---every other mutation here does -- never hand-roll placement against a
+---copied item table.
+local function addToStash(stashId, itemName, amount, slot, info)
+    local wanted = lower(itemName)
+    amount = tonumber(amount)
+    if not wanted or not amount or amount <= 0 then return false end
+    local inventoryKey, inventory = resolve(stashId, 'stash')
+    if not inventory or inventory.type ~= 'stash' then return false end
+    return internal.lock({ inventoryKey }, function()
+        local key, current = resolve(inventoryKey)
+        if not current then return false end
+        local ok = internal.addTo(key, wanted, amount, slot, info or {})
+        if not ok then return false end
+        internal.bump(key); internal.broadcast(key)
+        return true
+    end)
+end
+
+---Upstream: RemoveFromStash(stashId, itemName, amount, slot). A named slot is
+---removed from directly and must already hold at least `amount` of the named
+---item; otherwise every matching slot is drained (lowest slot first) until
+---`amount` is satisfied. The whole removal is refused up front if the stash
+---does not hold enough, rather than draining some slots and then reporting
+---failure with the stash already half-emptied.
+local function removeFromStash(stashId, itemName, amount, slot)
+    local wanted = lower(itemName)
+    amount = tonumber(amount)
+    if not wanted or not amount or amount <= 0 then return false end
+    local inventoryKey, inventory = resolve(stashId, 'stash')
+    if not inventory or inventory.type ~= 'stash' then return false end
+    return internal.lock({ inventoryKey }, function()
+        local key, current = resolve(inventoryKey)
+        if not current then return false end
+        if slot ~= nil then
+            slot = tonumber(slot)
+            local item = slot and current.items[slot]
+            if not item or lower(item.name) ~= wanted or item.amount < amount then return false end
+            local ok = internal.removeFrom(key, slot, amount)
+            if not ok then return false end
+            internal.bump(key); internal.broadcast(key)
+            return true
+        end
+        local candidates = slotsByItem(current.items, wanted)
+        local available = 0
+        for _, candidateSlot in ipairs(candidates) do available = available + current.items[candidateSlot].amount end
+        if available < amount then return false end
+        local remaining = amount
+        for _, candidateSlot in ipairs(candidates) do
+            if remaining <= 0 then break end
+            local item = current.items[candidateSlot]
+            local take = math.min(remaining, item.amount)
+            local ok = internal.removeFrom(key, candidateSlot, take)
+            if not ok then return false end
+            remaining = remaining - take
+        end
+        internal.bump(key); internal.broadcast(key)
+        return true
+    end)
+end
+
 -- This module does NOT call exports(). It builds a table which
 -- server/compat/providers.lua publishes under the `qb-inventory` identity
 -- through __cfx_export_qb-inventory_<name> handlers -- a namespace entirely
@@ -153,6 +216,8 @@ local api = {
     ClearStash = clearStash,
     CreateInventory = createInventory,
     RemoveInventory = removeInventory,
+    AddToStash = addToStash,
+    RemoveFromStash = removeFromStash,
 }
 
 -- Full upstream qb-inventory compatibility uses the same authority methods,
