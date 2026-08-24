@@ -301,7 +301,9 @@ local function writeMigrationRow(source, sourceKey, sourceChecksum, status, kind
         VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `source_checksum`=VALUES(`source_checksum`),
         `inventory_type`=VALUES(`inventory_type`), `inventory_id`=VALUES(`inventory_id`),
         `status`=VALUES(`status`), `error`=VALUES(`error`), `imported_at`=CURRENT_TIMESTAMP]],
-        { source, sourceKey, sourceChecksum, kind, id, status, err })
+        -- `err` is nil on the success path; bind it as a real NULL so the
+        -- array keeps its seven elements.
+        { source, sourceKey, sourceChecksum, kind, id, status, err or QB.sql.NULL })
 end
 
 local function quarantine(source, sourceKey, raw, reason)
@@ -321,7 +323,8 @@ end
 local function finishMigrationState(source, status, report, err)
     return db([[UPDATE `qbinventory_migration_state` SET `status`=?, `last_finished_at`=CURRENT_TIMESTAMP,
         `imported_count`=?, `skipped_count`=?, `quarantined_count`=?, `last_error`=? WHERE `source_name`=?]],
-        { status, report.imported, report.skipped, report.quarantined, err, source })
+        -- `err` sits mid-array and is nil on success, which would leave a hole.
+        { status, report.imported, report.skipped, report.quarantined, err or QB.sql.NULL, source })
 end
 
 local function emitProgress(report, source, phase, row)

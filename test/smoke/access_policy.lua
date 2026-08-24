@@ -18,7 +18,7 @@ local docs = read('docs.md')
 -- Inspection is opt-in and proximity cannot be used as an implicit grant.
 H.ok(config:find('playerInspection = { access = nil }', 1, true), 'inspection starts default-deny')
 H.ok(server:find("return allowed, allowed and nil or 'player inspection not authorised'", 1, true), 'inspection requires an explicit trusted grant')
-H.ok(server:find('if type(policy.access) == \'function\' then', 1, true), 'configured inspection policy must be executable server code')
+H.ok(server:find('if I.isCallable(policy.access) then', 1, true), 'configured inspection policy must be executable server code')
 H.ok(server:find('pcall(callback, src, target', 1, true), 'inspection policies are isolated from authority errors')
 H.ok(server:find("if result == false then return false, reason or 'player inspection denied' end", 1, true), 'one inspection policy can veto access')
 H.ok(server:find('I.copy(playerData(src) or {})', 1, true), 'inspection policies receive detached source data')

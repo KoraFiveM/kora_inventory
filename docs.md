@@ -193,9 +193,75 @@ The lower-camel exports are the qbcore gateway surface:
 qb-style aliases are also exported (`AddItem`, `RemoveItem`, `OpenInventory`,
 `GetStashItems`, `RegisterStash`, and so on), alongside ox-style constructors
 `RegisterStash`, `CreateTemporaryStash`, `RegisterShop`, `BuyItem`,
-`RegisterHook`, and `RemoveHooks`. These are direct `qbinventory` exports
-only. Do not enable the `qb-inventory` or `ox_inventory` provider identities
-until their upstream contracts have been completed and contract-tested.
+`RegisterHook`, and `RemoveHooks`.
+
+Every public name is reachable in **both cases** (`registerStash` and
+`RegisterStash`). Half this surface once carried a lowercase alias and half did
+not, so a caller had to know which half a name fell in;
+`test/smoke/export_collisions.lua` now asserts the pairing and that both cases
+resolve to the same function.
+
+### Provider identities
+
+`qb-inventory` and `ox_inventory` are **enabled**. Each compat module builds a
+table which `server/compat/providers.lua` publishes as
+`__cfx_export_<identity>_<name>` handlers -- a namespace separate from
+qbinventory's own flat export table, which is what lets same-named qb and ox
+exports keep their different upstream return shapes.
+`test/smoke/provider_contract.lua` loads both realms the way FXServer does and
+asserts every name in `test/contracts/upstream.lua` is actually callable on the
+right identity **in the right realm**.
+
+A compat module must never call `exports()`. Doing so writes into qbinventory's
+own flat table and silently replaces a native export for every other resource --
+`client/compat/ox.lua` did exactly that to `openInventory`/`closeInventory`, and
+because its wrappers then re-entered the export, every stash and shop open
+recursed until the client hung. `test/smoke/export_collisions.lua` covers both
+realms against that.
+
+### Reading qbcore's shared item registry
+
+`exports.qbcore:getShared(name, key)` requires **both** arguments -- it returns
+`registries[name].materialised[key]`. Calling it with only a registry name
+returns `nil` unconditionally, silently. The registry is named `items`,
+lower-case (`qbcore/modules/registry/server.lua:12`), and there is no public
+accessor for the whole name-keyed map: `allShared('items')` returns a dense
+ARRAY of records, so a map has to be rebuilt from it.
+
+Both ox compat realms previously called `getShared('Items')` -- wrong registry
+name *and* no key -- so every item lookup resolved to nil. Anything gated on
+such a lookup reports "no such item" for every item in the game.
+
+### Client compat surfaces
+
+- `client/compat.lua` -- the qb-inventory client bridge (net events, commands,
+  `inv_busy`). Registers no exports.
+- `client/compat/ox.lua` -- the whole `ox_inventory` client identity, including
+  its own `openInventory`/`closeInventory` wrappers (which carry the
+  `setStashTarget` substitution).
+- `client.lua` -- qbinventory's native client exports, and the `qb-inventory`
+  identity only.
+
+**One module owns one identity.** Registering the same name on the same identity
+from two files "works" only because the later `AddEventHandler` wins, so
+behaviour would change silently if `client_scripts` were reordered.
+
+### Deliberate divergences from upstream
+
+These are intentional and tested; they are the points where upstream's contract
+conflicts with this resource's authority model.
+
+| Area | Upstream | Here | Why |
+|---|---|---|---|
+| Full-inventory replacement | `SetInventoryData` trusts the client's inventory ids | translated onto the validated transfer funnel; can only name the two inventories the caller's own session already holds | a client must never assert what it may touch |
+| `Inventories` / `Drops` / `RegisteredShops` | mutable globals other resources write to | not exposed | a mutable global bypasses the lock/bump/broadcast write funnel |
+| `qb-inventory:server:updateDrop` | writes drop coords from the client | inert no-op | position gates every distance check |
+| `qb-inventory:server:snowball` | grants a weapon on a client event | inert no-op | server code can call `AddItem` directly |
+| `SaveInventory(source, offline)` | writes player items | flushes secondary inventories only | qbcore owns player persistence |
+| ox `GetInventory` / `Inventory` | a live `OxInventory` instance with methods | a detached snapshot | a live object is a mutation path around the write funnel |
+| ox `SetSlotCount` / `SetMaxWeight` | resizes any inventory | refuses player inventories | qbcore owns player dimensions |
+| ox `SetMetadata` | accepts `metadata.weight` | rejects it | a caller-supplied weight invalidates capacity checks |
+| ox `addCash` / `removeCash` / `getBank` / `getCards` / `giveCard` | operate on `money` / `mastercard` items | routed to qbcore accounts | qbcore owns balances |
 
 ## Client and renderer contract
 
@@ -213,6 +279,53 @@ revisions, slots, amount, server item data, routing bucket, access policy, and
 distance immediately before mutation. Viewers of a shared inventory receive a
 revisioned replacement view after each committed change; stale actions are
 rejected rather than merged.
+
+### Using items
+
+An item definition (qbcore's shared `items` registry) may set two qbinventory-
+native fields on top of the usual `useable`/`weight`/`unique`/etc, both derived
+and validated by `buildItem` exactly like those:
+
+- `preventClose` (boolean) -- default `false`. A completed use normally closes
+  the panel client-side afterwards (mirroring real qb-inventory's
+  `shouldClose`); `preventClose = true` keeps it open. A legacy item that sets
+  `shouldClose = false` (kept as pure qb-core compat metadata, see below) is
+  honoured as an implicit `preventClose = true` even without the native field.
+- `useTime` (integer ms) -- default `0` (today's immediate-use behaviour).
+  When set, the client runs qblib's progress bar
+  (`QB.progressbar.start`, see `qblib/modules/progressbar`) for `useTime` ms
+  *before* it ever contacts the server. If the bar is cancelled or never
+  starts, the client never sends the use request at all -- there is no
+  server-side "was it shown" flag to trust, so not asking is what keeps a
+  cancelled bar from ever applying its effect.
+
+Both fields are canonical and, like `weight`/`useable`/`shouldClose`, cannot be
+forged onto a stored item through `setItems`/`SetInventory`'s per-field
+passthrough.
+
+`intentUse` (the server half of the NUI `use` action) reports
+`{ preventClose }` back to the caller on success, and `client.lua`'s
+`submitIntent` calls `closeInventory()` unless that came back `true`. The same
+gate (`QbInventory.useGate`, defined in `client.lua`) runs before both this NUI
+path and the hotbar keybinds below, so there is exactly one place that decides
+whether a use is allowed to proceed.
+
+Pressing `1`-`5` uses whatever item currently occupies inventory slots 1-5,
+even with the panel closed -- qbinventory has no separate hotbar/quickslot
+data model (see the `qb-inventory:client:hotbar` no-op just below), so the
+first 5 general inventory slots double as the hotbar, matching real
+qb-inventory/ox_inventory. `client/hotbar.lua` registers these with the plain
+`RegisterCommand` + `RegisterKeyMapping` pattern used elsewhere in this
+codebase, does nothing while `IsNuiFocused()`/`IsPauseMenuActive()` (so it
+never fights the panel's own Use action), and reuses the existing legacy
+`QBCore:Server:UseItem` transport -- which already re-resolves the slot from
+qbcore-owned `PlayerData` and never trusts the transmitted item record --
+instead of adding a second server-side use path.
+
+Double-clicking a slot in the bundled web UI (`web/src/App.tsx`) triggers the
+same `activateItem` used by the detail panel's Use/Buy button and the
+Enter-key shortcut on a selected item; there is only one place that decides
+what "activate this item" means.
 
 ### qb-inventory client bridge
 

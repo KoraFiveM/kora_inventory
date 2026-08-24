@@ -67,6 +67,16 @@ local function buildItem(name, amount, slot, metadata)
         metadata = I.copy(metadata or {}), type = def.type or 'item', unique = def.unique or false,
         useable = def.useable == true or hasUseable(def.name or name), container = def.container == true, image = def.image, imageUrl = def.imageUrl, label = def.label or name,
         weight = def.weight or 0, shouldClose = def.shouldClose, description = def.description,
+        -- `preventClose` is qbinventory's own native field (opposite polarity
+        -- of legacy `shouldClose`, default false = "closes the panel after
+        -- use"). `shouldClose` itself is left untouched above for qb-core
+        -- compat parity -- but a legacy item that set `shouldClose = false`
+        -- meant exactly "leave the inventory open", so honour that as an
+        -- implicit preventClose when the item hasn't set the native field.
+        preventClose = def.preventClose == true or def.shouldClose == false,
+        -- Milliseconds run through qblib's progress bar (client.lua) before a
+        -- use effect applies. 0/absent keeps today's immediate-use behaviour.
+        useTime = math.max(0, math.floor(tonumber(def.useTime) or 0)),
         created = os.time(),
     }
 end
@@ -83,7 +93,7 @@ local function showItemBox(src, name, amount, action)
 
     local def = itemDef(name)
     if not def then return end
-    emit(src, 'qbinventory:client:itemBox', {
+    local payload = {
         name = def.name or tostring(name):lower(),
         label = def.label or tostring(name),
         image = def.image,
@@ -91,7 +101,13 @@ local function showItemBox(src, name, amount, action)
         amount = amount,
         action = action,
         duration = math.max(750, math.floor(tonumber(policy.duration) or 2600)),
-    })
+    }
+    emit(src, 'qbinventory:client:itemBox', payload)
+    -- The upstream name, for legacy client scripts. Argument order is
+    -- upstream's (itemData, type, amount). qbinventory's own client bridge
+    -- registers this as a no-op, so its UI still renders exactly one receipt
+    -- from the native event above.
+    emit(src, 'qb-inventory:client:ItemBox', payload, action, amount)
 end
 
 local function secondary(kind, id, opts)
@@ -196,7 +212,7 @@ local function mayInspectPlayer(src, target)
         if result == true then allowed = true end
         return true
     end
-    if type(policy.access) == 'function' then
+    if I.isCallable(policy.access) then
         local ok, err = run(policy.access)
         if not ok then return false, err end
     end
@@ -261,6 +277,12 @@ local function broadcast(k)
     for src, session in pairs(sessions) do
         if session.primary == k or session.secondary == k then
             emit(src, 'qbinventory:client:sessionPatched', session.token, update)
+            -- Legacy qb-inventory dependants listen for this to re-read their
+            -- own PlayerData after a change. qbinventory's own client bridge
+            -- treats it as a refresh request, and third-party scripts that only
+            -- know the upstream name now hear about committed changes at all --
+            -- previously nothing outside qbinventory was ever notified.
+            emit(src, 'qb-inventory:client:updateInventory')
         end
     end
 end
@@ -710,11 +732,14 @@ local function intentUse(src, request)
         if not currentSession or not current then return false, 'stale inventory' end
         local item = current.items[slot]
         if not item then return false, 'invalid item slot' end
-        local itemName = item.name
+        -- Captured before useItem() runs: a successful use can consume the
+        -- item (or the whole stack), so `current.items[slot]` may be gone or
+        -- a different record afterwards.
+        local itemName, preventClose = item.name, item.preventClose == true
         local ok, err = useItem(src, slot)
         if not ok then return false, err or 'item cannot be used' end
         recordAudit('use', src, { item = itemName, slot = slot })
-        return true
+        return true, { preventClose = preventClose }
     end)
 end
 
@@ -1027,7 +1052,7 @@ function setItems(src, newItems)
             if field ~= 'slot' and field ~= 'name' and field ~= 'amount' and field ~= 'count'
                 and field ~= 'info' and field ~= 'metadata' and field ~= 'weight' and field ~= 'type'
                 and field ~= 'unique' and field ~= 'useable' and field ~= 'label' and field ~= 'image' and field ~= 'imageUrl'
-                and field ~= 'shouldClose' then
+                and field ~= 'shouldClose' and field ~= 'preventClose' and field ~= 'useTime' then
                 built[field] = I.copy(value)
             end
         end
@@ -1043,7 +1068,7 @@ end
 
 local useables, useableOwners = {}, QB.resources.serverRegistry(function(name) useables[name] = nil end)
 function createUseable(name, handler)
-    assert(type(name) == 'string' and type(handler) == 'function', 'name and handler are required')
+    assert(type(name) == 'string' and I.isCallable(handler), 'name and handler are required')
     local owner = GetInvokingResource() or resource; useables[name] = handler; useableOwners.track(owner, name)
 end
 -- Whether clicking Use on this item would do something even without a
@@ -1241,7 +1266,7 @@ function buyItem(src, shopId, slot, count)
 end
 
 function registerHook(eventName, callback, options)
-    assert(type(eventName) == 'string' and type(callback) == 'function', 'eventName and callback are required')
+    assert(type(eventName) == 'string' and I.isCallable(callback), 'eventName and callback are required')
     hooks[eventName] = hooks[eventName] or {}
     local id = nextHookId; nextHookId = nextHookId + 1
     hooks[eventName][id] = { id = id, callback = callback, options = options or {}, owner = GetInvokingResource() or resource }
@@ -1253,7 +1278,7 @@ function removeHooks(id) for _, list in pairs(hooks) do list[id] = nil end end
 ---callback receives source, target, and detached player data; it must return
 ---true to grant. Returning false rejects the request.
 function registerInspectionAccess(callback)
-    assert(type(callback) == 'function', 'inspection callback is required')
+    assert(I.isCallable(callback), 'inspection callback is required')
     local id = nextInspectionHookId; nextInspectionHookId = nextInspectionHookId + 1
     inspectionHooks[id] = { callback = callback, owner = GetInvokingResource() or resource }
     return id
@@ -1311,6 +1336,44 @@ local function canAddToInventory(reference, name, amount, slot, metadata)
     return true
 end
 
+---Move a secondary inventory to a new id, keeping its contents, viewers and
+---durable row. ox_inventory's UpdateVehicle renames trunk/glovebox inventories
+---when a plate changes; setting inv.id in place is not enough -- the registry
+---is keyed by the OLD key, so the inventory stays reachable only under the old
+---name while its own .key field claims otherwise.
+---@return string|nil newKey, string|nil err
+local function rekeySecondary(reference, newKind, newId)
+    local oldKey, inv = resolveInventoryRef(reference)
+    if not oldKey or not inv then return nil, 'inventory' end
+    if inv.type == 'player' then return nil, 'player inventories cannot be rekeyed' end
+
+    local newKey = key(newKind or inv.type, newId)
+    if newKey == oldKey then return newKey end
+    if inventories[newKey] then return nil, 'target inventory already exists' end
+
+    -- Drop the durable row under the old identity BEFORE re-registering, so a
+    -- crash between the two cannot leave the same contents persisted twice.
+    local persistence = I.persistence
+    if persistence and persistence.delete and persistence.shouldPersist and persistence.shouldPersist(inv) then
+        persistence.delete(inv.type, inv.id)
+    end
+
+    inventories[oldKey] = nil
+    inv.key, inv.id = newKey, newId
+    if newKind then inv.type = newKind end
+    inventories[newKey] = inv
+
+    -- Any session pointing at the old key would fail every subsequent
+    -- revision check, so move viewers across rather than stranding them.
+    for src, session in pairs(sessions) do
+        if session.primary == oldKey then session.primary = newKey end
+        if session.secondary == oldKey then session.secondary = newKey end
+    end
+
+    bump(newKey); broadcast(newKey)
+    return newKey
+end
+
 local function removeSecondaryInventory(reference)
     local k, inv = resolveInventoryRef(reference)
     if not k or not inv then return false, 'inventory not found' end
@@ -1347,7 +1410,7 @@ local function setInventoryItems(reference, items)
             if field ~= 'slot' and field ~= 'name' and field ~= 'amount' and field ~= 'count'
                 and field ~= 'info' and field ~= 'metadata' and field ~= 'weight' and field ~= 'type'
                 and field ~= 'unique' and field ~= 'useable' and field ~= 'label' and field ~= 'image' and field ~= 'imageUrl'
-                and field ~= 'shouldClose' then
+                and field ~= 'shouldClose' and field ~= 'preventClose' and field ~= 'useTime' then
                 built[field] = I.copy(value)
             end
         end
@@ -1368,6 +1431,7 @@ I.internal = {
     createSecondary = secondary,
     setInventoryItems = setInventoryItems,
     removeSecondary = removeSecondaryInventory,
+    rekeySecondary = rekeySecondary,
     canAdd = canAddToInventory,
     addTo = addTo,
     removeFrom = removeFrom,
@@ -1384,6 +1448,18 @@ I.internal = {
     registerInspectionAccess = registerInspectionAccess,
     removeInspectionAccess = removeInspectionAccess,
     getRevision = revision,
+    -- Read-only view of a player's live session. Compatibility bridges need the
+    -- token and the two authorised inventory keys to translate a legacy request
+    -- into a validated transfer; they must never be able to invent them.
+    sessionOf = function(src)
+        local session = sessions[src]
+        if not session then return nil end
+        return { token = session.token, primary = session.primary, secondary = session.secondary, expires = session.expires }
+    end,
+    -- The validated move/split/swap funnel: token, both revisions, access,
+    -- routing bucket, distance and hooks are all rechecked inside its lock.
+    -- Legacy transports translate onto this instead of mutating items directly.
+    transfer = function(src, request) return transfer(src, request) end,
     copy = I.copy,
     totalWeight = I.totalWeight,
     sameInfo = I.sameInfo,
@@ -1405,11 +1481,27 @@ local api = {
     ClearInventory = clearInventory, SetInventory = setItems, CreateUsableItem = createUseable,
     OpenInventory = openQbInventory, CloseInventory = closeInventory, GetInventory = function(src) return playerItems(src) end,
     GetStashItems = stashGet, SetStashItems = stashSet, RegisterStash = registerStash,
-    CreateTemporaryStash = createTemporaryStash, RegisterShop = registerShop, BuyItem = buyItem,
+    CreateTemporaryStash = createTemporaryStash, RegisterShop = registerShop, registerShop = registerShop, BuyItem = buyItem,
     RegisterHook = registerHook, RemoveHooks = removeHooks,
     registerHook = registerHook, removeHooks = removeHooks,
     RegisterInspectionAccess = registerInspectionAccess, RemoveInspectionAccess = removeInspectionAccess,
+    registerInspectionAccess = registerInspectionAccess,
 }
+
+-- Every public name is reachable in BOTH cases. Half of this surface already
+-- carried a lowercase alias (registerShop/registerHook/removeHooks/
+-- registerInspectionAccess) and half did not, so a caller had to know which
+-- half a given name fell in -- qbambulance called `registerStash` and got
+-- "No such export". Alias by reference rather than re-declaring the closure,
+-- so both cases stay the same function object. test/smoke/contract.lua asserts
+-- the pairing, so a future one-cased addition fails the suite.
+api.registerStash = api.RegisterStash
+api.createTemporaryStash = api.CreateTemporaryStash
+api.buyItem = api.BuyItem
+api.getInventory = api.GetInventory
+api.getFreeWeight = api.GetFreeWeight
+api.removeInspectionAccess = api.RemoveInspectionAccess
+
 -- These are qbinventory-private bridge exports for qbcore only. They are not
 -- advertised through qb-inventory/ox_inventory compatibility identities.
 local physicalCashApi = {

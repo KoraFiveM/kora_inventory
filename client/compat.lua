@@ -63,22 +63,22 @@ local function openLegacyTarget(other)
     return true
 end
 
+---Respond to a legacy "your inventory changed" push.
+---
+---Under qbinventory this is a deliberate no-op, and it must stay one. An open
+---session is already kept current by the authoritative
+---`qbinventory:client:sessionPatched` stream, and with no session open there is
+---no UI to refresh -- so there is no state a re-open could recover.
+---
+---It matters that this does NOT re-open: the server emits the legacy
+---`qb-inventory:client:updateInventory` after every committed change, so that
+---third-party scripts which only know the upstream name hear about it at all.
+---Re-opening in response would close and reissue the player's own session on
+---every single item change.
+---
+---The legacy payload is ignored either way; it is never a source of truth.
 local function refreshActiveSession()
-    local active = getCurrentSession()
-    local secondary = active and active.secondary
-    if active and not secondary then
-        openInventory('player', GetPlayerServerId(PlayerId()))
-        return true
-    end
-    if type(secondary) ~= 'table' or not validIdentifier(secondary.type)
-        or (type(secondary.id) ~= 'string' and type(secondary.id) ~= 'number') then
-        return false
-    end
-
-    -- Re-open only the server-issued target. This produces a new authoritative
-    -- snapshot; it does not copy data from qb-inventory:updateInventory.
-    openInventory(secondary.type, secondary.id)
-    return true
+    return getCurrentSession() ~= nil
 end
 
 -- A qbinventory session is the single lifecycle authority for inv_busy. The
@@ -115,6 +115,45 @@ end)
 -- to carry UI data or decide whether boxes are enabled.
 RegisterNetEvent('qb-inventory:client:ItemBox', function()
 end)
+
+-- The rest of upstream's client event surface. qbinventory owns its own UI, so
+-- most of these are DELIBERATE no-ops rather than missing work: registering the
+-- names means an unmodified qb-inventory dependant fires them harmlessly
+-- instead of erroring, while presentation stays under qbinventory's control
+-- (same reasoning as the ItemBox handler above).
+
+-- Upstream renders a "required items" hint panel. qbinventory's NUI does not
+-- take item lists from other resources -- that is the spoofing vector the
+-- ItemBox policy exists to close -- so the payload is intentionally dropped.
+RegisterNetEvent('qb-inventory:client:requiredItems', function() end)
+
+-- The hotbar is part of qbinventory's own UI and is driven from its session,
+-- not from a caller-supplied item list.
+RegisterNetEvent('qb-inventory:client:hotbar', function() end)
+
+-- Purely cosmetic, and safe to honour: play the same give animation upstream
+-- does. Skipped in a vehicle, exactly as upstream does.
+RegisterNetEvent('qb-inventory:client:giveAnim', function()
+    if IsPedInAnyVehicle(PlayerPedId(), false) then return end
+    RequestAnimDict('mp_common')
+    local deadline = GetGameTimer() + 1000
+    while not HasAnimDictLoaded('mp_common') and GetGameTimer() < deadline do Wait(0) end
+    if not HasAnimDictLoaded('mp_common') then return end
+    TaskPlayAnim(PlayerPedId(), 'mp_common', 'givetake1_b', 8.0, -8.0, -1, 49, 0, false, false, false)
+end)
+
+-- Drop discovery is server-resolved here: qbinventory hands the client a
+-- session for a drop it has already access-checked, so there is no client-side
+-- drop entity registry to add or remove targets from. Accepting these keeps
+-- upstream drop scripts from erroring.
+RegisterNetEvent('qb-inventory:client:setupDropTarget', function() end)
+RegisterNetEvent('qb-inventory:client:removeDropTarget', function() end)
+
+-- Registered CLIENT-side upstream despite the :server: name (qb-policejob
+-- fires it). Opening another player's inventory is gated by the server's
+-- inspection policy, so this cannot be granted from a client event -- the
+-- officer's own search flow goes through qbinventory's validated open.
+RegisterNetEvent('qb-inventory:server:RobPlayer', function() end)
 
 -- Older qb scripts used these names before the resource prefix was
 -- standardised. Keep the aliases narrow and subject to the same safe routing.

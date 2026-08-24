@@ -90,7 +90,7 @@ end
 
 ---Register a trusted, resource-owned server access callback.
 function V.registerAccess(callbackFn, options)
-    assert(type(callbackFn) == 'function', 'vehicle access callback is required')
+    assert(I.isCallable(callbackFn), 'vehicle access callback is required')
     options = options or {}
     if options.kind then assert(storageKind(options.kind), 'invalid vehicle storage type') end
     if options.class ~= nil then assert(asInteger(options.class) ~= nil, 'invalid vehicle class') end
@@ -117,7 +117,7 @@ end
 function V.authorise(src, vehicle)
     if type(src) ~= 'number' or type(vehicle) ~= 'table' then return false, 'invalid vehicle access request' end
     for _, check in ipairs({ cfg.ownerCheck, cfg.accessCheck }) do
-        if type(check) == 'function' then
+        if I.isCallable(check) then
             local ok, reason = callback(check, src, vehicle)
             if not ok then return false, reason end
         end

@@ -94,7 +94,7 @@ local function normaliseRecipe(id, recipe)
         output = output,
         -- This callback is registered by a server resource. It can inspect
         -- server-owned station/context data, but cannot alter planned items.
-        access = type(recipe.access) == 'function' and recipe.access or nil,
+        access = I.isCallable(recipe.access) and recipe.access or nil,
         station = type(recipe.station) == 'string' and recipe.station or nil,
     }
 end
@@ -123,7 +123,7 @@ function C.get(id)
 end
 
 function C.registerHook(callback)
-    assert(type(callback) == 'function', 'craft hook is required')
+    assert(I.isCallable(callback), 'craft hook is required')
     local id = nextHookId
     nextHookId = nextHookId + 1
     hooks[id] = { callback = callback, owner = owner() }

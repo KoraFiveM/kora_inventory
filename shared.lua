@@ -24,6 +24,17 @@ function I.sameInfo(a, b)
     return true
 end
 
+-- FXServer's exports boundary hands a cross-resource function argument back as
+-- a table with a __call metamethod, not a plain Lua function -- so a bare
+-- type(x) == 'function' check rejects a perfectly callable handler registered
+-- from another resource. Mirrors qblib/local/events/server.lua:47 and
+-- qbcore/modules/registry/shared.lua:116 (RI.isCallable).
+function I.isCallable(x)
+    if type(x) == 'function' then return true end
+    local mt = getmetatable(x)
+    return mt ~= nil and type(mt.__call) == 'function'
+end
+
 function I.itemWeight(item)
     return (tonumber(item and item.weight) or 0) * (tonumber(item and item.amount) or 0)
 end

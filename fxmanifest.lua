@@ -37,9 +37,18 @@ server_scripts {
     'server/containers.lua',
     'server/crafting.lua',
     'server/shops/ammunation.lua',
-    -- Direct, server-only compatibility helpers. Provider identities remain
-    -- intentionally disabled until full upstream contracts are verified.
+    -- Server-only compatibility helpers. Each builds a table which
+    -- server/compat/providers.lua publishes under its provider identity; a
+    -- compat module never calls exports() itself. The identities are LIVE and
+    -- their surfaces are enforced against test/contracts/upstream.lua by
+    -- test/smoke/provider_contract.lua.
     'server/compat/qb.lua',
+    -- Upstream qb-inventory's net-event transport, translated onto the
+    -- validated transfer funnel. Loads after server.lua (needs I.api/I.internal)
+    -- and after compat/qb.lua purely to keep the qb surface together.
+    'server/compat/qb_events.lua',
+    -- Upstream qb-inventory's QBCore callbacks (drops, purchase, give).
+    'server/compat/qb_callbacks.lua',
     'server/compat/ox.lua',
     'server/compat/providers.lua',
 }
@@ -48,6 +57,9 @@ client_scripts {
     'client.lua',
     -- Resolves nearby recipients locally; it never exposes them to the NUI.
     'client/give_target.lua',
+    -- Slot 1-5 hotbar keybinds. Loads after client.lua for QbInventory.useGate
+    -- and the legacy QBCore:Server:UseItem transport it reuses.
+    'client/hotbar.lua',
     'client/shops/ammunation.lua',
     -- Legacy qb-inventory event/command adapter. It has no NUI authority and
     -- only routes requested targets through client.lua's validated transport.

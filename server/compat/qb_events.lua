@@ -1,0 +1,122 @@
+-- qb-inventory server-realm net event and callback bridge.
+--
+-- Upstream qb-inventory drives its UI entirely over net events, so a stock
+-- third-party script talks to those names rather than to exports. Registering
+-- them is what makes an unmodified qb-inventory dependant work here.
+--
+-- SECURITY: none of these accept inventory contents from the client. Upstream's
+-- SetInventoryData is a move/split/swap engine that trusts the client's
+-- inventory ids; here it is translated onto qbinventory's own validated
+-- transfer funnel, which rechecks the session token, both revisions, access,
+-- routing bucket and distance inside a lock. The translation can only ever name
+-- the two inventories the caller's own server-issued session already
+-- authorises, so a crafted payload cannot reach a third inventory.
+-- test/smoke/contract.lua asserts there is no client-authorised full-inventory
+-- replacement path, and that stays true.
+
+local I = assert(QbInventory, 'qbinventory authority missing')
+local internal = assert(I and I.internal, 'qbinventory internal authority must load before qb event compatibility')
+local api = assert(I.api, 'qbinventory api must load before qb event compatibility')
+
+local function reject(src, reason)
+    TriggerClientEvent('qbinventory:client:rejected', src, reason)
+    return false, reason
+end
+
+---Translate an upstream qb-inventory inventory id onto a key the caller's live
+---session already holds. Returning only session keys is the security property:
+---'player' is the caller's own inventory, anything else can only be whatever
+---the server itself put in the secondary slot when it opened the session.
+---@return string|nil
+local function sessionKeyFor(session, identifier)
+    if identifier == nil or identifier == 'player' then return session.primary end
+    if type(identifier) ~= 'string' then return nil end
+
+    -- 'otherplayer-<id>' addresses a player inventory; every other upstream
+    -- prefix ('drop-', 'shop-', a bare stash name) addresses the secondary.
+    local otherPlayer = identifier:match('^otherplayer%-(%d+)$')
+    if otherPlayer then
+        local key = internal.playerKey(tonumber(otherPlayer))
+        return (key == session.primary or key == session.secondary) and key or nil
+    end
+
+    if session.secondary then
+        local _, inventory = internal.resolveInventory(session.secondary)
+        if inventory then
+            -- Accept the caller's spelling only if it actually denotes the
+            -- inventory the server already opened for them.
+            local id = tostring(inventory.id)
+            local stripped = identifier:gsub('^drop%-', ''):gsub('^shop%-', '')
+            if identifier == session.secondary or stripped == id or identifier == id then
+                return session.secondary
+            end
+        end
+    end
+    return nil
+end
+
+RegisterNetEvent('qb-inventory:server:SetInventoryData', function(fromInventory, toInventory, fromSlot, toSlot, fromAmount, _toAmount)
+    local src = source
+    local session = internal.sessionOf(src)
+    if not session then return reject(src, 'no open inventory session') end
+
+    local fromKey = sessionKeyFor(session, fromInventory)
+    local toKey = sessionKeyFor(session, toInventory)
+    if not fromKey or not toKey then return reject(src, 'inventory not in session') end
+
+    -- Supply the token and CURRENT revisions ourselves: upstream's protocol has
+    -- no concept of either, and a client must never be able to assert them.
+    return internal.transfer(src, {
+        token = session.token,
+        fromInventory = fromKey,
+        toInventory = toKey,
+        fromSlot = fromSlot,
+        toSlot = toSlot,
+        amount = fromAmount,
+        fromRevision = internal.getRevision(fromKey),
+        toRevision = internal.getRevision(toKey),
+    })
+end)
+
+RegisterNetEvent('qb-inventory:server:closeInventory', function()
+    internal.close(source, 'requested')
+end)
+
+RegisterNetEvent('qb-inventory:server:useItem', function(item)
+    local src = source
+    -- Only the slot is read. The item's name, weight and metadata are re-read
+    -- from qbcore-owned player data by useItem itself, so a forged payload
+    -- cannot use an item the player does not hold.
+    local slot = tonumber(type(item) == 'table' and item.slot or item)
+    if not slot then return end
+    api.useItem(src, slot)
+end)
+
+RegisterNetEvent('qb-inventory:server:openDrop', function(dropId)
+    local src = source
+    if type(dropId) ~= 'string' and type(dropId) ~= 'number' then return end
+    -- Upstream addresses drops as 'drop-<id>' while qbinventory's key is
+    -- key('drop', id), so the prefix has to come off first -- forwarding it
+    -- verbatim builds 'drop:drop-<id>' and never resolves.
+    local id = tostring(dropId):gsub('^drop%-', '')
+    -- open() runs the full access/distance/bucket check for the drop.
+    api.OpenInventory(src, id, { type = 'drop', id = id })
+end)
+
+RegisterNetEvent('qb-inventory:server:openVending', function()
+    local src = source
+    api.OpenInventory(src, 'vending', { type = 'shop', id = 'vending' })
+end)
+
+-- Upstream writes Drops[dropId].coords straight from the client. Position is
+-- authority state here (it gates every distance check), so this is accepted as
+-- a deliberate no-op rather than a client-writable field.
+RegisterNetEvent('qb-inventory:server:updateDrop', function() end)
+
+-- Upstream's snowball hooks add/remove a weapon on demand from a client event.
+-- Granting an item on client say-so is exactly the shape this resource refuses;
+-- a server-side script wanting it can call AddItem directly.
+RegisterNetEvent('qb-inventory:server:snowball', function() end)
+
+I.compat = I.compat or {}
+I.compat.qbEvents = { sessionKeyFor = sessionKeyFor }

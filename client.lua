@@ -5,6 +5,19 @@ local session
 local pendingGive
 local nextGiveRequestId = 0
 
+-- Shared by submitIntent's 'use' branch below and client/hotbar.lua's
+-- keybinds: gates a use behind qblib's progress bar when the item defines
+-- `useTime`. There is no server-side "was the bar actually shown/completed"
+-- flag to trust, so the only safe design is not sending the use request at
+-- all until the bar itself reports completion -- a cancelled/never-started
+-- bar returns here without ever reaching the server.
+function QbInventory.useGate(item)
+    local useTime = item and tonumber(item.useTime) or 0
+    if useTime <= 0 then return true end
+    local completed = QB.progressbar.start({ label = item.label or item.name, duration = useTime, canCancel = true })
+    return completed == true
+end
+
 RegisterNetEvent('qbinventory:client:sessionOpened', function(payload)
     if type(payload) ~= 'table' or type(payload.token) ~= 'string' then return end
     session = payload
@@ -77,6 +90,17 @@ function submitIntent(intent)
         return true
     end
     if action == 'use' or action == 'drop' or action == 'buy' then
+        if action == 'use' then
+            local slot = math.floor(tonumber(payload.slot) or 0)
+            local item = session.primary.items and session.primary.items[slot]
+            if not QbInventory.useGate(item) then
+                -- Cancelled (or never started) progress bar: treat exactly
+                -- like a rejected use attempt, without ever contacting the
+                -- server, so the effect can never apply for a bar the player
+                -- did not actually complete.
+                return false, 'cancelled'
+            end
+        end
         local ok, result = QB.callback.trigger('qbinventory:server:intent', {
             token = session.token,
             action = action,
@@ -84,7 +108,14 @@ function submitIntent(intent)
             primaryRevision = session.primary and session.primary.revision,
             secondaryRevision = session.secondary and session.secondary.revision,
         })
-        if not ok then TriggerEvent('qbinventory:ui:rejected', { reason = result }) end
+        if not ok then
+            TriggerEvent('qbinventory:ui:rejected', { reason = result })
+        elseif action == 'use' and (type(result) ~= 'table' or result.preventClose ~= true) then
+            -- Default behaviour: close the panel after a completed use
+            -- (mirrors real qb-inventory's shouldClose). An item opts out of
+            -- this with preventClose = true.
+            closeInventory()
+        end
         return ok == true, result
     end
     if action ~= 'move' and action ~= 'split' and action ~= 'transfer' and action ~= 'swapItems' then
@@ -158,10 +189,18 @@ exports('submitIntent', submitIntent)
 exports('getCurrentSession', getCurrentSession)
 exports('HasItem', hasItem)
 
-for _, identity in ipairs({ 'qb-inventory', 'ox_inventory' }) do
-    AddEventHandler(('__cfx_export_%s_HasItem'):format(identity), function(setCB) setCB(hasItem) end)
-    AddEventHandler(('__cfx_export_%s_openInventory'):format(identity), function(setCB) setCB(openInventory) end)
-    AddEventHandler(('__cfx_export_%s_closeInventory'):format(identity), function(setCB) setCB(closeInventory) end)
+-- ONE module owns ONE identity. client/compat/ox.lua owns `ox_inventory`
+-- wholesale, including its own openInventory/closeInventory wrappers; this file
+-- owns `qb-inventory`. Registering the same name on the same identity from two
+-- files "works" only because the later AddEventHandler wins, so the behaviour
+-- would silently change if client_scripts were reordered -- and ox's wrapper
+-- carries state (the setStashTarget substitution) that the plain function does
+-- not. HasItem is a qb-inventory export only; ox has no client HasItem.
+for _, exportName in ipairs({ 'HasItem', 'openInventory', 'closeInventory' }) do
+    local fn = exportName == 'HasItem' and hasItem
+        or exportName == 'openInventory' and openInventory
+        or closeInventory
+    AddEventHandler(('__cfx_export_qb-inventory_%s'):format(exportName), function(setCB) setCB(fn) end)
 end
 
 AddEventHandler('onClientResourceStop', function(name)

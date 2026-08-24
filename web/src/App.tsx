@@ -66,12 +66,13 @@ interface SlotProps {
     onDrop: (source: DragSlot, target: SlotTarget) => void
     onDragEnd: () => void
     onSelect: (item?: InventoryItem) => void
+    onActivate: (item: InventoryItem) => void
 }
 
 /** React DnD's TouchBackend uses global CEF input listeners for both touch and
  * mouse. Unlike HTML5 DnD or source pointer-capture, it resolves the actual
  * destination slot after the cursor leaves the source element. */
-function InventorySlot({ item, index, inventory, selected, busy, canDropSlot, onDrop, onDragEnd, onSelect }: SlotProps) {
+function InventorySlot({ item, index, inventory, selected, busy, canDropSlot, onDrop, onDragEnd, onSelect, onActivate }: SlotProps) {
     const target = useMemo<SlotTarget>(() => ({ inventoryId: inventory.id, slot: index }), [index, inventory.id])
     const suppressClick = useRef(false)
     const [{ isDragging }, dragRef] = useDrag<DragSlot, SlotTarget, { isDragging: boolean }>(() => ({
@@ -115,6 +116,11 @@ function InventorySlot({ item, index, inventory, selected, busy, canDropSlot, on
             if (suppressClick.current) { suppressClick.current = false; return }
             if (!busy) onSelect(item)
         }}
+        onDoubleClick={() => {
+            // Same use-item action as the detail panel's Use/Buy button and
+            // the Enter-key shortcut on a selected item -- see activateItem.
+            if (!busy && item) onActivate(item)
+        }}
         onKeyDown={(event) => {
             if (event.key !== "Enter" && event.key !== " ") return
             event.preventDefault()
@@ -132,7 +138,7 @@ function InventorySlot({ item, index, inventory, selected, busy, canDropSlot, on
     </button>
 }
 
-function InventoryPanel({ inventory, selected, busy, canDropSlot, onDrop, onDragEnd, onSelect }: {
+function InventoryPanel({ inventory, selected, busy, canDropSlot, onDrop, onDragEnd, onSelect, onActivate }: {
     inventory: InventoryView
     selected?: Selection
     busy: boolean
@@ -140,6 +146,7 @@ function InventoryPanel({ inventory, selected, busy, canDropSlot, onDrop, onDrag
     onDrop: (source: DragSlot, target: SlotTarget) => void
     onDragEnd: () => void
     onSelect: (inventory: InventoryView, item: InventoryItem | undefined, slot: number) => void
+    onActivate: (inventory: InventoryView, item: InventoryItem) => void
 }) {
     const items = asSlots(inventory.items)
     const bySlot = new Map(items.map((item) => [item.slot, item]))
@@ -153,7 +160,7 @@ function InventoryPanel({ inventory, selected, busy, canDropSlot, onDrop, onDrag
             {Array.from({ length: inventory.slots }, (_, offset) => {
                 const slot = offset + 1
                 const item = bySlot.get(slot)
-                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} />
+                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} />
             })}
         </div>
     </section>
@@ -321,10 +328,15 @@ function InventoryApp() {
     const buy = useCallback((inventory: InventoryView, item: InventoryItem) => {
         if (inventory.type === "shop" && session) void submit("buy", { inventory: inventory.id, slot: item.slot, amount: 1 }, [inventory.id, session.player.id])
     }, [session, submit])
-    const activateSelected = useCallback((selection: Selection) => {
-        if (selection.inventory.type === "shop") buy(selection.inventory, selection.item)
-        else use(selection.inventory, selection.item)
+    // Shared by the Enter-key shortcut on a selected item and the slot
+    // grid's double-click handler below -- both just trigger whatever the
+    // detail panel's own primary-action button would (buy in a shop, use
+    // otherwise), rather than each re-deciding it themselves.
+    const activateItem = useCallback((inventory: InventoryView, item: InventoryItem) => {
+        if (inventory.type === "shop") buy(inventory, item)
+        else use(inventory, item)
     }, [buy, use])
+    const activateSelected = useCallback((selection: Selection) => activateItem(selection.inventory, selection.item), [activateItem])
     const close = useCallback(() => { if (session) void closeSession(session.sessionId, session.token) }, [session])
 
     useEffect(() => {
@@ -344,7 +356,7 @@ function InventoryApp() {
         <header className="inventory-topbar"><div className="brand"><PackageOpen size={20} /><span>INVENTORY</span><em>LIVE</em></div><label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search selected item" /></label><button className="close" onClick={close} aria-label="Close inventory"><X size={20} /></button></header>
         {error && <div className="notice" role="alert"><CircleAlert size={16} />{error}</div>}
         <div className="inventory-layout">
-            <InventoryPanel inventory={session.player} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} />
+            <InventoryPanel inventory={session.player} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} />
             <aside className={`item-detail${filteredSelected ? "" : " item-detail-empty"}`}>{filteredSelected ? <>
                 <ItemArtwork item={filteredSelected.item} className="detail-art" />
                 <p className="eyebrow">{filteredSelected.inventory.type === "shop" ? "shop item" : `slot ${filteredSelected.item.slot}`}</p>
@@ -359,7 +371,7 @@ function InventoryApp() {
                     </>}
                 </>}
             </> : <div className="empty-detail"><PackageOpen size={30} /><h1>Item details</h1><p>{selected ? `Choose a destination for ${(selected.item.label ?? selected.item.name)}.` : "Select an item to inspect it, then use, move, or drop it."}</p></div>}</aside>
-            {session.secondary ? <InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} /> : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section>}
+            {session.secondary ? <InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} /> : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section>}
         </div>
         <footer className="shortcut-bar"><span><kbd>Esc</kbd> Close</span><span><kbd>↵</kbd> Use selected</span><span><kbd>Drag</kbd> Move or stack</span><span>{movePending ? "Updating inventory…" : `Revision ${session.revision ?? 0}`}</span></footer>
     </main></>

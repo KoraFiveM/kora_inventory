@@ -24,9 +24,21 @@ end
 -- the list a second time, so this test cannot silently drift out of sync
 -- with the real load order.
 local manifest = read('fxmanifest.lua')
+-- Comment lines inside these blocks contain apostrophes ("client.lua's
+-- validated transport"), which a bare '([^']+)' scan happily reads as quoted
+-- paths. Skip comment lines before extracting.
+local function pathsFrom(block)
+    local paths = {}
+    for line in block:gmatch('[^\n]+') do
+        if not line:match('^%s*%-%-') then
+            for path in line:gmatch("'([^']+)'") do paths[#paths + 1] = path end
+        end
+    end
+    return paths
+end
+
 local block = assert(manifest:match('server_scripts%s*{(.-)\n}'), 'fxmanifest.lua must declare server_scripts')
-local serverScripts = {}
-for path in block:gmatch("'([^']+)'") do serverScripts[#serverScripts + 1] = path end
+local serverScripts = pathsFrom(block)
 H.ok(#serverScripts >= 8, 'fxmanifest server_scripts were discovered')
 
 -- Shared-script prerequisites. Every server_scripts file below assumes
@@ -117,5 +129,90 @@ H.equal(#collisions, 0, 'no export name is silently overwritten by a later serve
 local total = 0
 for _ in pairs(registeredBy) do total = total + 1 end
 H.ok(total > 20, 'the combined exports table captured every server_scripts export')
+
+-- Dual-case pairing. Half this surface shipped with a lowercase alias and half
+-- without, so a caller had to know which half a name fell in -- qbambulance
+-- called `registerStash`, which only existed as `RegisterStash`, and got
+-- "No such export" at boot. These pairs must stay reachable in BOTH cases and
+-- must resolve to the SAME function, so an alias can never drift into a second
+-- implementation.
+--
+-- This is an explicit list, not a mechanical case transform, because the
+-- PascalCase half of the surface is mostly qb-inventory COMPAT aliases under
+-- different names (setItems/SetInventory, stashGet/GetStashItems,
+-- canCarry/CanAddItem) rather than case variants. Only genuine case pairs
+-- belong here. Deliberately NOT paired: OpenInventory/CloseInventory, whose
+-- lowercase forms are the distinct client-realm exports.
+for _, pair in ipairs({
+    'addItem/AddItem', 'removeItem/RemoveItem', 'getItemByName/GetItemByName',
+    'getItemsByName/GetItemsByName', 'getItemBySlot/GetItemBySlot',
+    'getItemCount/GetItemCount', 'hasItem/HasItem', 'getFreeSlot/GetFreeSlot',
+    'clearInventory/ClearInventory', 'getInventory/GetInventory',
+    'getFreeWeight/GetFreeWeight', 'registerStash/RegisterStash',
+    'createTemporaryStash/CreateTemporaryStash', 'registerShop/RegisterShop',
+    'buyItem/BuyItem', 'registerHook/RegisterHook', 'removeHooks/RemoveHooks',
+    'registerInspectionAccess/RegisterInspectionAccess',
+    'removeInspectionAccess/RemoveInspectionAccess',
+}) do
+    local lower, upper = pair:match('^(.-)/(.+)$')
+    local lowerEntries, upperEntries = registeredBy[lower], registeredBy[upper]
+    H.ok(lowerEntries ~= nil, 'export ' .. lower .. ' is registered')
+    H.ok(upperEntries ~= nil, 'export ' .. upper .. ' is registered')
+    if lowerEntries and upperEntries then
+        H.ok(lowerEntries[#lowerEntries].fn == upperEntries[#upperEntries].fn,
+            'export ' .. pair .. ' resolve to the same function')
+    end
+end
+
+-- --- client realm ---
+--
+-- The same flat-namespace hazard applies to client_scripts, and it BIT:
+-- client/compat/ox.lua looped `exports(name, fn)` over its whole Ox table,
+-- which includes openInventory/closeInventory. client.lua registers those
+-- first, so the compat wrappers silently replaced them for every resource in
+-- the server -- and those wrappers called exports.qbinventory:openInventory,
+-- which then resolved back to themselves. Unbounded recursion on every
+-- qbpolice/qbambulance/qbclothing/qblib-playground stash or shop open.
+--
+-- These client files touch NUI and LocalPlayer at load time, so they are read
+-- statically rather than dofile'd. The invariant enforced is the same one the
+-- server realm gets structurally from server/compat/providers.lua: a compat
+-- module builds a table and its PROVIDER IDENTITY publishes it -- a compat
+-- module never registers into qbinventory's own export table.
+local clientBlock = assert(manifest:match('client_scripts%s*{(.-)\n}'), 'fxmanifest.lua must declare client_scripts')
+local clientScripts = pathsFrom(clientBlock)
+H.ok(#clientScripts >= 5, 'fxmanifest client_scripts were discovered')
+
+local ownerOfExport = {}
+local clientProblems = {}
+for _, path in ipairs(clientScripts) do
+    local source = read(path)
+    local isCompat = path:find('compat', 1, true) ~= nil
+
+    -- Literal registrations: exports('name', fn)
+    for name in source:gmatch("exports%(%s*'([%w_]+)'") do
+        if ownerOfExport[name] and ownerOfExport[name] ~= path then
+            clientProblems[#clientProblems + 1] =
+                ("%s is registered by both '%s' and '%s'"):format(name, ownerOfExport[name], path)
+        end
+        ownerOfExport[name] = ownerOfExport[name] or path
+    end
+
+    -- Dynamic registrations: `exports(name, fn)` inside a loop. Unresolvable
+    -- statically, so a compat module is simply not allowed to do it.
+    if isCompat and source:find('exports%(%s*[%a_][%w_]*%s*,') then
+        clientProblems[#clientProblems + 1] =
+            ("%s registers exports dynamically into qbinventory's own table; publish under its provider identity instead"):format(path)
+    end
+end
+table.sort(clientProblems)
+
+H.equal(#clientProblems, 0, 'no client_scripts export is registered by two files'
+    .. (clientProblems[1] and (' (first: ' .. clientProblems[1] .. ')') or ''))
+
+-- The two names the recursion actually went through must stay owned by
+-- client.lua, which is what every other resource calls.
+H.equal(ownerOfExport['openInventory'], 'client.lua', 'client.lua owns the openInventory export')
+H.equal(ownerOfExport['closeInventory'], 'client.lua', 'client.lua owns the closeInventory export')
 
 H.finish()

@@ -52,7 +52,7 @@ local function setItemData(identifier, itemName, dataKey, value, slot)
     -- checks or turn a stackable item into a unique one mid-transaction.
     if ({ slot = true, name = true, amount = true, count = true, weight = true,
         type = true, unique = true, useable = true, label = true, image = true,
-        shouldClose = true })[dataKey] then return false end
+        shouldClose = true, preventClose = true, useTime = true })[dataKey] then return false end
     local inventoryKey, inventory = resolve(identifier)
     if not inventory then return nil end
 
@@ -136,14 +136,14 @@ local function canAddItem(identifier, itemName, amount)
     return internal.canAdd(identifier, wanted, amount)
 end
 
--- GetInventory/CanAddItem are deliberately NOT exported under those names:
--- server.lua already registers native exports with the same names
--- (GetInventory(src) takes a numeric player source; CanAddItem is the native
--- canCarry signature). Since exports() writes into one flat per-resource
--- table and this file loads after server.lua in fxmanifest.lua, reusing those
--- names would silently overwrite the native ones for every other resource
--- that calls them. Use the ByIdentifier-suffixed names below instead, which
--- match this module's string-identifier calling convention.
+-- This module does NOT call exports(). It builds a table which
+-- server/compat/providers.lua publishes under the `qb-inventory` identity
+-- through __cfx_export_qb-inventory_<name> handlers -- a namespace entirely
+-- separate from qbinventory's own flat export table. That separation is what
+-- lets GetInventory and CanAddItem keep their upstream qb-inventory return
+-- shapes here while server.lua's native exports of the same names keep theirs.
+-- (An earlier version of this file did call exports() and silently overwrote
+-- the native ones; test/smoke/export_collisions.lua guards that regression.)
 local api = {
     GetSlotsByItem = slotsByItem,
     GetFirstSlotByItem = firstSlotByItem,
@@ -153,8 +153,6 @@ local api = {
     ClearStash = clearStash,
     CreateInventory = createInventory,
     RemoveInventory = removeInventory,
-    GetInventoryByIdentifier = getInventory,
-    CanAddItemByIdentifier = canAddItem,
 }
 
 -- Full upstream qb-inventory compatibility uses the same authority methods,
@@ -163,25 +161,106 @@ local api = {
 -- I.api is installed by server.lua in the live resource. Keeping a blank
 -- fallback permits this transport-free adapter to be unit-tested in isolation.
 local native = I.api or {}
-api.LoadInventory = function(source) return I.copy(native.GetInventory(source) or {}) end
-api.SaveInventory = function(_) return true end -- qbcore persistence owns player writes.
-api.SetInventory = function(source, items) return native.SetInventory(source, items or {}) end
-api.UseItem = function(source, item) return native.useItem(source, type(item) == 'table' and item.slot or item) end
+
+---Upstream: LoadInventory(source, citizenid) -> slot-keyed item table.
+---`citizenid` is accepted and ignored: qbcore owns player persistence and has
+---already loaded PlayerData.items by the time anything can call this.
+api.LoadInventory = function(source, _citizenid) return I.copy(native.GetInventory(source) or {}) end
+
+---Upstream: SaveInventory(source, offline). Player items are written through
+---qbcore's own mutation funnel, so there is nothing to flush for a player.
+---Secondary inventories DO have durable state of their own, so honour the call
+---by flushing them rather than pretending the whole thing is a no-op.
+api.SaveInventory = function(_source, _offline)
+    local persistence = I.persistence
+    if persistence and type(persistence.flush) == 'function' then pcall(persistence.flush) end
+    return true
+end
+
+---Upstream: SetInventory(identifier, items, reason). The identifier may be a
+---player source OR a secondary inventory id, so route non-players through the
+---authority write funnel instead of only handling players.
+api.SetInventory = function(identifier, items, reason)
+    items = items or {}
+    local inventoryKey, inventory = resolve(identifier)
+    if inventory and inventory.type == 'player' then
+        return native.SetInventory(inventory.source or identifier, items, reason)
+    end
+    if not inventory then return false end
+    return internal.lock({ inventoryKey }, function()
+        return internal.setInventoryItems(inventoryKey, items)
+    end)
+end
+
+---Upstream: UseItem(itemName, ...) -- the first argument is the ITEM NAME and
+---the varargs are forwarded to the registered handler, which upstream calls as
+---(source, itemData). qbinventory's own earlier compat shape was
+---UseItem(source, item); both are accepted so neither caller breaks.
+api.UseItem = function(first, second, third)
+    if type(first) == 'string' then
+        local source = tonumber(second)
+        if not source then return false, 'UseItem requires a player source' end
+        return native.useItem(source, (type(third) == 'table' and third.slot) or first)
+    end
+    return native.useItem(first, type(second) == 'table' and second.slot or second)
+end
+
 api.OpenInventoryById = function(source, target) return I.internal.open(source, 'player:' .. tostring(tonumber(target) or -1)) end
-api.CreateShop = function(name, data) return native.RegisterShop(name, data or {}) end
+
+---Upstream: CreateShop(shopData) -- ONE table. `shopData.name` names the shop;
+---a table with no `name` is treated as a collection of shops keyed by name.
+---The older CreateShop(name, data) form is still accepted.
+api.CreateShop = function(first, second)
+    if type(first) == 'string' then return native.RegisterShop(first, second or {}) end
+    if type(first) ~= 'table' then return nil, 'CreateShop requires a shop table' end
+    if first.name then return native.RegisterShop(first.name, first) end
+
+    local last, err
+    for shopName, shopData in pairs(first) do
+        if type(shopData) == 'table' then
+            last, err = native.RegisterShop(shopData.name or shopName, shopData)
+            if not last then return nil, err end
+        end
+    end
+    return last
+end
+
 api.OpenShop = function(source, name) return native.OpenInventory(source, 'shop', name) end
 api.OpenInventory = function(source, identifier, data) return native.OpenInventory(source, identifier, data) end
-api.CloseInventory = native.CloseInventory
-api.GetInventory = function(identifier)
-    local _, inv = resolve(identifier)
-    return inv and I.copy(inv.items or {}) or nil
-end
+
+---Upstream: CloseInventory(source, identifier). qbinventory sessions are keyed
+---by player, so the identifier is advisory -- closing the player's session is
+---what actually releases the inventory either way. Kept as a WRAPPER rather
+---than a direct `native.CloseInventory` reference: the value-copy form silently
+---became nil under the `I.api or {}` fallback, and providers.lua's
+---`type(fn) == 'function'` filter then dropped the export entirely.
+api.CloseInventory = function(source, _identifier) return native.CloseInventory(source) end
+
+---Upstream: GetInventory(identifier) -> the whole inventory record, not just
+---its items. Returns the detached descriptor built above.
+api.GetInventory = getInventory
 api.GetItemBySlot = native.GetItemBySlot
 api.GetItemByName = native.GetItemByName
 api.GetItemsByName = native.GetItemsByName
 api.GetItemCount = native.GetItemCount
 api.GetFreeWeight = native.GetFreeWeight
-api.CanAddItem = native.CanAddItem
+-- Upstream HasItem(source, items, amount) accepts a name, an array of names,
+-- or a {name = count} map, and returns a plain boolean. server.lua's native
+-- hasItem already handles all three shapes identically, so this is a straight
+-- wire-up -- it was simply never copied onto the compat table, which left
+-- exports['qb-inventory']:HasItem(...) resolving to nothing on the server.
+api.HasItem = native.HasItem
+---Upstream: CanAddItem(identifier, item, amount) -> true, or false plus a
+---reason of exactly 'weight' or 'slots' (bare false for an unresolvable
+---inventory or unknown item). internal.canAdd already speaks that vocabulary
+---and, unlike the native canCarry, accepts a secondary inventory identifier
+---rather than only a player source.
+api.CanAddItem = function(identifier, item, amount)
+    local ok, reason = canAddItem(identifier, item, amount)
+    if ok then return true end
+    if reason == 'weight' or reason == 'slots' then return false, reason end
+    return false
+end
 api.ClearInventory = native.ClearInventory
 api.AddItem = native.AddItem
 api.RemoveItem = native.RemoveItem
