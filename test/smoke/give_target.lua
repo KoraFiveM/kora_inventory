@@ -5,6 +5,7 @@ file:close()
 
 H.ok(source:find('QB.closest.player', 1, true), 'checks qblib closest player first')
 H.ok(source:find("QB.world.getNearbyEntities('player'", 1, true), 'only uses world scan to distinguish multiple recipients')
+H.ok(source:find('QB.cache.coords()', 1, true), 'availability polling uses qblib\'s shared local-coordinate cache')
 H.ok(source:find("'qbinventory:ui:giveAvailability'", 1, true), 'browser bridge receives availability only')
 H.ok(source:find('Wait(750)', 1, true), 'give availability is refreshed while a session remains open')
 H.ok(source:find("'qbinventory:client:giveTargetResolved'", 1, true), 'resolved recipient stays in the local client transport')

@@ -36,7 +36,7 @@ local function giveDistance()
 end
 
 local function serverIdForPed(ped)
-    if not ped or ped == 0 or ped == PlayerPedId() then return nil end
+    if not ped or ped == 0 or ped == QB.cache.ped() then return nil end
 
     for _, playerId in ipairs(GetActivePlayers()) do
         if playerId ~= PlayerId() and GetPlayerPed(playerId) == ped then
@@ -51,7 +51,7 @@ end
 -- used after that to distinguish a single unambiguous recipient from several
 -- targetable peds.  Neither result crosses the Lua/NUI boundary.
 local function nearbyPlayers()
-    local coords = GetEntityCoords(PlayerPedId())
+    local coords = QB.cache.coords()
     local radius = giveDistance()
     local closest = QB.closest.player(coords, radius)
     if not closest or not closest.id then return {} end
