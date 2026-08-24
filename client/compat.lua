@@ -174,6 +174,11 @@ end)
 
 RegisterCommand('inventory', function()
     if IsPauseMenuActive() or IsNuiFocused() then return end
+    -- TAB also drives qblib's zone creator (cycle adjustable parameter);
+    -- both are independent RegisterKeyMapping binds, so a creator session
+    -- must explicitly veto this one rather than relying on FiveM to pick
+    -- only one handler for a shared key.
+    if QB.zones.isCreatorActive() then return end
     openSelf()
 end, false)
 

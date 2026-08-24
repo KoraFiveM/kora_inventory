@@ -11,6 +11,7 @@ H.ok(source:find("'qb-inventory:client:closeInv'", 1, true), 'bridges legacy clo
 H.ok(source:find("'qb-inventory:client:updateInventory'", 1, true), 'bridges legacy update event')
 H.ok(source:find("'qb-inventory:client:ItemBox'", 1, true), 'legacy item boxes are intercepted by inventory presentation policy')
 H.ok(source:find("RegisterCommand('inventory'", 1, true), 'inventory command')
+H.ok(source:find('QB.zones.isCreatorActive()', 1, true), 'TAB defers to an in-progress zone creator session instead of opening alongside it')
 H.ok(source:find("RegisterCommand('closeInv'", 1, true), 'close command')
 H.ok(source:find("RegisterKeyMapping('openInv'", 1, true), 'legacy TAB key mapping')
 H.ok(source:find("openInventory(typeName, id)", 1, true), 'legacy targets route through validated open API')
