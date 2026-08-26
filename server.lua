@@ -227,7 +227,11 @@ local function mayInspectPlayer(src, target)
     return allowed, allowed and nil or 'player inspection not authorised'
 end
 
-local function canAccess(src, inv)
+-- `opts` is only ever the raw client-supplied open request (never available
+-- during in-session transfer revalidation, see validSession below) -- an
+-- access callback that depends on it must treat a missing opts as "already
+-- gated at open time", not as a reason to fail an otherwise-valid session.
+local function canAccess(src, inv, opts)
     if not inv then return false, 'inventory not found' end
     if inv.type == 'player' then
         if inv.source == src then return true end
@@ -243,7 +247,7 @@ local function canAccess(src, inv)
     end
     if not groupAllowed(src, inv.groups) then return false, 'not authorised' end
     if inv.access then
-        local ok, allowed = pcall(inv.access, src, inv)
+        local ok, allowed = pcall(inv.access, src, inv, opts)
         if not ok or not allowed then return false, 'access denied' end
     end
     if inv.coords and not QB.distance.player(src, inv.coords, inv.distance) then return false, 'too far away' end
@@ -591,7 +595,7 @@ local function open(src, secondaryKey, opts)
     local primary = playerKey(src)
     local second = getInventory(secondaryKey)
     if not second then return false, 'inventory not found' end
-    local ok, err = canAccess(src, second)
+    local ok, err = canAccess(src, second, opts)
     if not ok then return false, err end
     local hookOK, hookErr = runHooks('openInventory', src, { inventoryId = secondaryKey, inventoryType = second.type })
     if not hookOK then return false, hookErr end

@@ -56,6 +56,7 @@ end
 Config = { qbinventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
+dofile('config/shops/vendingmachine.lua')
 dofile('shared.lua')
 
 QB = {

@@ -48,6 +48,7 @@ H.ok(#serverScripts >= 8, 'fxmanifest server_scripts were discovered')
 Config = { qbinventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
+dofile('config/shops/vendingmachine.lua')
 dofile('shared.lua')
 
 -- A minimal QB (qblib/qbsql) surface. Only the entry points touched

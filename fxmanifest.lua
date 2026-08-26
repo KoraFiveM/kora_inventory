@@ -15,12 +15,14 @@ provide 'ox_inventory'
 dependency 'qblib'
 dependency 'qbsql'
 dependency 'qbcore'
+dependency 'qbtarget'
 
 shared_scripts {
     '@qblib/init.lua',
     '@qbsql/init.lua',
     'config.lua',
     'config/shops/ammunation.lua',
+    'config/shops/vendingmachine.lua',
     'shared.lua',
 }
 
@@ -37,6 +39,7 @@ server_scripts {
     'server/containers.lua',
     'server/crafting.lua',
     'server/shops/ammunation.lua',
+    'server/shops/vendingmachine.lua',
     -- Server-only compatibility helpers. Each builds a table which
     -- server/compat/providers.lua publishes under its provider identity; a
     -- compat module never calls exports() itself. The identities are LIVE and
@@ -61,6 +64,7 @@ client_scripts {
     -- and the legacy QBCore:Server:UseItem transport it reuses.
     'client/hotbar.lua',
     'client/shops/ammunation.lua',
+    'client/shops/vendingmachine.lua',
     -- Legacy qb-inventory event/command adapter. It has no NUI authority and
     -- only routes requested targets through client.lua's validated transport.
     'client/compat.lua',

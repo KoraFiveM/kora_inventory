@@ -383,6 +383,42 @@ The initial catalog includes standard qbcore weapons and the registered
 `config.lua`/`server.lua`/`client.lua` respectively in the manifest; the shop
 files do not add a generic client-to-server shop event.
 
+### Bundled vending machines
+
+Unlike Ammu-Nation, `config/shops/vendingmachine.lua` has no curated location
+list -- a vending machine is any `models` prop
+(`prop_vend_soda_01`/`prop_vend_soda_02`/`prop_vend_water_01`/
+`prop_vend_coffe_01`, matching real qb-inventory's default set) a mapper
+placed anywhere, and FXServer has no way to independently query a static map
+prop's position the way it can a player ped. `client/shops/vendingmachine.lua`
+targets those models globally through `exports.qbtarget:addModel` (a
+persistent, streaming-aware registration -- qbinventory now `dependency`s
+`qbtarget` for this), not qblib's own `QB.interact.addTargetModel`, which is
+documented as a one-shot snapshot of whatever is streamed in at call time and
+would miss every machine outside the player's initial render distance.
+Selecting a machine sends its live entity coordinates alongside the fixed
+`vendingmachine` shop id.
+
+`server/shops/vendingmachine.lua`'s access callback bounds-checks those
+reported coordinates against the source's own live server position (the same
+trust boundary real qb-inventory's `OpenShop` accepts -- see its
+`server/main.lua`) rather than inventing a stronger guarantee the platform
+can't back up. A verified open is cached per-source for
+`Config.qbinventory.sessionTtl` so qbinventory's own in-session revalidation
+(`validSession`, which re-runs `access` on every transfer but has no fresh
+client data to offer) doesn't kick a player out mid-purchase; a bare open
+with no coordinates at all, or coordinates that don't place the source near a
+real approval, is always rejected outright and never seeds that cache. This
+is a generic capability, not vending-specific: `canAccess`/`open` thread the
+raw client open request through as a third `opts` argument to any shop's
+`access(source, inventory, opts)` callback, so any future shop with the same
+"no fixed location list" shape can reuse the pattern.
+
+Stock reuses this project's own item catalog (`water_bottle`, `soda`) rather
+than porting upstream's `kurkakola` name verbatim -- the registry already
+departs from upstream naming elsewhere (e.g. `water_bottle` is labelled
+"Water", not upstream's "Bottle of Water").
+
 The NUI bridge is separated from the inventory transport: only `client/ui.lua`
 uses browser callbacks, focus, or `SendNUIMessage`; it hands a restricted
 envelope to the local `qbinventory:client:submitIntent` event. `client.lua`
