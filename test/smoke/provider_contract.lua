@@ -78,6 +78,7 @@ QB.entities = setmetatable({}, { __index = function() return function() end end 
 QB.anim = setmetatable({}, { __index = function() return function() end end })
 QB.blips = setmetatable({}, { __index = function() return function() end end })
 QB.theme = setmetatable({}, { __index = function() return function() end end })
+QB.keybind = { add = function() return { remove = function() return true end } end }
 
 GetCurrentResourceName = function() return 'qbinventory' end
 GetInvokingResource = function() return nil end

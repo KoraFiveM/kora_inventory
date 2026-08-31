@@ -36,6 +36,11 @@ end
 
 for slot = 1, HOTBAR_SLOTS do
     local command = ('qbinventory:hotbar%d'):format(slot)
-    RegisterCommand(command, function() useHotbarSlot(slot) end, false)
-    RegisterKeyMapping(command, ('Use hotbar item %d'):format(slot), 'keyboard', tostring(slot))
+    QB.keybind.add({
+        name = command,
+        description = ('Use hotbar item %d'):format(slot),
+        defaultMapper = 'keyboard',
+        defaultKey = tostring(slot),
+        onPressed = function() useHotbarSlot(slot) end,
+    })
 end

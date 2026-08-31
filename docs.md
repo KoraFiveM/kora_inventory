@@ -314,9 +314,8 @@ Pressing `1`-`5` uses whatever item currently occupies inventory slots 1-5,
 even with the panel closed -- qbinventory has no separate hotbar/quickslot
 data model (see the `qb-inventory:client:hotbar` no-op just below), so the
 first 5 general inventory slots double as the hotbar, matching real
-qb-inventory/ox_inventory. `client/hotbar.lua` registers these with the plain
-`RegisterCommand` + `RegisterKeyMapping` pattern used elsewhere in this
-codebase, does nothing while `IsNuiFocused()`/`IsPauseMenuActive()` (so it
+qb-inventory/ox_inventory. `client/hotbar.lua` registers these through
+`QB.keybind`, does nothing while `IsNuiFocused()`/`IsPauseMenuActive()` (so it
 never fights the panel's own Use action), and reuses the existing legacy
 `QBCore:Server:UseItem` transport -- which already re-resolves the slot from
 qbcore-owned `PlayerData` and never trusts the transmitted item record --
@@ -333,7 +332,7 @@ what "activate this item" means.
 safe during migration. It listens for `qb-inventory:client:openInventory`,
 `closeInv`, and `updateInventory` (plus the narrowly equivalent old
 `inventory:client:*` aliases), the `inventory`, `openInv`, and `closeInv`
-commands, and the default `openInv`/`TAB` key mapping.
+commands, and the default `openInv`/`TAB` mapping through `QB.keybind`.
 
 Legacy item tables, slot counts, labels, weights and metadata are never read.
 An open event contributes only a validated identifier request; qbinventory's

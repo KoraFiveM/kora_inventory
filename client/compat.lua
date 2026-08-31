@@ -176,7 +176,7 @@ end)
 RegisterCommand('inventory', function()
     if IsPauseMenuActive() or IsNuiFocused() then return end
     -- TAB also drives qblib's zone creator (cycle adjustable parameter);
-    -- both are independent RegisterKeyMapping binds, so a creator session
+    -- both are independent keybinds, so a creator session
     -- must explicitly veto this one rather than relying on FiveM to pick
     -- only one handler for a shared key.
     if QB.zones.isCreatorActive() then return end
@@ -185,15 +185,22 @@ end, false)
 
 -- Match qb-inventory's established TAB command name while allowing scripts
 -- and players to continue using the clearer `inventory` command directly.
-RegisterCommand('openInv', function()
+local function openInventoryCommand()
     ExecuteCommand('inventory')
-end, false)
+end
+RegisterCommand('openInv', openInventoryCommand, false)
 
 RegisterCommand('closeInv', function()
     closeInventory()
 end, false)
 
-RegisterKeyMapping('openInv', 'Open inventory (qbinventory)', 'keyboard', 'TAB')
+QB.keybind.add({
+    name = 'openInv',
+    description = 'Open inventory (qbinventory)',
+    defaultMapper = 'keyboard',
+    defaultKey = 'TAB',
+    onPressed = openInventoryCommand,
+})
 
 -- RegisterNetEvent, not AddEventHandler: qbcore only ever fires these two over
 -- the wire (TriggerClientEvent in qbcore's modules/player/server.lua). FiveM

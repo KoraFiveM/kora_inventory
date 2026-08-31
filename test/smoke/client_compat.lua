@@ -13,7 +13,8 @@ H.ok(source:find("'qb-inventory:client:ItemBox'", 1, true), 'legacy item boxes a
 H.ok(source:find("RegisterCommand('inventory'", 1, true), 'inventory command')
 H.ok(source:find('QB.zones.isCreatorActive()', 1, true), 'TAB defers to an in-progress zone creator session instead of opening alongside it')
 H.ok(source:find("RegisterCommand('closeInv'", 1, true), 'close command')
-H.ok(source:find("RegisterKeyMapping('openInv'", 1, true), 'legacy TAB key mapping')
+H.ok(source:find('QB.keybind.add({', 1, true) and source:find("name = 'openInv'", 1, true),
+    'legacy TAB mapping uses QB.keybind')
 H.ok(source:find("openInventory(typeName, id)", 1, true), 'legacy targets route through validated open API')
 H.ok(source:find('refreshActiveSession()', 1, true), 'updates request an authoritative refresh')
 -- The server emits the legacy qb-inventory:client:updateInventory after every
