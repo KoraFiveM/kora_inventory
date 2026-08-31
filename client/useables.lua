@@ -2,10 +2,10 @@
 -- eat/drink animation + brief screen effect for a consumed item.
 
 RegisterNetEvent('qbinventory:client:toggleWeapon', function(weaponName)
-    local ped = PlayerPedId()
+    local ped = QB.cache.ped()
     local hash = GetHashKey(weaponName)
 
-    if GetSelectedPedWeapon(ped) == hash then
+    if QB.cache.weapon() == hash then
         SetCurrentPedWeapon(ped, GetHashKey('weapon_unarmed'), true)
         return
     end
@@ -30,7 +30,7 @@ local function flashTimecycle(name, ms)
 end
 
 RegisterNetEvent('qbinventory:client:consumeEffect', function(_, effects)
-    local ped = PlayerPedId()
+    local ped = QB.cache.ped()
     local anim = (effects.thirst or effects.drunk) and DRINK_ANIM or EAT_ANIM
 
     RequestAnimDict(anim.dict)

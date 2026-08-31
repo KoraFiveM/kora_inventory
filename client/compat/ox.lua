@@ -324,7 +324,7 @@ local Ox = {
 -- it replaces, which made every ox durability/ammo caller a silent no-op.
 -- Defined outside the table literal so it can walk the raw item list.
 function Ox.getCurrentWeapon()
-    local selected = GetSelectedPedWeapon(PlayerPedId())
+    local selected = QB.cache.weapon()
     if not selected or selected == GetHashKey('weapon_unarmed') then return nil end
     local best
     for _, item in pairs(items()) do

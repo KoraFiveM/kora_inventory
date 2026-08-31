@@ -81,7 +81,11 @@ function openInventory(invType, data) calls.open[#calls.open + 1] = { invType = 
 function closeInventory() calls.closed = true end
 
 local progressResult, keyboardResult, progressActive = true, nil, false
+local pedWeapon = 0
 QB = {
+    cache = {
+        weapon = function() return pedWeapon end,
+    },
     notify = { send = function(payload) calls.notify[#calls.notify + 1] = payload end },
     progressbar = {
         start = function(payload) calls.progress[#calls.progress + 1] = payload; return progressResult end,
@@ -98,7 +102,6 @@ QB = {
 
 -- Natives getCurrentWeapon reaches for. GetHashKey only needs to be injective
 -- over the names used here.
-local pedWeapon = 0
 function PlayerPedId() return 1 end
 function GetSelectedPedWeapon() return pedWeapon end
 function GetHashKey(name) local h = 0; for i = 1, #name do h = (h * 31 + name:byte(i)) % 2 ^ 31 end return h end

@@ -27,7 +27,7 @@ local function openSelf()
     -- qbinventory validates the local player's server ID before granting the
     -- short-lived session. We intentionally do not inspect nearby vehicles,
     -- entities, or any client inventory record here.
-    openInventory('player', GetPlayerServerId(PlayerId()))
+    openInventory('player', QB.cache.serverId())
     return true
 end
 
@@ -134,12 +134,13 @@ RegisterNetEvent('qb-inventory:client:hotbar', function() end)
 -- Purely cosmetic, and safe to honour: play the same give animation upstream
 -- does. Skipped in a vehicle, exactly as upstream does.
 RegisterNetEvent('qb-inventory:client:giveAnim', function()
-    if IsPedInAnyVehicle(PlayerPedId(), false) then return end
+    local ped = QB.cache.ped()
+    if QB.cache.vehicle() then return end
     RequestAnimDict('mp_common')
     local deadline = GetGameTimer() + 1000
     while not HasAnimDictLoaded('mp_common') and GetGameTimer() < deadline do Wait(0) end
     if not HasAnimDictLoaded('mp_common') then return end
-    TaskPlayAnim(PlayerPedId(), 'mp_common', 'givetake1_b', 8.0, -8.0, -1, 49, 0, false, false, false)
+    TaskPlayAnim(ped, 'mp_common', 'givetake1_b', 8.0, -8.0, -1, 49, 0, false, false, false)
 end)
 
 -- Drop discovery is server-resolved here: qbinventory hands the client a

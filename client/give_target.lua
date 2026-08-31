@@ -39,7 +39,7 @@ local function serverIdForPed(ped)
     if not ped or ped == 0 or ped == QB.cache.ped() then return nil end
 
     for _, playerId in ipairs(GetActivePlayers()) do
-        if playerId ~= PlayerId() and GetPlayerPed(playerId) == ped then
+        if playerId ~= QB.cache.playerId() and GetPlayerPed(playerId) == ped then
             local serverId = GetPlayerServerId(playerId)
             if type(serverId) == 'number' and serverId > 0 then return serverId end
         end
