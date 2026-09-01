@@ -12,6 +12,7 @@ H.ok(source:find("'qb-inventory:client:updateInventory'", 1, true), 'bridges leg
 H.ok(source:find("'qb-inventory:client:ItemBox'", 1, true), 'legacy item boxes are intercepted by inventory presentation policy')
 H.ok(source:find("RegisterCommand('inventory'", 1, true), 'inventory command')
 H.ok(source:find('QB.zones.isCreatorActive()', 1, true), 'TAB defers to an in-progress zone creator session instead of opening alongside it')
+H.ok(source:find('QB.placement.isActive()', 1, true), 'TAB defers to an in-progress entity placement session through qblib export proxy')
 H.ok(source:find("RegisterCommand('closeInv'", 1, true), 'close command')
 H.ok(source:find('QB.keybind.add({', 1, true) and source:find("name = 'openInv'", 1, true),
     'legacy TAB mapping uses QB.keybind')

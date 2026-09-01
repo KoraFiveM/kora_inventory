@@ -175,11 +175,11 @@ end)
 
 RegisterCommand('inventory', function()
     if IsPauseMenuActive() or IsNuiFocused() then return end
-    -- TAB also drives qblib's zone creator (cycle adjustable parameter);
-    -- both are independent keybinds, so a creator session
+    -- TAB also drives qblib's zone and entity-placement creators;
+    -- all are independent keybinds, so an active creator session
     -- must explicitly veto this one rather than relying on FiveM to pick
     -- only one handler for a shared key.
-    if QB.zones.isCreatorActive() then return end
+    if QB.zones.isCreatorActive() or QB.placement.isActive() then return end
     openSelf()
 end, false)
 
