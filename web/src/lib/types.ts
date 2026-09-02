@@ -68,6 +68,6 @@ export interface ItemBoxReceipt {
     image?: string
     imageUrl?: string
     amount: number
-    action: "add" | "purchase"
+    action: "add" | "purchase" | "remove" | "use"
     duration?: number
 }

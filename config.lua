@@ -30,12 +30,18 @@ Config.qbinventory = {
     -- Item receipts are owned by qbinventory, never by the resource which
     -- grants an item.  Leave this disabled for a completely silent/headless
     -- inventory, or tune the single presentation policy here for every
-    -- compatible AddItem caller and qbinventory shop purchase.
+    -- compatible AddItem/RemoveItem caller, qbinventory shop purchase and
+    -- (opt-in) item use.
     itemBoxes = {
         enabled = true,
         duration = 2600,
         showAdditions = true,
         showPurchases = true,
+        showRemovals = true,
+        -- A useable that consumes its item already draws a removal receipt
+        -- through RemoveItem, so uses stay opt-in to avoid two receipts for
+        -- one action. Enable this for useables that are not consumed.
+        showUses = false,
     },
     persistence = {
         -- Secondary inventories only. Player items are qbcore-owned and are never
