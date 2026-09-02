@@ -99,6 +99,11 @@ h2 { margin-bottom: 0; font-size: 13px; }
 .item-box p { margin: 0 0 2px; color: hsl(var(--muted-foreground)); font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .item-box strong { display: block; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .item-box > b { color: hsl(var(--primary)); font-size: 11px; }
+/* Gains keep the brand accent; losses read as a muted debit so a removal is
+   never mistaken for a pickup at a glance. */
+.item-box-loss { border-left-color: hsl(var(--muted-foreground)); }
+.item-box-loss > b, .item-box-loss .item-box-art { color: hsl(var(--muted-foreground)); }
+.item-box-loss .item-box-art { background: hsl(var(--muted)); }
 @keyframes item-box-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
 .item-detail { padding: 11px; display: grid; align-content: start; gap: 7px; }

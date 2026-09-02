@@ -94,6 +94,8 @@ local function showItemBox(src, name, amount, action)
     if type(policy) ~= 'table' or policy.enabled ~= true then return end
     if action == 'add' and policy.showAdditions ~= true then return end
     if action == 'purchase' and policy.showPurchases ~= true then return end
+    if action == 'remove' and policy.showRemovals ~= true then return end
+    if action == 'use' and policy.showUses ~= true then return end
 
     local def = itemDef(name)
     if not def then return end
@@ -477,6 +479,7 @@ local function physicalCashDebit(src, policy, account, amount, reason)
     end
     bump(playerKey(src)); broadcast(playerKey(src))
     recordAudit('cash-remove', src, { account = account, amount = amount, reason = reason })
+    showItemBox(src, policy.item, amount, 'remove')
     return true
 end
 
@@ -955,13 +958,20 @@ function removeItem(src, name, amount, slot, reason)
         local items = playerItems(src)
         if slot then
             if not items[slot] or items[slot].name ~= name then return false, 'item not in slot' end
-            local ok, err = removePlayer(src, slot, amount); if ok then bump(playerKey(src)); broadcast(playerKey(src)) end; return ok, err
+            local ok, err = removePlayer(src, slot, amount)
+            if ok then
+                bump(playerKey(src)); broadcast(playerKey(src))
+                recordAudit('remove', src, { item = name, amount = amount, slot = slot, reason = reason })
+                showItemBox(src, name, amount, 'remove')
+            end
+            return ok, err
         end
         local remaining, planned = amount, {}
         for s = 1, C.playerSlots do local item = items[s]; if item and item.name == name then planned[#planned + 1] = { slot = s, amount = math.min(remaining, item.amount) }; remaining = remaining - item.amount; if remaining <= 0 then break end end end
         if remaining > 0 then return false, 'not enough of item' end
         for _, part in ipairs(planned) do removePlayer(src, part.slot, part.amount) end
         bump(playerKey(src)); broadcast(playerKey(src)); recordAudit('remove', src, { item = name, amount = amount, reason = reason })
+        showItemBox(src, name, amount, 'remove')
         return true
     end)
 end
@@ -1115,6 +1125,9 @@ function useItem(src, slotOrName)
             if not ok then return false, result end
             if result == false then return false, 'item use was rejected' end
             TriggerEvent('qbinventory:server:usedItem', src, item.name, item)
+            -- Opening a portable container above is deliberately excluded: it
+            -- consumes nothing and returns before this point.
+            showItemBox(src, item.name, 1, 'use')
             return true
         end
         TriggerEvent('QBCore:Server:UseItem', src, item)
