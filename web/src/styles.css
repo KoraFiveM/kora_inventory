@@ -24,6 +24,8 @@ button { color: inherit; }
 
 .inventory-shell {
   pointer-events: auto;
+  position: relative;
+  z-index: 1;
   width: min(1180px, calc(100vw - 40px));
   min-height: min(600px, calc(100vh - 40px));
   max-height: calc(100vh - 40px);
@@ -67,7 +69,7 @@ h2 { margin-bottom: 0; font-size: 13px; }
 .weight { display: grid; gap: 4px; color: hsl(var(--muted-foreground)); text-align: right; font-size: 9px; }
 .weight i, .durability { height: 3px; overflow: hidden; border-radius: 3px; background: hsl(var(--muted)); }
 .weight b, .durability i { display: block; height: 100%; border-radius: inherit; background: hsl(var(--primary)); }
-.slot-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; align-content: start; }
+.slot-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; align-content: start; }
 .slot { position: relative; aspect-ratio: 1 / 1; padding: 4px; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--muted-foreground)); background: hsl(var(--background)); cursor: grab; text-align: left; display: grid; grid-template-rows: 1fr auto auto; gap: 2px; touch-action: none; -webkit-user-select: none; user-select: none; }
 .slot:hover, .slot:focus-visible { outline: 0; border-color: hsl(var(--brand-border)); }
 .slot-selected { border-color: hsl(var(--primary)); background: hsl(var(--brand-soft)); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
@@ -81,12 +83,21 @@ h2 { margin-bottom: 0; font-size: 13px; }
 .item-art, .detail-art { display: grid; place-items: center; overflow: hidden; color: hsl(var(--primary)); font-weight: 800; background: hsl(var(--brand-soft)); }
 .item-art img, .detail-art img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgb(0 0 0 / .35)); }
 /* Artwork is the slot canvas, not a miniature icon. Text and counters sit above it. */
-.item-art { position: absolute; z-index: 0; box-sizing: border-box; inset: 15px 7px 20px; padding: 3px 4px; border-radius: 4px; background: transparent; font-size: 26px; }
+.item-art { position: absolute; z-index: 0; box-sizing: border-box; inset: 17px 7px 21px; padding: 3px 4px; border-radius: 4px; background: transparent; font-size: 30px; }
 .item-art img { transform: scale(1.1); }
-.item-label { position: absolute; z-index: 1; right: 26px; bottom: 3px; left: 4px; overflow: hidden; color: hsl(var(--foreground)); font-size: 9px; font-weight: 650; line-height: 1.1; text-overflow: ellipsis; text-shadow: 0 1px 3px rgb(0 0 0 / .8); white-space: nowrap; }
-.item-amount { position: absolute; z-index: 1; right: 4px; bottom: 3px; border-radius: 3px; padding: 1px 3px; background: hsl(var(--background) / .82); color: hsl(var(--foreground)); font-size: 8px; }
-.item-price { position: absolute; z-index: 1; top: 3px; right: 4px; border-radius: 3px; padding: 1px 3px; color: hsl(var(--primary)); background: hsl(var(--background) / .9); font-size: 10px; font-weight: 800; line-height: 1; text-shadow: 0 1px 2px rgb(0 0 0 / .65); }
+.item-label { position: absolute; z-index: 1; right: 4px; bottom: 3px; left: 5px; overflow: hidden; color: hsl(var(--foreground)); font-size: 10px; font-weight: 650; line-height: 1.15; text-overflow: ellipsis; text-shadow: 0 1px 3px rgb(0 0 0 / .8); white-space: nowrap; }
+.slot-priced .item-label { right: 32px; }
+/* Quantity reads top-right, opposite the slot number; a shop price takes the
+   bottom-right corner the quantity used to hold. */
+.item-amount { position: absolute; z-index: 1; top: 3px; right: 4px; border-radius: 3px; padding: 1px 4px; background: hsl(var(--background) / .82); color: hsl(var(--foreground)); font-size: 9px; font-weight: 700; line-height: 1.2; }
+.item-price { position: absolute; z-index: 1; right: 4px; bottom: 3px; border-radius: 3px; padding: 1px 3px; color: hsl(var(--primary)); background: hsl(var(--background) / .9); font-size: 10px; font-weight: 800; line-height: 1.2; text-shadow: 0 1px 2px rgb(0 0 0 / .65); }
 .durability { position: absolute; z-index: 1; right: 5px; bottom: 0; left: 5px; }
+/* Only mounted mid-drag (App.tsx), and painted behind the shell so a slot
+   under the cursor always wins. The gutter around the shell is the drop area. */
+.world-drop-zone { position: fixed; z-index: 0; inset: 0; pointer-events: auto; border: 2px dashed transparent; transition: background-color 120ms ease, border-color 120ms ease; }
+.world-drop-zone-armed { border-color: hsl(var(--brand-border)); background: hsl(var(--primary) / .12); }
+.world-drop-hint { position: fixed; z-index: 1200; bottom: 26px; left: 50%; transform: translateX(-50%); margin: 0; border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 5px 12px; color: hsl(var(--muted-foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); font-size: 10px; font-weight: 700; letter-spacing: .04em; pointer-events: none; }
+.world-drop-hint-armed { border-color: hsl(var(--brand-border)); color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
 .inventory-drag-preview { position: fixed; z-index: 1000; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 6px; width: min(170px, 32vw); min-height: 38px; overflow: hidden; border: 1px solid hsl(var(--brand-border)); border-radius: 7px; padding: 4px 6px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); pointer-events: none; font-size: 10px; font-weight: 700; }
 .inventory-drag-preview > span:not(.drag-preview-art) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inventory-drag-preview b { color: hsl(var(--muted-foreground)); font-size: 9px; }
@@ -114,6 +125,9 @@ h2 { margin-bottom: 0; font-size: 13px; }
 .detail-art img { padding: 10px; transform: scale(1.06); }
 dl { display: grid; grid-template-columns: 1fr auto; gap: 5px; margin: 3px 0; border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); padding: 7px 0; color: hsl(var(--muted-foreground)); font-size: 10px; }
 dd { margin: 0; color: hsl(var(--foreground)); font-weight: 650; }
+.amount-action { display: grid; gap: 6px; }
+.amount-slider { width: 100%; height: 16px; margin: 0; padding: 0; accent-color: hsl(var(--primary)); background: transparent; cursor: pointer; }
+.amount-slider:disabled { cursor: wait; opacity: .55; }
 .primary-action, .quiet-action { min-height: 30px; padding: 6px 9px; font-size: 11px; font-weight: 700; cursor: pointer; }
 .primary-action { border: 1px solid hsl(var(--primary)); border-radius: 6px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
 .primary-action:hover { filter: brightness(1.08); }
@@ -123,10 +137,10 @@ dd { margin: 0; color: hsl(var(--foreground)); font-weight: 650; }
 .secondary-empty { color: hsl(var(--muted-foreground)); text-align: center; display: grid; align-content: center; justify-items: center; gap: 6px; }
 .secondary-empty svg { color: hsl(var(--primary)); }
 .secondary-empty p { max-width: 220px; margin-bottom: 0; font-size: 11px; line-height: 1.4; }
-.shortcut-bar { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 10px; color: hsl(var(--muted-foreground)); font-size: 9px; }
+.shortcut-bar { display: grid; grid-template-columns: repeat(5, auto); justify-content: space-between; gap: 10px; color: hsl(var(--muted-foreground)); font-size: 9px; }
 kbd { border: 1px solid hsl(var(--border)); border-radius: 3px; padding: 1px 4px; color: hsl(var(--foreground)); background: hsl(var(--muted)); font-family: inherit; }
 .dev-launch { pointer-events: auto; display: grid; place-items: center; margin: 24px; border: 1px solid hsl(var(--brand-border)); border-radius: 7px; padding: 9px 12px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); cursor: pointer; }
 
-@media (max-width: 1040px) { .inventory-layout { grid-template-columns: minmax(240px, 1fr) 170px; } .inventory-layout > :last-child { grid-column: 1 / -1; min-height: 220px; } }
+@media (max-width: 1040px) { .slot-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .inventory-layout { grid-template-columns: minmax(240px, 1fr) 170px; } .inventory-layout > :last-child { grid-column: 1 / -1; min-height: 220px; } }
 @media (max-width: 700px) { .inventory-shell { width: calc(100vw - 20px); min-height: calc(100vh - 20px); max-height: calc(100vh - 20px); margin: 10px auto; padding: 8px; } .inventory-topbar { grid-template-columns: 1fr auto; } .search { grid-column: 1 / -1; grid-row: 2; } .inventory-layout { grid-template-columns: 1fr; } .inventory-layout > :last-child { grid-column: auto; } .item-detail { min-height: 170px; } .shortcut-bar { grid-template-columns: 1fr 1fr; justify-content: initial; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0ms !important; animation-duration: 0ms !important; } }

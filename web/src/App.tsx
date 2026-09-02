@@ -103,6 +103,9 @@ function InventorySlot({ item, index, inventory, selected, busy, canDropSlot, on
     }, [dragRef, dropRef])
     const classes = [
         "slot", item && "slot-filled", selected && "slot-selected", isDragging && "slot-drag-source",
+        // A shop slot puts a price where the label would otherwise end, so the
+        // label reserves that room only where a price is actually rendered.
+        inventory.type === "shop" && "slot-priced",
         isOver && canDrop && "slot-move-target", isOver && !canDrop && "slot-drop-invalid",
     ].filter(Boolean).join(" ")
 
@@ -208,6 +211,31 @@ function ItemBoxStack({ boxes }: { boxes: ActiveItemBox[] }) {
     </aside>
 }
 
+/** Dragging a stack out of the window drops it in the world. The zone is only
+ * mounted while a drag is running, so it never captures a click, and it sits
+ * behind the shell (z-index) so a slot under the cursor always wins the drop.
+ * `didDrop()` is belt-and-braces for the same reason. */
+function WorldDropZone({ session, busy, onDropOut }: { session: SessionSnapshot; busy: boolean; onDropOut: (source: DragSlot) => void }) {
+    const dragging = useDragLayer((monitor) => monitor.isDragging())
+    const [{ isOver, canDrop }, dropRef] = useDrop<DragSlot, undefined, { isOver: boolean; canDrop: boolean }>(() => ({
+        accept: SLOT_DRAG_TYPE,
+        // Only the player's own items can hit the floor. A stash, container or
+        // shop slot dragged out is a no-op, matching the server's drop intent.
+        canDrop: (source) => Boolean(source) && !busy && source.inventoryId === session.player.id,
+        drop: (source, monitor) => {
+            if (source && !monitor.didDrop()) onDropOut(source)
+            return undefined
+        },
+        collect: (monitor) => ({ isOver: monitor.isOver({ shallow: true }), canDrop: monitor.canDrop() }),
+    }), [busy, onDropOut, session.player.id])
+    if (!dragging) return null
+    const armed = isOver && canDrop
+    return <>
+        <div ref={dropRef} className={`world-drop-zone${armed ? " world-drop-zone-armed" : ""}`} aria-hidden="true" />
+        <p className={`world-drop-hint${armed ? " world-drop-hint-armed" : ""}`} role="status">{canDrop ? (armed ? "Release to drop on the ground" : "Drag outside the window to drop") : busy ? "Updating inventory…" : "This item cannot be dropped"}</p>
+    </>
+}
+
 function InventoryApp() {
     const [session, setSession] = useState<SessionSnapshot | null>(null)
     const [selected, setSelected] = useState<Selection | undefined>()
@@ -216,6 +244,7 @@ function InventoryApp() {
     const [giveAvailable, setGiveAvailable] = useState(false)
     const [movePending, setMovePending] = useState(false)
     const [itemBoxes, setItemBoxes] = useState<ActiveItemBox[]>([])
+    const [dropAmount, setDropAmount] = useState(1)
     const pendingInventories = useRef<Set<string> | undefined>()
     const requestPending = useRef(false)
     const nextItemBoxId = useRef(1)
@@ -321,17 +350,25 @@ function InventoryApp() {
         if (sourceInventory && targetInventory) move(sourceInventory, source.slot, targetInventory, target.slot)
     }, [canDropSlot, move, session])
 
+    // A single click inspects, and only inspects. Moving is drag-only (drag onto
+    // a slot to move/stack, drag outside the window to drop), so a click on an
+    // empty slot can no longer fling the previous selection into it.
     const selectSlot = useCallback((inventory: InventoryView, item: InventoryItem | undefined, slot: number) => {
         if (movePending) return
-        if (selected) {
-            if (selected.inventory.type === "shop" && inventory.id === selected.inventory.id) { setSelected(item ? { inventory, item } : undefined); return }
-            if (selected.inventory.id === inventory.id && selected.item.slot === slot) { setSelected(undefined); return }
-            if (item) setSelected({ inventory, item })
-            else { move(selected.inventory, selected.item.slot, inventory, slot); setSelected(undefined) }
-            return
-        }
-        if (item) setSelected({ inventory, item })
-    }, [move, movePending, selected])
+        setSelected((current) => {
+            if (!item) return undefined
+            if (current && current.inventory.id === inventory.id && current.item.slot === slot) return undefined
+            return { inventory, item }
+        })
+    }, [movePending])
+
+    const dropOut = useCallback((source: DragSlot) => {
+        if (!session || source.inventoryId !== session.player.id) return
+        const item = findItem(session.player, source.slot)
+        if (!item || !Number.isFinite(item.amount) || item.amount < 1) { setError("That item is no longer available"); return }
+        setSelected(undefined)
+        void submit("drop", { inventory: source.inventoryId, slot: source.slot, amount: item.amount })
+    }, [session, submit])
 
     const use = useCallback((inventory: InventoryView, item: InventoryItem) => {
         if (inventory.id !== session?.player.id) { setError("Only items in your inventory can be used"); return }
@@ -361,9 +398,14 @@ function InventoryApp() {
     }, [activateSelected, close, movePending, selected])
 
     const filteredSelected = useMemo(() => selected && (selected.item.label ?? selected.item.name).toLowerCase().includes(query.toLowerCase()) ? selected : undefined, [query, selected])
+    // A fresh selection always starts at one, so a large slider value can never
+    // carry over onto a different (or smaller) stack.
+    useEffect(() => { setDropAmount(1) }, [selected?.inventory.id, selected?.item.slot])
+    const dropMax = Math.max(1, Math.floor(filteredSelected?.item.amount ?? 1))
+    const dropCount = Math.min(Math.max(1, dropAmount), dropMax)
     if (!session) return <><ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</>
 
-    return <><ItemBoxStack boxes={itemBoxes} /><main className="inventory-shell">
+    return <><ItemBoxStack boxes={itemBoxes} /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} /><main className="inventory-shell">
         <DragPreview session={session} />
         <header className="inventory-topbar"><div className="brand"><PackageOpen size={20} /><span>INVENTORY</span><em>LIVE</em></div><label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search selected item" /></label><button className="close" onClick={close} aria-label="Close inventory"><X size={20} /></button></header>
         {error && <div className="notice" role="alert"><CircleAlert size={16} />{error}</div>}
@@ -378,14 +420,17 @@ function InventoryApp() {
                 {filteredSelected.inventory.type === "shop" ? <button className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item)}>Buy one · ${(filteredSelected.item.price ?? 0).toLocaleString()}</button> : <>
                     {(filteredSelected.item.useable || filteredSelected.item.container) && <button className="primary-action" disabled={movePending} onClick={() => use(filteredSelected.inventory, filteredSelected.item)}>{filteredSelected.item.container ? `Open ${filteredSelected.item.label ?? "container"}` : "Use item"}</button>}
                     {filteredSelected.inventory.id === session.player.id && <>
-                        <button className="quiet-action" disabled={movePending} onClick={() => void submit("drop", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: 1 })}>Drop one</button>
+                        <div className="amount-action">
+                            {dropMax > 1 && <input className="amount-slider" type="range" min={1} max={dropMax} step={1} value={dropCount} disabled={movePending} aria-label={`Amount to drop, 1 to ${dropMax}`} onChange={(event) => setDropAmount(Number(event.target.value))} />}
+                            <button className="quiet-action" disabled={movePending} onClick={() => void submit("drop", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: dropCount })}>Drop {dropCount}</button>
+                        </div>
                         {giveAvailable && <button className="quiet-action" disabled={movePending} onClick={() => void submit("give", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: 1 })}>Give one</button>}
                     </>}
                 </>}
-            </> : <div className="empty-detail"><PackageOpen size={30} /><h1>Item details</h1><p>{selected ? `Choose a destination for ${(selected.item.label ?? selected.item.name)}.` : "Select an item to inspect it, then use, move, or drop it."}</p></div>}</aside>
+            </> : <div className="empty-detail"><PackageOpen size={30} /><h1>Item details</h1><p>{selected ? `${(selected.item.label ?? selected.item.name)} is hidden by the current search.` : "Click an item to inspect it. Drag it to move or stack it, or drag it outside the window to drop it."}</p></div>}</aside>
             {session.secondary ? <InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} /> : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section>}
         </div>
-        <footer className="shortcut-bar"><span><kbd>Esc</kbd> Close</span><span><kbd>↵</kbd> Use selected</span><span><kbd>Drag</kbd> Move or stack</span><span>{movePending ? "Updating inventory…" : `Revision ${session.revision ?? 0}`}</span></footer>
+        <footer className="shortcut-bar"><span><kbd>Esc</kbd> Close</span><span><kbd>↵</kbd> Use selected</span><span><kbd>Drag</kbd> Move or stack</span><span><kbd>Drag out</kbd> Drop</span><span>{movePending ? "Updating inventory…" : `Revision ${session.revision ?? 0}`}</span></footer>
     </main></>
 }
 
