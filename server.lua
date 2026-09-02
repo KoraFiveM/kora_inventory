@@ -1084,7 +1084,12 @@ function setItems(src, newItems)
     end)
 end
 
-local useables, useableOwners = {}, QB.resources.serverRegistry(function(name) useables[name] = nil end)
+local useables = {}
+-- Declared on its own line first: a `local x = ... function() x end` would
+-- close over the *global* x, since the local is not in scope until after its
+-- own statement -- and the cleanup only runs on resource stop, so the nil
+-- index would not surface until then.
+local useableOwners = QB.resources.serverRegistry(function(name) useables[name] = nil end)
 function createUseable(name, handler)
     assert(type(name) == 'string' and I.isCallable(handler), 'name and handler are required')
     local owner = GetInvokingResource() or resource; useables[name] = handler; useableOwners.track(owner, name)
