@@ -38,6 +38,10 @@ server_scripts {
     'server/vehicles.lua',
     'server/containers.lua',
     'server/crafting.lua',
+    -- Visible weapon carry + draw/holster pacing. Loads after useables.lua,
+    -- whose weapon handler delegates to it at call time, and after
+    -- crafting.lua so weapon metadata rules are already in place.
+    'server/weaponcarry.lua',
     'server/shops/ammunation.lua',
     'server/shops/vendingmachine.lua',
     -- Server-only compatibility helpers. Each builds a table which
@@ -70,7 +74,11 @@ client_scripts {
     'client/compat.lua',
     'client/compat/ox.lua',
     'client/ui.lua',
-    'client/useables.lua'
+    'client/useables.lua',
+    -- Renders every player's carried weapons from the server-set state bag,
+    -- and plays out the draw/holster this client was asked for. It owns the
+    -- weapon half of the old client/useables.lua toggle.
+    'client/weaponcarry.lua'
 }
 
 ui_page 'web/build/index.html'

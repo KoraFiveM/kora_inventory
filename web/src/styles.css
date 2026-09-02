@@ -141,6 +141,8 @@ dd { margin: 0; color: hsl(var(--foreground)); font-weight: 650; }
 kbd { border: 1px solid hsl(var(--border)); border-radius: 3px; padding: 1px 4px; color: hsl(var(--foreground)); background: hsl(var(--muted)); font-family: inherit; }
 .dev-launch { pointer-events: auto; display: grid; place-items: center; margin: 24px; border: 1px solid hsl(var(--brand-border)); border-radius: 7px; padding: 9px 12px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); cursor: pointer; }
 
-@media (max-width: 1040px) { .slot-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .inventory-layout { grid-template-columns: minmax(240px, 1fr) 170px; } .inventory-layout > :last-child { grid-column: 1 / -1; min-height: 220px; } }
+/* The slot grid stays 5 columns wide at every width -- only the surrounding
+   layout reflows. */
+@media (max-width: 1040px) { .inventory-layout { grid-template-columns: minmax(240px, 1fr) 170px; } .inventory-layout > :last-child { grid-column: 1 / -1; min-height: 220px; } }
 @media (max-width: 700px) { .inventory-shell { width: calc(100vw - 20px); min-height: calc(100vh - 20px); max-height: calc(100vh - 20px); margin: 10px auto; padding: 8px; } .inventory-topbar { grid-template-columns: 1fr auto; } .search { grid-column: 1 / -1; grid-row: 2; } .inventory-layout { grid-template-columns: 1fr; } .inventory-layout > :last-child { grid-column: auto; } .item-detail { min-height: 170px; } .shortcut-bar { grid-template-columns: 1fr 1fr; justify-content: initial; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0ms !important; animation-duration: 0ms !important; } }

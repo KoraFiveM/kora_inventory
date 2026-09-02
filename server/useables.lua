@@ -9,13 +9,21 @@
 
 -- --- weapons ---
 
--- v1: equip/holster toggle only, ammo always starts at 0. The weapon item
--- stays in the player's inventory the whole time it's equipped -- simplest,
+-- Equip/holster toggle only, ammo always starts at 0. The weapon item stays
+-- in the player's inventory the whole time it's equipped -- simplest,
 -- desync-free behaviour (matches vanilla weapon-wheel semantics), rather than
 -- a remove-on-equip/restore-on-holster/ammo-loading system, which is a
 -- separate feature this doesn't attempt.
+--
+-- The draw itself (which way the toggle goes, how long it takes, and the
+-- carried-weapon prop it swaps with) belongs to server/weaponcarry.lua, which
+-- loads after this file -- so it is resolved per use, not captured here.
 local function weaponUseable(src, item)
-    TriggerClientEvent('qbinventory:client:toggleWeapon', src, item.name)
+    local carry = QbInventory.weaponCarry
+    if carry then return carry.toggle(src, item) end
+    -- weaponcarry.lua is a sibling module, not a dependency: without it a
+    -- weapon still equips, just instantly and with nothing shown on the back.
+    TriggerClientEvent('qbinventory:client:toggleWeapon', src, { name = item.name, slot = item.slot, action = 'toggle', duration = 0 })
     return true -- successful use; item remains in inventory because no removal is performed
 end
 

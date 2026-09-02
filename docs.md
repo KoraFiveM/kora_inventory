@@ -59,6 +59,71 @@ This foundation does not yet supply a crafting UI, station discovery, progress
 timers, GTA weapon-native synchronisation, or ammo-item conversion. Those
 require an explicit server-authoritative integration layer.
 
+### Visible weapon carry and draw pacing
+
+`Config.qbinventory.weaponCarry` turns weapons a player owns but is not
+holding into props on their body, and turns equipping one from an instant
+snap into a timed, animated draw. Set `enabled = false` to switch the whole
+feature off; nothing else about the inventory changes.
+
+`visibility` picks what other players can see:
+
+- `'all'` -- every carryable weapon anywhere in the inventory is rendered.
+- `'hotbar'` (default) -- only weapons in slots `1..Config.qbinventory.hotbarSlots`
+  are rendered. A weapon stowed past that range is genuinely concealed.
+
+`hotbarSlots` is a single top-level value precisely because two features ask
+the same question: `client/hotbar.lua` binds the number keys to exactly that
+range, and this is the range that counts as "openly carried". Two constants
+would silently disagree about which slots a player can actually see.
+
+Drawing costs `drawTime` and plays `drawAnim`; holstering costs `holsterTime`
+and plays `holsterAnim`. Drawing a weapon that was *not* openly carried costs
+`concealedDrawTime` on top -- pulling something nobody saw coming takes longer
+than unslinging what was already on your back. That surcharge only applies
+while `visibility = 'hotbar'`: in `'all'` mode (or with the feature disabled)
+a weapon's slot says nothing about whether it was visible, so there is no
+concealment to price. Set the durations to `0` for the previous instant
+toggle. The bar deliberately cannot be cancelled -- a cancellable draw is a
+free way to skip the surcharge by tapping the item repeatedly.
+
+A weapon is classified by its qbcore `weapontype` through `tiers`
+(`back` / `sling` / `hip`), and each tier lists ordered attachment positions
+in `attachments`. A weapon that finds no free position in its tier is simply
+not rendered rather than stacked on top of one that is. `weapons` holds
+per-item overrides: `tier = false` excludes an item entirely, `bone`/`pos`/
+`rot` re-place one item, and `model` renders a plain prop instead of the
+weapon -- which is also how a non-weapon item can be carried, since only
+registry weapons are classified automatically. `components` maps a weapon
+component *item name* to the GTA component it renders as; it is empty by
+default because qbcore's shared registry carries no component-to-native
+mapping and guessing one would attach the wrong part.
+
+The carried list is built on the server from qbcore-owned `PlayerData` and
+published on the replicated player state bag `qbinventory:weaponCarry`
+(cleared with an explicit `false`, never a nil deletion -- a nil write is a
+key deletion and does not replicate like a value change). Clients only
+*render* that bag. A client never submits, extends or edits its own carried
+list, so this can never become a channel for advertising items a player does
+not own or hiding ones they do.
+
+The one thing a client may say is "the draw you asked me for finished"
+(`qbinventory:server:weaponToggled`), and that is matched against a pending
+request this server issued and re-resolved against the real slot before it is
+believed -- a client cannot confirm a weapon it does not have, in a slot it
+was not asked about. `qbinventory:server:weaponUnequipped` carries no payload
+at all and can only ever put a weapon *back* on its own player's body (weapon
+wheel, disarm, death), never take one off. Read-only server exports:
+
+```lua
+exports.qbinventory:GetCarriedWeapons(src)  -- the rendered list
+exports.qbinventory:GetEquippedWeapon(src)  -- { slot, name } or nil
+```
+
+There is deliberately no setter. A resource that wants a different carried
+list changes the player's items, not the render. Equipping still does not
+remove the weapon item from its slot (see `server/useables.lua`).
+
 Opening another player's inventory is also denied by default: distance and
 routing-bucket checks are necessary but never sufficient. Configure the trusted
 `Config.qbinventory.playerInspection.access(source, target, sourceData,
@@ -310,11 +375,13 @@ gate (`QbInventory.useGate`, defined in `client.lua`) runs before both this NUI
 path and the hotbar keybinds below, so there is exactly one place that decides
 whether a use is allowed to proceed.
 
-Pressing `1`-`5` uses whatever item currently occupies inventory slots 1-5,
-even with the panel closed -- qbinventory has no separate hotbar/quickslot
-data model (see the `qb-inventory:client:hotbar` no-op just below), so the
-first 5 general inventory slots double as the hotbar, matching real
-qb-inventory/ox_inventory. `client/hotbar.lua` registers these through
+Pressing `1`-`5` uses whatever item currently occupies inventory slots
+`1..Config.qbinventory.hotbarSlots`, even with the panel closed -- qbinventory
+has no separate hotbar/quickslot data model (see the
+`qb-inventory:client:hotbar` no-op just below), so the first N general
+inventory slots double as the hotbar, matching real qb-inventory/ox_inventory.
+That same range is what `weaponCarry`'s `'hotbar'` visibility treats as openly
+carried, which is why it is one config value rather than a constant in each. `client/hotbar.lua` registers these through
 `QB.keybind`, does nothing while `IsNuiFocused()`/`IsPauseMenuActive()` (so it
 never fights the panel's own Use action), and reuses the existing legacy
 `QBCore:Server:UseItem` transport -- which already re-resolves the slot from

@@ -1,20 +1,10 @@
--- Client half of server/useables.lua: weapon equip/holster toggle, and the
--- eat/drink animation + brief screen effect for a consumed item.
-
-RegisterNetEvent('qbinventory:client:toggleWeapon', function(weaponName)
-    local ped = QB.cache.ped()
-    local hash = GetHashKey(weaponName)
-
-    if QB.cache.weapon() == hash then
-        SetCurrentPedWeapon(ped, GetHashKey('weapon_unarmed'), true)
-        return
-    end
-
-    if not HasPedGotWeapon(ped, hash, false) then
-        GiveWeaponToPed(ped, hash, 0, false, true)
-    end
-    SetCurrentPedWeapon(ped, hash, true)
-end)
+-- Client half of server/useables.lua: the eat/drink animation + brief screen
+-- effect for a consumed item.
+--
+-- The weapon equip/holster toggle used to live here too. It moved to
+-- client/weaponcarry.lua, which owns the whole draw: the timing, the
+-- animation, and the carried prop that has to come off the player's back as
+-- the weapon reaches their hands.
 
 local EAT_ANIM = { dict = 'mp_player_inteat@burger', anim = 'mp_player_int_eat_burger', flag = 49 }
 local DRINK_ANIM = { dict = 'amb@world_human_drinking@coffee@male@idle_a', anim = 'idle_c', flag = 49 }

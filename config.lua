@@ -3,6 +3,11 @@ Config = Config or {}
 Config.qbinventory = {
     playerSlots = 41,
     playerMaxWeight = 120000,
+    -- Slots 1..hotbarSlots double as the hotbar. client/hotbar.lua binds the
+    -- number keys to exactly this range, and weaponCarry's 'hotbar'
+    -- visibility mode treats exactly this range as "openly carried", so the
+    -- two can never drift apart into two different meanings of "hotbar".
+    hotbarSlots = 5,
     defaultSlots = 50,
     defaultMaxWeight = 100000,
     interactionDistance = 3.0,
@@ -148,6 +153,94 @@ Config.qbinventory = {
         serialPrefix = 'QB',
         -- Explicit allow-lists. An absent weapon (and absent `default`) has
         -- no allowed components, preventing arbitrary client metadata.
+        components = {},
+    },
+    -- Visible weapon carry. A weapon a player owns but is not currently
+    -- holding is rendered on their body for every nearby client, and drawing
+    -- one takes time and plays an animation instead of snapping into hand.
+    --
+    -- This is presentation and pacing only. It never adds, removes, moves or
+    -- reveals an inventory item, the carried list is built by the server from
+    -- qbcore-owned PlayerData (never submitted by a browser or a client), and
+    -- a client may only confirm the draw/holster the server itself asked it
+    -- for. Disabling it leaves the inventory model completely unchanged.
+    weaponCarry = {
+        enabled = true,
+        -- Which of a player's weapons are rendered on their body:
+        --   'all'    -- every carryable weapon in the inventory.
+        --   'hotbar' -- only weapons in slots 1..hotbarSlots. A weapon stowed
+        --              past that range is concealed, and drawing it costs
+        --              `concealedDrawTime` extra below.
+        visibility = 'hotbar',
+        -- Equip/holster timing in milliseconds. 0 restores the previous
+        -- instant toggle and skips the animation entirely.
+        drawTime = 900,
+        holsterTime = 700,
+        -- Added to drawTime when the weapon was NOT openly carried -- it sits
+        -- outside the hotbar range while visibility = 'hotbar'. Nobody saw it
+        -- coming, so it takes longer to produce. Deliberately ignored in
+        -- 'all' mode and while this system is disabled: there is no
+        -- concealment to price when every weapon is visible, or none are.
+        concealedDrawTime = 1800,
+        -- Played for the duration of the draw/holster. `false` disables the
+        -- animation while keeping the timing.
+        drawAnim = { dict = 'reaction@intimidation@cop@unarmed', clip = 'intro', flag = 49 },
+        holsterAnim = { dict = 'reaction@intimidation@cop@unarmed', clip = 'outro', flag = 49 },
+        -- Freeze/disable policy passed to qblib's progress bar while drawing.
+        -- Combat is disabled so a draw cannot be used as an instant attack.
+        disable = { move = false, combat = true, car = false },
+        -- qbcore shared/weapons.lua `weapontype` -> attachment tier. A type
+        -- that is absent here is never carried: Throwable and Equipment are
+        -- left out on purpose (a grenade on the spine looks wrong and a
+        -- parachute already has its own component).
+        tiers = {
+            Rifle = 'back', Shotgun = 'back', SMG = 'back',
+            Sniper = 'back', LMG = 'back', Heavy = 'back',
+            Melee = 'sling',
+            Pistol = 'hip',
+        },
+        -- Attachment positions per tier, taken in order. A weapon that finds
+        -- no free position in its tier is simply not rendered, rather than
+        -- stacked on top of one that already is.
+        --
+        -- Offsets are plain {x,y,z} tables rather than vec3: config.lua is a
+        -- shared script the plain-Lua smoke tests dofile() outside FiveM,
+        -- where vec3 does not exist. The client converts them.
+        --
+        -- These numbers are the Renewed-Weaponscarry slot table (bone 24817 =
+        -- SKEL_Spine3) and are a tuned starting point, not a law -- adjust per
+        -- weapon through `weapons` below when a model sits wrong.
+        attachments = {
+            back = {
+                { bone = 24817, pos = { x = 0.04, y = -0.15, z = 0.12 }, rot = { x = 0.0, y = 0.0, z = 0.0 } },
+                { bone = 24817, pos = { x = 0.04, y = -0.17, z = 0.02 }, rot = { x = 0.0, y = 0.0, z = 0.0 } },
+                { bone = 24817, pos = { x = 0.04, y = -0.19, z = -0.08 }, rot = { x = 0.0, y = 0.0, z = 0.0 } },
+            },
+            sling = {
+                { bone = 24817, pos = { x = -0.13, y = -0.16, z = -0.14 }, rot = { x = 5.0, y = 62.0, z = 0.0 } },
+                { bone = 24817, pos = { x = -0.13, y = -0.15, z = 0.10 }, rot = { x = 5.0, y = 124.0, z = 0.0 } },
+            },
+            hip = {
+                { bone = 24817, pos = { x = -0.28, y = -0.14, z = 0.15 }, rot = { x = 0.0, y = 92.0, z = -13.0 } },
+                { bone = 24817, pos = { x = -0.27, y = -0.14, z = 0.15 }, rot = { x = 0.0, y = 92.0, z = 13.0 } },
+            },
+        },
+        -- Per-item overrides, keyed by item name. `tier = false` stops an
+        -- item being carried at all; `bone`/`pos`/`rot` override that tier's
+        -- next free position for this one item; `model` renders a plain prop
+        -- instead of the weapon itself, which is also how a NON-weapon item
+        -- (a wrapped brick, a duffel) can be carried -- give it an explicit
+        -- `tier` and `model`, since only registry weapons are classified
+        -- automatically by `tiers` above.
+        weapons = {
+            weapon_petrolcan = { tier = false },
+            weapon_fireextinguisher = { tier = false },
+        },
+        -- Weapon component item name -> the GTA component this renders as, so
+        -- an attached scope/suppressor shows on the carried weapon. Values are
+        -- component names ('COMPONENT_AT_AR_SUPP_02') or hashes. Empty by
+        -- default: qbcore's shared registry carries no component -> native
+        -- mapping, and guessing one would attach the wrong part.
         components = {},
     },
 }

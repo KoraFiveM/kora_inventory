@@ -41,6 +41,24 @@ unless an explicit nesting policy is added. Evidence/confiscation is default-den
 server-side access, target entity, range, routing-bucket, slot/amount, capacity
 and deterministic-lock checks. Metadata always comes from the source item.
 
+## Visible weapon carry
+
+`server/weaponcarry.lua` builds the carried-weapon list from qbcore-owned
+`PlayerData` and publishes it on the replicated player state bag
+`qbinventory:weaponCarry`. `client/weaponcarry.lua` only RENDERS that bag. Do
+not add a client event, NUI callback or export that lets a client submit,
+extend or edit a carried list -- that would make the bag a channel for
+advertising items a player does not own, or hiding ones they do. Clear the bag
+with an explicit `false`, never a nil deletion.
+
+The one client->server message in this domain
+(`qbinventory:server:weaponToggled`) may only confirm a pending draw/holster
+this server itself issued, and is re-resolved against the real slot before it
+is believed. Keep it that way: no item record, name, duration or equipped
+state may be accepted from the client. `qbinventory:server:weaponUnequipped`
+is payload-free on purpose -- it can only ever put a weapon back on its own
+player's body, never take one off.
+
 ## Tests
 
 Keep the plain-Lua smoke tests deterministic and do not require a running

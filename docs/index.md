@@ -236,6 +236,18 @@ exports.qbinventory:SetWeaponComponents(...)
 New weapon metadata gets a server-generated serial, bounded durability/ammo,
 and only components listed in `Config.qbinventory.weapons.components`.
 
+### Visible weapon carry
+```lua
+exports.qbinventory:GetCarriedWeapons(src)  -- read-only, server-built
+exports.qbinventory:GetEquippedWeapon(src)  -- { slot, name } or nil
+```
+`Config.qbinventory.weaponCarry` renders weapons a player owns but is not
+holding onto their body, and makes equipping one a timed, animated draw.
+`visibility = 'all'` shows every carryable weapon; `'hotbar'` shows only slots
+`1..hotbarSlots` and charges `concealedDrawTime` extra to draw anything stowed
+past them. The carried list is built on the server and pushed out on the
+replicated `qbinventory:weaponCarry` player state bag; clients only render it.
+
 ### Vehicles (trunk/glovebox)
 ```lua
 QbInventory.vehicles.registerAccess(callback, options)   -- (in the domain module's realm)
@@ -291,6 +303,8 @@ instead.
 for stashes/shops/drops), `Config.qbinventory.vehicles.classes` (per-class
 trunk/glovebox slots and weight, set a type to `false` to disable it),
 `Config.qbinventory.playerInspection.access`, `Config.qbinventory.weapons.components`,
+`Config.qbinventory.hotbarSlots` (5 -- both the number-key range and what
+counts as openly carried), `Config.qbinventory.weaponCarry`,
 `Config.qbinventory.containers.items` (portable container item definitions,
 e.g. `backpack`), `Config.qbinventory.containers.evidence.access`. Bundled
 Ammu-Nation shop data lives in `config/shops/ammunation.lua`.

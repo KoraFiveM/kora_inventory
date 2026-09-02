@@ -7,7 +7,13 @@
 -- with no special first-N meaning), this picks the same interpretation real
 -- qb-inventory/ox_inventory hotbars use: the first N general inventory slots
 -- double as the hotbar, rather than inventing a new reserved slot range.
-local HOTBAR_SLOTS = 5
+--
+-- The range comes from config rather than a constant here because a second
+-- feature reads the same "is it in the hotbar" question: weaponCarry's
+-- 'hotbar' visibility mode shows exactly these slots on a player's body and
+-- charges extra to draw from outside them. Two constants would silently
+-- disagree about which slots the player can actually see.
+local HOTBAR_SLOTS = math.max(0, math.floor(tonumber(Config.qbinventory.hotbarSlots) or 5))
 
 local function useHotbarSlot(slot)
     -- Keys 1-5 also type into chat/search boxes and the pause menu. Only fire
