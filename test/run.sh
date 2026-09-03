@@ -4,6 +4,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/shared.lua
 "${LUA:-lua}" test/smoke/funcref.lua
 "${LUA:-lua}" test/smoke/rekey.lua
+"${LUA:-lua}" test/smoke/remove_from_contract.lua
 "${LUA:-lua}" test/smoke/contract.lua
 "${LUA:-lua}" test/smoke/persistence.lua
 "${LUA:-lua}" test/smoke/client_compat.lua

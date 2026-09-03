@@ -347,6 +347,23 @@ local function addSecondary(inv, name, amount, slot, metadata)
     return true, slot
 end
 
+---Removes from a SECONDARY inventory (stash, drop, trunk, glovebox, container,
+---evidence). Reached only through removeFrom, which dispatches here for
+---anything that is not a player inventory.
+---
+---Returns `(ok, err, removed)` -- three values, matching removePlayer. The
+---middle slot is the ERROR and stays nil on success; the item is third. This
+---returned `(true, removed)` for a long time, one value short, so every call
+---site's `local ok, err, removed = removeFrom(...)` bound the item to `err` and
+---left `removed` nil -- and the next line crashed with "attempt to index a nil
+---value (local 'removed')". That made a transfer OUT of any secondary
+---inventory fail, which is most of what a stash is for.
+---@param inv table
+---@param slot integer
+---@param amount integer|nil Defaults to the whole stack.
+---@return boolean ok
+---@return string|nil err
+---@return table|nil removed
 local function removeSecondary(inv, slot, amount)
     local item = inv.items[slot]
     if not item then return false, 'empty slot' end
@@ -355,7 +372,7 @@ local function removeSecondary(inv, slot, amount)
     local removed = I.copy(item)
     removed.amount = amount
     if amount == item.amount then inv.items[slot] = nil else item.amount = item.amount - amount end
-    return true, removed
+    return true, nil, removed
 end
 
 local function addPlayer(src, name, amount, slot, metadata, reason)
@@ -557,6 +574,17 @@ local function addTo(k, name, amount, slot, metadata, reason)
     return addSecondary(inv, name, amount, slot, metadata)
 end
 
+---Removes `amount` from `slot` of any inventory.
+---
+---`(ok, err, removed)` on BOTH branches -- callers read the removed item from
+---the third slot, and a two-value branch here silently hands them an error
+---message where the item should be.
+---@param k string Inventory key.
+---@param slot integer
+---@param amount integer|nil Defaults to the whole stack.
+---@return boolean ok
+---@return string|nil err
+---@return table|nil removed
 local function removeFrom(k, slot, amount)
     local inv = getInventory(k)
     if not inv then return false, 'inventory not found' end
