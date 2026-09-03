@@ -258,7 +258,7 @@ function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDr
     // there.
     const hotbarCount = showHotbar && isPlayer ? Math.max(0, Math.min(hotbarSlots ?? 0, inventory.slots)) : 0
 
-    return <section className="inventory-panel" aria-label={inventory.label ?? inventory.id} aria-busy={busy || undefined}>
+    return <section className={`inventory-panel${isPlayer ? " inventory-panel-player" : ""}`} aria-label={inventory.label ?? inventory.id} aria-busy={busy || undefined}>
         <header className="panel-header">
             <div><p className="eyebrow">{inventory.type ?? "inventory"}</p><h2>{inventory.label ?? inventory.id}</h2></div>
             <div className="weight"><span>{(inventory.weight ?? 0).toLocaleString()} / {(inventory.maxWeight ?? 0).toLocaleString()} g</span><i><b style={{ width: `${percentage}%` }} /></i></div>
