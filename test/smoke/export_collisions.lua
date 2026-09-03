@@ -152,6 +152,7 @@ for _, pair in ipairs({
     'getFreeWeight/GetFreeWeight', 'registerStash/RegisterStash',
     'createTemporaryStash/CreateTemporaryStash', 'registerShop/RegisterShop',
     'buyItem/BuyItem', 'registerHook/RegisterHook', 'removeHooks/RemoveHooks',
+    'getShopItems/GetShopItems', 'setShopItems/SetShopItems',
     'registerInspectionAccess/RegisterInspectionAccess',
     'removeInspectionAccess/RemoveInspectionAccess',
 }) do

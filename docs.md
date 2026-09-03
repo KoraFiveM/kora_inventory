@@ -253,7 +253,17 @@ The lower-camel exports are the qbcore gateway surface:
 - `getWeight`, `canCarry`, `addItem`, `removeItem`, `getItemByName`,
   `getItemsByName`, `getItemBySlot`, `getItemCount`, `hasItem`, `getFreeSlot`,
   `moveItem`, `clearInventory`, `setItems`, `createUseable`, `useItem`
-- `stashGet`, `stashSet`, `stashOpen`, `dropCreate`, `dropTake`
+- `stashGet`, `stashSet`, `stashOpen`, `shopGet`, `shopSet`, `dropCreate`, `dropTake`
+
+`shopGet(id)` / `shopSet(id, items)` (aliased `GetShopItems` / `SetShopItems`)
+are the only way to change a shop's stock or prices after registration:
+`RegisterShop` seeds stock only for a shop that was not restored from durable
+storage, and the generic transfer path refuses shop inventories outright
+("shop items must be purchased"). They go through the same locked write funnel
+as `stashSet`, so revision, viewers and persistence stay consistent, and each
+slot keeps its own `price` field. Unlike the stash pair they reject an unknown
+id instead of lazily creating one -- a shop is a deliberate registration with
+prices and an access policy.
 
 qb-style aliases are also exported (`AddItem`, `RemoveItem`, `OpenInventory`,
 `GetStashItems`, `RegisterStash`, and so on), alongside ox-style constructors

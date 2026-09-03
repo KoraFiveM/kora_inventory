@@ -1156,6 +1156,30 @@ function stashSet(identifier, items)
         return setInventoryItems(inv.key, I.copy(items or {}))
     end)
 end
+-- Shop stock accessors. A shop is registered with its opening stock, but until
+-- now nothing could change that stock afterwards: registerShop only seeds a
+-- shop that was NOT restored from durable storage, and the generic transfer
+-- path deliberately refuses shop inventories ("shop items must be purchased").
+-- A restocking/business resource therefore had no way to put goods on a shelf
+-- or reprice one. These are the shop equivalents of stashGet/stashSet and go
+-- through the same locked setInventoryItems funnel, so stock, revision,
+-- viewers and persistence all stay consistent. Unlike the stash pair they
+-- refuse an unknown id rather than lazily creating one -- a shop is a
+-- deliberate registration with prices and an access policy, never something a
+-- restock call should conjure into existence.
+function shopGet(identifier)
+    local inv = getInventory(key('shop', identifier))
+    if not inv then return nil, 'shop not found' end
+    return I.copy(inv.stock or inv.items or {})
+end
+function shopSet(identifier, items)
+    local inv = getInventory(key('shop', identifier))
+    if not inv then return false, 'shop not found' end
+    if type(items) ~= 'table' then return false, 'items must be a table' end
+    return lock({ inv.key }, function()
+        return setInventoryItems(inv.key, I.copy(items))
+    end)
+end
 function stashOpen(src, identifier, opts)
     local template = ownedStashTemplates[tostring(identifier)]
     local inv, err
@@ -1506,7 +1530,9 @@ local api = {
     CanAddItem = canCarry, GetFreeWeight = function(src) local w, m = getWeight(src); return m - w end,
     ClearInventory = clearInventory, SetInventory = setItems, CreateUsableItem = createUseable,
     OpenInventory = openQbInventory, CloseInventory = closeInventory, GetInventory = function(src) return playerItems(src) end,
+    shopGet = shopGet, shopSet = shopSet,
     GetStashItems = stashGet, SetStashItems = stashSet, RegisterStash = registerStash,
+    GetShopItems = shopGet, SetShopItems = shopSet,
     CreateTemporaryStash = createTemporaryStash, RegisterShop = registerShop, registerShop = registerShop, BuyItem = buyItem,
     RegisterHook = registerHook, RemoveHooks = removeHooks,
     registerHook = registerHook, removeHooks = removeHooks,
@@ -1522,6 +1548,8 @@ local api = {
 -- so both cases stay the same function object. test/smoke/contract.lua asserts
 -- the pairing, so a future one-cased addition fails the suite.
 api.registerStash = api.RegisterStash
+api.getShopItems = api.GetShopItems
+api.setShopItems = api.SetShopItems
 api.createTemporaryStash = api.CreateTemporaryStash
 api.buyItem = api.BuyItem
 api.getInventory = api.GetInventory
