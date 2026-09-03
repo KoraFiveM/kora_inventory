@@ -23,6 +23,7 @@ shared_scripts {
     'config.lua',
     'config/shops/ammunation.lua',
     'config/shops/vendingmachine.lua',
+    'config/shops/liquorstore.lua',
     'shared.lua',
 }
 
@@ -44,6 +45,7 @@ server_scripts {
     'server/weaponcarry.lua',
     'server/shops/ammunation.lua',
     'server/shops/vendingmachine.lua',
+    'server/shops/liquorstore.lua',
     -- Server-only compatibility helpers. Each builds a table which
     -- server/compat/providers.lua publishes under its provider identity; a
     -- compat module never calls exports() itself. The identities are LIVE and
@@ -67,8 +69,11 @@ client_scripts {
     -- Slot 1-5 hotbar keybinds. Loads after client.lua for QbInventory.useGate
     -- and the legacy QBCore:Server:UseItem transport it reuses.
     'client/hotbar.lua',
+    -- Ground-drop props. Presentation only; see the file header.
+    'client/drops.lua',
     'client/shops/ammunation.lua',
     'client/shops/vendingmachine.lua',
+    'client/shops/liquorstore.lua',
     -- Legacy qb-inventory event/command adapter. It has no NUI authority and
     -- only routes requested targets through client.lua's validated transport.
     'client/compat.lua',
@@ -85,5 +90,11 @@ ui_page 'web/build/index.html'
 
 files {
     'web/build/index.html',
-    'web/build/assets/**/*'
+    'web/build/assets/**/*',
+    -- Locally hosted item artwork, served as nui://qbinventory/images/<file>.
+    -- Outside web/ deliberately: web/build is Vite's output directory, and art
+    -- a server owner dropped in must not be something `pnpm build` can delete.
+    --
+    -- '**/*' is the recursive form FiveM honours; a bare '**' matches nothing.
+    'images/**/*'
 }

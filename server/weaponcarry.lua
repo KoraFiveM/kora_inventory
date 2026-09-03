@@ -150,6 +150,20 @@ local function drawDuration(slot)
     return duration
 end
 
+---The animation tier for one weapon name: the same tier `tiers` assigns for
+---carry, so where a weapon is worn and how it is produced stay one decision.
+---
+---Read straight from `tiers` rather than through `carryRule`, because a weapon
+---excluded from CARRY still has to be drawn: a throwable or an item with
+---`tier = false` is simply not rendered on the body, which says nothing about
+---which animation suits it. Nil falls back to the single drawAnim/holsterAnim.
+---@param name string
+---@return string|nil
+local function animTier(name)
+    local def = internal.itemDef(name)
+    return def and (cfg.tiers or {})[def.weapontype] or nil
+end
+
 ---Server half of using a weapon item: decide draw vs holster, price it, and
 ---ask that one client to play it out. Nothing is committed until the client
 ---confirms below, so a cancelled draw leaves the player exactly as they were.
@@ -183,6 +197,10 @@ local function toggle(src, item)
         duration = duration,
         -- Presentation for the bar; the client owns nothing else about it.
         label = item.label or item.name,
+        -- Which animation to play. Resolved here because the tier already
+        -- lives here, and it keeps the client from having to look a weapon's
+        -- class up for itself just to pick an anim.
+        tier = animTier(item.name),
     })
     return true
 end

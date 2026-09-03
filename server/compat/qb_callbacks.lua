@@ -95,9 +95,15 @@ local bridgeDrops = {}
 -- Two further divergences, both consequences of drops being server-resolved in
 -- this resource (see client/compat.lua's setupDropTarget note): the map is keyed
 -- by the bare qbinventory drop id, because upstream's client feeds that key
--- straight back to `qb-inventory:server:openDrop`, and `entityId` is 0 because
--- qbinventory never spawns a networked bag prop -- upstream's client skips a
--- drop whose entity does not exist, which is the intended outcome.
+-- straight back to `qb-inventory:server:openDrop`, and `entityId` is 0.
+--
+-- `entityId` stays 0 even though qbinventory now DOES render a bag on the floor
+-- (client/drops.lua). That prop is a local, non-networked object created
+-- independently on each client, so it has no network id to hand out and no
+-- meaning on any other machine. Upstream's client skips a drop whose entity
+-- does not exist, which is still the intended outcome here: a legacy client
+-- rendering its own duplicate bag on top of ours is worse than it rendering
+-- none, and either way the drop opens by id.
 QB.callback.register('qb-inventory:server:GetCurrentDrops', function()
     local drops = {}
     for id, createdTime in pairs(bridgeDrops) do
@@ -157,9 +163,10 @@ QB.callback.register('qb-inventory:server:createDrop', function(src, item)
         end
         local id = api.dropCreate(coords, { [1] = dropped })
         bridgeDrops[tostring(id)] = os.time()
-        -- Upstream returns the bag prop's network id and its client appends
-        -- 'drop-'. qbinventory has no prop, so this is the drop's own id, which
-        -- is what its open path expects back.
+        -- Upstream returns the bag prop's NETWORK id and its client appends
+        -- 'drop-'. qbinventory's bag (client/drops.lua) is local to each
+        -- client and has no network id, so this is the drop's own id, which is
+        -- what its open path expects back.
         return id
     end))
 end)

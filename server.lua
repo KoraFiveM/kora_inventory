@@ -1196,6 +1196,31 @@ function dropCreate(coords, items)
     local inv = secondary('drop', id, { label = 'Ground drop', coords = coords, distance = C.dropDistance, slots = C.defaultSlots, items = items, temporary = true })
     TriggerClientEvent('qbinventory:client:dropCreated', -1, id, coords); return id
 end
+
+---Every live ground drop, as { { id, coords }, ... }.
+---
+---Exists so client/drops.lua can render the props for drops that already
+---existed when a player connected -- `dropCreated` is a one-shot broadcast, so
+---without this a bag is visible only to whoever was online when it landed.
+---
+---Deliberately IDs and coordinates only, never contents: the position of a
+---dropped bag is already broadcast to every client the moment it is created,
+---but what is inside one is not, and must stay a server-side question answered
+---by `open`'s own access and distance checks.
+---@return table[]
+local function dropList()
+    local out = {}
+    for _, inv in pairs(inventories) do
+        if inv.type == 'drop' and inv.coords then
+            out[#out + 1] = { id = inv.id, coords = inv.coords }
+        end
+    end
+    return out
+end
+
+QB.callback.register('qbinventory:server:drops', function(_src)
+    return dropList()
+end)
 function dropTake(src, id, slot, amount)
     local inv = getInventory(key('drop', id)); if not inv then return false, 'no such drop' end
     local ok, payload = open(src, inv.key); if not ok then return false, payload end

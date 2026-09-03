@@ -77,8 +77,18 @@ the same question: `client/hotbar.lua` binds the number keys to exactly that
 range, and this is the range that counts as "openly carried". Two constants
 would silently disagree about which slots a player can actually see.
 
-Drawing costs `drawTime` and plays `drawAnim`; holstering costs `holsterTime`
-and plays `holsterAnim`. Drawing a weapon that was *not* openly carried costs
+Drawing costs `drawTime`; holstering costs `holsterTime`. The animation is
+chosen **per weapon class** from `drawAnims`/`holsterAnims`, keyed by the same
+`tiers` entry that decides where the weapon is worn -- so where a weapon sits
+and how it is produced are one decision rather than two that can disagree. A
+rifle coming off the back and a pistol off the hip are different movements, and
+playing the hip draw for both was the clearest sign the animation was
+decorative. A class with no entry falls back to `drawAnim`/`holsterAnim`; an
+entry set to `false` skips the animation for that class while keeping its
+timing. The tier is resolved on the server and sent with the toggle, so the
+client does not look a weapon's class up just to pick an animation.
+
+Drawing a weapon that was *not* openly carried costs
 `concealedDrawTime` on top -- pulling something nobody saw coming takes longer
 than unslinging what was already on your back. That surcharge only applies
 while `visibility = 'hotbar'`: in `'all'` mode (or with the feature disabled)
@@ -337,6 +347,92 @@ conflicts with this resource's authority model.
 | ox `SetSlotCount` / `SetMaxWeight` | resizes any inventory | refuses player inventories | qbcore owns player dimensions |
 | ox `SetMetadata` | accepts `metadata.weight` | rejects it | a caller-supplied weight invalidates capacity checks |
 | ox `addCash` / `removeCash` / `getBank` / `getCards` / `giveCard` | operate on `money` / `mastercard` items | routed to qbcore accounts | qbcore owns balances |
+
+## Ammunition
+
+Using an ammo item loads the weapon the player currently has **drawn**.
+
+Which weapon that is, and how many rounds it gets, are both resolved on the
+server: the weapon comes from `server/weaponcarry.lua`'s own record of the draw
+it asked for (only ever set after the client confirmed a draw the server
+initiated, and re-validated against qbcore-owned `PlayerData` at that point),
+and the round count comes from the shared item definition's `rounds`. The
+client's use request contributes a slot and nothing else -- no weapon name,
+hash, ammo type or count crosses the wire inbound.
+
+The magazine's `ammoType` must match the drawn weapon's `ammotype`; a mismatch
+refuses the use and consumes nothing. `server/useables.lua` registers a useable
+for every registry item that has both `ammoType` and a positive `rounds`, so a
+server adding its own magazine gets a working use with no code change.
+
+A weapon must be **drawn**, not merely owned. GTA's ammo lives on the ped's
+weapon and the ped only has the weapon while it is drawn, so loading a
+holstered one would require ammo persisted in item metadata and reapplied on
+every draw -- a separate feature. Accepting the use and silently doing nothing
+would consume the magazine for no effect, so it is refused with a reason
+instead.
+
+## UI presentation config
+
+`Config.qbinventory.ui` is the only config that crosses into the browser,
+pushed on `qbinventory:nui:config` at resource start and on every session open.
+Nothing in it is authority and the inventory engine never reads it.
+
+| Key | Effect |
+| --- | --- |
+| `centreWhenSolo` | With no second inventory open, drop the third column instead of rendering a panel whose content is a sentence explaining that it is empty. |
+| `showHotbar` | Outline slots `1..hotbarSlots` on the player's own inventory in the accent colour, so the keys `client/hotbar.lua` already binds are visible rather than folklore. |
+| `images` | Item artwork resolution -- see below. |
+
+`hotbarSlots` is sent alongside it because the NUI draws the boundary and cannot
+know where it is otherwise. It stays a read of the same single value
+`client/hotbar.lua` binds its keys from, so the outline and the keys cannot
+disagree.
+
+### Item artwork
+
+Artwork is resolved as an ordered list of candidates, walked on `onError`:
+
+1. the item's own `imageUrl`, if it is `https://` and `allowRemote` is not false
+2. `<localPath>/<item.image>`, when the legacy `image` field carries an extension
+3. `<localPath>/<item.name>.<ext>` for each configured extension, in order
+4. the first letter of the label
+
+Ordered rather than probed: there is no way to ask whether a `nui://` file
+exists without requesting it, and an `<img onError>` chain gets that for free
+with no HEAD requests and no manifest to keep in sync. Set `preferLocal = true`
+to move the remote URL to the end of that list, or `allowRemote = false` to drop
+it entirely.
+
+Local files live in `qbinventory/images/` (see its README) and are served as
+`nui://qbinventory/images/<file>`. That is outside `web/` on purpose: `web/build`
+is Vite's output directory, and artwork a server owner added must not be
+something `pnpm build` can delete.
+
+**Animated WebP and GIF need no special handling** -- CEF animates both in a
+plain `<img>`, so the work is allowing the extension, not a second code path.
+
+The scheme check is an **allowlist**, not decoration. Item definitions come from
+shared registries any resource can extend, so `imageUrl` is untrusted text on
+its way into an `src`; only `https://` is accepted, and a local name must be a
+plain identifier or it is rejected outright rather than escaped.
+
+## Ground drops
+
+Dropping an item creates a temporary `drop` inventory at the player's position
+and leaves a bag prop on the floor (`Config.qbinventory.drops`).
+
+The prop is **presentation only**. It is a local, non-networked object created
+independently on each client; it carries no inventory identity, and interacting
+with it calls the ordinary open path with the drop id the server broadcast. The
+server then re-resolves that drop and repeats its access, distance and
+routing-bucket checks like any other inventory -- so deleting the prop, moving
+it, or fabricating one client-side gains nothing.
+
+`qbinventory:server:drops` returns live drop ids and coordinates so a client
+that connected after a bag landed can still render it. Coordinates are already
+broadcast to every client at drop time; **contents are never included** -- what
+is inside a bag stays a server-side question answered by `open`.
 
 ## Client and renderer contract
 

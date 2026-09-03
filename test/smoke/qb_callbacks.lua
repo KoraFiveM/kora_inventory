@@ -166,7 +166,7 @@ local drops = handlers['qb-inventory:server:GetCurrentDrops'](7)
 H.equal(drops['1'].name, 'drop-1', 'the drop carries its upstream name')
 H.ok(drops['1'].items == nil, 'drop contents are never handed to a client that has no session for them')
 H.equal(drops['1'].coords, pedCoords[70], 'the already-broadcast coords are reported')
-H.equal(drops['1'].entityId, 0, 'there is no networked bag prop to hand out')
+H.equal(drops['1'].entityId, 0, 'the bag prop is local to each client, so there is no network id to hand out')
 
 -- A drop taken from the authority stops being reported.
 inventories['drop:1'] = nil

@@ -54,6 +54,12 @@ button { color: inherit; }
 .notice { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid hsl(0 72% 55% / .45); border-radius: 6px; color: hsl(0 90% 80%); background: hsl(0 72% 25% / .26); font-size: 11px; }
 
 .inventory-layout { min-height: 0; display: grid; grid-template-columns: minmax(260px, 1fr) 195px minmax(260px, 1fr); gap: 8px; }
+/* Nothing open beside the player's inventory: two columns, centred, with the
+   player's panel capped so a 41-slot grid does not stretch to a 5-slot-wide
+   row of very large squares on a wide screen. `justify-content` centres the
+   pair in the leftover space -- the panels keep their own sizes rather than
+   growing to fill it. */
+.inventory-layout-solo { grid-template-columns: minmax(260px, 620px) 195px; justify-content: center; }
 .inventory-panel, .item-detail { min-height: 0; overflow: auto; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--surface-raised)); }
 .inventory-panel, .item-detail { scrollbar-width: thin; scrollbar-color: hsl(var(--border-strong)) transparent; }
 .inventory-panel::-webkit-scrollbar, .item-detail::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
@@ -76,6 +82,20 @@ h2 { margin-bottom: 0; font-size: 13px; }
 .slot-move-target { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft) / .58); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
 .slot-selected.slot-move-target { border-color: hsl(var(--primary)); }
 .slot-drag-source { cursor: grabbing; opacity: .34; }
+/* Hotbar range (slots 1..Config.qbinventory.hotbarSlots) on the player's own
+   inventory. Drawn as ONE continuous accent frame around the whole run rather
+   than a box per slot: five separate outlines read as five special slots, and
+   the point is that they are one strip. The top and bottom edges run across
+   every slot; the left and right edges are added only at the ends. Uses an
+   inset shadow, not `border`, so it cannot shift the slot's layout by a pixel
+   and cannot fight the selection/drop-target border colours. */
+.slot-hotbar { box-shadow: inset 0 1px 0 hsl(var(--primary)), inset 0 -1px 0 hsl(var(--primary)); }
+.slot-hotbar-first { box-shadow: inset 0 1px 0 hsl(var(--primary)), inset 0 -1px 0 hsl(var(--primary)), inset 1px 0 0 hsl(var(--primary)); }
+.slot-hotbar-last { box-shadow: inset 0 1px 0 hsl(var(--primary)), inset 0 -1px 0 hsl(var(--primary)), inset -1px 0 0 hsl(var(--primary)); }
+/* A selected or targeted hotbar slot keeps its own state shadow: the state is
+   transient and needs to win, and the accent frame is still visible on the
+   slots either side of it. */
+.slot-hotbar.slot-selected, .slot-hotbar.slot-move-target, .slot-hotbar.slot-drop-invalid { box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
 .slot-drop-invalid { border-color: hsl(var(--danger) / .75); box-shadow: inset 0 0 0 1px hsl(var(--danger) / .4); }
 .slot[aria-disabled="true"] { cursor: wait; }
 .slot-filled { color: hsl(var(--foreground)); }
@@ -83,13 +103,18 @@ h2 { margin-bottom: 0; font-size: 13px; }
 .item-art, .detail-art { display: grid; place-items: center; overflow: hidden; color: hsl(var(--primary)); font-weight: 800; background: hsl(var(--brand-soft)); }
 .item-art img, .detail-art img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgb(0 0 0 / .35)); }
 /* Artwork is the slot canvas, not a miniature icon. Text and counters sit above it. */
-.item-art { position: absolute; z-index: 0; box-sizing: border-box; inset: 17px 7px 21px; padding: 3px 4px; border-radius: 4px; background: transparent; font-size: 30px; }
+.item-art { position: absolute; z-index: 0; box-sizing: border-box; inset: 21px 7px 21px; padding: 3px 4px; border-radius: 4px; background: transparent; font-size: 30px; }
 .item-art img { transform: scale(1.1); }
 .item-label { position: absolute; z-index: 1; right: 4px; bottom: 3px; left: 5px; overflow: hidden; color: hsl(var(--foreground)); font-size: 10px; font-weight: 650; line-height: 1.15; text-overflow: ellipsis; text-shadow: 0 1px 3px rgb(0 0 0 / .8); white-space: nowrap; }
 .slot-priced .item-label { right: 32px; }
 /* Quantity reads top-right, opposite the slot number; a shop price takes the
    bottom-right corner the quantity used to hold. */
-.item-amount { position: absolute; z-index: 1; top: 3px; right: 4px; border-radius: 3px; padding: 1px 4px; background: hsl(var(--background) / .82); color: hsl(var(--foreground)); font-size: 9px; font-weight: 700; line-height: 1.2; }
+/* The quantity has to be readable against artwork, not merely present. At 9px
+   on a translucent background it sat over the item image and read as absent --
+   which is what "the amount is missing" meant. An opaque chip with a border,
+   a step up in size, and an artwork inset that clears it (see .item-art) fixes
+   legibility without moving it off the corner it belongs in. */
+.item-amount { position: absolute; z-index: 1; top: 2px; right: 3px; border: 1px solid hsl(var(--border)); border-radius: 4px; padding: 0 4px; background: hsl(var(--background)); color: hsl(var(--foreground)); font-size: 11px; font-weight: 800; line-height: 15px; letter-spacing: -.01em; }
 .item-price { position: absolute; z-index: 1; right: 4px; bottom: 3px; border-radius: 3px; padding: 1px 3px; color: hsl(var(--primary)); background: hsl(var(--background) / .9); font-size: 10px; font-weight: 800; line-height: 1.2; text-shadow: 0 1px 2px rgb(0 0 0 / .65); }
 .durability { position: absolute; z-index: 1; right: 5px; bottom: 0; left: 5px; }
 /* Only mounted mid-drag (App.tsx), and painted behind the shell so a slot
@@ -98,7 +123,10 @@ h2 { margin-bottom: 0; font-size: 13px; }
 .world-drop-zone-armed { border-color: hsl(var(--brand-border)); background: hsl(var(--primary) / .12); }
 .world-drop-hint { position: fixed; z-index: 1200; bottom: 26px; left: 50%; transform: translateX(-50%); margin: 0; border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 5px 12px; color: hsl(var(--muted-foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); font-size: 10px; font-weight: 700; letter-spacing: .04em; pointer-events: none; }
 .world-drop-hint-armed { border-color: hsl(var(--brand-border)); color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
-.inventory-drag-preview { position: fixed; z-index: 1000; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 6px; width: min(170px, 32vw); min-height: 38px; overflow: hidden; border: 1px solid hsl(var(--brand-border)); border-radius: 7px; padding: 4px 6px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); pointer-events: none; font-size: 10px; font-weight: 700; }
+/* translate(-50%,-50%) centres the preview on the cursor -- App.tsx sets the
+   raw pointer position and this does the centring, because the element's width
+   is a min() of the viewport and is not knowable from JS. */
+.inventory-drag-preview { translate: -50% -50%; position: fixed; z-index: 1000; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 6px; width: min(170px, 32vw); min-height: 38px; overflow: hidden; border: 1px solid hsl(var(--brand-border)); border-radius: 7px; padding: 4px 6px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); pointer-events: none; font-size: 10px; font-weight: 700; }
 .inventory-drag-preview > span:not(.drag-preview-art) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inventory-drag-preview b { color: hsl(var(--muted-foreground)); font-size: 9px; }
 .drag-preview-art { display: grid; place-items: center; width: 30px; height: 30px; overflow: hidden; border-radius: 5px; background: hsl(var(--brand-soft)); color: hsl(var(--primary)); }

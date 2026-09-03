@@ -29,15 +29,38 @@ local function reportUnequipped()
     TriggerServerEvent('qbinventory:server:weaponUnequipped')
 end
 
+---The animation for one draw/holster.
+---
+---Per-tier first, then the single fallback. A tier set to `false` in
+---drawAnims/holsterAnims means "no animation for this class" and must NOT fall
+---through to the generic one, so the two lookups are kept apart rather than
+---collapsed into an `or` chain.
+---@param action string
+---@param tier string|nil
+---@return table|nil
+local function toggleAnim(action, tier)
+    local perTier = action == 'holster' and cfg.holsterAnims or cfg.drawAnims
+
+    if tier and type(perTier) == 'table' then
+        local entry = perTier[tier]
+        if entry == false then return nil end
+        if type(entry) == 'table' then return entry end
+    end
+
+    local fallback = action == 'holster' and cfg.holsterAnim or cfg.drawAnim
+    return type(fallback) == 'table' and fallback or nil
+end
+
 ---Run the draw/holster animation for `duration`, reporting whether it ran to
 ---completion. A zero duration keeps the original instant behaviour.
 ---@param action string
 ---@param duration integer
 ---@param label string
+---@param tier string|nil Weapon class tier, chosen by the server.
 ---@return boolean completed
-local function playToggle(action, duration, label)
+local function playToggle(action, duration, label, tier)
     if duration <= 0 then return true end
-    local anim = action == 'holster' and cfg.holsterAnim or cfg.drawAnim
+    local anim = toggleAnim(action, tier)
     return QB.progressbar.start({
         label = label,
         duration = duration,
@@ -67,7 +90,12 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
     end
 
     toggling = true
-    local completed = playToggle(action, math.floor(tonumber(request.duration) or 0), request.label or request.name)
+    local completed = playToggle(
+        action,
+        math.floor(tonumber(request.duration) or 0),
+        request.label or request.name,
+        type(request.tier) == 'string' and request.tier or nil
+    )
     toggling = false
     if not completed then return end
 
@@ -86,6 +114,44 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
     end
 
     if request.slot then TriggerServerEvent('qbinventory:server:weaponToggled', request.slot) end
+end)
+
+-- Loading a magazine. The weapon is named BY THE SERVER, from its own record of
+-- what this player drew (server/useables.lua's ammoUseable) -- this client is
+-- told what to load, and contributes nothing to the decision.
+--
+-- GiveWeaponToPed rather than AddAmmoToPed alone: ammo can only sit on a weapon
+-- the ped actually has, and a weapon-wheel switch mid-use can leave the ped
+-- momentarily without it. Giving it back with 0 rounds is a no-op when the ped
+-- already holds it and repairs the case where it does not, so the magazine the
+-- server has already consumed is never silently lost.
+RegisterNetEvent('qbinventory:client:addAmmo', function(request)
+    if type(request) ~= 'table' or type(request.weapon) ~= 'string' then return end
+
+    local rounds = math.floor(tonumber(request.rounds) or 0)
+    if rounds <= 0 then return end
+
+    local ped = QB.cache.ped()
+    local hash = GetHashKey(request.weapon)
+
+    if not HasPedGotWeapon(ped, hash, false) then
+        GiveWeaponToPed(ped, hash, 0, false, false)
+    end
+
+    -- Clamped twice: against the weapon's own engine maximum, which is what
+    -- stops a magazine overfilling a weapon, and against the configured
+    -- ceiling, which is a server policy on top of it.
+    local _, maxAmmo = GetMaxAmmo(ped, hash)
+    local ceiling = math.floor(tonumber(request.maxAmmo) or 0)
+    if ceiling > 0 then
+        maxAmmo = maxAmmo and maxAmmo > 0 and math.min(maxAmmo, ceiling) or ceiling
+    end
+
+    local current = GetAmmoInPedWeapon(ped, hash) or 0
+    local target = current + rounds
+    if maxAmmo and maxAmmo > 0 then target = math.min(target, maxAmmo) end
+
+    SetPedAmmo(ped, hash, target)
 end)
 
 -- A drawn weapon can leave the player's hands without a holster: the weapon

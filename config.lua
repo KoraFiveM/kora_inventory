@@ -17,6 +17,65 @@ Config.qbinventory = {
     playerInspection = { access = nil },
     sessionTtl = 120000,
     dropDistance = 2.0,
+
+    -- A dropped item leaves a real bag on the floor to walk up to, rather than
+    -- an invisible interaction point.
+    --
+    -- The prop is PRESENTATION ONLY and lives entirely on each client: it is a
+    -- local, non-networked object, it carries no inventory identity, and
+    -- interacting with it opens the drop by the id the server broadcast --
+    -- which the server re-checks for access, distance and routing bucket like
+    -- any other inventory. Deleting or spoofing the prop gains nothing.
+    drops = {
+        enabled = true,
+        model = 'prop_med_bag_01b',
+        -- Drop coordinates come from the player's ped, which is roughly a metre
+        -- off the floor. Trace down to the ground so the bag sits on the
+        -- surface instead of hovering at waist height.
+        placeOnGround = true,
+        -- Metres. Kept at or below dropDistance so the prompt can never appear
+        -- at a range the server will refuse to open the drop from.
+        interactionDistance = 1.5,
+        label = 'Pick up',
+        icon = 'package',
+    },
+
+    -- Presentation only. Everything in here is pushed to the browser on
+    -- `qbinventory:nui:config` and changes nothing the server decides -- the
+    -- inventory engine never reads it. Kept in one sub-table so it is obvious
+    -- at a glance which config values cross into the NUI and which do not.
+    ui = {
+        -- With no second inventory open, centre the player's panel instead of
+        -- rendering an empty "no secondary inventory" placeholder beside it.
+        -- The placeholder is a whole panel of chrome describing its own
+        -- absence, which is most of what an inventory is open for.
+        centreWhenSolo = true,
+
+        -- Outline the first `hotbarSlots` slots in the accent colour so the
+        -- keys 1-5 already bound in client/hotbar.lua are visible rather than
+        -- folklore. Purely a border: the slots behave identically either way.
+        showHotbar = true,
+
+        -- Item artwork resolution. `localPath` is tried before any remote
+        -- `imageUrl` when `preferLocal` is set, and always as the fallback when
+        -- a remote image 404s.
+        --
+        -- Extensions are tried in order for `<localPath>/<item name>.<ext>`, so
+        -- put the format you actually ship first. Animated WebP and GIF need no
+        -- special handling -- CEF animates both in a plain <img> -- so they are
+        -- listed purely to allow the extension.
+        images = {
+            localPath = 'nui://qbinventory/images',
+            extensions = { 'webp', 'png', 'gif', 'jpg' },
+            -- Try the local file before the remote URL. Leave false to keep
+            -- qbcore's remote catalogue as the primary source and use local
+            -- files only for items it has no artwork for.
+            preferLocal = false,
+            -- Set false to never make an outbound image request at all. Items
+            -- with no local file fall back to the first-letter placeholder.
+            allowRemote = true,
+        },
+    },
     auditLimit = 1000,
     requireSameBucket = true,
     -- Physical cash is opt-in. When enabled, the configured qbcore account is
@@ -184,8 +243,36 @@ Config.qbinventory = {
         concealedDrawTime = 1800,
         -- Played for the duration of the draw/holster. `false` disables the
         -- animation while keeping the timing.
+        --
+        -- These two are the FALLBACK, used for anything the per-tier table
+        -- below has no entry for.
         drawAnim = { dict = 'reaction@intimidation@cop@unarmed', clip = 'intro', flag = 49 },
         holsterAnim = { dict = 'reaction@intimidation@cop@unarmed', clip = 'outro', flag = 49 },
+
+        -- Per-tier animations, keyed by the SAME tier a weapon gets from
+        -- `tiers` below -- so where a weapon is carried and how it is produced
+        -- are one decision, not two that can disagree. A rifle coming off the
+        -- back and a pistol coming off the hip are different movements, and
+        -- playing the hip draw for both was the single most visible tell that
+        -- the animation was decorative.
+        --
+        -- A tier absent here falls back to drawAnim/holsterAnim above; set an
+        -- entry to `false` to skip the animation for that tier while keeping
+        -- its timing.
+        drawAnims = {
+            -- Long guns: both hands, reaching over the shoulder.
+            back = { dict = 'anim@am_hold_up@male', clip = 'shoppay_idle_a', flag = 49 },
+            -- Melee, worn on a sling at the hip.
+            sling = { dict = 'melee@holster', clip = 'unholster', flag = 49 },
+            -- Sidearm from the hip -- the original animation, which was
+            -- correct all along for exactly this tier.
+            hip = { dict = 'reaction@intimidation@cop@unarmed', clip = 'intro', flag = 49 },
+        },
+        holsterAnims = {
+            back = { dict = 'anim@am_hold_up@male', clip = 'shoppay_idle_a', flag = 49 },
+            sling = { dict = 'melee@holster', clip = 'holster', flag = 49 },
+            hip = { dict = 'reaction@intimidation@cop@unarmed', clip = 'outro', flag = 49 },
+        },
         -- Freeze/disable policy passed to qblib's progress bar while drawing.
         -- Combat is disabled so a draw cannot be used as an instant attack.
         disable = { move = false, combat = true, car = false },

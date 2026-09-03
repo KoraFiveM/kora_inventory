@@ -53,11 +53,17 @@ local function capture(eventName, handler)
 end
 
 -- --- shared prerequisites (fxmanifest shared_scripts) ---
+--
+-- Discovered from the manifest rather than listed here: each shop's server
+-- file `assert`s its own config block at load time, so a newly added shop this
+-- list had not been updated for failed the whole test with an assertion from
+-- inside that shop rather than anything about the provider contract.
 Config = { qbinventory = {} }
-dofile('config.lua')
-dofile('config/shops/ammunation.lua')
-dofile('config/shops/vendingmachine.lua')
-dofile('shared.lua')
+for _, path in ipairs(pathsFrom('shared_scripts')) do
+    -- '@resource/file.lua' entries are other resources (qblib, qbsql); the QB
+    -- surface they provide is mocked below.
+    if path:sub(1, 1) ~= '@' then dofile(path) end
+end
 
 QB = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },

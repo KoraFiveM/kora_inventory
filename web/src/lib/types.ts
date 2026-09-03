@@ -71,3 +71,27 @@ export interface ItemBoxReceipt {
     action: "add" | "purchase" | "remove" | "use"
     duration?: number
 }
+
+/**
+ * The presentation half of `Config.qbinventory`, pushed on
+ * `qbinventory:nui:config`. Everything here is a rendering choice -- nothing in
+ * it is authority, and the server never reads it back.
+ */
+export interface UiConfig {
+    /** Slots 1..hotbarSlots are the hotbar; the same range client/hotbar.lua binds. */
+    hotbarSlots?: number
+    /** Centre the player panel when no second inventory is open. */
+    centreWhenSolo?: boolean
+    /** Outline the hotbar slots in the accent colour. */
+    showHotbar?: boolean
+    images?: {
+        /** e.g. `nui://qbinventory/images` */
+        localPath?: string
+        /** Tried in order for `<localPath>/<name>.<ext>`. */
+        extensions?: string[]
+        /** Try the local file before the item's own remote `imageUrl`. */
+        preferLocal?: boolean
+        /** When false, no outbound image request is ever made. */
+        allowRemote?: boolean
+    }
+}

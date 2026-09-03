@@ -1,13 +1,35 @@
 import { CircleAlert, PackageOpen, Search, X } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd"
 import { TouchBackend } from "react-dnd-touch-backend"
 import { closeSession, sendIntent } from "@/lib/nui"
 import { openDevHarness } from "@/lib/dev"
-import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, ThemeTokens } from "@/lib/types"
+import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, ThemeTokens, UiConfig } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
+
+/**
+ * Presentation config from `Config.qbinventory.ui`, pushed on
+ * `qbinventory:nui:config`.
+ *
+ * The defaults here are what renders in the window between the UI mounting and
+ * that message arriving (and in the dev harness, which sends no config at all),
+ * so they mirror the shipped config rather than being "off".
+ */
+const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar">> & { images: NonNullable<UiConfig["images"]> } = {
+    hotbarSlots: 5,
+    centreWhenSolo: true,
+    showHotbar: true,
+    images: {
+        localPath: "nui://qbinventory/images",
+        extensions: ["webp", "png", "gif", "jpg"],
+        preferLocal: false,
+        allowRemote: true,
+    },
+}
+
+const UiConfigContext = createContext(DEFAULT_UI_CONFIG)
 
 interface DragSlot { inventoryId: string; slot: number }
 interface SlotTarget { inventoryId: string; slot: number }
@@ -50,10 +72,72 @@ function findItem(inventory: InventoryView | undefined, slot: number) {
     return inventory && asSlots(inventory.items).find((item) => item.slot === slot)
 }
 
-function ItemArtwork({ item, className }: { item: Pick<InventoryItem, "name" | "label" | "imageUrl">; className: string }) {
-    const [failed, setFailed] = useState(false)
-    const source = !failed && item.imageUrl?.startsWith("https://") ? item.imageUrl : undefined
-    return <span className={className}>{source ? <img src={source} alt="" onError={() => setFailed(true)} /> : (item.label ?? item.name).slice(0, 1)}</span>
+/**
+ * Item name -> a safe `nui://` URL, or undefined.
+ *
+ * Item records reach the browser from shared item definitions any resource can
+ * extend, so a name is untrusted text on the way into an `src`. Anything but a
+ * plain identifier is rejected outright rather than escaped -- item names are
+ * already constrained to that shape, so there is nothing legitimate to lose.
+ */
+function localImageUrl(base: string | undefined, name: string, extension: string) {
+    if (!base) return undefined
+    if (!/^[a-z0-9_-]+$/i.test(name)) return undefined
+    if (!/^[a-z0-9]+$/i.test(extension)) return undefined
+    return `${base.replace(/\/+$/, "")}/${name}.${extension}`
+}
+
+/**
+ * Every URL worth trying for one item's artwork, best first.
+ *
+ * Ordered rather than probed: there is no way to ask whether a `nui://` file
+ * exists without requesting it, and an `<img onError>` chain gets that for free
+ * with no HEAD requests and no manifest to keep in sync.
+ */
+function artworkCandidates(item: Pick<InventoryItem, "name" | "label" | "image" | "imageUrl">, images: NonNullable<UiConfig["images"]>) {
+    const out: string[] = []
+
+    // Only https:// remote artwork. The scheme allowlist is the point: an item
+    // definition is data from another resource, and a `javascript:` or `data:`
+    // value in `imageUrl` must never reach an `src`.
+    const remote = images.allowRemote !== false && item.imageUrl?.startsWith("https://") ? item.imageUrl : undefined
+
+    if (remote && !images.preferLocal) out.push(remote)
+
+    // qbcore's legacy `image` field is a bare filename ('water_bottle.png'),
+    // which is the one case where the extension is already chosen for us.
+    const named = typeof item.image === "string" ? item.image.replace(/\.[a-z0-9]+$/i, "") : undefined
+    const explicit = typeof item.image === "string" ? /\.([a-z0-9]+)$/i.exec(item.image)?.[1] : undefined
+    if (named && explicit) {
+        const url = localImageUrl(images.localPath, named, explicit)
+        if (url) out.push(url)
+    }
+
+    for (const extension of images.extensions ?? []) {
+        const url = localImageUrl(images.localPath, item.name, extension)
+        if (url && !out.includes(url)) out.push(url)
+    }
+
+    if (remote && images.preferLocal) out.push(remote)
+
+    return out
+}
+
+function ItemArtwork({ item, className }: { item: Pick<InventoryItem, "name" | "label" | "image" | "imageUrl">; className: string }) {
+    const { images } = useContext(UiConfigContext)
+    const candidates = useMemo(() => artworkCandidates(item, images), [item.name, item.image, item.imageUrl, images])
+    const [attempt, setAttempt] = useState(0)
+
+    // A different item in the same slot is a different candidate list, so the
+    // attempt counter has to go back to the start or the new item inherits the
+    // old one's failures and shows the letter placeholder.
+    useEffect(() => { setAttempt(0) }, [candidates])
+
+    const source = candidates[attempt]
+
+    return <span className={className}>{source
+        ? <img key={source} src={source} alt="" onError={() => setAttempt((current) => current + 1)} />
+        : (item.label ?? item.name).slice(0, 1)}</span>
 }
 
 interface SlotProps {
@@ -67,12 +151,16 @@ interface SlotProps {
     onDragEnd: () => void
     onSelect: (item?: InventoryItem) => void
     onActivate: (item: InventoryItem) => void
+    /** Part of the hotbar range, so it carries the accent outline. */
+    hotbar?: boolean
+    /** The last slot of that range, which closes the outline on the right. */
+    lastHotbar?: boolean
 }
 
 /** React DnD's TouchBackend uses global CEF input listeners for both touch and
  * mouse. Unlike HTML5 DnD or source pointer-capture, it resolves the actual
  * destination slot after the cursor leaves the source element. */
-function InventorySlot({ item, index, inventory, selected, busy, canDropSlot, onDrop, onDragEnd, onSelect, onActivate }: SlotProps) {
+function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate }: SlotProps) {
     const target = useMemo<SlotTarget>(() => ({ inventoryId: inventory.id, slot: index }), [index, inventory.id])
     const suppressClick = useRef(false)
     const [{ isDragging }, dragRef] = useDrag<DragSlot, SlotTarget, { isDragging: boolean }>(() => ({
@@ -106,6 +194,12 @@ function InventorySlot({ item, index, inventory, selected, busy, canDropSlot, on
         // A shop slot puts a price where the label would otherwise end, so the
         // label reserves that room only where a price is actually rendered.
         inventory.type === "shop" && "slot-priced",
+        // Accent outline on the hotbar range. `hotbar` is decided by the panel,
+        // not here: the range only means anything on the player's own
+        // inventory, and a stash's first five slots are not bound to anything.
+        hotbar && "slot-hotbar",
+        hotbar && index === 1 && "slot-hotbar-first",
+        hotbar && lastHotbar && "slot-hotbar-last",
         isOver && canDrop && "slot-move-target", isOver && !canDrop && "slot-drop-invalid",
     ].filter(Boolean).join(" ")
 
@@ -141,7 +235,7 @@ function InventorySlot({ item, index, inventory, selected, busy, canDropSlot, on
     </button>
 }
 
-function InventoryPanel({ inventory, selected, busy, canDropSlot, onDrop, onDragEnd, onSelect, onActivate }: {
+function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDrop, onDragEnd, onSelect, onActivate }: {
     inventory: InventoryView
     selected?: Selection
     busy: boolean
@@ -150,10 +244,20 @@ function InventoryPanel({ inventory, selected, busy, canDropSlot, onDrop, onDrag
     onDragEnd: () => void
     onSelect: (inventory: InventoryView, item: InventoryItem | undefined, slot: number) => void
     onActivate: (inventory: InventoryView, item: InventoryItem) => void
+    /** True for the player's own inventory -- the only one with a hotbar. */
+    isPlayer?: boolean
 }) {
+    const { hotbarSlots, showHotbar } = useContext(UiConfigContext)
     const items = asSlots(inventory.items)
     const bySlot = new Map(items.map((item) => [item.slot, item]))
     const percentage = inventory.maxWeight ? Math.min(100, Math.round(((inventory.weight ?? 0) / inventory.maxWeight) * 100)) : 0
+
+    // Only the player's own inventory has a hotbar. The number keys act on the
+    // player's slots 1-5 wherever the cursor is, so outlining a stash's or a
+    // shop's first five slots would advertise a binding that does not exist
+    // there.
+    const hotbarCount = showHotbar && isPlayer ? Math.max(0, Math.min(hotbarSlots ?? 0, inventory.slots)) : 0
+
     return <section className="inventory-panel" aria-label={inventory.label ?? inventory.id} aria-busy={busy || undefined}>
         <header className="panel-header">
             <div><p className="eyebrow">{inventory.type ?? "inventory"}</p><h2>{inventory.label ?? inventory.id}</h2></div>
@@ -163,7 +267,7 @@ function InventoryPanel({ inventory, selected, busy, canDropSlot, onDrop, onDrag
             {Array.from({ length: inventory.slots }, (_, offset) => {
                 const slot = offset + 1
                 const item = bySlot.get(slot)
-                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} />
+                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} hotbar={slot <= hotbarCount} lastHotbar={slot === hotbarCount} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} />
             })}
         </div>
     </section>
@@ -179,7 +283,13 @@ function DragPreview({ session }: { session: SessionSnapshot | null }) {
     const source = findInventory(session, item.inventoryId)
     const draggedItem = findItem(source, item.slot)
     if (!source || !draggedItem) return null
-    return <div className="inventory-drag-preview" style={{ transform: `translate3d(${clientOffset.x + 14}px, ${clientOffset.y + 14}px, 0)` }} aria-hidden="true">
+    // Positioned exactly on the cursor. The centring is done in CSS
+    // (`translate(-50%, -50%)` on the element) rather than by subtracting half
+    // the size here, because the preview's width is a `min()` of the viewport
+    // and is not known to JS. The old fixed `+14, +14` nudge put the preview
+    // below and right of the pointer, which reads as lag on the way to a slot
+    // and makes it unclear which slot is actually being targeted.
+    return <div className="inventory-drag-preview" style={{ transform: `translate3d(${clientOffset.x}px, ${clientOffset.y}px, 0)` }} aria-hidden="true">
         <ItemArtwork item={draggedItem} className="drag-preview-art" />
         <span>{draggedItem.label ?? draggedItem.name}</span>
         <b>×{draggedItem.amount}</b>
@@ -245,6 +355,7 @@ function InventoryApp() {
     const [movePending, setMovePending] = useState(false)
     const [itemBoxes, setItemBoxes] = useState<ActiveItemBox[]>([])
     const [dropAmount, setDropAmount] = useState(1)
+    const [uiConfig, setUiConfig] = useState(DEFAULT_UI_CONFIG)
     const pendingInventories = useRef<Set<string> | undefined>()
     const requestPending = useRef(false)
     const nextItemBoxId = useRef(1)
@@ -264,6 +375,20 @@ function InventoryApp() {
         if (pending.size === 0) clearPendingMove()
     }, [clearPendingMove])
 
+    // Merged onto the defaults rather than replacing them, so a config table
+    // that omits a key keeps the shipped behaviour for it instead of dropping to
+    // `undefined` and rendering as "off".
+    useNuiEvent<UiConfig>("qbinventory:nui:config", (config) => {
+        if (!config || typeof config !== "object") return
+        setUiConfig((current) => ({
+            ...current,
+            ...config,
+            hotbarSlots: Number.isFinite(config.hotbarSlots) ? Number(config.hotbarSlots) : current.hotbarSlots,
+            centreWhenSolo: config.centreWhenSolo ?? current.centreWhenSolo,
+            showHotbar: config.showHotbar ?? current.showHotbar,
+            images: { ...current.images, ...(config.images ?? {}) },
+        }))
+    })
     useNuiEvent<ThemeTokens>("qbinventory:nui:theme", (tokens) => {
         for (const [key, value] of Object.entries(tokens ?? {})) document.documentElement.style.setProperty(`--${key}`, value)
     })
@@ -403,14 +528,19 @@ function InventoryApp() {
     useEffect(() => { setDropAmount(1) }, [selected?.inventory.id, selected?.item.slot])
     const dropMax = Math.max(1, Math.floor(filteredSelected?.item.amount ?? 1))
     const dropCount = Math.min(Math.max(1, dropAmount), dropMax)
-    if (!session) return <><ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</>
+    if (!session) return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
 
-    return <><ItemBoxStack boxes={itemBoxes} /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} /><main className="inventory-shell">
+    // Solo layout: with nothing open beside the player's inventory, drop the
+    // third column entirely rather than filling it with a panel whose only
+    // content is a sentence explaining that it is empty.
+    const solo = uiConfig.centreWhenSolo && !session.secondary
+
+    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} /><main className="inventory-shell">
         <DragPreview session={session} />
         <header className="inventory-topbar"><div className="brand"><PackageOpen size={20} /><span>INVENTORY</span><em>LIVE</em></div><label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search selected item" /></label><button className="close" onClick={close} aria-label="Close inventory"><X size={20} /></button></header>
         {error && <div className="notice" role="alert"><CircleAlert size={16} />{error}</div>}
-        <div className="inventory-layout">
-            <InventoryPanel inventory={session.player} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} />
+        <div className={`inventory-layout${solo ? " inventory-layout-solo" : ""}`}>
+            <InventoryPanel inventory={session.player} isPlayer selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} />
             <aside className={`item-detail${filteredSelected ? "" : " item-detail-empty"}`}>{filteredSelected ? <>
                 <ItemArtwork item={filteredSelected.item} className="detail-art" />
                 <p className="eyebrow">{filteredSelected.inventory.type === "shop" ? "shop item" : `slot ${filteredSelected.item.slot}`}</p>
@@ -428,10 +558,12 @@ function InventoryApp() {
                     </>}
                 </>}
             </> : <div className="empty-detail"><PackageOpen size={30} /><h1>Item details</h1><p>{selected ? `${(selected.item.label ?? selected.item.name)} is hidden by the current search.` : "Click an item to inspect it. Drag it to move or stack it, or drag it outside the window to drop it."}</p></div>}</aside>
-            {session.secondary ? <InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} /> : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section>}
+            {session.secondary
+                ? <InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} />
+                : solo ? null : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section>}
         </div>
         <footer className="shortcut-bar"><span><kbd>Esc</kbd> Close</span><span><kbd>↵</kbd> Use selected</span><span><kbd>Drag</kbd> Move or stack</span><span><kbd>Drag out</kbd> Drop</span><span>{movePending ? "Updating inventory…" : `Revision ${session.revision ?? 0}`}</span></footer>
-    </main></>
+    </main></UiConfigContext.Provider>
 }
 
 export default function App() {
