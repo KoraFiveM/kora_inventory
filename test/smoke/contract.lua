@@ -7,7 +7,7 @@ for _, exportName in ipairs({
     'getWeight', 'canCarry', 'addItem', 'removeItem', 'getItemByName',
     'getItemsByName', 'getItemBySlot', 'getItemCount', 'hasItem', 'getFreeSlot',
     'moveItem', 'clearInventory', 'setItems', 'createUseable', 'useItem',
-    'stashGet', 'stashSet', 'stashOpen', 'dropCreate', 'dropTake',
+    'stashGet', 'stashSet', 'stashOpen', 'shopGet', 'shopSet', 'dropCreate', 'dropTake',
 }) do
     H.ok(source:find(exportName .. ' = ' .. exportName, 1, true), 'gateway export ' .. exportName)
 end
