@@ -21,11 +21,13 @@ end
 -- draw. Used only to notice the weapon leaving their hands by some other
 -- route (weapon wheel, disarm, death) so the server can put the prop back.
 local drawn
+local drawnSlot
 local toggling = false
 
 local function reportUnequipped()
     if not drawn then return end
     drawn = nil
+    drawnSlot = nil
     TriggerServerEvent('qbinventory:server:weaponUnequipped')
 end
 
@@ -105,12 +107,22 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
     if action == 'holster' then
         SetCurrentPedWeapon(ped, GetHashKey('weapon_unarmed'), true)
         drawn = nil
+        drawnSlot = nil
     else
+        local ammo = math.max(0, math.floor(tonumber(request.ammo) or 0))
         if not HasPedGotWeapon(ped, hash, false) then
-            GiveWeaponToPed(ped, hash, 0, false, true)
+            GiveWeaponToPed(ped, hash, ammo, false, true)
         end
+        SetPedAmmo(ped, hash, ammo)
+        for _, component in ipairs(type(request.components) == 'table' and request.components or {}) do
+            local componentHash = type(component) == 'string' and GetHashKey(component) or tonumber(component)
+            if componentHash then GiveWeaponComponentToPed(ped, hash, componentHash) end
+        end
+        local tint = math.floor(tonumber(request.tint) or 0)
+        if tint >= 0 and tint <= 32 then SetPedWeaponTintIndex(ped, hash, tint) end
         SetCurrentPedWeapon(ped, hash, true)
         drawn = hash
+        drawnSlot = tonumber(request.slot)
     end
 
     if request.slot then TriggerServerEvent('qbinventory:server:weaponToggled', request.slot) end
@@ -147,8 +159,12 @@ RegisterNetEvent('qbinventory:client:addAmmo', function(request)
         maxAmmo = maxAmmo and maxAmmo > 0 and math.min(maxAmmo, ceiling) or ceiling
     end
 
-    local current = GetAmmoInPedWeapon(ped, hash) or 0
-    local target = current + rounds
+    local target = math.floor(tonumber(request.ammo) or -1)
+    if target < 0 then
+        -- Backwards-compatible shape for callers from before ammo was
+        -- persisted by the server. qbinventory itself sends `ammo` above.
+        target = (GetAmmoInPedWeapon(ped, hash) or 0) + rounds
+    end
     if maxAmmo and maxAmmo > 0 then target = math.min(target, maxAmmo) end
 
     SetPedAmmo(ped, hash, target)
@@ -162,6 +178,23 @@ QB.cache.onChange('weapon', function(weapon)
 end)
 QB.cache.onChange('isDead', function(isDead)
     if isDead then reportUnequipped() end
+end)
+
+-- Persist only ammunition that has been consumed. The server checks both the
+-- slot and its own equipped record, and refuses any report that would raise
+-- ammo, so this cannot turn the native client weapon count into an item-mint.
+AddEventHandler('CEventGunShot', function(_, eventEntity)
+    if not drawn or not drawnSlot or eventEntity ~= QB.cache.ped() then return end
+    -- The server already knows the equipped slot. Never submit a claimed ammo
+    -- amount, weapon hash, coordinates, serial, or casing from this client.
+    if ((C.weapons or {}).ballistics or {}).enabled == true then
+        TriggerServerEvent('qbinventory:server:weaponFired')
+    else
+        -- Retain the older lower-only persistence path when a server owner
+        -- deliberately turns forensic round tracking off.
+        TriggerServerEvent('qbinventory:server:weaponAmmoConsumed', drawnSlot,
+            GetAmmoInPedWeapon(QB.cache.ped(), drawn) or 0)
+    end
 end)
 
 -- --- carried props ----------------------------------------------------------

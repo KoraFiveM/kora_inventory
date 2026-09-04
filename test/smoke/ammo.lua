@@ -26,6 +26,11 @@ local WEAPONS = { { name = 'weapon_unarmed' }, { name = 'weapon_pistol' }, { nam
 QbInventory = {
     internal = { itemDef = function(name) return ITEMS[name] end },
     weaponCarry = nil, -- set per case below
+    weapons = {
+        getState = function() return { ammo = 0 } end,
+        setAmmo = function() return true end,
+        loadRounds = function(_, _, _, count) return true, { ammo = count } end,
+    },
 }
 
 local useables = {}
@@ -123,7 +128,9 @@ H.equal(pushed[1].src, 7, 'to that player only')
 H.equal(pushed[1].payload.weapon, 'weapon_pistol',
     'naming the weapon from the SERVER equipped record, never from the request')
 H.equal(pushed[1].payload.rounds, 12, 'with the round count from the shared item definition')
-H.equal(pushed[1].payload.maxAmmo, Config.qbinventory.weapons.maxAmmo, 'and the configured ceiling')
+H.equal(pushed[1].payload.maxAmmo,
+    math.min(Config.qbinventory.weapons.maxAmmo, Config.qbinventory.weapons.ballistics.maxLoadedRounds),
+    'and the configured weapon/ballistics ceiling')
 
 -- A failed removal must not still tell the client to load rounds -- that would
 -- be free ammunition every time a race or a stale slot lost the item.

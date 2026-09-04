@@ -377,6 +377,14 @@ end
 
 local function addPlayer(src, name, amount, slot, metadata, reason)
     local items = playerItems(src)
+    -- Every weapon added through the public inventory surface receives the
+    -- canonical server metadata, not only weapons crafted in crafting.lua.
+    -- This covers shops, admin grants and compatibility callers alike.
+    if I.weapons and I.weapons.isWeapon and I.weapons.prepareMetadata and I.weapons.isWeapon(name) then
+        local prepared, prepareErr = I.weapons.prepareMetadata(name, metadata)
+        if not prepared then return false, prepareErr end
+        metadata = prepared
+    end
     local item, err = buildItem(name, amount, slot, metadata)
     if not item then return false, err end
     if I.totalWeight(items) + I.itemWeight(item) > C.playerMaxWeight then return false, 'over weight' end
@@ -389,6 +397,14 @@ local function addPlayer(src, name, amount, slot, metadata, reason)
                 return false, 'no free slot'
             end
             local one = I.copy(item); one.amount = 1; one.slot = free
+            -- A multi-item grant must never duplicate an instance serial.
+            if item.unique and I.weapons and I.weapons.isWeapon and I.weapons.prepareMetadata and I.weapons.isWeapon(name) then
+                local individual = I.copy(metadata or {})
+                individual.serial = nil
+                local prepared, prepareErr = I.weapons.prepareMetadata(name, individual)
+                if not prepared then return false, prepareErr end
+                one.info, one.metadata = prepared, I.copy(prepared)
+            end
             local ok, err = playerSetPath(src, { 'items', free }, one)
             if not ok then
                 for _, used in ipairs(placed) do playerSetPath(src, { 'items', used }, nil) end
@@ -916,7 +932,13 @@ local function intentBuy(src, request)
             local paid, payErr = exports.qbcore:removeMoney(src, currentShop.currency == 'money' and 'cash' or currentShop.currency, price * count, 'qbinventory-shop')
             if not paid then return false, payErr end
         end
-        local added, addErr = addPlayer(src, currentItem.name, count, nil, currentItem.info, 'purchase')
+        local purchaseInfo = I.copy(currentItem.info or {})
+        if I.weapons and I.weapons.isWeapon and I.weapons.prepareMetadata and I.weapons.isWeapon(currentItem.name) then
+            local prepared, prepareErr = I.weapons.prepareMetadata(currentItem.name, purchaseInfo)
+            if not prepared then return false, prepareErr end
+            purchaseInfo = prepared
+        end
+        local added, addErr = addPlayer(src, currentItem.name, count, nil, purchaseInfo, 'purchase')
         if not added then
             if price > 0 then exports.qbcore:addMoney(src, currentShop.currency == 'money' and 'cash' or currentShop.currency, price * count, 'qbinventory-refund') end
             return false, addErr
@@ -927,6 +949,10 @@ local function intentBuy(src, request)
         broadcast(shopKey); broadcast(session.primary)
         recordAudit('purchase', src, { shop = currentShop.id, item = currentItem.name, amount = count, price = price * count })
         showItemBox(src, currentItem.name, count, 'purchase')
+        TriggerEvent('qbinventory:server:itemPurchased', src, {
+            shopId = currentShop.id, itemName = currentItem.name, count = count,
+            metadata = I.copy(purchaseInfo), price = price * count,
+        })
         return true
     end)
 end
@@ -1360,10 +1386,20 @@ function buyItem(src, shopId, slot, count)
             local paid, payErr = exports.qbcore:removeMoney(src, shop.currency == 'money' and 'cash' or shop.currency, price * count, 'qbinventory-shop')
             if not paid then return false, payErr end
         end
-        local added, addErr = addPlayer(src, item.name, count, nil, item.info)
+        local purchaseInfo = I.copy(item.info or {})
+        if I.weapons and I.weapons.isWeapon and I.weapons.prepareMetadata and I.weapons.isWeapon(item.name) then
+            local prepared, prepareErr = I.weapons.prepareMetadata(item.name, purchaseInfo)
+            if not prepared then return false, prepareErr end
+            purchaseInfo = prepared
+        end
+        local added, addErr = addPlayer(src, item.name, count, nil, purchaseInfo)
         if not added then if price > 0 then exports.qbcore:addMoney(src, shop.currency == 'money' and 'cash' or shop.currency, price * count, 'qbinventory-refund') end; return false, addErr end
         item.amount = item.amount - count; if item.amount == 0 then shop.stock[slot] = nil end
         bump(shop.key); bump(playerKey(src)); broadcast(shop.key); broadcast(playerKey(src)); recordAudit('purchase', src, { shop = shopId, item = item.name, amount = count, price = price * count })
+        TriggerEvent('qbinventory:server:itemPurchased', src, {
+            shopId = shopId, itemName = item.name, count = count,
+            metadata = I.copy(purchaseInfo), price = price * count,
+        })
         return true
     end)
 end

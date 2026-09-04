@@ -23,6 +23,8 @@ local internal = assert(I.internal, 'qbinventory authority must load before weap
 
 local C = Config.qbinventory
 local cfg = C.weaponCarry or {}
+local weaponCfg = C.weapons or {}
+local durabilityCfg = weaponCfg.durability or {}
 
 -- Replicated. Cleared with an explicit `false`, never a nil deletion: a nil
 -- write is a key DELETION and does not replicate like a value change, so a
@@ -36,6 +38,9 @@ local equipped = {}
 -- src -> { slot, name, action, expires }: the one toggle this server asked
 -- for. A confirmation that does not match it is ignored.
 local pending = {}
+-- Native gunshots are reported by the local shooter, so rate-limit the only
+-- client-originating edge of the ballistic pipeline before touching metadata.
+local lastShotAt = {}
 
 local function integer(value, fallback)
     local n = math.floor(tonumber(value) or fallback or 0)
@@ -164,6 +169,17 @@ local function animTier(name)
     return def and (cfg.tiers or {})[def.weapontype] or nil
 end
 
+---Durability percentage points lost for `rounds` accepted shots. This is
+---entirely server config: a client cannot select a multiplier, opt out or
+---report a positive/negative wear amount.
+local function shotWear(name, rounds)
+    if durabilityCfg.enabled ~= true or (durabilityCfg.excluded or {})[name] == true then return 0 end
+    local perShot = tonumber(durabilityCfg.perShot) or 0
+    local multiplier = tonumber((durabilityCfg.multipliers or {})[name])
+    if multiplier == nil then multiplier = tonumber(durabilityCfg.defaultMultiplier) or 1 end
+    return math.max(0, perShot * math.max(0, multiplier) * math.max(0, rounds))
+end
+
 ---Server half of using a weapon item: decide draw vs holster, price it, and
 ---ask that one client to play it out. Nothing is committed until the client
 ---confirms below, so a cancelled draw leaves the player exactly as they were.
@@ -178,6 +194,7 @@ local function toggle(src, item)
     local holstering = holding ~= nil and holding.slot == slot and holding.name == item.name
     local action = holstering and 'holster' or 'draw'
     local duration = holstering and integer(cfg.holsterTime, 0) or drawDuration(slot)
+    local info = item.info or item.metadata or {}
 
     pending[src] = {
         slot = slot,
@@ -195,6 +212,14 @@ local function toggle(src, item)
         slot = slot,
         action = action,
         duration = duration,
+        -- Item metadata is the durable source of truth. The client receives
+        -- an initial value only to reproduce that server state on a new draw;
+        -- shot reports below can decrease it but never increase it.
+        ammo = math.floor(tonumber(info.ammo) or 0),
+        tint = math.max(0, math.min(32, math.floor(tonumber(info.tint) or 0))),
+        -- This uses the same allow-list as the carried prop renderer. The
+        -- client never receives raw metadata component names.
+        components = renderableComponents(info),
         -- Presentation for the bar; the client owns nothing else about it.
         label = item.label or item.name,
         -- Which animation to play. Resolved here because the tier already
@@ -235,6 +260,62 @@ RegisterNetEvent('qbinventory:server:weaponUnequipped', function()
     publish(src)
 end)
 
+-- GTA owns the immediate shot count on the ped, but qbinventory owns the
+-- durable item state. A client report can only lower the ammo stored on the
+-- weapon the server has already confirmed as drawn; reloading is the sole
+-- server-side path that raises it. That makes this safe for both native
+-- qbinventory draws and the qb-weapons compatibility adapter.
+RegisterNetEvent('qbinventory:server:weaponAmmoConsumed', function(slot, amount)
+    local src = source
+    local holding = equipped[src]
+    slot = math.floor(tonumber(slot) or 0)
+    amount = math.floor(tonumber(amount) or -1)
+    if not holding or slot ~= holding.slot or amount < 0 then return end
+    local state = I.weapons and I.weapons.getState and I.weapons.getState(src, slot)
+    local current = math.floor(tonumber(state and state.ammo) or 0)
+    local rounds = current - amount
+    if rounds <= 0 or not I.weapons then return end
+
+    -- Ballistics-capable weapons consume their individually tracked rounds.
+    -- A legacy count-only weapon stays supported through SetAmmo until its
+    -- next state write migrates it to per-round metadata.
+    local consumed = 0
+    local bullets = type(state.loadedBullets) == 'table' and #state.loadedBullets or 0
+    if weaponCfg.ballistics and weaponCfg.ballistics.enabled == true
+        and bullets >= rounds and type(I.weapons.fireRound) == 'function' then
+        for _ = 1, rounds do
+            local fired = I.weapons.fireRound(src, slot)
+            if not fired then break end
+            consumed = consumed + 1
+        end
+    elseif I.weapons.setAmmo and I.weapons.setAmmo(src, slot, amount) then
+        consumed = rounds
+    end
+
+    local wear = shotWear(holding.name, consumed)
+    if wear > 0 and I.weapons.consumeDurability then I.weapons.consumeDurability(src, slot, wear) end
+end)
+
+-- The client sends no weapon, ammo, casing, coordinate, serial, or evidence
+-- payload. This handler re-resolves the confirmed slot, consumes exactly one
+-- loaded round, then lets the police domain create a casing from server-owned
+-- data. FiveM cannot expose native weapon-fire state to the server, therefore
+-- the cadence limit is an intentional anti-spam floor.
+RegisterNetEvent('qbinventory:server:weaponFired', function()
+    local src = source
+    local holding = equipped[src]
+    if not holding or not I.weapons or not I.weapons.fireRound then return end
+    local now = GetGameTimer()
+    local minGap = math.max(0, math.floor(tonumber(((C.weapons or {}).ballistics or {}).shotCooldown) or 65))
+    if lastShotAt[src] and now - lastShotAt[src] < minGap then return end
+    local fired, round = I.weapons.fireRound(src, holding.slot)
+    if not fired then return end
+    lastShotAt[src] = now
+    local wear = shotWear(holding.name, 1)
+    if wear > 0 and I.weapons.consumeDurability then I.weapons.consumeDurability(src, holding.slot, wear) end
+    TriggerEvent('qbinventory:server:weaponRoundFired', src, round)
+end)
+
 -- Every player item write funnels through qbcore's setPath, which fires this
 -- for qbinventory's own transfers as well as another resource's AddItem, so
 -- one handler covers picking a rifle up, dropping it, and moving it in or out
@@ -252,13 +333,13 @@ end)
 
 AddEventHandler('playerDropped', function()
     local src = source
-    equipped[src], pending[src] = nil, nil
+    equipped[src], pending[src], lastShotAt[src] = nil, nil, nil
 end)
 
 AddEventHandler('qbcore:server:playerLoaded', function(src)
     -- A fresh spawn holds nothing, whatever a previous session left behind,
     -- and the bag has to be seeded before any client can render it.
-    equipped[src], pending[src] = nil, nil
+    equipped[src], pending[src], lastShotAt[src] = nil, nil, nil
     publish(src)
 end)
 
@@ -277,6 +358,7 @@ I.weaponCarry = {
     buildCarryList = buildCarryList,
     carryRule = carryRule,
     drawDuration = drawDuration,
+    shotWear = shotWear,
     stateKey = STATE_KEY,
     ---@param src integer
     ---@return table|nil  -- { slot, name } or nil when empty-handed

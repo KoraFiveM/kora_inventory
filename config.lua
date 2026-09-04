@@ -210,6 +210,33 @@ Config.qbinventory = {
         defaultDurability = 100,
         maxAmmo = 10000,
         serialPrefix = 'QB',
+        -- Ammunition is not merely an integer.  Every loaded round is a
+        -- discrete record on its weapon (`info.loadedBullets`), so loading a
+        -- 12-round magazine creates exactly 12 traceable rounds.  The
+        -- server is the only code that creates, loads, or consumes them.
+        ballistics = {
+            enabled = true,
+            maxLoadedRounds = 240,     -- hard metadata cap; keep this close to the weapons used on your server
+            shotCooldown = 65,         -- server-side floor between accepted native shot reports
+            casingOffset = 0.75,       -- metres behind/alongside the shooter for the recovered casing marker
+        },
+        -- Wear is applied by the SERVER for every accepted round fired.
+        -- `perShot` is durability percentage points (0.10 means 1 point per
+        -- 10 shots); per-weapon multipliers make high-wear weapons degrade
+        -- faster without changing the shared baseline. Set enabled = false
+        -- to keep tracking shots/ammo but disable all firing wear.
+        durability = {
+            enabled = true,
+            perShot = 0.10,
+            defaultMultiplier = 1.0,
+            multipliers = {
+                -- weapon_pistol = 1.0,
+                -- weapon_carbinerifle = 1.25,
+            },
+            excluded = {
+                -- weapon_stungun = true,
+            },
+        },
         -- Explicit allow-lists. An absent weapon (and absent `default`) has
         -- no allowed components, preventing arbitrary client metadata.
         components = {},

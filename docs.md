@@ -1,10 +1,10 @@
 # qbinventory
 
-`qbinventory` is the server-authoritative inventory provider. It provides both
-`qb-inventory` and `ox_inventory` compatibility identities, pinned to the
-contract fixtures in `test/contracts/`. Same-named qb and ox exports retain
-their upstream-specific signatures through separate identity routing. A real
-qb-inventory or ox_inventory resource must not run alongside qbinventory.
+`qbinventory` is the server-authoritative inventory provider. It provides the
+`qb-inventory`, `ox_inventory`, and retired `qb-weapons` compatibility
+identities. Same-named qb and ox exports retain their upstream-specific
+signatures through separate identity routing. A real qb-inventory, ox_inventory
+or qb-weapons resource must not run alongside qbinventory.
 
 ## Ownership and startup
 
@@ -48,16 +48,31 @@ validates all recipe ingredients/weight/slots, then commits through
 slots. Hooks can approve/reject a craft but cannot mutate its planned state.
 
 Weapon helpers are also server-only: `PrepareWeaponMetadata`, `GetWeaponState`,
-`SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, and
-`SetWeaponComponents`. New weapon metadata receives a server serial, bounded
-durability and ammo, and only configured components in
+`SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`,
+`SetWeaponComponents`, `LoadWeaponRounds`, and `FireWeaponRound`. New weapon
+metadata receives a server serial, bounded durability and ammo, and only configured components in
 `Config.qbinventory.weapons.components` are accepted. Gameplay weapon-use code
 must invoke durability/ammo changes from validated server actions; do not add a
 generic client event for these exports.
 
-This foundation does not yet supply a crafting UI, station discovery, progress
-timers, GTA weapon-native synchronisation, or ammo-item conversion. Those
-require an explicit server-authoritative integration layer.
+When `Config.qbinventory.weapons.ballistics.enabled` is set (the default), a
+weapon's `info.loadedBullets` contains one generated record for every loaded
+round; a 12-round magazine therefore contributes exactly 12 entries. The
+client only reports that its native ped fired. The server resolves the equipped
+slot, consumes one entry with `FireWeaponRound`, and emits a server-only fired
+round event for an evidence resource. Cartridge IDs are not firearm serials:
+the serial-to-casing link belongs in protected police storage and is revealed
+only after the investigation flow completes.
+
+`Config.qbinventory.weapons.durability` controls normal firing wear. With the
+default `perShot = 0.10`, every ten accepted rounds remove one durability
+point. Set a per-weapon value in `multipliers` (for example, `1.25` for a
+rifle that wears 25% faster), add non-wearing weapons to `excluded`, or set
+`enabled = false` to turn firing wear off. The server derives the number of
+rounds from its own lower-only ammo record, so a client cannot lower wear by
+claiming it fired fewer shots or repair a weapon by claiming extra ammo.
+
+This foundation does not yet supply a crafting UI or station discovery.
 
 ### Visible weapon carry and draw pacing
 
@@ -133,6 +148,30 @@ exports.qbinventory:GetEquippedWeapon(src)  -- { slot, name } or nil
 There is deliberately no setter. A resource that wants a different carried
 list changes the player's items, not the render. Equipping still does not
 remove the weapon item from its slot (see `server/useables.lua`).
+
+### Retired `qb-weapons` compatibility
+
+`qbinventory` provides `qb-weapons`, so a resource that only lists it as a
+dependency continues to start without a second weapon controller. It accepts
+the legacy draw, holster, ammo, durability and read-only ammo callback names
+and routes them to the current inventory lifecycle. Legacy client item tables
+are reduced to a slot and the real item is read from the player's inventory;
+reported ammo can only decrease, and reported quality can only consume
+durability. `quality` is retained as a mirror of canonical `durability` for
+old weapon metadata and existing database rows.
+
+The legacy client `getConfigWeaponAttachments` export remains available too.
+It is derived only from the explicit qbinventory component allow-lists, so
+attachment UIs can read it without gaining a metadata or component mutation
+path.
+
+The retired repair-station and attachment-item systems are not recreated:
+they depended on `qb-weapons`' resource-local configuration and accepted
+client-selected station/item data. The old repair and attachment callbacks are
+registered and safely refuse rather than hanging a stale caller. A replacement
+gameplay resource must validate its station/role/cost server-side and then use
+`SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, or
+`SetWeaponComponents`.
 
 Opening another player's inventory is also denied by default: distance and
 routing-bucket checks are necessary but never sufficient. Configure the trusted
@@ -363,14 +402,15 @@ hash, ammo type or count crosses the wire inbound.
 The magazine's `ammoType` must match the drawn weapon's `ammotype`; a mismatch
 refuses the use and consumes nothing. `server/useables.lua` registers a useable
 for every registry item that has both `ammoType` and a positive `rounds`, so a
-server adding its own magazine gets a working use with no code change.
+server adding its own magazine gets a working use with no code change. The new
+amount is saved on the weapon before the client is instructed to display it;
+shot reports may only lower that saved amount, and drawing restores the saved
+amount to the GTA weapon.
 
-A weapon must be **drawn**, not merely owned. GTA's ammo lives on the ped's
-weapon and the ped only has the weapon while it is drawn, so loading a
-holstered one would require ammo persisted in item metadata and reapplied on
-every draw -- a separate feature. Accepting the use and silently doing nothing
-would consume the magazine for no effect, so it is refused with a reason
-instead.
+A weapon must be **drawn**, not merely owned. This keeps magazine use honest:
+the server knows exactly which weapon it is loading and the GTA ped has that
+weapon ready to receive the synchronised amount. Loading a holstered weapon is
+refused and consumes nothing.
 
 ## UI presentation config
 

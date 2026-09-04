@@ -18,6 +18,8 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/containers.lua
 "${LUA:-lua}" test/smoke/qb_compat.lua
 "${LUA:-lua}" test/smoke/qb_events.lua
+"${LUA:-lua}" test/smoke/qb_weapons_compat.lua
+"${LUA:-lua}" test/smoke/qb_weapons_client_compat.lua
 "${LUA:-lua}" test/smoke/qb_callbacks.lua
 "${LUA:-lua}" test/smoke/use_item.lua
 "${LUA:-lua}" test/smoke/hotbar.lua

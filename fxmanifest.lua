@@ -11,6 +11,10 @@ description 'Server-authoritative inventory with bundled NUI'
 -- and client/ui.lua may only submit validated intents through client.lua.
 provide 'qb-inventory'
 provide 'ox_inventory'
+-- qb-inventory now owns the weapon lifecycle too.  Keep this provider alias
+-- so resources which only declare qb-weapons as a dependency can be migrated
+-- without a second weapon controller running beside the inventory.
+provide 'qb-weapons'
 
 dependency 'qblib'
 dependency 'qbsql'
@@ -32,17 +36,21 @@ server_scripts {
     -- import. It is deliberately loaded before the inventory authority.
     'server/persistence.lua',
     'server.lua',
-    -- Weapon/consumable use handlers. Must load after server.lua (needs its
-    -- global createUseable/removeItem) but has no dependency on the files
-    -- below it, so it sits here.
+    'server/crafting.lua',
+    -- Weapon/consumable use handlers.  This follows crafting.lua because the
+    -- ammunition loader uses its server-only per-round ballistics API.
     'server/useables.lua',
     'server/vehicles.lua',
     'server/containers.lua',
-    'server/crafting.lua',
     -- Visible weapon carry + draw/holster pacing. Loads after useables.lua,
     -- whose weapon handler delegates to it at call time, and after
     -- crafting.lua so weapon metadata rules are already in place.
     'server/weaponcarry.lua',
+    -- Narrow adapter for the legacy qb-weapons event/callback names.  This
+    -- comes after the authoritative weapon modules so it can resolve slots,
+    -- ammunition and durability from qbinventory state rather than trusting
+    -- the old client item payloads.
+    'server/compat/qb_weapons.lua',
     'server/shops/ammunation.lua',
     'server/shops/vendingmachine.lua',
     'server/shops/liquorstore.lua',
@@ -83,7 +91,10 @@ client_scripts {
     -- Renders every player's carried weapons from the server-set state bag,
     -- and plays out the draw/holster this client was asked for. It owns the
     -- weapon half of the old client/useables.lua toggle.
-    'client/weaponcarry.lua'
+    'client/weaponcarry.lua',
+    -- Legacy qb-weapons client events, translated into the server-owned
+    -- qbinventory weapon lifecycle above.
+    'client/compat/qb_weapons.lua'
 }
 
 ui_page 'web/build/index.html'

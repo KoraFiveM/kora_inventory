@@ -116,8 +116,35 @@ local function ammoUseable(src, item)
         return false, ('%s does not take %s'):format(weaponDef and (weaponDef.label or weaponDef.name) or 'that weapon', def.label or def.name)
     end
 
+    -- Persist each round before telling the client to add it. The client
+    -- event is presentation-only; weapon metadata is the authoritative
+    -- magazine and has one record per loaded round.
+    local state = QbInventory.weapons and QbInventory.weapons.getState
+        and QbInventory.weapons.getState(src, holding.slot) or {}
+    local current = math.floor(tonumber(state and state.ammo) or 0)
+    local weaponsCfg = Config.qbinventory.weapons or {}
+    local ceiling = math.floor(tonumber(weaponsCfg.maxAmmo) or 0)
+    local ballisticCap = math.floor(tonumber((weaponsCfg.ballistics or {}).maxLoadedRounds) or ceiling)
+    if ceiling > 0 and ballisticCap > 0 then ceiling = math.min(ceiling, ballisticCap) end
+    if ceiling <= 0 then return false, 'weapon ammunition capacity is not configured' end
+    if current + rounds > ceiling then return false, 'not enough room for that magazine' end
+
+    local loadRounds = QbInventory.weapons and QbInventory.weapons.loadRounds
+    if not loadRounds then return false, 'weapon ballistics state unavailable' end
+    local saved, stateOrErr = loadRounds(src, holding.slot, def.ammoType, rounds)
+    if not saved then return false, stateOrErr end
+    local target = math.floor(tonumber(stateOrErr and stateOrErr.ammo) or 0)
+
     local removed, removeErr = removeItem(src, item.name, 1, item.slot, 'loaded ammunition')
-    if not removed then return false, removeErr end
+    if not removed then
+        -- Do not leave a durable ammo increase behind when the magazine could
+        -- not be charged. `setAmmo` only touches the same server-resolved
+        -- weapon slot, so this restores the pre-use value without consulting
+        -- any client state.
+        local setAmmo = QbInventory.weapons and QbInventory.weapons.setAmmo
+        if setAmmo then setAmmo(src, holding.slot, current) end
+        return false, removeErr
+    end
 
     -- The weapon NAME comes from the server's own equipped record, so the
     -- client is told what to load rather than asked. The cap is config, and the
@@ -125,7 +152,11 @@ local function ammoUseable(src, item)
     TriggerClientEvent('qbinventory:client:addAmmo', src, {
         weapon = holding.name,
         rounds = rounds,
-        maxAmmo = math.floor(tonumber((Config.qbinventory.weapons or {}).maxAmmo) or 0),
+        -- Send the absolute amount rather than a delta: if shots were fired
+        -- while a reload was in progress the client still converges on the
+        -- server's durable value.
+        ammo = target,
+        maxAmmo = ceiling,
     })
     return true
 end

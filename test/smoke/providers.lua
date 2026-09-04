@@ -21,4 +21,8 @@ _G.GetResourceByFindIndex = function() return 'qb-inventory' end
 local ok, err = pcall(dofile, 'server/compat/providers.lua')
 H.ok(not ok and tostring(err):find('provider conflict', 1, true), 'a real qb-inventory resource must still fail fast')
 
+_G.GetResourceByFindIndex = function() return 'qb-weapons' end
+ok, err = pcall(dofile, 'server/compat/providers.lua')
+H.ok(not ok and tostring(err):find('provider conflict', 1, true), 'the retired qb-weapons controller cannot run beside its replacement')
+
 H.finish()
