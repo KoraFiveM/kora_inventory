@@ -189,7 +189,13 @@ end
 -- module builds a table and its PROVIDER IDENTITY publishes it -- a compat
 -- module never registers into qbinventory's own export table.
 local clientBlock = assert(manifest:match('client_scripts%s*{(.-)\n}'), 'fxmanifest.lua must declare client_scripts')
-local clientScripts = pathsFrom(clientBlock)
+local clientScripts = {}
+for _, path in ipairs(pathsFrom(clientBlock)) do
+    -- Imported dependency files execute in this resource's VM, but they do
+    -- not belong to qbinventory's local export surface and cannot be opened
+    -- relative to this repository by a plain-Lua test.
+    if path:sub(1, 1) ~= '@' then clientScripts[#clientScripts + 1] = path end
+end
 H.ok(#clientScripts >= 5, 'fxmanifest client_scripts were discovered')
 
 local ownerOfExport = {}

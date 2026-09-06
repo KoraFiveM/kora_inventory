@@ -20,7 +20,7 @@ local function send(action, data)
 end
 
 local function pushTheme()
-    send('qbinventory:nui:theme', QB.theme.tokens())
+    QBTheme.refresh()
 end
 
 -- The presentation half of Config.qbinventory, and the ONLY config that crosses
@@ -165,7 +165,7 @@ end)
 -- qblib computes the tokens in Lua, so this bridge does not duplicate the
 -- design-system HSL math in TypeScript. qbinventory can trigger this local
 -- event after a live theme change without involving inventory authority.
-AddEventHandler('qbinventory:client:theme', pushTheme)
+AddEventHandler('qbinventory:client:theme', QBTheme.refresh)
 
 RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
     if type(data) ~= 'table'

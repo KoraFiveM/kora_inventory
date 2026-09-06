@@ -30,12 +30,11 @@ Config.qbinventory.shops.liquorstore = {
         color = 21,
         scale = 0.7,
         shortRange = true,
-        -- The label doubles as the legend heading, so every branch shares it.
+        -- A shared label keeps every branch recognisable as the same shop.
         label = "Rob's Liquor",
-        -- Groups all five branches under one heading in the pause-map legend
-        -- instead of listing the same name five times. See qblib
-        -- modules/blips/docs.md.
-        category = 11,
+        -- Category 2 lists this shop by name instead of putting it under GTA's
+        -- built-in "Owned Property" category (11).
+        category = 2,
     },
 
     inventory = {

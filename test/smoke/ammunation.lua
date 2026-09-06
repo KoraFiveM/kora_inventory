@@ -7,6 +7,7 @@ dofile('config/shops/ammunation.lua')
 local shop = Config.qbinventory.shops.ammunation
 H.equal(shop.id, 'ammunation', 'Ammu-Nation has a fixed canonical identifier')
 H.ok(#shop.locations >= 1, 'Ammu-Nation has approved locations')
+H.equal(shop.blip.category, 2, 'Ammu-Nation uses the labelled legend category')
 local expectedAmmo = {
     pistol_ammo = true, smg_ammo = true, shotgun_ammo = true,
     rifle_ammo = true, mg_ammo = true, snp_ammo = true,

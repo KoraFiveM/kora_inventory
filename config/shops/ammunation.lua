@@ -25,6 +25,7 @@ Config.qbinventory.shops.ammunation = {
         scale = 0.72,
         shortRange = true,
         label = 'Ammu-Nation',
+        category = 2,
     },
 
     -- Each row is a real qbcore shared weapon or ammo item. Keep native

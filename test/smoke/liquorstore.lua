@@ -27,10 +27,9 @@ for _, row in ipairs(shop.inventory) do
     H.equal(row.weight, nil, 'shop config leaves canonical weights to the registry-backed authority')
 end
 
--- Every branch shares one blip label and category, which is what collapses the
--- five of them into a single pause-map legend heading.
-H.equal(shop.blip.category, 11, 'branches are grouped in the map legend rather than listed one per row')
-H.equal(shop.blip.label, shop.label, 'the legend heading is the shop name')
+-- The shop has its own labelled legend entry, not GTA's Owned Property group.
+H.equal(shop.blip.category, 2, 'Rob\'s Liquor uses the labelled legend category')
+H.equal(shop.blip.label, shop.label, 'the map label is the shop name')
 
 -- Each location must carry an explicit bucket: the server policy fails closed
 -- on a missing one, so a row without it is a shop nobody can ever open.

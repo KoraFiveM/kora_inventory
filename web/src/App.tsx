@@ -4,7 +4,7 @@ import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd"
 import { TouchBackend } from "react-dnd-touch-backend"
 import { closeSession, sendIntent } from "@/lib/nui"
 import { openDevHarness } from "@/lib/dev"
-import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, ThemeTokens, UiConfig } from "@/lib/types"
+import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, UiConfig } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
@@ -283,16 +283,17 @@ function DragPreview({ session }: { session: SessionSnapshot | null }) {
     const source = findInventory(session, item.inventoryId)
     const draggedItem = findItem(source, item.slot)
     if (!source || !draggedItem) return null
-    // Positioned exactly on the cursor. The centring is done in CSS
-    // (`translate(-50%, -50%)` on the element) rather than by subtracting half
-    // the size here, because the preview's width is a `min()` of the viewport
-    // and is not known to JS. The old fixed `+14, +14` nudge put the preview
-    // below and right of the pointer, which reads as lag on the way to a slot
-    // and makes it unclear which slot is actually being targeted.
-    return <div className="inventory-drag-preview" style={{ transform: `translate3d(${clientOffset.x}px, ${clientOffset.y}px, 0)` }} aria-hidden="true">
-        <ItemArtwork item={draggedItem} className="drag-preview-art" />
-        <span>{draggedItem.label ?? draggedItem.name}</span>
-        <b>×{draggedItem.amount}</b>
+    // `left`/`top` plus the broadly supported `transform` property keeps the
+    // visual centre at the pointer in CEF as well as current Chromium. Using
+    // the newer standalone `translate` property made older CEF builds ignore
+    // the -50% offset, leaving the preview noticeably down and right.
+    return <div className={`inventory-drag-preview slot slot-filled${source.type === "shop" ? " slot-priced" : ""}`} style={{ left: clientOffset.x, top: clientOffset.y }} aria-hidden="true">
+        <span className="slot-number">{draggedItem.slot}</span>
+        <ItemArtwork item={draggedItem} className="item-art" />
+        <span className="item-label">{draggedItem.label ?? draggedItem.name}</span>
+        <span className="item-amount">×{draggedItem.amount}</span>
+        {source.type === "shop" && typeof draggedItem.price === "number" && <span className="item-price">${draggedItem.price.toLocaleString()}</span>}
+        {typeof draggedItem.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, draggedItem.durability))}%` }} /></span>}
     </div>
 }
 
@@ -354,7 +355,7 @@ function InventoryApp() {
     const [giveAvailable, setGiveAvailable] = useState(false)
     const [movePending, setMovePending] = useState(false)
     const [itemBoxes, setItemBoxes] = useState<ActiveItemBox[]>([])
-    const [dropAmount, setDropAmount] = useState(1)
+    const [selectedAmount, setSelectedAmount] = useState(1)
     const [uiConfig, setUiConfig] = useState(DEFAULT_UI_CONFIG)
     const pendingInventories = useRef<Set<string> | undefined>()
     const requestPending = useRef(false)
@@ -388,9 +389,6 @@ function InventoryApp() {
             showHotbar: config.showHotbar ?? current.showHotbar,
             images: { ...current.images, ...(config.images ?? {}) },
         }))
-    })
-    useNuiEvent<ThemeTokens>("qbinventory:nui:theme", (tokens) => {
-        for (const [key, value] of Object.entries(tokens ?? {})) document.documentElement.style.setProperty(`--${key}`, value)
     })
     useNuiEvent<SessionSnapshot>("qbinventory:nui:sessionOpened", (snapshot) => {
         clearPendingMove(); setSession(snapshot); setSelected(undefined); setGiveAvailable(false); setError(undefined)
@@ -499,8 +497,11 @@ function InventoryApp() {
         if (inventory.id !== session?.player.id) { setError("Only items in your inventory can be used"); return }
         void submit("use", { inventory: inventory.id, slot: item.slot })
     }, [session, submit])
-    const buy = useCallback((inventory: InventoryView, item: InventoryItem) => {
-        if (inventory.type === "shop" && session) void submit("buy", { inventory: inventory.id, slot: item.slot, amount: 1 }, [inventory.id, session.player.id])
+    const buy = useCallback((inventory: InventoryView, item: InventoryItem, amount = 1) => {
+        if (inventory.type !== "shop" || !session) return
+        const stock = Math.max(1, Math.floor(item.amount))
+        const count = Math.min(Math.max(1, Math.floor(amount)), stock)
+        void submit("buy", { inventory: inventory.id, slot: item.slot, amount: count }, [inventory.id, session.player.id])
     }, [session, submit])
     // Shared by the Enter-key shortcut on a selected item and the slot
     // grid's double-click handler below -- both just trigger whatever the
@@ -524,10 +525,10 @@ function InventoryApp() {
 
     const filteredSelected = useMemo(() => selected && (selected.item.label ?? selected.item.name).toLowerCase().includes(query.toLowerCase()) ? selected : undefined, [query, selected])
     // A fresh selection always starts at one, so a large slider value can never
-    // carry over onto a different (or smaller) stack.
-    useEffect(() => { setDropAmount(1) }, [selected?.inventory.id, selected?.item.slot])
-    const dropMax = Math.max(1, Math.floor(filteredSelected?.item.amount ?? 1))
-    const dropCount = Math.min(Math.max(1, dropAmount), dropMax)
+    // carry over onto a different stack or shop stock row.
+    useEffect(() => { setSelectedAmount(1) }, [selected?.inventory.id, selected?.item.slot])
+    const selectedMax = Math.max(1, Math.floor(filteredSelected?.item.amount ?? 1))
+    const selectedCount = Math.min(Math.max(1, selectedAmount), selectedMax)
     if (!session) return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
 
     // Solo layout: with nothing open beside the player's inventory, drop the
@@ -537,30 +538,41 @@ function InventoryApp() {
 
     return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} /><main className="inventory-shell">
         <DragPreview session={session} />
-        <header className="inventory-topbar"><div className="brand"><PackageOpen size={20} /><span>INVENTORY</span><em>LIVE</em></div><label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search selected item" /></label><button className="close" onClick={close} aria-label="Close inventory"><X size={20} /></button></header>
+        <header className="inventory-topbar">
+            <div className="brand"><span className="brand-mark"><PackageOpen size={18} /></span><span>INVENTORY</span><em><i />LIVE</em></div>
+            <label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter the selected item" /></label>
+            <div className="topbar-actions"><span className="session-state">{session.secondary ? "Transfer open" : "Personal inventory"}</span><button className="close" onClick={close} aria-label="Close inventory"><X size={18} /></button></div>
+        </header>
         {error && <div className="notice" role="alert"><CircleAlert size={16} />{error}</div>}
         <div className={`inventory-layout${solo ? " inventory-layout-solo" : ""}`}>
-            <InventoryPanel inventory={session.player} isPlayer selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} />
-            <aside className={`item-detail${filteredSelected ? "" : " item-detail-empty"}`}>{filteredSelected ? <>
+            <section className="inventory-stage inventory-stage-player">
+                <InventoryPanel inventory={session.player} isPlayer selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} />
+            </section>
+            <aside className={`item-detail${filteredSelected ? "" : " item-detail-empty"}`}>
+                <header className="detail-header"><span>Item inspector</span><em>{filteredSelected ? "Selected" : "Select an item"}</em></header>
+                {filteredSelected ? <>
                 <ItemArtwork item={filteredSelected.item} className="detail-art" />
                 <p className="eyebrow">{filteredSelected.inventory.type === "shop" ? "shop item" : `slot ${filteredSelected.item.slot}`}</p>
                 <h1>{filteredSelected.item.label ?? filteredSelected.item.name}</h1>
                 <p>{filteredSelected.item.description ?? "No item description available."}</p>
                 <dl><dt>Amount</dt><dd>×{filteredSelected.item.amount}</dd><dt>Weight</dt><dd>{filteredSelected.item.weight ?? 0} g</dd>{filteredSelected.inventory.type === "shop" && <><dt>Price</dt><dd>${(filteredSelected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
-                {filteredSelected.inventory.type === "shop" ? <button className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item)}>Buy one · ${(filteredSelected.item.price ?? 0).toLocaleString()}</button> : <>
+                {filteredSelected.inventory.type === "shop" ? <div className="amount-action">
+                    {selectedMax > 1 && <input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Quantity to buy, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} />}
+                    <button className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item, selectedCount)}>Buy {selectedCount} · ${((filteredSelected.item.price ?? 0) * selectedCount).toLocaleString()}</button>
+                </div> : <>
                     {(filteredSelected.item.useable || filteredSelected.item.container) && <button className="primary-action" disabled={movePending} onClick={() => use(filteredSelected.inventory, filteredSelected.item)}>{filteredSelected.item.container ? `Open ${filteredSelected.item.label ?? "container"}` : "Use item"}</button>}
                     {filteredSelected.inventory.id === session.player.id && <>
                         <div className="amount-action">
-                            {dropMax > 1 && <input className="amount-slider" type="range" min={1} max={dropMax} step={1} value={dropCount} disabled={movePending} aria-label={`Amount to drop, 1 to ${dropMax}`} onChange={(event) => setDropAmount(Number(event.target.value))} />}
-                            <button className="quiet-action" disabled={movePending} onClick={() => void submit("drop", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: dropCount })}>Drop {dropCount}</button>
+                            {selectedMax > 1 && <input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Amount to drop, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} />}
+                            <button className="quiet-action" disabled={movePending} onClick={() => void submit("drop", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: selectedCount })}>Drop {selectedCount}</button>
                         </div>
                         {giveAvailable && <button className="quiet-action" disabled={movePending} onClick={() => void submit("give", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: 1 })}>Give one</button>}
                     </>}
                 </>}
-            </> : <div className="empty-detail"><PackageOpen size={30} /><h1>Item details</h1><p>{selected ? `${(selected.item.label ?? selected.item.name)} is hidden by the current search.` : "Click an item to inspect it. Drag it to move or stack it, or drag it outside the window to drop it."}</p></div>}</aside>
+            </> : <div className="empty-detail"><span className="empty-detail-icon"><PackageOpen size={30} /></span><h1>Inspect an item</h1><p>{selected ? `${(selected.item.label ?? selected.item.name)} is hidden by the current search.` : "Select an item to see its details. Drag it between slots to move or stack it, or drag it outside the window to drop it."}</p></div>}</aside>
             {session.secondary
-                ? <InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} />
-                : solo ? null : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section>}
+                ? <section className="inventory-stage inventory-stage-secondary"><InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} /></section>
+                : solo ? null : <section className="inventory-stage inventory-stage-secondary"><section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section></section>}
         </div>
         <footer className="shortcut-bar"><span><kbd>Esc</kbd> Close</span><span><kbd>↵</kbd> Use selected</span><span><kbd>Drag</kbd> Move or stack</span><span><kbd>Drag out</kbd> Drop</span><span>{movePending ? "Updating inventory…" : `Revision ${session.revision ?? 0}`}</span></footer>
     </main></UiConfigContext.Provider>

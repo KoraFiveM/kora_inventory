@@ -86,6 +86,7 @@ QB.anim = setmetatable({}, { __index = function() return function() end end })
 QB.blips = setmetatable({}, { __index = function() return function() end end })
 QB.theme = setmetatable({}, { __index = function() return function() end end })
 QB.keybind = { add = function() return { remove = function() return true end } end }
+QBTheme = { refresh = function() end, apply = function() return {} end }
 
 GetCurrentResourceName = function() return 'qbinventory' end
 GetInvokingResource = function() return nil end
@@ -137,7 +138,9 @@ exports = setmetatable({}, {
 realm = 'server'
 for _, path in ipairs(pathsFrom('server_scripts')) do dofile(path) end
 realm = 'client'
-for _, path in ipairs(pathsFrom('client_scripts')) do dofile(path) end
+for _, path in ipairs(pathsFrom('client_scripts')) do
+    if path:sub(1, 1) ~= '@' then dofile(path) end
+end
 
 -- Sanity: fail loudly rather than vacuously if the loads above did nothing.
 local function size(t) local n = 0 for _ in pairs(t or {}) do n = n + 1 end return n end

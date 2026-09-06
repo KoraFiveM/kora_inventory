@@ -16,6 +16,7 @@ provide 'ox_inventory'
 -- without a second weapon controller running beside the inventory.
 provide 'qb-weapons'
 
+dependency 'qbtheme'
 dependency 'qblib'
 dependency 'qbsql'
 dependency 'qbcore'
@@ -71,6 +72,7 @@ server_scripts {
 }
 
 client_scripts {
+    '@qbtheme/client/bridge.lua',
     'client.lua',
     -- Resolves nearby recipients locally; it never exposes them to the NUI.
     'client/give_target.lua',
