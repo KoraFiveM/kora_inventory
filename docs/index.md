@@ -185,7 +185,7 @@ qb-style aliases are also exported: `AddItem`, `RemoveItem`, `GetItemByName`,
 exports.qbinventory:stashGet(id)
 exports.qbinventory:stashSet(id, items)
 exports.qbinventory:stashOpen(src, id, opts)
-exports.qbinventory:registerStash(id, label, slots, maxWeight, owner, groups, coords)
+exports.qbinventory:registerStash(id, label, slots, maxWeight, owner, groups, coords, distance)
 exports.qbinventory:createTemporaryStash(properties)          -- returns an inventory key
 exports.qbinventory:registerShop(id, data)                    -- { slots, inventory/items, prices }
 exports.qbinventory:buyItem(src, shopId, slot, count)
@@ -193,6 +193,12 @@ exports.qbinventory:buyItem(src, shopId, slot, count)
 `RegisterStash(..., owner = true, ...)` is a **template**, not a single shared
 stash: each caller gets their own `stash:<template>:<citizenid>` record,
 derived server-side from the caller's own session.
+
+`coords` may be one `{ x, y, z }` point or an array of them. A shop accepts the
+same forms in `data.coords`. The server grants and continuously revalidates a
+session only while the player is within `distance` of at least one registered
+point; re-registering an id moves that boundary without resetting its contents.
+A point in a list may carry its own `distance` override.
 
 ### Drops
 ```lua

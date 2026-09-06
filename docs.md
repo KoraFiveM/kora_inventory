@@ -21,6 +21,13 @@ derives the caller's citizen id server-side and uses a separate durable
 `stash:<template>:<citizenid>` record. A caller cannot choose another owner's
 identifier through the client transport.
 
+Registered stash `coords` and shop `data.coords` accept either one `{x,y,z}`
+point or a list of allowed points. The same any-point distance rule runs when a
+session opens and before every mutation. Re-registering an existing id updates
+that live boundary while retaining its durable contents.
+Trusted registrations may put a `distance` override on a list entry when
+different fixtures sharing one inventory need different interaction radii.
+
 ## Crafting and weapons (server-only foundation)
 
 `server/crafting.lua` is a headless, server-only foundation. It deliberately

@@ -119,7 +119,10 @@ end
 local function secondary(kind, id, opts)
     local k = key(kind, id)
     local inv = inventories[k]
-    if inv then return inv end
+    -- The second return means "already exists", whether it came from this live
+    -- registry or durable restoration. Callers such as RegisterShop must never
+    -- reseed and wipe stock merely because a fixture refreshed its policy.
+    if inv then return inv, true end
     opts = opts or {}
     -- Hydrate qbinventory-owned storage only after the persistence bootstrap
     -- has completed. Player inventories are intentionally never read here.
@@ -201,6 +204,19 @@ local function groupAllowed(src, groups)
     return false
 end
 
+---One registered inventory may be reachable from several fixtures. Funnel the
+---single-coordinate and coordinate-list forms through one fail-closed check so
+---open and in-session revalidation always apply the same rule.
+local function withinCoordinates(src, coords, distance)
+    local points = I.coordinateList(coords)
+    if points == nil then return true end
+    for _, point in ipairs(points) do
+        local ok, nearby = pcall(QB.distance.player, src, point, tonumber(point.distance) or distance)
+        if ok and nearby then return true end
+    end
+    return false
+end
+
 local function sameBucket(src, target)
     return not C.requireSameBucket or GetPlayerRoutingBucket(src) == GetPlayerRoutingBucket(target)
 end
@@ -252,18 +268,19 @@ local function canAccess(src, inv, opts)
         local ok, allowed = pcall(inv.access, src, inv, opts)
         if not ok or not allowed then return false, 'access denied' end
     end
-    if inv.coords and not QB.distance.player(src, inv.coords, inv.distance) then return false, 'too far away' end
+    if not withinCoordinates(src, inv.coords, inv.distance) then return false, 'too far away' end
     return true
 end
 
-local function view(k)
-    local inv = getInventory(k)
-    if not inv then return nil end
-    local items = I.copy(inv.items)
+local function viewItems(source)
+    local items = I.copy(source or {})
     -- Older player records predate `imageUrl`. Resolve presentation fields from
     -- the current core registry at render time so no player-inventory migration
     -- is needed merely to adopt the remote artwork catalogue.
     for _, item in pairs(items) do
+        -- Trusted server integrations may attach bookkeeping to durable stock.
+        -- It is authority state, not item metadata, and must never reach NUI.
+        item.serverData = nil
         local def = item and itemDef(item.name)
         if def then
             item.image = def.image or item.image
@@ -271,10 +288,17 @@ local function view(k)
             item.container = def.container == true
         end
     end
+    return items
+end
+
+local function view(k)
+    local inv = getInventory(k)
+    if not inv then return nil end
+    local items = viewItems(inv.items)
     return {
         id = inv.id, key = inv.key, type = inv.type, label = inv.label, slots = inv.slots,
         maxWeight = inv.maxWeight, weight = I.totalWeight(inv.items), revision = revision(k),
-        items = items, stock = inv.stock and I.copy(inv.stock) or nil,
+        items = items, stock = inv.stock and viewItems(inv.stock) or nil,
     }
 end
 
@@ -947,7 +971,10 @@ local function intentBuy(src, request)
         if currentItem.amount == 0 then currentShop.items[slot] = nil; if currentShop.stock then currentShop.stock[slot] = nil end end
         bump(shopKey); bump(session.primary)
         broadcast(shopKey); broadcast(session.primary)
-        recordAudit('purchase', src, { shop = currentShop.id, item = currentItem.name, amount = count, price = price * count })
+        recordAudit('purchase', src, {
+            shop = currentShop.id, item = currentItem.name, amount = count, price = price * count,
+            serverData = I.copy(currentItem.serverData),
+        })
         showItemBox(src, currentItem.name, count, 'purchase')
         TriggerEvent('qbinventory:server:itemPurchased', src, {
             shopId = currentShop.id, itemName = currentItem.name, count = count,
@@ -1290,13 +1317,36 @@ function dropTake(src, id, slot, amount)
 end
 
 -- Ox-style inventory constructors and shops.
-function registerStash(id, label, slots, maxWeight, owner, groups, coords)
-    local opts = { label = label, slots = slots, maxWeight = maxWeight, owner = owner, groups = groups, coords = coords }
+local function refreshRegistration(inv, opts)
+    inv.label = opts.label or inv.label
+    inv.slots = math.floor(tonumber(opts.slots) or inv.slots)
+    inv.maxWeight = tonumber(opts.maxWeight or opts.maxweight) or inv.maxWeight
+    inv.coords = I.copy(opts.coords)
+    inv.distance = tonumber(opts.distance) or C.interactionDistance
+    inv.groups = I.copy(opts.groups)
+    inv.owner = opts.owner
+    inv.access = opts.access
+    if inv.type == 'shop' then
+        inv.prices = opts.prices or inv.prices or {}
+        inv.currency = opts.currency or 'money'
+    end
+    if I.persistence and I.persistence.markDirty then I.persistence.markDirty(inv) end
+end
+
+function registerStash(id, label, slots, maxWeight, owner, groups, coords, distance)
+    local opts = {
+        label = label, slots = slots, maxWeight = maxWeight, owner = owner,
+        groups = groups, coords = coords, distance = distance,
+    }
     if owner == true then
         ownedStashTemplates[tostring(id)] = opts
         return key('stash', id)
     end
-    local inv = secondary('stash', id, opts); return inv.key
+    local inv = secondary('stash', id, opts)
+    -- Re-registration retains contents but refreshes the live access boundary.
+    -- This matters for resources whose fixtures can be edited at runtime.
+    refreshRegistration(inv, opts)
+    return inv.key
 end
 function createTemporaryStash(properties) properties = properties or {}; properties.temporary = true; local inv = secondary('temporary', properties.id or ('tmp-%d'):format(now()), properties); return inv.key end
 
@@ -1332,6 +1382,7 @@ function registerShop(id, data)
     if not initial then return nil, stockErr end
     data.slots = slots
     local inv, restored = secondary('shop', id, data)
+    refreshRegistration(inv, data)
     if not restored then
         inv.stock = initial
         inv.items = inv.stock -- a shop is rendered as an inventory; stock is its authoritative slot table.
@@ -1395,7 +1446,10 @@ function buyItem(src, shopId, slot, count)
         local added, addErr = addPlayer(src, item.name, count, nil, purchaseInfo)
         if not added then if price > 0 then exports.qbcore:addMoney(src, shop.currency == 'money' and 'cash' or shop.currency, price * count, 'qbinventory-refund') end; return false, addErr end
         item.amount = item.amount - count; if item.amount == 0 then shop.stock[slot] = nil end
-        bump(shop.key); bump(playerKey(src)); broadcast(shop.key); broadcast(playerKey(src)); recordAudit('purchase', src, { shop = shopId, item = item.name, amount = count, price = price * count })
+        bump(shop.key); bump(playerKey(src)); broadcast(shop.key); broadcast(playerKey(src)); recordAudit('purchase', src, {
+            shop = shopId, item = item.name, amount = count, price = price * count,
+            serverData = I.copy(item.serverData),
+        })
         TriggerEvent('qbinventory:server:itemPurchased', src, {
             shopId = shopId, itemName = item.name, count = count,
             metadata = I.copy(purchaseInfo), price = price * count,

@@ -38,9 +38,24 @@ local equipped = {}
 -- src -> { slot, name, action, expires }: the one toggle this server asked
 -- for. A confirmation that does not match it is ignored.
 local pending = {}
+-- Temporary server-issued range weapons are not inventory items. Their finite
+-- round count still lives here so training resources never trust a client
+-- claim that a shot happened.
+local training = {}
 -- Native gunshots are reported by the local shooter, so rate-limit the only
 -- client-originating edge of the ballistic pipeline before touching metadata.
 local lastShotAt = {}
+
+local function stopTraining(src)
+    if not training[src] then return false end
+    training[src] = nil
+    TriggerClientEvent('qbinventory:client:stopTrainingWeapon', src)
+    return true
+end
+
+local trainingOwnership = QB.resources.serverRegistry(function(src)
+    stopTraining(src)
+end)
 
 local function integer(value, fallback)
     local n = math.floor(tonumber(value) or fallback or 0)
@@ -303,6 +318,27 @@ end)
 -- the cadence limit is an intentional anti-spam floor.
 RegisterNetEvent('qbinventory:server:weaponFired', function()
     local src = source
+    local rangeWeapon = training[src]
+    if rangeWeapon then
+        local current = GetGameTimer()
+        local minGap = math.max(0, math.floor(tonumber(((C.weapons or {}).ballistics or {}).shotCooldown) or 65))
+        if lastShotAt[src] and current - lastShotAt[src] < minGap then return end
+        lastShotAt[src] = current
+        rangeWeapon.remaining = rangeWeapon.remaining - 1
+        rangeWeapon.fired = rangeWeapon.fired + 1
+        TriggerEvent('qbinventory:server:trainingRoundFired', src, {
+            owner = rangeWeapon.owner,
+            weapon = rangeWeapon.name,
+            shot = rangeWeapon.fired,
+            remaining = rangeWeapon.remaining,
+        })
+        if rangeWeapon.remaining <= 0 then
+            trainingOwnership.untrack(src)
+            stopTraining(src)
+        end
+        return
+    end
+
     local holding = equipped[src]
     if not holding or not I.weapons or not I.weapons.fireRound then return end
     local now = GetGameTimer()
@@ -333,12 +369,16 @@ end)
 
 AddEventHandler('playerDropped', function()
     local src = source
+    trainingOwnership.untrack(src)
+    stopTraining(src)
     equipped[src], pending[src], lastShotAt[src] = nil, nil, nil
 end)
 
 AddEventHandler('qbcore:server:playerLoaded', function(src)
     -- A fresh spawn holds nothing, whatever a previous session left behind,
     -- and the bag has to be seeded before any client can render it.
+    trainingOwnership.untrack(src)
+    stopTraining(src)
     equipped[src], pending[src], lastShotAt[src] = nil, nil, nil
     publish(src)
 end)
@@ -369,3 +409,27 @@ I.weaponCarry = {
 -- a different carried list changes the player's items, not the render.
 exports('GetCarriedWeapons', function(src) return buildCarryList(tonumber(src) or 0) end)
 exports('GetEquippedWeapon', I.weaponCarry.equippedWeapon)
+
+exports('StartTrainingWeapon', function(src, weaponName, rounds)
+    src = tonumber(src)
+    rounds = math.floor(tonumber(rounds) or 0)
+    local owner = GetInvokingResource()
+    local definition = type(weaponName) == 'string' and internal.itemDef(weaponName) or nil
+    if not src or not owner or not definition or not definition.weapontype then return false, 'invalid training weapon' end
+    if rounds < 1 or rounds > 100 then return false, 'invalid training round count' end
+    if equipped[src] or pending[src] then return false, 'holster the current weapon first' end
+    if training[src] then return false, 'a training weapon is already active' end
+
+    training[src] = { owner = owner, name = weaponName, remaining = rounds, fired = 0 }
+    trainingOwnership.track(owner, src)
+    TriggerClientEvent('qbinventory:client:startTrainingWeapon', src, weaponName, rounds)
+    return true
+end)
+
+exports('StopTrainingWeapon', function(src)
+    src = tonumber(src)
+    local state = src and training[src] or nil
+    if not state or state.owner ~= GetInvokingResource() then return false end
+    trainingOwnership.untrack(src)
+    return stopTraining(src)
+end)

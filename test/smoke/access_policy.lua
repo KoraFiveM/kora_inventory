@@ -38,4 +38,14 @@ H.ok(server:find("inv.owner ~= src and inv.owner ~= data.citizenid", 1, true), '
 H.ok(server:find("ownedStash(src, identifier, ownedStashTemplates[tostring(identifier)])", 1, true), 'network open resolves registered owned stash server-side')
 H.ok(docs:find("A caller cannot choose another owner's", 1, true), 'owned stash boundary is documented')
 
+-- One inventory id may be registered at several real-world fixtures. Both the
+-- initial open and lease revalidation still funnel through canAccess.
+H.ok(server:find('local function withinCoordinates(src, coords, distance)', 1, true), 'coordinate access has one shared helper')
+H.ok(server:find('local points = I.coordinateList(coords)', 1, true), 'single and multi-point forms share normalisation')
+H.ok(server:find('tonumber(point.distance) or distance', 1, true), 'each shared fixture may retain its own bounded interaction radius')
+H.ok(server:find('if not withinCoordinates(src, inv.coords, inv.distance)', 1, true), 'all secondary access enforces the coordinate helper')
+H.ok(server:find('refreshRegistration(inv, opts)', 1, true), 'stash re-registration refreshes a moved fixture boundary')
+H.ok(server:find('refreshRegistration(inv, data)', 1, true), 'shop re-registration refreshes a moved fixture boundary')
+H.ok(server:find('if inv then return inv, true end', 1, true), 'live shop re-registration cannot reseed and erase stock')
+
 H.finish()

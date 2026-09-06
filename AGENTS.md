@@ -22,6 +22,16 @@ routing bucket, and distance before touching state. Client data is intent only:
 never trust item records, labels, weights, prices, item definitions, or IDs
 outside the inventory IDs granted by that session.
 
+An inventory's trusted `coords` may be one point or an array of fixture points.
+Both forms must stay behind the single `withinCoordinates` check in `canAccess`;
+an empty or malformed non-nil policy denies access, while nil means unbounded.
+List entries may carry a trusted `distance` override; do not collapse different
+fixture radii into one wider boundary that applies to every point.
+
+Durable secondary items may carry trusted top-level `serverData` for server
+integrations. It must be removed by `view`, never copied into purchased item
+metadata, and may reach integrations only through post-commit server events.
+
 ## Item containers and evidence
 
 `server/containers.lua` is a trusted server-only domain with no NUI or net

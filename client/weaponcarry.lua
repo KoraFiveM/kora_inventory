@@ -23,6 +23,7 @@ end
 local drawn
 local drawnSlot
 local toggling = false
+local trainingWeapon
 
 local function reportUnequipped()
     if not drawn then return end
@@ -170,6 +171,20 @@ RegisterNetEvent('qbinventory:client:addAmmo', function(request)
     SetPedAmmo(ped, hash, target)
 end)
 
+RegisterNetEvent('qbinventory:client:startTrainingWeapon', function(name, rounds)
+    if type(name) ~= 'string' then return end
+    local ped = QB.cache.ped()
+    trainingWeapon = GetHashKey(name)
+    GiveWeaponToPed(ped, trainingWeapon, math.max(0, math.floor(tonumber(rounds) or 0)), false, true)
+    SetCurrentPedWeapon(ped, trainingWeapon, true)
+end)
+
+RegisterNetEvent('qbinventory:client:stopTrainingWeapon', function()
+    if not trainingWeapon then return end
+    RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
+    trainingWeapon = nil
+end)
+
 -- A drawn weapon can leave the player's hands without a holster: the weapon
 -- wheel, a disarm, death, a respawn. Tell the server so the prop goes back on
 -- their body instead of vanishing for everyone until their next use.
@@ -177,14 +192,25 @@ QB.cache.onChange('weapon', function(weapon)
     if drawn and weapon ~= drawn then reportUnequipped() end
 end)
 QB.cache.onChange('isDead', function(isDead)
-    if isDead then reportUnequipped() end
+    if isDead then
+        reportUnequipped()
+        if trainingWeapon then
+            RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
+            trainingWeapon = nil
+        end
+    end
 end)
 
 -- Persist only ammunition that has been consumed. The server checks both the
 -- slot and its own equipped record, and refuses any report that would raise
 -- ammo, so this cannot turn the native client weapon count into an item-mint.
 AddEventHandler('CEventGunShot', function(_, eventEntity)
-    if not drawn or not drawnSlot or eventEntity ~= QB.cache.ped() then return end
+    if eventEntity ~= QB.cache.ped() then return end
+    if trainingWeapon then
+        TriggerServerEvent('qbinventory:server:weaponFired')
+        return
+    end
+    if not drawn or not drawnSlot then return end
     -- The server already knows the equipped slot. Never submit a claimed ammo
     -- amount, weapon hash, coordinates, serial, or casing from this client.
     if ((C.weapons or {}).ballistics or {}).enabled == true then
@@ -195,6 +221,12 @@ AddEventHandler('CEventGunShot', function(_, eventEntity)
         TriggerServerEvent('qbinventory:server:weaponAmmoConsumed', drawnSlot,
             GetAmmoInPedWeapon(QB.cache.ped(), drawn) or 0)
     end
+end)
+
+AddEventHandler('onClientResourceStop', function(name)
+    if name ~= GetCurrentResourceName() or not trainingWeapon then return end
+    RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
+    trainingWeapon = nil
 end)
 
 -- --- carried props ----------------------------------------------------------
