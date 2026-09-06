@@ -1165,7 +1165,7 @@ function setItems(src, newItems)
     end)
 end
 
-local useables = {}
+local useables, builtInUseables = {}, {}
 -- Declared on its own line first: a `local x = ... function() x end` would
 -- close over the *global* x, since the local is not in scope until after its
 -- own statement -- and the cleanup only runs on resource stop, so the nil
@@ -1174,6 +1174,13 @@ local useableOwners = QB.resources.serverRegistry(function(name) useables[name] 
 function createUseable(name, handler)
     assert(type(name) == 'string' and I.isCallable(handler), 'name and handler are required')
     local owner = GetInvokingResource() or resource; useables[name] = handler; useableOwners.track(owner, name)
+end
+-- Internal, registry-driven handlers (weapons/ammunition) live below explicit
+-- resource registrations so a gameplay resource can intentionally override
+-- them. Passing nil removes only the built-in handler.
+function setBuiltInUseable(name, handler)
+    assert(type(name) == 'string' and (handler == nil or I.isCallable(handler)), 'name and callable handler are required')
+    builtInUseables[name] = handler
 end
 -- Whether clicking Use on this item would do something even without a
 -- registered handler: either a portable-container definition (useItem's own
@@ -1186,7 +1193,7 @@ end
 -- defined earlier in this same file, but only ever CALLED later, once every
 -- top-level statement here has run -- can resolve it too.
 function hasUseable(name)
-    if useables[name] then return true end
+    if useables[name] or builtInUseables[name] then return true end
     local containers = QbInventory.containers
     return containers and containers.isPortableItem and containers.isPortableItem({ name = name }) or false
 end
@@ -1205,7 +1212,7 @@ function useItem(src, slotOrName)
             end
             return false, result
         end
-        local handler = useables[item.name]
+        local handler = useables[item.name] or builtInUseables[item.name]
         if handler then
             local ok, result = pcall(handler, src, I.copy(item))
             if not ok then return false, result end

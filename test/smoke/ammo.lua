@@ -34,6 +34,7 @@ QbInventory = {
 }
 
 local useables = {}
+function setBuiltInUseable(name, fn) useables[name] = fn end
 function createUseable(name, fn) useables[name] = fn end
 
 local removals = {}
@@ -45,6 +46,7 @@ function removeItem(src, name, amount, slot, reason)
 end
 
 local pushed = {}
+local sharedChangeHandlers = {}
 function TriggerClientEvent(event, src, payload)
     pushed[#pushed + 1] = { event = event, src = src, payload = payload }
 end
@@ -53,7 +55,7 @@ exports = setmetatable({}, {
     __index = function(_, resource)
         return setmetatable({}, {
             __index = function(_, name)
-                return function(_, registry)
+                return function(_, registry, handler)
                     if resource == 'qbcore' and name == 'allShared' then
                         if registry == 'weapons' then return WEAPONS end
                         if registry == 'items' then
@@ -61,6 +63,10 @@ exports = setmetatable({}, {
                             for _, def in pairs(ITEMS) do out[#out + 1] = def end
                             return out
                         end
+                    end
+                    if resource == 'qbcore' and name == 'onSharedChange' then
+                        sharedChangeHandlers[registry] = handler
+                        return 1
                     end
                     return {}
                 end
@@ -77,6 +83,17 @@ H.ok(useables.pistol_ammo, 'a magazine with an ammoType and rounds is useable')
 H.ok(useables.rifle_ammo, 'every such magazine is registered, not a hard-coded list')
 H.equal(useables.dud_ammo, nil, 'an ammoType with no rounds is not registered as usable ammunition')
 H.equal(useables.weapon_unarmed, nil, 'fists are still never a useable item')
+
+ITEMS.runtime_ammo = { name = 'runtime_ammo', label = 'Runtime Magazine', ammoType = 'AMMO_PISTOL', rounds = 6 }
+sharedChangeHandlers.items('add', 'runtime_ammo', ITEMS.runtime_ammo)
+H.ok(useables.runtime_ammo, 'an ammunition definition added at runtime becomes useable immediately')
+sharedChangeHandlers.items('remove', 'runtime_ammo', nil)
+H.equal(useables.runtime_ammo, nil, 'removing a runtime ammunition definition removes its built-in handler')
+
+sharedChangeHandlers.weapons('add', 'weapon_runtime', { name = 'weapon_runtime', weapontype = 'Pistol' })
+H.ok(useables.weapon_runtime, 'a weapon definition added at runtime becomes useable immediately')
+sharedChangeHandlers.weapons('remove', 'weapon_runtime', nil)
+H.equal(useables.weapon_runtime, nil, 'removing a runtime weapon definition removes its built-in handler')
 
 -- --- refusals ---------------------------------------------------------------
 

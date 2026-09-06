@@ -80,7 +80,7 @@ export interface ItemBoxReceipt {
 export interface UiConfig {
     /** Slots 1..hotbarSlots are the hotbar; the same range client/hotbar.lua binds. */
     hotbarSlots?: number
-    /** Centre the player panel when no second inventory is open. */
+    /** Show a compact player grid with a selection drawer when no second inventory is open. */
     centreWhenSolo?: boolean
     /** Outline the hotbar slots in the accent colour. */
     showHotbar?: boolean

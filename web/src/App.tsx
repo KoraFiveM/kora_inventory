@@ -523,7 +523,11 @@ function InventoryApp() {
         return () => window.removeEventListener("keydown", onKey)
     }, [activateSelected, close, movePending, selected])
 
-    const filteredSelected = useMemo(() => selected && (selected.item.label ?? selected.item.name).toLowerCase().includes(query.toLowerCase()) ? selected : undefined, [query, selected])
+    const solo = Boolean(session && uiConfig.centreWhenSolo && !session.secondary)
+    // Search belongs to the three-column transfer view. It is intentionally
+    // hidden in compact solo mode, so a query left over from another session
+    // must never hide the newly selected drawer contents.
+    const filteredSelected = useMemo(() => selected && (solo || (selected.item.label ?? selected.item.name).toLowerCase().includes(query.toLowerCase())) ? selected : undefined, [query, selected, solo])
     // A fresh selection always starts at one, so a large slider value can never
     // carry over onto a different stack or shop stock row.
     useEffect(() => { setSelectedAmount(1) }, [selected?.inventory.id, selected?.item.slot])
@@ -531,25 +535,25 @@ function InventoryApp() {
     const selectedCount = Math.min(Math.max(1, selectedAmount), selectedMax)
     if (!session) return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
 
-    // Solo layout: with nothing open beside the player's inventory, drop the
-    // third column entirely rather than filling it with a panel whose only
-    // content is a sentence explaining that it is empty.
-    const solo = uiConfig.centreWhenSolo && !session.secondary
-
-    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} /><main className="inventory-shell">
+    // Solo layout starts as the player's inventory alone. Its inspector is a
+    // drawer, mounted only after selection, so an idle personal inventory does
+    // not reserve a permanently empty actions column.
+    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} /><main className={`inventory-shell${solo ? " inventory-shell-solo" : ""}`}>
         <DragPreview session={session} />
-        <header className="inventory-topbar">
-            <div className="brand"><span className="brand-mark"><PackageOpen size={18} /></span><span>INVENTORY</span><em><i />LIVE</em></div>
-            <label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter the selected item" /></label>
-            <div className="topbar-actions"><span className="session-state">{session.secondary ? "Transfer open" : "Personal inventory"}</span><button className="close" onClick={close} aria-label="Close inventory"><X size={18} /></button></div>
-        </header>
-        {error && <div className="notice" role="alert"><CircleAlert size={16} />{error}</div>}
+        <div className="inventory-heading">
+            <header className="inventory-topbar">
+                <div className="brand"><span className="brand-mark"><PackageOpen size={18} /></span><span>INVENTORY</span><em><i />LIVE</em></div>
+                <label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter the selected item" /></label>
+                <div className="topbar-actions"><span className="session-state">{session.secondary ? "Transfer open" : "Personal inventory"}</span><button className="close" onClick={close} aria-label="Close inventory"><X size={18} /></button></div>
+            </header>
+            {error && <div className="notice" role="alert"><CircleAlert size={16} />{error}</div>}
+        </div>
         <div className={`inventory-layout${solo ? " inventory-layout-solo" : ""}`}>
             <section className="inventory-stage inventory-stage-player">
                 <InventoryPanel inventory={session.player} isPlayer selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} />
             </section>
-            <aside className={`item-detail${filteredSelected ? "" : " item-detail-empty"}`}>
-                <header className="detail-header"><span>Item inspector</span><em>{filteredSelected ? "Selected" : "Select an item"}</em></header>
+            {(!solo || selected) && <aside className={`item-detail${solo ? " item-detail-drawer" : ""}${filteredSelected ? "" : " item-detail-empty"}`} aria-label="Selected item actions">
+                <header className="detail-header"><span>Item inspector</span><span className="detail-header-actions"><em>{filteredSelected ? "Selected" : "Select an item"}</em>{solo && <button className="detail-close" onClick={() => setSelected(undefined)} aria-label="Close item drawer"><X size={14} /></button>}</span></header>
                 {filteredSelected ? <>
                 <ItemArtwork item={filteredSelected.item} className="detail-art" />
                 <p className="eyebrow">{filteredSelected.inventory.type === "shop" ? "shop item" : `slot ${filteredSelected.item.slot}`}</p>
@@ -569,7 +573,7 @@ function InventoryApp() {
                         {giveAvailable && <button className="quiet-action" disabled={movePending} onClick={() => void submit("give", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: 1 })}>Give one</button>}
                     </>}
                 </>}
-            </> : <div className="empty-detail"><span className="empty-detail-icon"><PackageOpen size={30} /></span><h1>Inspect an item</h1><p>{selected ? `${(selected.item.label ?? selected.item.name)} is hidden by the current search.` : "Select an item to see its details. Drag it between slots to move or stack it, or drag it outside the window to drop it."}</p></div>}</aside>
+            </> : <div className="empty-detail"><span className="empty-detail-icon"><PackageOpen size={30} /></span><h1>Inspect an item</h1><p>{selected ? `${(selected.item.label ?? selected.item.name)} is hidden by the current search.` : "Select an item to see its details. Drag it between slots to move or stack it, or drag it outside the window to drop it."}</p></div>}</aside>}
             {session.secondary
                 ? <section className="inventory-stage inventory-stage-secondary"><InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} /></section>
                 : solo ? null : <section className="inventory-stage inventory-stage-secondary"><section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section></section>}

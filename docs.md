@@ -15,6 +15,12 @@ replication and persistence remain single-writer. qbinventory owns secondary
 inventory state (stashes, temporary stashes, drops, and shops), sessions,
 revisions, locks, hook registration, and audit events.
 
+Shared item definitions remain in qbcore's runtime `items` registry and are
+looked up when each inventory operation runs; qbinventory never caches the
+legacy `QBCore.Shared.Items` map. Runtime weapon and ammunition additions are
+observed through registry subscriptions and receive their built-in use handler
+without a resource restart.
+
 `RegisterStash(..., owner = true, ...)` is a private-stash template. It does
 not create a shared stash with a boolean owner flag: on open, qbinventory
 derives the caller's citizen id server-side and uses a separate durable
@@ -427,7 +433,7 @@ Nothing in it is authority and the inventory engine never reads it.
 
 | Key | Effect |
 | --- | --- |
-| `centreWhenSolo` | With no second inventory open, drop the third column instead of rendering a panel whose content is a sentence explaining that it is empty. |
+| `centreWhenSolo` | With no second inventory open, show only a compact centred player grid; selecting an item slides its inspector and actions out in a drawer. |
 | `showHotbar` | Outline slots `1..hotbarSlots` on the player's own inventory in the accent colour, so the keys `client/hotbar.lua` already binds are visible rather than folklore. |
 | `images` | Item artwork resolution -- see below. |
 

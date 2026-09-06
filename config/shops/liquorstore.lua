@@ -32,9 +32,8 @@ Config.qbinventory.shops.liquorstore = {
         shortRange = true,
         -- A shared label keeps every branch recognisable as the same shop.
         label = "Rob's Liquor",
-        -- Category 2 lists this shop by name instead of putting it under GTA's
-        -- built-in "Owned Property" category (11).
-        category = 2,
+        -- Reusing the shop name groups every branch beneath one legend heading.
+        category = "Rob's Liquor",
     },
 
     inventory = {

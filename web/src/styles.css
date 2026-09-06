@@ -1,15 +1,26 @@
 html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; background: transparent !important; pointer-events: none; }
 
+/* FiveM users generally play at a wide range of resolutions.  The inventory
+   should feel like an overlay, not a replacement for the entire game view.
+   Keep scrolling for long inventories, but do not expose browser scrollbars
+   inside the NUI. */
+.inventory-shell, .inventory-panel, .item-detail { scrollbar-width: none; -ms-overflow-style: none; }
+.inventory-shell::-webkit-scrollbar, .inventory-panel::-webkit-scrollbar, .item-detail::-webkit-scrollbar { display: none; }
+
 .inventory-shell {
   pointer-events: auto;
   position: relative;
   z-index: 1;
-  width: min(1420px, calc(100vw - 64px));
-  min-height: min(680px, calc(100vh - 64px));
-  max-height: calc(100vh - 64px);
-  margin: 32px auto;
+  /* Deliberately fixed to the requested 70% of the available game view. */
+  width: min(1420px, 70vw);
+  height: 70vh;
+  min-height: 0;
+  max-height: 70vh;
+  margin: 15vh auto;
   padding: 14px;
-  overflow: auto;
+  /* The outer frame must never acquire its own scrollbar; slot lists and the
+     inspector handle any overflow within their respective panels. */
+  overflow: hidden;
   border: 1px solid hsl(var(--border-strong) / .82);
   border-radius: 18px;
   background:
@@ -17,8 +28,36 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
     linear-gradient(145deg, hsl(var(--surface-raised) / .98), hsl(var(--surface)) 32%, hsl(var(--background) / .98));
   box-shadow: 0 32px 90px rgb(0 0 0 / 68%), inset 0 1px 0 rgb(255 255 255 / .035);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
+}
+.inventory-heading { min-width: 0; display: grid; gap: 12px; }
+
+/* Personal inventory is content-sized and remains centred until an item is
+   selected. The selected item's existing inspector then slides out beside it
+   without leaving a blank column in the resting layout. */
+.inventory-shell-solo {
+  /* Five 90-ish pixel slots plus the panel and shell padding: the frame hugs
+     the grid instead of inheriting the full transfer-window width. */
+  width: min(540px, calc(100vw - 40px));
+  height: fit-content;
+  max-height: 70vh;
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  overflow: visible;
+  transform: translate(-50%, -50%);
+}
+.inventory-shell-solo .inventory-topbar { grid-template-columns: minmax(0, 1fr) auto; }
+.inventory-shell-solo .search, .inventory-shell-solo .session-state { display: none; }
+/* The same Tab key opens this NUI in-game. CEF can immediately transfer that
+   keypress into browser focus, which paints qbtheme's pale focus ring over an
+   inventory control even though the player did not navigate to it. Inventory
+   interactions are mouse/drag driven, so keep focus styling out of this UI. */
+.inventory-shell :is(button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .inventory-topbar { display: grid; grid-template-columns: minmax(210px, 1fr) minmax(250px, 390px) auto; align-items: center; gap: 12px; min-height: 38px; padding: 1px 2px; }
@@ -38,11 +77,10 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
 .notice { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid hsl(var(--destructive-border)); border-radius: 9px; color: hsl(var(--destructive)); background: hsl(var(--destructive-soft)); font-size: 11px; }
 
 .inventory-layout { min-height: 0; display: grid; grid-template-columns: minmax(310px, 1fr) minmax(250px, 290px) minmax(310px, 1fr); gap: 14px; }
-/* When there is no container/shop open, keep the player inventory and the
-   inspector together rather than leaving the second half of the window empty. */
 .inventory-layout-solo {
-  grid-template-columns: minmax(560px, 1fr) minmax(270px, 320px);
-  width: min(100%, 1180px);
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
   justify-self: center;
 }
 .inventory-stage { min-width: 0; min-height: 0; display: grid; }
@@ -62,6 +100,7 @@ h2 { margin-bottom: 0; font-size: 15px; letter-spacing: -.015em; }
 .slot-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; align-content: start; }
 .slot { position: relative; aspect-ratio: 1 / 1; padding: 4px; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: 9px; color: hsl(var(--muted-foreground)); background: linear-gradient(145deg, hsl(var(--background)), hsl(var(--card))); cursor: grab; text-align: left; display: grid; grid-template-rows: 1fr auto auto; gap: 2px; touch-action: none; -webkit-user-select: none; user-select: none; transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease, box-shadow 120ms ease; }
 .slot:hover, .slot:focus-visible { outline: 0; border-color: hsl(var(--brand-border)); transform: translateY(-2px); box-shadow: 0 7px 15px rgb(0 0 0 / .22); }
+.inventory-shell .slot:focus-visible { border-color: hsl(var(--border)); transform: none; box-shadow: none; }
 .slot-selected { border-color: hsl(var(--primary)); background: hsl(var(--brand-soft)); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)), 0 7px 16px rgb(0 0 0 / .18); }
 .slot-move-target { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft) / .58); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
 .slot-selected.slot-move-target { border-color: hsl(var(--primary)); }
@@ -126,8 +165,13 @@ h2 { margin-bottom: 0; font-size: 15px; letter-spacing: -.015em; }
 @keyframes item-box-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
 .item-detail { padding: 14px; display: grid; align-content: start; gap: 10px; border-color: hsl(var(--border-strong) / .72); box-shadow: 0 18px 44px rgb(0 0 0 / .16); }
+.item-detail-drawer { position: absolute; box-sizing: border-box; top: 0; left: calc(100% + 14px); width: 270px; height: 100%; max-height: 100%; background: linear-gradient(155deg, hsl(var(--surface-raised)), hsl(var(--background) / .96)); animation: item-drawer-in 160ms ease-out both; }
+@keyframes item-drawer-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
 .detail-header { display: flex; align-items: center; justify-content: space-between; min-height: 22px; padding-bottom: 10px; border-bottom: 1px solid hsl(var(--border) / .85); color: hsl(var(--foreground)); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.detail-header-actions { display: flex; align-items: center; gap: 6px; }
 .detail-header em { border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 3px 5px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .55); font-size: 7px; font-style: normal; letter-spacing: .08em; white-space: nowrap; }
+.detail-close { display: grid; width: 22px; height: 22px; padding: 0; place-items: center; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .55); cursor: pointer; }
+.detail-close:hover { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
 .item-detail:not(.item-detail-empty) .detail-header em { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
 .item-detail-empty { grid-template-rows: auto minmax(0, 1fr); align-content: stretch; background: linear-gradient(160deg, hsl(var(--surface-panel)), hsl(var(--background) / .68)); }
 .item-detail h1 { margin-bottom: 0; font-size: 16px; line-height: 1.08; }
@@ -157,21 +201,29 @@ kbd { border: 1px solid hsl(var(--border-strong)); border-radius: 4px; padding: 
 /* The slot grid stays 5 columns wide at every width -- only the surrounding
    layout reflows. */
 @media (max-width: 1120px) {
-  .inventory-shell { width: min(1180px, calc(100vw - 40px)); min-height: min(640px, calc(100vh - 40px)); max-height: calc(100vh - 40px); margin: 20px auto; }
+  .inventory-shell { width: 70vw; height: 70vh; min-height: 0; max-height: 70vh; margin: 15vh auto; }
   .inventory-layout { grid-template-columns: minmax(250px, 1fr) minmax(230px, 270px); }
   .inventory-stage-secondary { grid-column: 1 / -1; min-height: 260px; }
-  .inventory-layout-solo { grid-template-columns: minmax(420px, 1fr) 250px; }
+  .inventory-shell-solo { width: min(480px, calc(100vw - 300px)); height: fit-content; margin: 0; }
+  .inventory-layout-solo { grid-template-columns: minmax(0, 1fr); width: 100%; }
+  .item-detail-drawer { width: 250px; }
 }
 @media (max-width: 700px) {
-  .inventory-shell { width: calc(100vw - 20px); min-height: calc(100vh - 20px); max-height: calc(100vh - 20px); margin: 10px auto; padding: 9px; border-radius: 13px; }
+  /* On a narrow device the 70% presentation would make controls unusably
+     small, so retain a near-full-screen touch layout. */
+  .inventory-shell { width: calc(100vw - 20px); height: calc(100vh - 20px); min-height: 0; max-height: calc(100vh - 20px); margin: 10px auto; padding: 9px; border-radius: 13px; }
+  .inventory-shell-solo { width: calc(100vw - 20px); height: calc(100vh - 20px); margin: 0; top: 10px; left: 10px; transform: none; overflow: hidden; }
   .inventory-topbar { grid-template-columns: 1fr auto; gap: 8px; }
   .brand { grid-template-columns: 30px auto; gap: 7px; }
   .brand-mark { width: 30px; height: 30px; border-radius: 9px; }
   .brand em, .session-state { display: none; }
   .search { grid-column: 1 / -1; grid-row: 2; }
   .inventory-layout, .inventory-layout-solo { grid-template-columns: 1fr; width: 100%; }
+  .inventory-layout-solo { overflow: auto; }
   .inventory-stage-secondary { grid-column: auto; min-height: 220px; }
   .item-detail { min-height: 220px; }
+  .item-detail-drawer { position: relative; top: auto; left: auto; width: auto; height: auto; max-height: none; animation-name: item-drawer-in-mobile; }
   .shortcut-bar { grid-template-columns: 1fr 1fr; justify-content: initial; }
 }
+@keyframes item-drawer-in-mobile { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0ms !important; animation-duration: 0ms !important; } }

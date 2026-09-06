@@ -30,12 +30,15 @@ local function weaponUseable(src, item)
     return true -- successful use; item remains in inventory because no removal is performed
 end
 
-for _, def in ipairs(exports.qbcore:allShared('weapons')) do
+local function refreshWeaponUseable(name, def)
     -- weapon_unarmed isn't a real carryable item -- nothing stocks/loots it.
-    if def.name ~= 'weapon_unarmed' then
-        createUseable(def.name, weaponUseable)
-    end
+    setBuiltInUseable(name, def and name ~= 'weapon_unarmed' and weaponUseable or nil)
 end
+
+for _, def in ipairs(exports.qbcore:allShared('weapons')) do refreshWeaponUseable(def.name, def) end
+exports.qbcore:onSharedChange('weapons', function(_, name, def)
+    refreshWeaponUseable(name, def)
+end)
 
 -- --- consumables ---
 
@@ -164,8 +167,12 @@ end
 -- Every ammo item in the shared registry, found by the fields that MAKE it one
 -- (`ammoType` + `rounds`) rather than by a name pattern, so a server adding its
 -- own magazine item gets a working use with no change here.
-for _, def in ipairs(exports.qbcore:allShared('items')) do
-    if def.ammoType and tonumber(def.rounds) and tonumber(def.rounds) > 0 then
-        createUseable(def.name, ammoUseable)
-    end
+local function refreshAmmoUseable(name, def)
+    local isAmmo = def and def.ammoType and tonumber(def.rounds) and tonumber(def.rounds) > 0
+    setBuiltInUseable(name, isAmmo and ammoUseable or nil)
 end
+
+for _, def in ipairs(exports.qbcore:allShared('items')) do refreshAmmoUseable(def.name, def) end
+exports.qbcore:onSharedChange('items', function(_, name, def)
+    refreshAmmoUseable(name, def)
+end)

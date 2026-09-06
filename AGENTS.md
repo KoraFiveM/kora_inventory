@@ -14,6 +14,9 @@ data directly.
 Player items remain exclusively in qbcore's `PlayerData.items` and its
 `players.inventory` persistence column. Never create a qbinventory player-item
 table and never mutate a player inventory other than through qbcore exports.
+Resolve item definitions through qbcore's getter at use time; never cache or
+index the legacy `QBCore.Shared.Items` map. Registry-driven built-in use
+handlers must subscribe to runtime add/update/remove changes.
 
 ## Security
 

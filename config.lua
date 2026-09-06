@@ -45,10 +45,8 @@ Config.qbinventory = {
     -- inventory engine never reads it. Kept in one sub-table so it is obvious
     -- at a glance which config values cross into the NUI and which do not.
     ui = {
-        -- With no second inventory open, centre the player's panel instead of
-        -- rendering an empty "no secondary inventory" placeholder beside it.
-        -- The placeholder is a whole panel of chrome describing its own
-        -- absence, which is most of what an inventory is open for.
+        -- With no second inventory open, show a compact centred player grid.
+        -- Selecting an item opens its inspector/actions in a side drawer.
         centreWhenSolo = true,
 
         -- Outline the first `hotbarSlots` slots in the accent colour so the

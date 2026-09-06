@@ -119,6 +119,13 @@ QB.shared.register('items', 'bandage', {
 `useTime` runs qblib's client progress bar before the use request is ever
 sent to the server; a cancelled bar never reaches your handler.
 
+Item definitions are resolved through qbcore's getter when an operation runs;
+qbinventory does not capture the shared Items table at startup. Definitions can
+therefore be registered, updated, or removed at runtime. Its built-in weapon and
+ammunition handlers also subscribe to those registry changes, so a newly
+registered weapon or magazine is usable immediately without restarting either
+resource.
+
 ### Ground drops
 ```lua
 -- server: drop items at a location (e.g. on player death)
