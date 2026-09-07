@@ -14,12 +14,8 @@
 
 local cfg = (Config.qbinventory and Config.qbinventory.drops) or {}
 
--- id -> { entity = number|nil, zone = string }
+-- id -> { entity = number|nil, target = integer }
 local drops = {}
-
-local function zoneName(id)
-    return ('qbinventory:drop:%s'):format(id)
-end
 
 ---Drop coordinates are the dropping player's ped position, which sits about a
 ---metre above the floor. A downward trace puts the bag on the surface; a failed
@@ -40,8 +36,24 @@ local function removeDrop(id)
     if not record then return end
 
     drops[tostring(id)] = nil
-    QB.interact.removeZone(record.zone)
+    exports.qbtarget:removeZone(record.target)
     if record.entity then QB.entities.remove(record.entity) end
+end
+
+local function addDropTarget(id, coords)
+    return exports.qbtarget:addSphereZone({
+        coords = coords,
+        radius = cfg.interactionDistance or 1.5,
+        options = {
+            {
+                label = cfg.label or 'Pick up',
+                icon = cfg.icon or 'package',
+                onSelect = function()
+                    exports.qbinventory:openInventory('drop', id)
+                end,
+            },
+        },
+    })
 end
 
 local function addDrop(id, coords)
@@ -58,17 +70,8 @@ local function addDrop(id, coords)
     -- Registered BEFORE the model finishes streaming. QB.entities.create waits
     -- on the model, and a drop emptied during that wait would otherwise land its
     -- removal before this record existed and leave the prop orphaned.
-    drops[stringId] = { zone = zoneName(stringId) }
-
-    QB.interact.addCircleZone(zoneName(stringId), placed, cfg.interactionDistance or 1.5, {
-        {
-            label = cfg.label or 'Pick up',
-            icon = cfg.icon or 'package',
-            action = function()
-                exports.qbinventory:openInventory('drop', stringId)
-            end,
-        },
-    }, false)
+    drops[stringId] = { coords = placed }
+    drops[stringId].target = addDropTarget(stringId, placed)
 
     local entity = QB.entities.create(cfg.model or 'prop_med_bag_01b', placed, { freeze = true })
     local record = drops[stringId]
@@ -88,6 +91,13 @@ end)
 
 RegisterNetEvent('qbinventory:client:dropRemoved', function(id)
     removeDrop(id)
+end)
+
+AddEventHandler('onClientResourceStart', function(resource)
+    if resource ~= 'qbtarget' then return end
+    for id, record in pairs(drops) do
+        record.target = addDropTarget(id, record.coords)
+    end
 end)
 
 -- Hydration. `dropCreated` is a one-shot broadcast, so a player connecting (or

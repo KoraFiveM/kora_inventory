@@ -12,20 +12,28 @@ end
 
 RegisterNetEvent('qbinventory:client:openAmmunation', openAmmunation)
 
-for index, location in ipairs(shop.locations or {}) do
-    local zoneName = ('qbinventory:ammunation:%d'):format(index)
-    QB.interact.addCircleZone(zoneName, {
-        x = location.x,
-        y = location.y,
-        z = location.z,
-    }, shop.interactionDistance, {
-        {
-            label = ('Browse %s'):format(shop.label),
-            icon = 'shopping-basket',
-            action = openAmmunation,
-        },
-    }, false)
+local function registerAmmunationTargets()
+    for _, location in ipairs(shop.locations or {}) do
+        exports.qbtarget:addSphereZone({
+            coords = { x = location.x, y = location.y, z = location.z },
+            radius = shop.interactionDistance,
+            options = {
+                {
+                    label = ('Browse %s'):format(shop.label),
+                    icon = 'shopping-basket',
+                    onSelect = openAmmunation,
+                },
+            },
+        })
+    end
+end
 
+registerAmmunationTargets()
+AddEventHandler('onClientResourceStart', function(resource)
+    if resource == 'qbtarget' then registerAmmunationTargets() end
+end)
+
+for _, location in ipairs(shop.locations or {}) do
     if shop.blip and shop.blip.enabled then
         QB.blips.create({ x = location.x, y = location.y, z = location.z }, shop.blip)
     end

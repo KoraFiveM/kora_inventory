@@ -105,6 +105,7 @@ QB = {
 function PlayerPedId() return 1 end
 function GetSelectedPedWeapon() return pedWeapon end
 function GetHashKey(name) local h = 0; for i = 1, #name do h = (h * 31 + name:byte(i)) % 2 ^ 31 end return h end
+joaat = GetHashKey
 
 -- The compat file publishes ONLY through the ox_inventory export identity.
 -- Capturing it this way asserts the registration path itself, and leaving

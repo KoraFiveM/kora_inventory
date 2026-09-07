@@ -325,11 +325,11 @@ local Ox = {
 -- Defined outside the table literal so it can walk the raw item list.
 function Ox.getCurrentWeapon()
     local selected = QB.cache.weapon()
-    if not selected or selected == GetHashKey('weapon_unarmed') then return nil end
+    if not selected or selected == joaat('weapon_unarmed') then return nil end
     local best
     for _, item in pairs(items()) do
         local name = itemName(item.name)
-        if name and name:sub(1, 7) == 'weapon_' and GetHashKey(name) == selected
+        if name and name:sub(1, 7) == 'weapon_' and joaat(name) == selected
             and (not best or (item.slot or 0) < (best.slot or 0)) then
             best = item
         end

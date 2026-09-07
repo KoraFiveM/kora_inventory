@@ -12,20 +12,28 @@ end
 
 RegisterNetEvent('qbinventory:client:openLiquorStore', openLiquorStore)
 
-for index, location in ipairs(shop.locations or {}) do
-    local zoneName = ('qbinventory:liquorstore:%d'):format(index)
-    QB.interact.addCircleZone(zoneName, {
-        x = location.x,
-        y = location.y,
-        z = location.z,
-    }, shop.interactionDistance, {
-        {
-            label = ('Browse %s'):format(shop.label),
-            icon = 'wine',
-            action = openLiquorStore,
-        },
-    }, false)
+local function registerLiquorStoreTargets()
+    for _, location in ipairs(shop.locations or {}) do
+        exports.qbtarget:addSphereZone({
+            coords = { x = location.x, y = location.y, z = location.z },
+            radius = shop.interactionDistance,
+            options = {
+                {
+                    label = ('Browse %s'):format(shop.label),
+                    icon = 'wine',
+                    onSelect = openLiquorStore,
+                },
+            },
+        })
+    end
+end
 
+registerLiquorStoreTargets()
+AddEventHandler('onClientResourceStart', function(resource)
+    if resource == 'qbtarget' then registerLiquorStoreTargets() end
+end)
+
+for _, location in ipairs(shop.locations or {}) do
     if shop.blip and shop.blip.enabled then
         QB.blips.create({ x = location.x, y = location.y, z = location.z }, shop.blip)
     end

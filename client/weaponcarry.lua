@@ -84,7 +84,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
     if toggling then return end
 
     local ped = QB.cache.ped()
-    local hash = GetHashKey(request.name)
+    local hash = joaat(request.name)
     -- 'toggle' is the fallback shape server/useables.lua emits when
     -- weaponcarry.lua is not loaded; resolve it the way that code used to.
     local action = request.action
@@ -106,7 +106,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
     -- replaced the handle the bar started with.
     ped = QB.cache.ped()
     if action == 'holster' then
-        SetCurrentPedWeapon(ped, GetHashKey('weapon_unarmed'), true)
+        SetCurrentPedWeapon(ped, joaat('weapon_unarmed'), true)
         drawn = nil
         drawnSlot = nil
     else
@@ -116,7 +116,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
         end
         SetPedAmmo(ped, hash, ammo)
         for _, component in ipairs(type(request.components) == 'table' and request.components or {}) do
-            local componentHash = type(component) == 'string' and GetHashKey(component) or tonumber(component)
+            local componentHash = type(component) == 'string' and joaat(component) or tonumber(component)
             if componentHash then GiveWeaponComponentToPed(ped, hash, componentHash) end
         end
         local tint = math.floor(tonumber(request.tint) or 0)
@@ -145,7 +145,7 @@ RegisterNetEvent('qbinventory:client:addAmmo', function(request)
     if rounds <= 0 then return end
 
     local ped = QB.cache.ped()
-    local hash = GetHashKey(request.weapon)
+    local hash = joaat(request.weapon)
 
     if not HasPedGotWeapon(ped, hash, false) then
         GiveWeaponToPed(ped, hash, 0, false, false)
@@ -174,7 +174,7 @@ end)
 RegisterNetEvent('qbinventory:client:startTrainingWeapon', function(name, rounds)
     if type(name) ~= 'string' then return end
     local ped = QB.cache.ped()
-    trainingWeapon = GetHashKey(name)
+    trainingWeapon = joaat(name)
     GiveWeaponToPed(ped, trainingWeapon, math.max(0, math.floor(tonumber(rounds) or 0)), false, true)
     SetCurrentPedWeapon(ped, trainingWeapon, true)
 end)
@@ -299,14 +299,14 @@ local function createCarried(carried)
     -- A configured override can name something that is not a real weapon.
     -- QB.stream.loadWeaponAsset asserts on that, so check first: an entry
     -- with neither a valid weapon nor a `model` simply renders nothing.
-    if not IsWeaponValid(GetHashKey(carried.name)) then return 0 end
+    if not IsWeaponValid(joaat(carried.name)) then return 0 end
 
     local entity = 0
     QB.stream.loadWeaponAsset(carried.name, function(hash)
         entity = CreateWeaponObject(hash, 0, 0.0, 0.0, 0.0, true, 1.0, 0, false, true) or 0
         if entity == 0 then return end
         for _, component in ipairs(carried.components or {}) do
-            local componentHash = type(component) == 'string' and GetHashKey(component) or tonumber(component)
+            local componentHash = type(component) == 'string' and joaat(component) or tonumber(component)
             if componentHash then GiveWeaponComponentToWeaponObject(entity, componentHash) end
         end
         if carried.tint then SetWeaponObjectTintIndex(entity, carried.tint) end
