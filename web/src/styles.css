@@ -1,4 +1,5 @@
 html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; background: transparent !important; pointer-events: none; }
+#root { position: relative; }
 
 /* FiveM users generally play at a wide range of resolutions.  The inventory
    should feel like an overlay, not a replacement for the entire game view.
@@ -9,14 +10,18 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
 
 .inventory-shell {
   pointer-events: auto;
-  position: relative;
+  position: absolute;
   z-index: 1;
-  /* Deliberately fixed to the requested 70% of the available game view. */
-  width: min(1420px, 70vw);
-  height: 70vh;
+  /* Size and centre against the scaled NUI root. Viewport units resolve before
+     scaleNui's transform and make the full inventory too tall and too low. */
+  width: min(1420px, 70%);
+  height: 70%;
   min-height: 0;
-  max-height: 70vh;
-  margin: 15vh auto;
+  max-height: 70%;
+  margin: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   padding: 14px;
   /* The outer frame must never acquire its own scrollbar; slot lists and the
      inspector handle any overflow within their respective panels. */
@@ -207,7 +212,7 @@ kbd { border: 1px solid hsl(var(--border-strong)); border-radius: 4px; padding: 
 /* The slot grid stays 5 columns wide at every width -- only the surrounding
    layout reflows. */
 @media (max-width: 1120px) {
-  .inventory-shell { width: 70vw; height: 70vh; min-height: 0; max-height: 70vh; margin: 15vh auto; }
+  .inventory-shell { width: 70%; height: 70%; min-height: 0; max-height: 70%; margin: 0; }
   .inventory-layout { grid-template-columns: minmax(250px, 1fr) minmax(230px, 270px); }
   .inventory-stage-secondary { grid-column: 1 / -1; min-height: 260px; }
   .inventory-shell-solo { width: min(480px, calc(100vw - 300px)); height: fit-content; margin: 0; }
@@ -217,7 +222,7 @@ kbd { border: 1px solid hsl(var(--border-strong)); border-radius: 4px; padding: 
 @media (max-width: 700px) {
   /* On a narrow device the 70% presentation would make controls unusably
      small, so retain a near-full-screen touch layout. */
-  .inventory-shell { width: calc(100vw - 20px); height: calc(100vh - 20px); min-height: 0; max-height: calc(100vh - 20px); margin: 10px auto; padding: 9px; border-radius: 13px; }
+  .inventory-shell { width: calc(100% - 20px); height: calc(100% - 20px); min-height: 0; max-height: calc(100% - 20px); margin: 0; top: 10px; left: 10px; transform: none; padding: 9px; border-radius: 13px; }
   .inventory-shell-solo { width: calc(100vw - 20px); height: calc(100vh - 20px); margin: 0; top: 10px; left: 10px; transform: none; overflow: hidden; }
   .inventory-topbar { grid-template-columns: 1fr auto; gap: 8px; }
   .brand { grid-template-columns: 30px auto; gap: 7px; }
