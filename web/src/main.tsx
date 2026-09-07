@@ -5,7 +5,7 @@ import "./styles.css"
 
 const scaleNui = () => {
     const root = document.getElementById("root")!
-    const scale = Math.min(2, Math.max(1, Math.min(window.innerWidth / 2560, window.innerHeight / 1440)))
+    const scale = Math.min(2, Math.max(0.5, Math.min(window.innerWidth / 1920, window.innerHeight / 1080)))
     root.style.width = `${window.innerWidth / scale}px`
     root.style.height = `${window.innerHeight / scale}px`
     root.style.transform = `scale(${scale})`

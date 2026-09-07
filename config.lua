@@ -309,7 +309,10 @@ Config.qbinventory = {
             Rifle = 'back', Shotgun = 'back', SMG = 'back',
             Sniper = 'back', LMG = 'back', Heavy = 'back',
             Melee = 'sling',
-            Pistol = 'hip',
+            -- Keep sidearms visible with the rest of the carried weapons.
+            -- This also uses the back draw/holster animation and attachment
+            -- positions, so a pistol is not left at the hip.
+            Pistol = 'back',
         },
         -- Attachment positions per tier, taken in order. A weapon that finds
         -- no free position in its tier is simply not rendered, rather than

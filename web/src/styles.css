@@ -72,7 +72,13 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
 .topbar-actions { display: flex; align-items: center; justify-content: end; gap: 8px; }
 .session-state { padding: 0 2px; color: hsl(var(--muted-foreground)); font-size: 9px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
 .close, .quiet-action { border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(var(--muted)); cursor: pointer; }
+.close, .detail-close {
+  box-sizing: border-box;
+  padding: 0;
+  line-height: 0;
+}
 .close { width: 34px; height: 34px; display: grid; place-items: center; background: hsl(var(--background) / .62); }
+.close svg, .detail-close svg { display: block; flex: none; }
 .close:hover, .quiet-action:hover { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
 .notice { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid hsl(var(--destructive-border)); border-radius: 9px; color: hsl(var(--destructive)); background: hsl(var(--destructive-soft)); font-size: 11px; }
 

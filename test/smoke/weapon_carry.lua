@@ -118,7 +118,7 @@ end
 -- classification ------------------------------------------------------------
 
 H.equal(carry.carryRule('weapon_carbinerifle').tier, 'back', 'a rifle is carried on the back')
-H.equal(carry.carryRule('weapon_pistol').tier, 'hip', 'a pistol is carried on the hip')
+H.equal(carry.carryRule('weapon_pistol').tier, 'back', 'a pistol is carried on the back')
 H.equal(carry.carryRule('weapon_bat').tier, 'sling', 'a melee weapon is slung')
 H.equal(carry.carryRule('weapon_grenade'), nil, 'a throwable has no configured tier and is not carried')
 H.equal(carry.carryRule('weapon_petrolcan'), nil, 'an explicit tier = false override excludes a weapon')
