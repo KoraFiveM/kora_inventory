@@ -661,6 +661,23 @@ local function close(src, reason)
     return true
 end
 
+---Remove an exhausted ground drop and its client-side representation.
+---
+---Drops are temporary inventories, but their bag props live on every client.
+---Keeping this in the mutation funnel (rather than only in `dropTake`) makes
+---the ordinary two-panel transfer path clean up the prop as well.
+---@param inv table
+---@param src integer|nil
+local function removeEmptyDrop(inv, src)
+    if inv.type ~= 'drop' or next(inv.items) then return false end
+
+    if I.persistence and I.persistence.delete then I.persistence.delete(inv.type, inv.id) end
+    inventories[inv.key] = nil
+    TriggerClientEvent('qbinventory:client:dropRemoved', -1, inv.id)
+    if src then close(src, 'drop empty') end
+    return true
+end
+
 local function open(src, secondaryKey, opts)
     close(src, 'replaced')
     local primary = playerKey(src)
@@ -790,7 +807,9 @@ local function transfer(src, request)
         broadcast(fromKey); if toKey ~= fromKey then broadcast(toKey) end
         recordAudit('transfer', src, { from = fromKey, to = toKey, item = removed.name, amount = amount })
         TriggerEvent('qbinventory:server:itemsMoved', src, payload)
-        return true, { fromRevision = revision(fromKey), toRevision = revision(toKey) }
+        local result = { fromRevision = revision(fromKey), toRevision = revision(toKey) }
+        removeEmptyDrop(currentFrom, src)
+        return true, result
     end)
 end
 
@@ -1314,12 +1333,6 @@ function dropTake(src, id, slot, amount)
     local ok, payload = open(src, inv.key); if not ok then return false, payload end
     local s = sessions[src]
     local result, err = transfer(src, { token = s.token, fromInventory = inv.key, toInventory = playerKey(src), fromSlot = slot, amount = amount, fromRevision = revision(inv.key), toRevision = revision(playerKey(src)) })
-    if result and not next(inv.items) then
-        if I.persistence and I.persistence.delete then I.persistence.delete(inv.type, inv.id) end
-        inventories[inv.key] = nil
-        TriggerClientEvent('qbinventory:client:dropRemoved', -1, id)
-        close(src, 'drop empty')
-    end
     return result, err
 end
 
@@ -1620,6 +1633,7 @@ setInventoryItems = function(reference, items)
     inv.items = checked
     if inv.type == 'shop' then inv.stock = inv.items end
     bump(k); broadcast(k)
+    removeEmptyDrop(inv)
     return true
 end
 
