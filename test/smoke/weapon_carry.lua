@@ -49,7 +49,10 @@ end
 local WEAPONS = {
     weapon_carbinerifle = { name = 'weapon_carbinerifle', label = 'Carbine Rifle', type = 'weapon', weapontype = 'Rifle', weight = 3000, unique = true, useable = true },
     weapon_pistol = { name = 'weapon_pistol', label = 'Pistol', type = 'weapon', weapontype = 'Pistol', weight = 1000, unique = true, useable = true },
-    weapon_bat = { name = 'weapon_bat', label = 'Bat', type = 'weapon', weapontype = 'Melee', weight = 1200, unique = true, useable = true },
+    weapon_bat = {
+        name = 'weapon_bat', label = 'Bat', type = 'weapon', weapontype = 'Melee', weight = 1200,
+        unique = true, useable = true, damageModifier = 0.4, disableCriticalHits = true,
+    },
     weapon_grenade = { name = 'weapon_grenade', label = 'Grenade', type = 'weapon', weapontype = 'Throwable', weight = 400, unique = true, useable = true },
     weapon_petrolcan = { name = 'weapon_petrolcan', label = 'Petrol Can', type = 'weapon', weapontype = 'Equipment', weight = 3000, unique = true, useable = true },
 }
@@ -177,6 +180,8 @@ H.equal(request.payload.slot, 9, 'the client is told which slot it is drawing')
 H.equal(request.payload.duration, cfg.drawTime + cfg.concealedDrawTime,
     'the concealed draw duration reaches the client')
 H.equal(request.payload.ammo, 7, 'a draw receives the server-persisted ammunition amount')
+H.equal(request.payload.damage.modifier, 0.4, 'a draw receives the shared weapon damage modifier')
+H.equal(request.payload.damage.disableCriticalHits, true, 'a draw receives the shared critical-hit policy')
 H.equal(carry.equippedWeapon(7), nil, 'nothing is equipped until the client confirms the animation finished')
 
 -- A confirmation for a slot the server did not ask about is ignored: the
@@ -289,6 +294,13 @@ H.ok(server:find("'qbinventory:server:weaponFired'", 1, true)
     'native shots reach the server without a client-selected weapon or ammo count')
 H.ok(manifest:find("'server/weaponcarry.lua'", 1, true) and manifest:find("'client/weaponcarry.lua'", 1, true),
     'both halves are loaded by the manifest')
+H.ok(server:find('damage = damageSettings(item.name)', 1, true)
+    and client:find('applyDamageSettings(hash, request.damage)', 1, true),
+    'damage settings travel from the shared weapon definition to a successful inventory draw')
+local weaponClient = client:sub(1, assert(client:find('-- --- carried props', 1, true)) - 1)
+H.ok(not weaponClient:find('while true do', 1, true)
+    and weaponClient:find('SetWeaponDamageModifier', 1, true),
+    'damage modifiers are draw-bound rather than continuously polled')
 H.ok(hotbar:find('Config.qbinventory.hotbarSlots', 1, true),
     'the hotbar keybinds and the carry visibility read one shared slot range')
 

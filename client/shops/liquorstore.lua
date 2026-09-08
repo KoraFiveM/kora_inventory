@@ -35,6 +35,14 @@ end)
 
 for _, location in ipairs(shop.locations or {}) do
     if shop.blip and shop.blip.enabled then
-        QB.blips.create({ x = location.x, y = location.y, z = location.z }, shop.blip)
+        local blip = QB.blips.create({ x = location.x, y = location.y, z = location.z }, shop.blip)
+        if blip and not shop.blip.info then
+            QB.blips.setInfo(blip, {
+                title = shop.label,
+                rows = {
+                    { kind = 'wrappedText', value = 'Browse this store\'s available drinks and supplies.' },
+                },
+            })
+        end
     end
 end

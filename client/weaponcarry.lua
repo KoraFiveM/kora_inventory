@@ -24,9 +24,40 @@ local drawn
 local drawnSlot
 local toggling = false
 local trainingWeapon
+local modifiedWeapon
+local criticalHitsDisabled = false
+
+-- Damage tuning is applied as part of a confirmed inventory draw rather than
+-- in a polling loop. Reset it immediately when that weapon leaves the hand so
+-- another resource's weapon is never affected by this inventory setting.
+local function clearDamageSettings()
+    if modifiedWeapon then
+        SetWeaponDamageModifier(modifiedWeapon, 1.0)
+        modifiedWeapon = nil
+    end
+    if criticalHitsDisabled then
+        SetPedSuffersCriticalHits(QB.cache.ped(), true)
+        criticalHitsDisabled = false
+    end
+end
+
+local function applyDamageSettings(weapon, settings)
+    clearDamageSettings()
+    local modifier = tonumber(type(settings) == 'table' and settings.modifier) or 1.0
+    if modifier < 0 then modifier = 1.0 end
+    if modifier ~= 1.0 then
+        SetWeaponDamageModifier(weapon, modifier)
+        modifiedWeapon = weapon
+    end
+    if type(settings) == 'table' and settings.disableCriticalHits == true then
+        SetPedSuffersCriticalHits(QB.cache.ped(), false)
+        criticalHitsDisabled = true
+    end
+end
 
 local function reportUnequipped()
     if not drawn then return end
+    clearDamageSettings()
     drawn = nil
     drawnSlot = nil
     TriggerServerEvent('qbinventory:server:weaponUnequipped')
@@ -107,6 +138,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
     ped = QB.cache.ped()
     if action == 'holster' then
         SetCurrentPedWeapon(ped, joaat('weapon_unarmed'), true)
+        clearDamageSettings()
         drawn = nil
         drawnSlot = nil
     else
@@ -122,6 +154,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
         local tint = math.floor(tonumber(request.tint) or 0)
         if tint >= 0 and tint <= 32 then SetPedWeaponTintIndex(ped, hash, tint) end
         SetCurrentPedWeapon(ped, hash, true)
+        applyDamageSettings(hash, request.damage)
         drawn = hash
         drawnSlot = tonumber(request.slot)
     end
@@ -171,16 +204,18 @@ RegisterNetEvent('qbinventory:client:addAmmo', function(request)
     SetPedAmmo(ped, hash, target)
 end)
 
-RegisterNetEvent('qbinventory:client:startTrainingWeapon', function(name, rounds)
+RegisterNetEvent('qbinventory:client:startTrainingWeapon', function(name, rounds, damage)
     if type(name) ~= 'string' then return end
     local ped = QB.cache.ped()
     trainingWeapon = joaat(name)
     GiveWeaponToPed(ped, trainingWeapon, math.max(0, math.floor(tonumber(rounds) or 0)), false, true)
     SetCurrentPedWeapon(ped, trainingWeapon, true)
+    applyDamageSettings(trainingWeapon, damage)
 end)
 
 RegisterNetEvent('qbinventory:client:stopTrainingWeapon', function()
     if not trainingWeapon then return end
+    clearDamageSettings()
     RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
     trainingWeapon = nil
 end)
@@ -195,6 +230,7 @@ QB.cache.onChange('isDead', function(isDead)
     if isDead then
         reportUnequipped()
         if trainingWeapon then
+            clearDamageSettings()
             RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
             trainingWeapon = nil
         end
@@ -224,9 +260,12 @@ AddEventHandler('CEventGunShot', function(_, eventEntity)
 end)
 
 AddEventHandler('onClientResourceStop', function(name)
-    if name ~= GetCurrentResourceName() or not trainingWeapon then return end
-    RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
-    trainingWeapon = nil
+    if name ~= GetCurrentResourceName() then return end
+    clearDamageSettings()
+    if trainingWeapon then
+        RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
+        trainingWeapon = nil
+    end
 end)
 
 -- --- carried props ----------------------------------------------------------

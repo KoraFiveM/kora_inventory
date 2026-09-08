@@ -184,6 +184,20 @@ local function animTier(name)
     return def and (cfg.tiers or {})[def.weapontype] or nil
 end
 
+---The shared combat settings for a weapon. Shared definitions are trusted
+---server configuration; malformed modifiers fall back to GTA's native value.
+---@param name string
+---@return table
+local function damageSettings(name)
+    local definition = internal.itemDef(name)
+    local modifier = tonumber(definition and definition.damageModifier)
+    if not modifier or modifier < 0 then modifier = 1.0 end
+    return {
+        modifier = modifier,
+        disableCriticalHits = definition and definition.disableCriticalHits == true,
+    }
+end
+
 ---Durability percentage points lost for `rounds` accepted shots. This is
 ---entirely server config: a client cannot select a multiplier, opt out or
 ---report a positive/negative wear amount.
@@ -241,6 +255,9 @@ local function toggle(src, item)
         -- lives here, and it keeps the client from having to look a weapon's
         -- class up for itself just to pick an anim.
         tier = animTier(item.name),
+        -- Combat tuning is registry data resolved on the server. The client
+        -- only applies it after this draw puts the real weapon in hand.
+        damage = damageSettings(item.name),
     })
     return true
 end
@@ -399,6 +416,7 @@ I.weaponCarry = {
     carryRule = carryRule,
     drawDuration = drawDuration,
     shotWear = shotWear,
+    damageSettings = damageSettings,
     stateKey = STATE_KEY,
     ---@param src integer
     ---@return table|nil  -- { slot, name } or nil when empty-handed
@@ -422,7 +440,7 @@ exports('StartTrainingWeapon', function(src, weaponName, rounds)
 
     training[src] = { owner = owner, name = weaponName, remaining = rounds, fired = 0 }
     trainingOwnership.track(owner, src)
-    TriggerClientEvent('qbinventory:client:startTrainingWeapon', src, weaponName, rounds)
+    TriggerClientEvent('qbinventory:client:startTrainingWeapon', src, weaponName, rounds, damageSettings(weaponName))
     return true
 end)
 
