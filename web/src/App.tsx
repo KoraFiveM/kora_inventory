@@ -283,11 +283,22 @@ function DragPreview({ session }: { session: SessionSnapshot | null }) {
     const source = findInventory(session, item.inventoryId)
     const draggedItem = findItem(source, item.slot)
     if (!source || !draggedItem) return null
+    // The DnD backend reports viewport coordinates, but the preview lives
+    // inside #root, whose NUI-resolution transform scales its coordinate
+    // space. Convert the pointer position back to root coordinates before
+    // assigning left/top; otherwise the preview is multiplied by that scale.
+    const root = document.getElementById("root")
+    const scale = root && root.offsetWidth ? root.getBoundingClientRect().width / root.offsetWidth : 1
+    const previewOffset = {
+        x: clientOffset.x / scale,
+        y: clientOffset.y / scale,
+    }
+
     // `left`/`top` plus the broadly supported `transform` property keeps the
     // visual centre at the pointer in CEF as well as current Chromium. Using
     // the newer standalone `translate` property made older CEF builds ignore
     // the -50% offset, leaving the preview noticeably down and right.
-    return <div className={`inventory-drag-preview slot slot-filled${source.type === "shop" ? " slot-priced" : ""}`} style={{ left: clientOffset.x, top: clientOffset.y }} aria-hidden="true">
+    return <div className={`inventory-drag-preview slot slot-filled${source.type === "shop" ? " slot-priced" : ""}`} style={{ left: previewOffset.x, top: previewOffset.y }} aria-hidden="true">
         <span className="slot-number">{draggedItem.slot}</span>
         <ItemArtwork item={draggedItem} className="item-art" />
         <span className="item-label">{draggedItem.label ?? draggedItem.name}</span>
