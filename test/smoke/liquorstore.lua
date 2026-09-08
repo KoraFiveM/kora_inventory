@@ -1,4 +1,4 @@
--- Rob's Liquor: the stock rows are real registry items, and the shop's access
+-- Liquor stores: the stock rows are real registry items, and the shop's access
 -- policy is the counter/bucket check -- not the shop id the client sent.
 local H = dofile('test/harness.lua')
 
@@ -27,13 +27,18 @@ for _, row in ipairs(shop.inventory) do
     H.equal(row.weight, nil, 'shop config leaves canonical weights to the registry-backed authority')
 end
 
--- Every branch shares one named category rather than becoming its own row.
-H.equal(shop.blip.category, shop.blip.label, 'Rob\'s Liquor locations share one named legend category')
-H.equal(shop.blip.label, shop.label, 'the map label is the shop name')
+-- Every branch shares the service category while retaining its storefront.
+H.equal(shop.blip.category, 'Liquor', 'liquor stores use the canonical category')
+H.equal(shop.blip.label, nil, 'qblib composes the map label from category and name')
+local storefronts = {}
+for _, location in ipairs(shop.locations) do storefronts[location.name] = true end
+H.ok(storefronts["Rob's Liquor"], 'Rob\'s Liquor locations retain their storefront name')
+H.ok(storefronts['24/7'], '24/7 locations can share the Liquor category')
 
 -- Each location must carry an explicit bucket: the server policy fails closed
 -- on a missing one, so a row without it is a shop nobody can ever open.
 for index, location in ipairs(shop.locations) do
+    H.equal(type(location.name), 'string', ('location %d declares its storefront name'):format(index))
     H.equal(type(location.bucket), 'number', ('location %d declares an explicit routing bucket'):format(index))
     H.equal(type(location.x), 'number', ('location %d has finite coordinates'):format(index))
 end

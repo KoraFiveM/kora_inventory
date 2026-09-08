@@ -375,7 +375,9 @@ such a lookup reports "no such item" for every item in the game.
   `inv_busy`). Registers no exports.
 - `client/compat/ox.lua` -- the whole `ox_inventory` client identity, including
   its own `openInventory`/`closeInventory` wrappers (which carry the
-  `setStashTarget` substitution).
+  `setStashTarget` substitution). Its UI adapters translate ox notification
+  positions onto qblib's six placements, preserve multi-select input rows, and
+  map progress scenarios and props onto qblib's supported shapes.
 - `client.lua` -- qbinventory's native client exports, and the `qb-inventory`
   identity only.
 
@@ -601,6 +603,13 @@ row or item data. `server/shops/ammunation.lua` registers the shop with an
 access callback that independently reads the player's server ped coordinates
 and routing bucket, and permits the open only inside a configured counter. A
 forged shop-ID request away from a counter or in another bucket is denied.
+The blip uses the canonical `Weapons` category and the separate storefront
+name `Ammu-Nation`, letting qblib render `Weapons: Ammu-Nation` while grouping
+it with other weapon shops.
+
+The bundled liquor shop follows the same contract. Each location declares its
+own storefront name (`Rob's Liquor` or `24/7`) while all of them use the
+canonical `Liquor` category and the same server-validated shop stock.
 
 The initial catalog includes standard qbcore weapons and the registered
 `pistol_ammo`, `smg_ammo`, `shotgun_ammo`, `rifle_ammo`, `mg_ammo`, and

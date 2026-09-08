@@ -310,6 +310,12 @@ break the authority model (`qb-inventory:server:updateDrop`,
 `qb-inventory:server:snowball`) — call the real exports from server code
 instead.
 
+The client compatibility helpers also normalize ox-style notifications,
+multi-select input rows, and progress scenarios/props onto qblib. The ox
+`center-left`/`center-right` notification positions retain their horizontal
+side but use qblib's top edge because qblib has no vertically centered toast
+stack.
+
 ## Config highlights (`config.lua`)
 
 `Config.qbinventory.playerSlots` (41), `Config.qbinventory.defaultSlots` (50

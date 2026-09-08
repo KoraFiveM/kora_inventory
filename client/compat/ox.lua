@@ -142,14 +142,38 @@ end
 -- unrecognised type fails QB.notify.assert, which drops the whole toast
 -- silently, so the vocabulary is translated rather than passed through.
 local NOTIFY_TYPES = { info = true, success = true, warning = true, error = true }
+local NOTIFY_POSITIONS = {
+    top = 'top-center', bottom = 'bottom-center',
+    ['top-left'] = 'top-left', ['top-right'] = 'top-right',
+    ['bottom-left'] = 'bottom-left', ['bottom-right'] = 'bottom-right',
+    ['center-left'] = 'top-left', ['center-right'] = 'top-right',
+}
 
 -- ox_lib inputDialog row types mapped onto QB.nui.openInputDialog field types.
 -- Anything outside this set degrades to a text field rather than erroring,
 -- matching how the qb-input compat shim in qblib handles unknown types.
 local KEYBOARD_TYPES = {
     input = 'text', text = 'text', password = 'password', textarea = 'textarea',
-    number = 'number', checkbox = 'checkbox', select = 'select', ['multi-select'] = 'select',
+    number = 'number', checkbox = 'checkbox', select = 'select', ['multi-select'] = 'multiselect',
 }
+
+local function progressProps(prop)
+    if type(prop) ~= 'table' then return nil end
+    local source = prop.model and { prop } or prop
+    local mapped = {}
+    for _, entry in ipairs(source) do
+        if type(entry) == 'table' and entry.model ~= nil then
+            mapped[#mapped + 1] = {
+                model = entry.model,
+                bone = entry.bone,
+                offset = entry.pos or entry.offset,
+                rotation = entry.rot or entry.rotation,
+                rotationOrder = entry.rotOrder or entry.rotationOrder,
+            }
+        end
+    end
+    return #mapped > 0 and mapped or nil
+end
 
 -- Upstream keeps this in a plain local (src/client.lua:22); see setStashTarget.
 local stashTarget
@@ -246,6 +270,7 @@ local Ox = {
         payload.description, payload.text = nil, nil
         if payload.type == 'inform' then payload.type = 'info' end
         if payload.type ~= nil and not NOTIFY_TYPES[payload.type] then payload.type = nil end
+        if payload.position ~= nil then payload.position = NOTIFY_POSITIONS[payload.position] end
         return QB.notify.send(payload)
     end,
     -- Upstream: `local success = lib.progressBar(options); if completed then
@@ -256,18 +281,19 @@ local Ox = {
         if type(options) ~= 'table' then return false end
         local disable = options.disable or {}
         local anim = options.anim
+        local scenario = anim and anim.scenario
         local success = QB.progressbar.start({
             label = options.label,
             duration = options.duration,
             canCancel = options.canCancel,
-            -- qblib's bar has no mouse-disable and no prop/scenario support, so
-            -- ox's disable.mouse / prop / scenario fields have nowhere to go.
             disable = { move = disable.move, combat = disable.combat, car = disable.car },
             -- ox names the clip `clip`; qb-progressbar callers say `anim`.
-            anim = anim and {
+            anim = anim and not scenario and {
                 dict = anim.dict, clip = anim.clip or anim.anim, flag = anim.flag,
                 blendIn = anim.blendIn, blendOut = anim.blendOut,
             } or nil,
+            scenario = scenario and { name = scenario } or nil,
+            props = progressProps(options.prop or options.props),
         })
         success = success == true
         if completed then completed(not success) end
