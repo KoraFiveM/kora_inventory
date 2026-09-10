@@ -47,13 +47,21 @@ Register a static recipe from its owning server resource:
 ```lua
 exports.qbinventory:RegisterCraftRecipe('repair_board', {
   ingredients = { { name = 'wood', amount = 2, metadata = { grade = 'oak' } } },
-  output = { name = 'board', amount = 1, metadata = { quality = 100 } },
+  outputs = {
+    { name = 'board', amount = 1, metadata = { quality = 100 } },
+    { name = 'sawdust', amount = 2 },
+  },
   access = function(source, recipe, context)
     -- `context` is server-owned station state, never a raw client payload.
     return true
   end,
 })
 ```
+
+The legacy singular `output = { ... }` form remains supported. Use
+`CanCraftRecipe(source, recipeId)` for a read-only feasibility check; it plans
+ingredient removal, all outputs, slots, and weight without running access
+callbacks/hooks or changing the inventory.
 
 Crafting locks the qbcore-owned player inventory, makes a detached plan,
 validates all recipe ingredients/weight/slots, then commits through

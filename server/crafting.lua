@@ -81,18 +81,37 @@ local function normaliseOutput(raw)
     return { name = name, amount = amount, metadata = copy(raw.metadata or raw.info or {}) }
 end
 
+local function normaliseOutputs(recipe)
+    local raw = recipe.outputs or recipe.give
+    if raw == nil then
+        local output, err = normaliseOutput(recipe.output or recipe.result)
+        return output and { output } or nil, err
+    end
+    if type(raw) ~= 'table' or #raw == 0 then return nil, 'recipe outputs are required' end
+    local outputs = {}
+    for _, value in ipairs(raw) do
+        local output, err = normaliseOutput(value)
+        if not output then return nil, err end
+        outputs[#outputs + 1] = output
+    end
+    return outputs
+end
+
 local function normaliseRecipe(id, recipe)
     if type(id) ~= 'string' or id == '' or #id > 96 or not id:match('^[%w_.%-]+$') then return nil, 'invalid recipe id' end
     if type(recipe) ~= 'table' then return nil, 'recipe must be a table' end
     local ingredients, ingredientErr = normaliseIngredients(recipe.ingredients or recipe.items)
     if not ingredients then return nil, ingredientErr end
-    local output, outputErr = normaliseOutput(recipe.output or recipe.result)
-    if not output then return nil, outputErr end
+    local outputs, outputErr = normaliseOutputs(recipe)
+    if not outputs then return nil, outputErr end
     return {
         id = id,
         label = type(recipe.label) == 'string' and recipe.label or id,
         ingredients = ingredients,
-        output = output,
+        -- Keep `output` for existing single-output consumers while `outputs`
+        -- is the canonical form used by the transaction planner.
+        output = outputs[1],
+        outputs = outputs,
         -- This callback is registered by a server resource. It can inspect
         -- server-owned station/context data, but cannot alter planned items.
         access = I.isCallable(recipe.access) and recipe.access or nil,
@@ -301,6 +320,36 @@ local function insertOutput(items, slots, output)
     return false, 'no free slot for recipe output'
 end
 
+local function planCraft(src, recipe)
+    local primary = internal.playerKey(src)
+    local key, inventory = internal.resolveInventory(primary)
+    if key ~= primary or not inventory then return nil, 'player inventory not found' end
+    local planned = copy(inventory.items)
+    for _, ingredient in ipairs(recipe.ingredients) do
+        local removed, removeErr = consume(planned, ingredient)
+        if not removed then return nil, removeErr end
+    end
+    for _, output in ipairs(recipe.outputs) do
+        local inserted, insertErr = insertOutput(planned, inventory.slots, output)
+        if not inserted then return nil, insertErr end
+    end
+    if internal.totalWeight(planned) > inventory.maxWeight then return nil, 'over weight' end
+    return planned, nil, primary
+end
+
+---Report whether the current inventory can complete a registered transaction.
+---Access callbacks and hooks are deliberately not run by this read-only query.
+function C.canCraft(src, recipeId)
+    src = tonumber(src)
+    local recipe = recipes[recipeId]
+    if not src or not recipe then return false, 'unknown recipe' end
+    local primary = internal.playerKey(src)
+    return internal.lock({ primary }, function()
+        local planned, err = planCraft(src, recipe)
+        return planned ~= nil, err
+    end)
+end
+
 ---Craft from static data only. `context` is opaque, trusted server context for
 ---the recipe access callback; never wire a raw client/NUI payload here.
 function C.craft(src, recipeId, context)
@@ -313,26 +362,19 @@ function C.craft(src, recipeId, context)
     end
     local primary = internal.playerKey(src)
     return internal.lock({ primary }, function()
-        local key, inventory = internal.resolveInventory(primary)
-        if key ~= primary or not inventory then return false, 'player inventory not found' end
-        local planned = copy(inventory.items)
-        for _, ingredient in ipairs(recipe.ingredients) do
-            local removed, removeErr = consume(planned, ingredient)
-            if not removed then return false, removeErr end
-        end
-        local inserted, insertErr = insertOutput(planned, inventory.slots, recipe.output)
-        if not inserted then return false, insertErr end
-        if internal.totalWeight(planned) > inventory.maxWeight then return false, 'over weight' end
+        local planned, planErr, inventoryKey = planCraft(src, recipe)
+        if not planned then return false, planErr end
         for _, hook in pairs(hooks) do
             local allowed, hookErr = invoke(hook.callback, {
-                source = src, recipe = copy(recipe), inventory = primary, context = context,
+                source = src, recipe = copy(recipe), inventory = inventoryKey, context = context,
             })
             if not allowed then return false, hookErr end
         end
-        local committed, commitErr = internal.setInventoryItems(primary, planned)
+        local committed, commitErr = internal.setInventoryItems(inventoryKey, planned)
         if not committed then return false, commitErr end
-        TriggerEvent('qbinventory:server:crafted', src, recipe.id, copy(recipe.output))
-        return true, copy(recipe.output)
+        local result = #recipe.outputs == 1 and copy(recipe.output) or copy(recipe.outputs)
+        TriggerEvent('qbinventory:server:crafted', src, recipe.id, result)
+        return true, result
     end)
 end
 
@@ -452,6 +494,7 @@ end)
 exports('RegisterCraftRecipe', C.register)
 exports('RemoveCraftRecipe', C.remove)
 exports('GetCraftRecipe', C.get)
+exports('CanCraftRecipe', C.canCraft)
 exports('CraftItem', C.craft)
 exports('RegisterCraftHook', C.registerHook)
 exports('RemoveCraftHook', C.removeHook)
