@@ -203,7 +203,9 @@ Config.qbinventory = {
     -- Recipes are registered only by server resources. qbinventory has no
     -- craft net event: callers must validate their station/role server-side
     -- and invoke the headless CraftItem export with trusted context.
-    crafting = {},
+    crafting = {
+        maxBatchAmount = 100,
+    },
     weapons = {
         defaultDurability = 100,
         maxAmmo = 10000,

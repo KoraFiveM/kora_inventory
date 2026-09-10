@@ -99,7 +99,19 @@ H.equal(state['player:7'].items[4].name, 'board', 'server recipe defines output'
 H.equal(crafting.craft(7, 'oak_board'), false, 'missing ingredients reject atomically')
 H.equal(state['player:7'].items[4].amount, 1, 'failed craft leaves output unchanged')
 
-state['player:7'].items[1].amount = 3
+state['player:7'].items[1].amount = 6
+state['player:7'].items[4] = nil
+H.equal(crafting.canCraft(7, 'oak_board', 3), true, 'batch feasibility scales ingredients and outputs')
+H.equal(crafting.canCraft(7, 'oak_board', 4), false, 'batch feasibility rejects an unavailable amount')
+local craftedBatch, batchOutput = crafting.craft(7, 'oak_board', nil, 3)
+H.equal(craftedBatch, true, batchOutput)
+H.equal(batchOutput.amount, 3, 'batch craft reports the full output amount')
+H.equal(state['player:7'].items[1].name, 'board', 'batch craft replaces the consumed ingredient slot with its output')
+H.equal(state['player:7'].items[1].amount, 3, 'batch craft grants the scaled output amount atomically')
+H.equal(crafting.craft(7, 'oak_board', nil, 101), false, 'batch amount is server bounded')
+H.equal(crafting.craft(7, 'oak_board', nil, 'many'), false, 'malformed batch amounts are rejected')
+
+state['player:7'].items[1] = { slot = 1, name = 'wood', amount = 3, weight = 10, info = { grade = 'oak' } }
 state['player:7'].items[4] = nil
 H.equal(crafting.register('too_many_outputs', {
     ingredients = { wood = 2 },

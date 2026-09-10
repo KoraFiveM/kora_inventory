@@ -152,7 +152,7 @@ exports.qbinventory:RegisterCraftRecipe('repair_board', {
 })
 
 -- later, after your resource has resolved station/job/proximity server-side
-exports.qbinventory:CraftItem(source, 'repair_board', trustedContext)
+exports.qbinventory:CraftItem(source, 'repair_board', trustedContext, amount)
 ```
 `server/crafting.lua` registers no NUI callback or network event on its own —
 a gameplay resource supplies the UI and the trusted context.
@@ -229,13 +229,16 @@ for an authorised police/admin/consent flow.
 exports.qbinventory:RegisterCraftRecipe(id, recipe)
 exports.qbinventory:RemoveCraftRecipe(id)
 exports.qbinventory:GetCraftRecipe(id)
-exports.qbinventory:CraftItem(src, recipeId, trustedContext)
+exports.qbinventory:CanCraftRecipe(src, recipeId, amount)
+exports.qbinventory:CraftItem(src, recipeId, trustedContext, amount)
 exports.qbinventory:RegisterCraftHook(callback)
 exports.qbinventory:RemoveCraftHook(id)
 ```
 Ships no station discovery, progress timers, or UI — a gameplay resource
 resolves its own server-side station/job/proximity checks before calling
-`CraftItem`.
+`CraftItem`. The optional amount defaults to one and is bounded by
+`Config.qbinventory.crafting.maxBatchAmount`; a batch remains one atomic
+ingredient/output transaction.
 
 ### Weapons (server-only)
 ```lua

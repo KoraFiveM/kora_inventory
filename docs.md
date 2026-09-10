@@ -39,7 +39,7 @@ different fixtures sharing one inventory need different interaction radii.
 `server/crafting.lua` is a headless, server-only foundation. It deliberately
 registers no network event or NUI callback. A gameplay resource must complete
 its own server-resolved station, job, proximity, routing-bucket and progression
-checks, then call `CraftItem(source, recipeId, trustedContext)`. Do not forward
+checks, then call `CraftItem(source, recipeId, trustedContext, amount)`. Do not forward
 a client recipe, output, item metadata, count or `trustedContext` to this API.
 
 Register a static recipe from its owning server resource:
@@ -59,9 +59,15 @@ exports.qbinventory:RegisterCraftRecipe('repair_board', {
 ```
 
 The legacy singular `output = { ... }` form remains supported. Use
-`CanCraftRecipe(source, recipeId)` for a read-only feasibility check; it plans
+`CanCraftRecipe(source, recipeId, amount?)` for a read-only feasibility check;
+it plans
 ingredient removal, all outputs, slots, and weight without running access
 callbacks/hooks or changing the inventory.
+
+`CraftItem(source, recipeId, trustedContext, amount?)` accepts a positive batch
+amount up to `Config.qbinventory.crafting.maxBatchAmount` (100 by default).
+Every ingredient and output is scaled, planned, and committed in the same
+locked transaction; the default amount remains one.
 
 Crafting locks the qbcore-owned player inventory, makes a detached plan,
 validates all recipe ingredients/weight/slots, then commits through

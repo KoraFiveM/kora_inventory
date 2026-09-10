@@ -15,6 +15,7 @@ local cfg = (Config.qbinventory and Config.qbinventory.crafting) or {}
 local weaponCfg = (Config.qbinventory and Config.qbinventory.weapons) or {}
 local ballisticsCfg = weaponCfg.ballistics or {}
 local recipes, recipeOwners, hooks, nextHookId = {}, {}, {}, 1
+local maxBatchAmount = math.max(1, math.floor(tonumber(cfg.maxBatchAmount) or 100))
 
 local function copy(value) return internal.copy(value) end
 local function integer(value, fallback)
@@ -320,17 +321,35 @@ local function insertOutput(items, slots, output)
     return false, 'no free slot for recipe output'
 end
 
-local function planCraft(src, recipe)
+local function craftAmount(value)
+    if value == nil then return 1 end
+    local number = tonumber(value)
+    if not number or number ~= number or number == math.huge or number == -math.huge then
+        return nil, 'invalid crafting amount'
+    end
+    local amount = math.floor(number)
+    if number ~= amount then return nil, 'invalid crafting amount' end
+    if amount < 1 or amount > maxBatchAmount then return nil, 'invalid crafting amount' end
+    return amount
+end
+
+local function scaledEntry(entry, amount)
+    local scaled = copy(entry)
+    scaled.amount = entry.amount * amount
+    return scaled
+end
+
+local function planCraft(src, recipe, amount)
     local primary = internal.playerKey(src)
     local key, inventory = internal.resolveInventory(primary)
     if key ~= primary or not inventory then return nil, 'player inventory not found' end
     local planned = copy(inventory.items)
     for _, ingredient in ipairs(recipe.ingredients) do
-        local removed, removeErr = consume(planned, ingredient)
+        local removed, removeErr = consume(planned, scaledEntry(ingredient, amount))
         if not removed then return nil, removeErr end
     end
     for _, output in ipairs(recipe.outputs) do
-        local inserted, insertErr = insertOutput(planned, inventory.slots, output)
+        local inserted, insertErr = insertOutput(planned, inventory.slots, scaledEntry(output, amount))
         if not inserted then return nil, insertErr end
     end
     if internal.totalWeight(planned) > inventory.maxWeight then return nil, 'over weight' end
@@ -339,40 +358,49 @@ end
 
 ---Report whether the current inventory can complete a registered transaction.
 ---Access callbacks and hooks are deliberately not run by this read-only query.
-function C.canCraft(src, recipeId)
+function C.canCraft(src, recipeId, amount)
     src = tonumber(src)
     local recipe = recipes[recipeId]
     if not src or not recipe then return false, 'unknown recipe' end
+    local parsedAmount, amountErr = craftAmount(amount)
+    if not parsedAmount then return false, amountErr end
     local primary = internal.playerKey(src)
     return internal.lock({ primary }, function()
-        local planned, err = planCraft(src, recipe)
+        local planned, err = planCraft(src, recipe, parsedAmount)
         return planned ~= nil, err
     end)
 end
 
 ---Craft from static data only. `context` is opaque, trusted server context for
 ---the recipe access callback; never wire a raw client/NUI payload here.
-function C.craft(src, recipeId, context)
+function C.craft(src, recipeId, context, amount)
     src = tonumber(src)
     local recipe = recipes[recipeId]
     if not src or not recipe then return false, 'unknown recipe' end
+    local parsedAmount, amountErr = craftAmount(amount)
+    if not parsedAmount then return false, amountErr end
     if recipe.access then
         local allowed, err = invoke(recipe.access, src, copy(recipe), context)
         if not allowed then return false, err end
     end
     local primary = internal.playerKey(src)
     return internal.lock({ primary }, function()
-        local planned, planErr, inventoryKey = planCraft(src, recipe)
+        local planned, planErr, inventoryKey = planCraft(src, recipe, parsedAmount)
         if not planned then return false, planErr end
         for _, hook in pairs(hooks) do
             local allowed, hookErr = invoke(hook.callback, {
                 source = src, recipe = copy(recipe), inventory = inventoryKey, context = context,
+                amount = parsedAmount,
             })
             if not allowed then return false, hookErr end
         end
         local committed, commitErr = internal.setInventoryItems(inventoryKey, planned)
         if not committed then return false, commitErr end
-        local result = #recipe.outputs == 1 and copy(recipe.output) or copy(recipe.outputs)
+        local scaledOutputs = {}
+        for _, output in ipairs(recipe.outputs) do
+            scaledOutputs[#scaledOutputs + 1] = scaledEntry(output, parsedAmount)
+        end
+        local result = #scaledOutputs == 1 and scaledOutputs[1] or scaledOutputs
         TriggerEvent('qbinventory:server:crafted', src, recipe.id, result)
         return true, result
     end)
