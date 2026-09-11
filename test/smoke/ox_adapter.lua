@@ -17,7 +17,7 @@ local H = dofile('test/harness.lua')
 local file = assert(io.open('server/compat/ox.lua', 'r'))
 local source = file:read('*a')
 file:close()
-H.ok(source:find('I.compat.ox = Ox', 1, true), 'adapter is namespaced and does not replace authority')
+H.ok(source:find('inventory.compat.ox = ox', 1, true), 'adapter is namespaced and does not replace authority')
 H.ok(not source:find("exports('", 1, true), 'adapter registers no Cfx exports; providers.lua owns the identity')
 
 -- --- the world the adapter runs in -----------------------------------------

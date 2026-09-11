@@ -21,16 +21,22 @@ local function useHotbarSlot(slot)
     -- uses for the `inventory` command. This also means the panel is always
     -- closed here in practice, since SetNuiFocus(true, true) (client/ui.lua)
     -- captures keyboard input the moment a qbinventory session opens.
-    if IsPauseMenuActive() or IsNuiFocused() then return end
+    if IsPauseMenuActive() or IsNuiFocused() then
+        return
+    end
 
     local data = exports.qbcore:getPlayerData()
     local item = data and data.items and data.items[slot]
-    if type(item) ~= 'table' then return end
+    if type(item) ~= 'table' then
+        return
+    end
 
     -- Same progress-bar gate as the NUI 'use' path in client.lua, shared
     -- through QbInventory so a cancelled bar never reaches the server here
     -- either.
-    if not QbInventory.useGate(item) then return end
+    if not QbInventory.useGate(item) then
+        return
+    end
 
     -- Reuse the existing legacy hotbar transport instead of adding a second
     -- server-side use path: server.lua's `QBCore:Server:UseItem` handler
@@ -47,6 +53,8 @@ for slot = 1, HOTBAR_SLOTS do
         description = ('Use hotbar item %d'):format(slot),
         defaultMapper = 'keyboard',
         defaultKey = tostring(slot),
-        onPressed = function() useHotbarSlot(slot) end,
+        onPressed = function()
+            useHotbarSlot(slot)
+        end,
     })
 end

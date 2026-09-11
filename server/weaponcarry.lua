@@ -18,13 +18,13 @@
 -- item (see server/useables.lua's note on why v1 keeps it in the slot).
 
 QbInventory = QbInventory or {}
-local I = QbInventory
-local internal = assert(I.internal, 'qbinventory authority must load before weapon carry')
+local inventory = QbInventory
+local internal = assert(inventory.internal, 'qbinventory authority must load before weapon carry')
 
-local C = Config.qbinventory
-local cfg = C.weaponCarry or {}
-local weaponCfg = C.weapons or {}
-local durabilityCfg = weaponCfg.durability or {}
+local config = Config.qbinventory
+local carryConfig = config.weaponCarry or {}
+local weaponConfig = config.weapons or {}
+local durabilityConfig = weaponConfig.durability or {}
 
 -- Replicated. Cleared with an explicit `false`, never a nil deletion: a nil
 -- write is a key DELETION and does not replicate like a value change, so a
@@ -47,7 +47,9 @@ local training = {}
 local lastShotAt = {}
 
 local function stopTraining(src)
-    if not training[src] then return false end
+    if not training[src] then
+        return false
+    end
     training[src] = nil
     TriggerClientEvent('qbinventory:client:stopTrainingWeapon', src)
     return true
@@ -58,13 +60,19 @@ local trainingOwnership = QB.resources.serverRegistry(function(src)
 end)
 
 local function integer(value, fallback)
-    local n = math.floor(tonumber(value) or fallback or 0)
-    return n >= 0 and n or 0
+    local number = math.floor(tonumber(value) or fallback or 0)
+    return number >= 0 and number or 0
 end
 
-local function enabled() return cfg.enabled == true end
-local function hotbarOnly() return enabled() and cfg.visibility == 'hotbar' end
-local function hotbarSlots() return integer(C.hotbarSlots, 5) end
+local function enabled()
+    return carryConfig.enabled == true
+end
+local function hotbarOnly()
+    return enabled() and carryConfig.visibility == 'hotbar'
+end
+local function hotbarSlots()
+    return integer(config.hotbarSlots, 5)
+end
 
 ---The carry rules for one item name, or nil when it is not carried at all.
 ---A registry weapon is classified automatically by its `weapontype`; anything
@@ -72,13 +80,18 @@ local function hotbarSlots() return integer(C.hotbarSlots, 5) end
 ---@param name string
 ---@return table|nil
 local function carryRule(name)
-    local override = (cfg.weapons or {})[name]
-    if override and override.tier == false then return nil end
+    local override = (carryConfig.weapons or {})[name]
+    if override and override.tier == false then
+        return nil
+    end
     local def = internal.itemDef(name)
-    local tier = override and override.tier
-        or (def and (cfg.tiers or {})[def.weapontype])
-    if not tier then return nil end
-    if not (cfg.attachments or {})[tier] then return nil end
+    local tier = override and override.tier or (def and (carryConfig.tiers or {})[def.weapontype])
+    if not tier then
+        return nil
+    end
+    if not (carryConfig.attachments or {})[tier] then
+        return nil
+    end
     return {
         tier = tier,
         model = override and override.model or nil,
@@ -92,9 +105,11 @@ end
 ---Only names explicitly mapped in `weaponCarry.components` survive, so an
 ---item's stored metadata cannot ask for an arbitrary native component.
 local function renderableComponents(info)
-    local mapping = cfg.components or {}
+    local mapping = carryConfig.components or {}
     local list = type(info) == 'table' and info.components or nil
-    if type(list) ~= 'table' then return nil end
+    if type(list) ~= 'table' then
+        return nil
+    end
     local out
     for _, component in ipairs(list) do
         local mapped = type(component) == 'string' and mapping[component] or nil
@@ -112,15 +127,19 @@ end
 ---@param src integer
 ---@return table[]
 local function buildCarryList(src)
-    if not enabled() then return {} end
+    if not enabled() then
+        return {}
+    end
     local items = exports.qbcore:getPlayerData(src, { 'items' }) or {}
     local limit = hotbarOnly() and hotbarSlots() or math.huge
     local holding = equipped[src]
 
     local slots = {}
     for slot in pairs(items) do
-        local n = tonumber(slot)
-        if n and n <= limit then slots[#slots + 1] = n end
+        local slotNumber = tonumber(slot)
+        if slotNumber and slotNumber <= limit then
+            slots[#slots + 1] = slotNumber
+        end
     end
     table.sort(slots)
 
@@ -151,7 +170,9 @@ end
 ---@param src integer
 local function publish(src)
     local player = Player(src)
-    if not player or not player.state then return end
+    if not player or not player.state then
+        return
+    end
     local carried = enabled() and buildCarryList(src) or {}
     -- `false`, never nil -- see STATE_KEY above.
     player.state:set(STATE_KEY, #carried > 0 and carried or false, true)
@@ -163,9 +184,9 @@ end
 ---@param slot integer
 ---@return integer milliseconds
 local function drawDuration(slot)
-    local duration = integer(cfg.drawTime, 0)
+    local duration = integer(carryConfig.drawTime, 0)
     if hotbarOnly() and slot > hotbarSlots() then
-        duration = duration + integer(cfg.concealedDrawTime, 0)
+        duration = duration + integer(carryConfig.concealedDrawTime, 0)
     end
     return duration
 end
@@ -181,7 +202,7 @@ end
 ---@return string|nil
 local function animTier(name)
     local def = internal.itemDef(name)
-    return def and (cfg.tiers or {})[def.weapontype] or nil
+    return def and (carryConfig.tiers or {})[def.weapontype] or nil
 end
 
 ---The shared combat settings for a weapon. Shared definitions are trusted
@@ -191,7 +212,9 @@ end
 local function damageSettings(name)
     local definition = internal.itemDef(name)
     local modifier = tonumber(definition and definition.damageModifier)
-    if not modifier or modifier < 0 then modifier = 1.0 end
+    if not modifier or modifier < 0 then
+        modifier = 1.0
+    end
     return {
         modifier = modifier,
         disableCriticalHits = definition and definition.disableCriticalHits == true,
@@ -202,10 +225,14 @@ end
 ---entirely server config: a client cannot select a multiplier, opt out or
 ---report a positive/negative wear amount.
 local function shotWear(name, rounds)
-    if durabilityCfg.enabled ~= true or (durabilityCfg.excluded or {})[name] == true then return 0 end
-    local perShot = tonumber(durabilityCfg.perShot) or 0
-    local multiplier = tonumber((durabilityCfg.multipliers or {})[name])
-    if multiplier == nil then multiplier = tonumber(durabilityCfg.defaultMultiplier) or 1 end
+    if durabilityConfig.enabled ~= true or (durabilityConfig.excluded or {})[name] == true then
+        return 0
+    end
+    local perShot = tonumber(durabilityConfig.perShot) or 0
+    local multiplier = tonumber((durabilityConfig.multipliers or {})[name])
+    if multiplier == nil then
+        multiplier = tonumber(durabilityConfig.defaultMultiplier) or 1
+    end
     return math.max(0, perShot * math.max(0, multiplier) * math.max(0, rounds))
 end
 
@@ -217,12 +244,14 @@ end
 ---@return boolean, table|string
 local function toggle(src, item)
     local slot = math.floor(tonumber(item.slot) or 0)
-    if slot <= 0 then return false, 'invalid weapon slot' end
+    if slot <= 0 then
+        return false, 'invalid weapon slot'
+    end
 
     local holding = equipped[src]
     local holstering = holding ~= nil and holding.slot == slot and holding.name == item.name
     local action = holstering and 'holster' or 'draw'
-    local duration = holstering and integer(cfg.holsterTime, 0) or drawDuration(slot)
+    local duration = holstering and integer(carryConfig.holsterTime, 0) or drawDuration(slot)
     local info = item.info or item.metadata or {}
 
     pending[src] = {
@@ -266,14 +295,27 @@ end
 ---finished. The slot is re-resolved against qbcore-owned PlayerData: a client
 ---cannot confirm a weapon it does not have, in a slot it was not asked about.
 RegisterNetEvent('qbinventory:server:weaponToggled', function(slot)
+    if GetInvokingResource() then
+        return
+    end
     local src = source
     local request = pending[src]
-    if not request then return end
-    if GetGameTimer() > request.expires then pending[src] = nil; return end
-    if math.floor(tonumber(slot) or 0) ~= request.slot then return end
+    if not request then
+        return
+    end
+    if GetGameTimer() > request.expires then
+        pending[src] = nil
+        return
+    end
+    if math.floor(tonumber(slot) or 0) ~= request.slot then
+        return
+    end
 
-    local owned = getItemBySlot(src, request.slot)
-    if not owned or owned.name ~= request.name then pending[src] = nil; return end
+    local owned = inventory.api.getItemBySlot(src, request.slot)
+    if not owned or owned.name ~= request.name then
+        pending[src] = nil
+        return
+    end
 
     pending[src] = nil
     equipped[src] = request.action == 'draw' and { slot = request.slot, name = request.name } or nil
@@ -285,8 +327,13 @@ end)
 ---because there is nothing here worth trusting a client with: it can only
 ---ever put a weapon BACK on its own player's body, never take one off.
 RegisterNetEvent('qbinventory:server:weaponUnequipped', function()
+    if GetInvokingResource() then
+        return
+    end
     local src = source
-    if not equipped[src] then return end
+    if not equipped[src] then
+        return
+    end
     equipped[src] = nil
     pending[src] = nil
     publish(src)
@@ -298,34 +345,49 @@ end)
 -- server-side path that raises it. That makes this safe for both native
 -- qbinventory draws and the qb-weapons compatibility adapter.
 RegisterNetEvent('qbinventory:server:weaponAmmoConsumed', function(slot, amount)
+    if GetInvokingResource() then
+        return
+    end
     local src = source
     local holding = equipped[src]
     slot = math.floor(tonumber(slot) or 0)
     amount = math.floor(tonumber(amount) or -1)
-    if not holding or slot ~= holding.slot or amount < 0 then return end
-    local state = I.weapons and I.weapons.getState and I.weapons.getState(src, slot)
+    if not holding or slot ~= holding.slot or amount < 0 then
+        return
+    end
+    local state = inventory.weapons and inventory.weapons.getState and inventory.weapons.getState(src, slot)
     local current = math.floor(tonumber(state and state.ammo) or 0)
     local rounds = current - amount
-    if rounds <= 0 or not I.weapons then return end
+    if rounds <= 0 or not inventory.weapons then
+        return
+    end
 
     -- Ballistics-capable weapons consume their individually tracked rounds.
     -- A legacy count-only weapon stays supported through SetAmmo until its
     -- next state write migrates it to per-round metadata.
     local consumed = 0
     local bullets = type(state.loadedBullets) == 'table' and #state.loadedBullets or 0
-    if weaponCfg.ballistics and weaponCfg.ballistics.enabled == true
-        and bullets >= rounds and type(I.weapons.fireRound) == 'function' then
+    if
+        weaponConfig.ballistics
+        and weaponConfig.ballistics.enabled == true
+        and bullets >= rounds
+        and type(inventory.weapons.fireRound) == 'function'
+    then
         for _ = 1, rounds do
-            local fired = I.weapons.fireRound(src, slot)
-            if not fired then break end
+            local fired = inventory.weapons.fireRound(src, slot)
+            if not fired then
+                break
+            end
             consumed = consumed + 1
         end
-    elseif I.weapons.setAmmo and I.weapons.setAmmo(src, slot, amount) then
+    elseif inventory.weapons.setAmmo and inventory.weapons.setAmmo(src, slot, amount) then
         consumed = rounds
     end
 
     local wear = shotWear(holding.name, consumed)
-    if wear > 0 and I.weapons.consumeDurability then I.weapons.consumeDurability(src, slot, wear) end
+    if wear > 0 and inventory.weapons.consumeDurability then
+        inventory.weapons.consumeDurability(src, slot, wear)
+    end
 end)
 
 -- The client sends no weapon, ammo, casing, coordinate, serial, or evidence
@@ -334,12 +396,17 @@ end)
 -- data. FiveM cannot expose native weapon-fire state to the server, therefore
 -- the cadence limit is an intentional anti-spam floor.
 RegisterNetEvent('qbinventory:server:weaponFired', function()
+    if GetInvokingResource() then
+        return
+    end
     local src = source
     local rangeWeapon = training[src]
     if rangeWeapon then
         local current = GetGameTimer()
-        local minGap = math.max(0, math.floor(tonumber(((C.weapons or {}).ballistics or {}).shotCooldown) or 65))
-        if lastShotAt[src] and current - lastShotAt[src] < minGap then return end
+        local minGap = math.max(0, math.floor(tonumber(((config.weapons or {}).ballistics or {}).shotCooldown) or 65))
+        if lastShotAt[src] and current - lastShotAt[src] < minGap then
+            return
+        end
         lastShotAt[src] = current
         rangeWeapon.remaining = rangeWeapon.remaining - 1
         rangeWeapon.fired = rangeWeapon.fired + 1
@@ -357,15 +424,23 @@ RegisterNetEvent('qbinventory:server:weaponFired', function()
     end
 
     local holding = equipped[src]
-    if not holding or not I.weapons or not I.weapons.fireRound then return end
+    if not holding or not inventory.weapons or not inventory.weapons.fireRound then
+        return
+    end
     local now = GetGameTimer()
-    local minGap = math.max(0, math.floor(tonumber(((C.weapons or {}).ballistics or {}).shotCooldown) or 65))
-    if lastShotAt[src] and now - lastShotAt[src] < minGap then return end
-    local fired, round = I.weapons.fireRound(src, holding.slot)
-    if not fired then return end
+    local minGap = math.max(0, math.floor(tonumber(((config.weapons or {}).ballistics or {}).shotCooldown) or 65))
+    if lastShotAt[src] and now - lastShotAt[src] < minGap then
+        return
+    end
+    local fired, round = inventory.weapons.fireRound(src, holding.slot)
+    if not fired then
+        return
+    end
     lastShotAt[src] = now
     local wear = shotWear(holding.name, 1)
-    if wear > 0 and I.weapons.consumeDurability then I.weapons.consumeDurability(src, holding.slot, wear) end
+    if wear > 0 and inventory.weapons.consumeDurability then
+        inventory.weapons.consumeDurability(src, holding.slot, wear)
+    end
     TriggerEvent('qbinventory:server:weaponRoundFired', src, round)
 end)
 
@@ -374,12 +449,16 @@ end)
 -- one handler covers picking a rifle up, dropping it, and moving it in or out
 -- of the hotbar range.
 AddEventHandler('qbcore:server:inventoryChanged', function(src)
-    if not enabled() then return end
+    if not enabled() then
+        return
+    end
     local holding = equipped[src]
     if holding then
         -- The held weapon may have just been moved, dropped or given away.
-        local owned = getItemBySlot(src, holding.slot)
-        if not owned or owned.name ~= holding.name then equipped[src] = nil end
+        local owned = inventory.api.getItemBySlot(src, holding.slot)
+        if not owned or owned.name ~= holding.name then
+            equipped[src] = nil
+        end
     end
     publish(src)
 end)
@@ -401,15 +480,19 @@ AddEventHandler('qbcore:server:playerLoaded', function(src)
 end)
 
 AddEventHandler('onResourceStop', function(name)
-    if name ~= GetCurrentResourceName() then return end
+    if name ~= GetCurrentResourceName() then
+        return
+    end
     -- Leave no props attached to anyone when this resource goes away.
     for src in pairs(equipped) do
         local player = Player(src)
-        if player and player.state then player.state:set(STATE_KEY, false, true) end
+        if player and player.state then
+            player.state:set(STATE_KEY, false, true)
+        end
     end
 end)
 
-I.weaponCarry = {
+inventory.weaponCarry = {
     toggle = toggle,
     refresh = publish,
     buildCarryList = buildCarryList,
@@ -420,23 +503,35 @@ I.weaponCarry = {
     stateKey = STATE_KEY,
     ---@param src integer
     ---@return table|nil  -- { slot, name } or nil when empty-handed
-    equippedWeapon = function(src) return equipped[src] and internal.copy(equipped[src]) or nil end,
+    equippedWeapon = function(src)
+        return equipped[src] and internal.copy(equipped[src]) or nil
+    end,
 }
 
 -- Read-only. There is deliberately no exported setter: a resource that wants
 -- a different carried list changes the player's items, not the render.
-exports('GetCarriedWeapons', function(src) return buildCarryList(tonumber(src) or 0) end)
-exports('GetEquippedWeapon', I.weaponCarry.equippedWeapon)
+exports('GetCarriedWeapons', function(src)
+    return buildCarryList(tonumber(src) or 0)
+end)
+exports('GetEquippedWeapon', inventory.weaponCarry.equippedWeapon)
 
 exports('StartTrainingWeapon', function(src, weaponName, rounds)
     src = tonumber(src)
     rounds = math.floor(tonumber(rounds) or 0)
     local owner = GetInvokingResource()
     local definition = type(weaponName) == 'string' and internal.itemDef(weaponName) or nil
-    if not src or not owner or not definition or not definition.weapontype then return false, 'invalid training weapon' end
-    if rounds < 1 or rounds > 100 then return false, 'invalid training round count' end
-    if equipped[src] or pending[src] then return false, 'holster the current weapon first' end
-    if training[src] then return false, 'a training weapon is already active' end
+    if not src or not owner or not definition or not definition.weapontype then
+        return false, 'invalid training weapon'
+    end
+    if rounds < 1 or rounds > 100 then
+        return false, 'invalid training round count'
+    end
+    if equipped[src] or pending[src] then
+        return false, 'holster the current weapon first'
+    end
+    if training[src] then
+        return false, 'a training weapon is already active'
+    end
 
     training[src] = { owner = owner, name = weaponName, remaining = rounds, fired = 0 }
     trainingOwnership.track(owner, src)
@@ -447,7 +542,9 @@ end)
 exports('StopTrainingWeapon', function(src)
     src = tonumber(src)
     local state = src and training[src] or nil
-    if not state or state.owner ~= GetInvokingResource() then return false end
+    if not state or state.owner ~= GetInvokingResource() then
+        return false
+    end
     trainingOwnership.untrack(src)
     return stopTraining(src)
 end)

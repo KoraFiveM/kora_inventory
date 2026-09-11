@@ -12,7 +12,7 @@
 -- Before this, `qbinventory:client:dropCreated` had no listener at all: a
 -- dropped item became an inventory at a coordinate with nothing to walk up to.
 
-local cfg = (Config.qbinventory and Config.qbinventory.drops) or {}
+local dropConfig = (Config.qbinventory and Config.qbinventory.drops) or {}
 
 -- id -> { entity = number|nil, target = integer }
 local drops = {}
@@ -23,31 +23,39 @@ local drops = {}
 ---@param coords table
 ---@return table
 local function onGround(coords)
-    if cfg.placeOnGround == false then return coords end
+    if dropConfig.placeOnGround == false then
+        return coords
+    end
 
     local found, z = GetGroundZFor_3dCoord(coords.x + 0.0, coords.y + 0.0, coords.z + 1.0, false)
-    if not found then return coords end
+    if not found then
+        return coords
+    end
 
     return { x = coords.x, y = coords.y, z = z }
 end
 
 local function removeDrop(id)
     local record = drops[tostring(id)]
-    if not record then return end
+    if not record then
+        return
+    end
 
     drops[tostring(id)] = nil
     exports.qbtarget:removeZone(record.target)
-    if record.entity then QB.entities.remove(record.entity) end
+    if record.entity then
+        QB.entities.remove(record.entity)
+    end
 end
 
 local function addDropTarget(id, coords)
     return exports.qbtarget:addSphereZone({
         coords = coords,
-        radius = cfg.interactionDistance or 1.5,
+        radius = dropConfig.interactionDistance or 1.5,
         options = {
             {
-                label = cfg.label or 'Pick up',
-                icon = cfg.icon or 'package',
+                label = dropConfig.label or 'Pick up',
+                icon = dropConfig.icon or 'package',
                 onSelect = function()
                     exports.qbinventory:openInventory('drop', id)
                 end,
@@ -57,13 +65,19 @@ local function addDropTarget(id, coords)
 end
 
 local function addDrop(id, coords)
-    if cfg.enabled == false then return end
-    if type(coords) ~= 'table' and type(coords) ~= 'vector3' then return end
+    if dropConfig.enabled == false then
+        return
+    end
+    if type(coords) ~= 'table' and type(coords) ~= 'vector3' then
+        return
+    end
 
     local stringId = tostring(id)
     -- A re-broadcast, or a hydrate racing a live create, must not stack a second
     -- prop and zone on the same drop.
-    if drops[stringId] then return end
+    if drops[stringId] then
+        return
+    end
 
     local placed = onGround(coords)
 
@@ -73,12 +87,14 @@ local function addDrop(id, coords)
     drops[stringId] = { coords = placed }
     drops[stringId].target = addDropTarget(stringId, placed)
 
-    local entity = QB.entities.create(cfg.model or 'prop_med_bag_01b', placed, { freeze = true })
+    local entity = QB.entities.create(dropConfig.model or 'prop_med_bag_01b', placed, { freeze = true })
     local record = drops[stringId]
 
     if not record then
         -- Removed while the model was streaming.
-        if entity then QB.entities.remove(entity) end
+        if entity then
+            QB.entities.remove(entity)
+        end
         return
     end
 
@@ -86,15 +102,23 @@ local function addDrop(id, coords)
 end
 
 RegisterNetEvent('qbinventory:client:dropCreated', function(id, coords)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
     addDrop(id, coords)
 end)
 
 RegisterNetEvent('qbinventory:client:dropRemoved', function(id)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
     removeDrop(id)
 end)
 
 AddEventHandler('onClientResourceStart', function(resource)
-    if resource ~= 'qbtarget' then return end
+    if resource ~= 'qbtarget' then
+        return
+    end
     for id, record in pairs(drops) do
         record.target = addDropTarget(id, record.coords)
     end
@@ -105,26 +129,36 @@ end)
 -- callback returns ids and coordinates only -- both already broadcast to every
 -- client at drop time -- never contents.
 local function hydrate()
-    if cfg.enabled == false then return end
+    if dropConfig.enabled == false then
+        return
+    end
 
     local list = QB.callback.trigger('qbinventory:server:drops')
-    if type(list) ~= 'table' then return end
+    if type(list) ~= 'table' then
+        return
+    end
 
     for _, entry in ipairs(list) do
-        if entry and entry.id ~= nil then addDrop(entry.id, entry.coords) end
+        if entry and entry.id ~= nil then
+            addDrop(entry.id, entry.coords)
+        end
     end
 end
 
 CreateThread(function()
     -- The callback handshake is not up at the first frame of a resource start,
     -- and on a fresh connect the player is not in the world yet either.
-    while not NetworkIsSessionStarted() do Wait(250) end
+    while not NetworkIsSessionStarted() do
+        Wait(250)
+    end
     Wait(1000)
     hydrate()
 end)
 
 AddEventHandler('onClientResourceStop', function(resource)
-    if resource ~= GetCurrentResourceName() then return end
+    if resource ~= GetCurrentResourceName() then
+        return
+    end
 
     -- QB.entities and QB.interact both clean up their own resource's handles on
     -- stop, so this only has to drop the bookkeeping.

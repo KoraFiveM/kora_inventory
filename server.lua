@@ -24,6 +24,10 @@ local nextInspectionHookId = 1
 -- it so the closure captures this local rather than resolving a nonexistent
 -- global when a resource calls SetStashItems during startup.
 local setInventoryItems
+local canCarry
+local hasUseable
+local useItem
+local dropCreate
 -- `owner = true` registrations are templates, not one globally shared stash.
 -- The actual secondary record is created lazily per citizen when they open it.
 
@@ -1623,11 +1627,19 @@ end
 
 -- Player inventory API ------------------------------------------------------
 
-function getWeight(src)
+---@param src integer
+---@return number currentWeight
+---@return number maxWeight
+local function getWeight(src)
     local inv = getInventory(playerKey(src))
     return inv and inventory.totalWeight(inv.items) or 0, config.playerMaxWeight
 end
-function canCarry(src, name, amount)
+---@param src integer
+---@param name string
+---@param amount number|nil
+---@return boolean canCarryItem
+---@return string|nil reason
+canCarry = function(src, name, amount)
     local def = itemDef(name)
     amount = inventory.amount(amount, 1)
     if not def or not amount then
@@ -1658,7 +1670,15 @@ function canCarry(src, name, amount)
     end
     return true
 end
-function addItem(src, name, amount, slot, info, reason)
+---@param src integer
+---@param name string
+---@param amount number|nil
+---@param slot integer|nil
+---@param info table|nil
+---@param reason string|nil
+---@return boolean added
+---@return string|nil reason
+local function addItem(src, name, amount, slot, info, reason)
     amount = inventory.amount(amount, 1)
     if cashItemsActive and isCashItemName(name) then
         -- Compatibility still works, but monetary accounting and events stay
@@ -1680,7 +1700,14 @@ function addItem(src, name, amount, slot, info, reason)
         return done, why
     end)
 end
-function removeItem(src, name, amount, slot, reason)
+---@param src integer
+---@param name string
+---@param amount number|nil
+---@param slot integer|nil
+---@param reason string|nil
+---@return boolean removed
+---@return string|nil reason
+local function removeItem(src, name, amount, slot, reason)
     amount = inventory.amount(amount, 1)
     if not amount then
         return false, 'invalid amount'
@@ -1730,7 +1757,11 @@ end
 local function itemNameKey(name)
     return type(name) == 'string' and name:lower() or nil
 end
-function getItemByName(src, name)
+
+---@param src integer
+---@param name string
+---@return table|nil item
+local function getItemByName(src, name)
     local wanted = itemNameKey(name)
     if not wanted then
         return nil
@@ -1741,7 +1772,10 @@ function getItemByName(src, name)
         end
     end
 end
-function getItemsByName(src, name)
+---@param src integer
+---@param name string
+---@return table[] items
+local function getItemsByName(src, name)
     local wanted, out = itemNameKey(name), {}
     if not wanted then
         return out
@@ -1753,10 +1787,16 @@ function getItemsByName(src, name)
     end
     return out
 end
-function getItemBySlot(src, slot)
+---@param src integer
+---@param slot integer
+---@return table|nil item
+local function getItemBySlot(src, slot)
     return playerItems(src)[slot]
 end
-function getItemCount(src, names)
+---@param src integer
+---@param names string|string[]
+---@return number count
+local function getItemCount(src, names)
     local wanted, total = {}, 0
     if type(names) == 'string' then
         wanted[itemNameKey(names)] = true
@@ -1777,7 +1817,11 @@ function getItemCount(src, names)
     end
     return total
 end
-function hasItem(src, names, amount)
+---@param src integer
+---@param names string|string[]|table<string, number>
+---@param amount number|nil
+---@return boolean hasItems
+local function hasItem(src, names, amount)
     if type(names) ~= 'table' then
         return getItemCount(src, names) >= (tonumber(amount) or 1)
     end
@@ -1796,10 +1840,18 @@ function hasItem(src, names, amount)
     end
     return true
 end
-function getFreeSlot(src)
+---@param src integer
+---@return integer|nil slot
+local function getFreeSlot(src)
     return inventory.firstFreeSlot(playerItems(src), config.playerSlots)
 end
-function moveItem(src, fromSlot, toSlot, amount)
+---@param src integer
+---@param fromSlot integer
+---@param toSlot integer
+---@param amount number|nil
+---@return boolean moved
+---@return string|nil reason
+local function moveItem(src, fromSlot, toSlot, amount)
     local from = getItemBySlot(src, fromSlot)
     if not from then
         return false, 'empty source slot'
@@ -1835,7 +1887,11 @@ function moveItem(src, fromSlot, toSlot, amount)
         return true
     end)
 end
-function clearInventory(src, keep)
+---@param src integer
+---@param keep string|string[]|table<string, boolean>|nil
+---@return boolean cleared
+---@return string|nil reason
+local function clearInventory(src, keep)
     local keeps = {}
     if type(keep) == 'string' then
         keeps[itemNameKey(keep)] = true
@@ -1861,7 +1917,11 @@ function clearInventory(src, keep)
         return true
     end)
 end
-function setItems(src, newItems)
+---@param src integer
+---@param newItems table<integer, table>
+---@return boolean replaced
+---@return string|nil reason
+local function setItems(src, newItems)
     if type(newItems) ~= 'table' then
         return false, 'items must be a table'
     end
@@ -1910,7 +1970,10 @@ local useables, builtInUseables = {}, {}
 local useableOwners = QB.resources.serverRegistry(function(name)
     useables[name] = nil
 end)
-function createUseable(name, handler)
+
+---@param name string
+---@param handler function|table
+local function createUseable(name, handler)
     assert(type(name) == 'string' and inventory.isCallable(handler), 'name and handler are required')
     local owner = GetInvokingResource() or resourceName
     useables[name] = handler
@@ -1919,7 +1982,9 @@ end
 -- Internal, registry-driven handlers (weapons/ammunition) live below explicit
 -- resource registrations so a gameplay resource can intentionally override
 -- them. Passing nil removes only the built-in handler.
-function setBuiltInUseable(name, handler)
+---@param name string
+---@param handler function|table|nil
+local function setBuiltInUseable(name, handler)
     assert(
         type(name) == 'string' and (handler == nil or inventory.isCallable(handler)),
         'name and callable handler are required'
@@ -1933,32 +1998,33 @@ end
 -- `useable` flag -- a static true (e.g. phone/id_card/lockpick) still shows
 -- the Use button and falls back to the legacy QBCore:Server:UseItem event
 -- for whichever resource handles it (useItem's own fallback, below), same as
--- real qb-core. A bare global (like createUseable/useItem) so buildItem --
--- defined earlier in this same file, but only ever CALLED later, once every
--- top-level statement here has run -- can resolve it too.
-function hasUseable(name)
+-- real qb-core. These are forward-declared locals because buildItem is defined
+-- earlier but is only called after this file has initialized the handlers.
+---@param name string
+---@return boolean hasHandler
+hasUseable = function(name)
     if useables[name] or builtInUseables[name] then
         return true
     end
     local containers = QbInventory.containers
     return containers and containers.isPortableItem and containers.isPortableItem({ name = name }) or false
 end
-function useItem(src, slotOrName)
+---@param src integer
+---@param slotOrName integer|string
+---@return boolean used
+---@return any result
+useItem = function(src, slotOrName)
     return lock({ playerKey(src) }, function()
         local item = type(slotOrName) == 'number' and getItemBySlot(src, slotOrName) or getItemByName(src, slotOrName)
         if not item then
             return false, 'item not found'
         end
-        local allowed, err = runHooks(
-            'usingItem',
-            src,
-            {
-                itemName = item.name,
-                item = inventory.copy(item),
-                inventoryId = playerKey(src),
-                inventoryType = 'player',
-            }
-        )
+        local allowed, err = runHooks('usingItem', src, {
+            itemName = item.name,
+            item = inventory.copy(item),
+            inventoryId = playerKey(src),
+            inventoryType = 'player',
+        })
         if not allowed then
             return false, err
         end
@@ -2009,11 +2075,17 @@ end
 
 -- Secondary inventories ----------------------------------------------------
 
-function stashGet(identifier)
+---@param identifier string|number
+---@return table items
+local function stashGet(identifier)
     local inv = secondary('stash', identifier)
     return inventory.copy(inv.items)
 end
-function stashSet(identifier, items)
+---@param identifier string|number
+---@param items table<integer, table>|nil
+---@return boolean updated
+---@return string|nil reason
+local function stashSet(identifier, items)
     local inv = secondary('stash', identifier)
     return lock({ inv.key }, function()
         return setInventoryItems(inv.key, inventory.copy(items or {}))
@@ -2030,14 +2102,21 @@ end
 -- refuse an unknown id rather than lazily creating one -- a shop is a
 -- deliberate registration with prices and an access policy, never something a
 -- restock call should conjure into existence.
-function shopGet(identifier)
+---@param identifier string|number
+---@return table|nil items
+---@return string|nil reason
+local function shopGet(identifier)
     local inv = getInventory(key('shop', identifier))
     if not inv then
         return nil, 'shop not found'
     end
     return inventory.copy(inv.stock or inv.items or {})
 end
-function shopSet(identifier, items)
+---@param identifier string|number
+---@param items table<integer, table>
+---@return boolean updated
+---@return string|nil reason
+local function shopSet(identifier, items)
     local inv = getInventory(key('shop', identifier))
     if not inv then
         return false, 'shop not found'
@@ -2049,7 +2128,12 @@ function shopSet(identifier, items)
         return setInventoryItems(inv.key, inventory.copy(items))
     end)
 end
-function stashOpen(src, identifier, opts)
+---@param src integer
+---@param identifier string|number
+---@param opts table|nil
+---@return boolean opened
+---@return table|string result
+local function stashOpen(src, identifier, opts)
     local template = ownedStashTemplates[tostring(identifier)]
     local inv, err
     if template or (type(opts) == 'table' and opts.owner == true) then
@@ -2062,7 +2146,10 @@ function stashOpen(src, identifier, opts)
     end
     return open(src, inv.key, opts)
 end
-function dropCreate(coords, items)
+---@param coords vector3|table
+---@param items table<integer, table>
+---@return integer id
+dropCreate = function(coords, items)
     local id = nextDropId
     nextDropId = nextDropId + 1
     local inv = secondary('drop', id, {
@@ -2101,7 +2188,13 @@ end
 QB.callback.register('qbinventory:server:drops', function(_src)
     return dropList()
 end)
-function dropTake(src, id, slot, amount)
+---@param src integer
+---@param id integer|string
+---@param slot integer
+---@param amount number|nil
+---@return boolean taken
+---@return any result
+local function dropTake(src, id, slot, amount)
     local inv = getInventory(key('drop', id))
     if not inv then
         return false, 'no such drop'
@@ -2143,7 +2236,16 @@ local function refreshRegistration(inv, opts)
     end
 end
 
-function registerStash(id, label, slots, maxWeight, owner, groups, coords, distance)
+---@param id string|number
+---@param label string|nil
+---@param slots integer|nil
+---@param maxWeight number|nil
+---@param owner integer|string|boolean|nil
+---@param groups table|nil
+---@param coords vector3|table|nil
+---@param distance number|nil
+---@return string inventoryKey
+local function registerStash(id, label, slots, maxWeight, owner, groups, coords, distance)
     local opts = {
         label = label,
         slots = slots,
@@ -2163,7 +2265,9 @@ function registerStash(id, label, slots, maxWeight, owner, groups, coords, dista
     refreshRegistration(inv, opts)
     return inv.key
 end
-function createTemporaryStash(properties)
+---@param properties table|nil
+---@return string inventoryKey
+local function createTemporaryStash(properties)
     properties = properties or {}
     properties.temporary = true
     local inv = secondary('temporary', properties.id or ('tmp-%d'):format(now()), properties)
@@ -2208,7 +2312,11 @@ local function normaliseShopStock(rows, slots)
     return entries
 end
 
-function registerShop(id, data)
+---@param id string|number
+---@param data table|nil
+---@return string|nil inventoryKey
+---@return string|nil reason
+local function registerShop(id, data)
     data = data or {}
     local slots = math.floor(tonumber(data.slots) or config.defaultSlots)
     if slots < 1 then
@@ -2233,7 +2341,12 @@ function registerShop(id, data)
     end
     return inv.key
 end
-function openInventory(src, invType, data)
+---@param src integer
+---@param invType string
+---@param data any
+---@return boolean opened
+---@return table|string result
+local function openInventory(src, invType, data)
     local inventoryKey
     if invType == 'player' then
         local target = tonumber(data) or src
@@ -2263,17 +2376,30 @@ function openInventory(src, invType, data)
     end
     return open(src, inventoryKey, type(data) == 'table' and data or nil)
 end
-function closeInventory(src)
+---@param src integer
+---@return boolean closed
+local function closeInventory(src)
     return close(src, 'requested')
 end
-function openQbInventory(src, identifier, opts)
+---@param src integer
+---@param identifier string|number
+---@param opts table|nil
+---@return boolean opened
+---@return table|string result
+local function openQbInventory(src, identifier, opts)
     if type(opts) == 'table' and opts.type then
         return openInventory(src, opts.type, opts)
     end
     return stashOpen(src, identifier, opts)
 end
 
-function buyItem(src, shopId, slot, count)
+---@param src integer
+---@param shopId string|number
+---@param slot integer
+---@param count number|nil
+---@return boolean purchased
+---@return string|nil reason
+local function buyItem(src, shopId, slot, count)
     local shop = getInventory(key('shop', shopId))
     if not shop then
         return false, 'shop not found'
@@ -2362,7 +2488,11 @@ function buyItem(src, shopId, slot, count)
     end)
 end
 
-function registerHook(eventName, callback, options)
+---@param eventName string
+---@param callback function|table
+---@param options table|nil
+---@return integer hookId
+local function registerHook(eventName, callback, options)
     assert(type(eventName) == 'string' and inventory.isCallable(callback), 'eventName and callback are required')
     hooks[eventName] = hooks[eventName] or {}
     local id = nextHookId
@@ -2371,7 +2501,8 @@ function registerHook(eventName, callback, options)
         { id = id, callback = callback, options = options or {}, owner = GetInvokingResource() or resourceName }
     return id
 end
-function removeHooks(id)
+---@param id integer
+local function removeHooks(id)
     for _, list in pairs(hooks) do
         list[id] = nil
     end
@@ -2380,14 +2511,17 @@ end
 ---Grant player inspection only through explicit trusted server policy. The
 ---callback receives source, target, and detached player data; it must return
 ---true to grant. Returning false rejects the request.
-function registerInspectionAccess(callback)
+---@param callback function|table
+---@return integer hookId
+local function registerInspectionAccess(callback)
     assert(inventory.isCallable(callback), 'inspection callback is required')
     local id = nextInspectionHookId
     nextInspectionHookId = nextInspectionHookId + 1
     inspectionHooks[id] = { callback = callback, owner = GetInvokingResource() or resourceName }
     return id
 end
-function removeInspectionAccess(id)
+---@param id integer
+local function removeInspectionAccess(id)
     inspectionHooks[id] = nil
 end
 
@@ -2610,6 +2744,8 @@ inventory.internal = {
     openSelf = openSelf,
     close = close,
     canAccess = canAccess,
+    hasUseable = hasUseable,
+    setBuiltInUseable = setBuiltInUseable,
     registerInspectionAccess = registerInspectionAccess,
     removeInspectionAccess = removeInspectionAccess,
     getRevision = revision,
@@ -2745,23 +2881,35 @@ inventory.api = api
 -- Network transport ---------------------------------------------------------
 
 RegisterNetEvent('qbinventory:server:open', function(invType, data)
+    if GetInvokingResource() then
+        return
+    end
     local ok, result = openInventory(source, invType, data)
     if not ok then
         TriggerClientEvent('qbinventory:client:rejected', source, result)
     end
 end)
 RegisterNetEvent('qbinventory:server:close', function(token)
+    if GetInvokingResource() then
+        return
+    end
     if sessions[source] and sessions[source].token == token then
         close(source, 'requested')
     end
 end)
 RegisterNetEvent('qbinventory:server:transfer', function(request)
+    if GetInvokingResource() then
+        return
+    end
     local ok, result = transfer(source, request)
     if not ok then
         TriggerClientEvent('qbinventory:client:rejected', source, result)
     end
 end)
 RegisterNetEvent('qbinventory:server:intent', function(request)
+    if GetInvokingResource() then
+        return
+    end
     local ok, result = handleIntent(source, request)
     if not ok then
         TriggerClientEvent('qbinventory:client:rejected', source, result)

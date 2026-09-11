@@ -7,8 +7,10 @@
 local H = dofile('test/harness.lua')
 
 local handlers, rejected, transfers, closed, used, opened = {}, {}, {}, {}, {}, {}
+local invokingResource
 RegisterNetEvent = function(name, fn) handlers[name] = fn end
 TriggerClientEvent = function(name, src, reason) rejected[#rejected + 1] = { name = name, src = src, reason = reason } end
+GetInvokingResource = function() return invokingResource end
 
 local session = { token = 'tok-1', primary = 'player:7', secondary = 'stash:locker', expires = 999 }
 local inventories = {
@@ -64,6 +66,11 @@ H.equal(request.toRevision, 42, 'the bridge supplies the current target revision
 H.equal(request.fromSlot, 1, 'source slot forwarded')
 H.equal(request.toSlot, 2, 'target slot forwarded')
 H.equal(request.amount, 5, 'amount comes from the upstream fromAmount argument')
+
+invokingResource = 'another-server-resource'
+setData('player', 'locker', 1, 2, 5)
+H.equal(#transfers, 1, 'a server resource cannot invoke the client-only transfer event')
+invokingResource = nil
 
 -- Another player's inventory is only reachable if the session actually holds it.
 transfers = {}

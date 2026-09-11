@@ -19,14 +19,18 @@
 -- but has no fresh client data to offer) doesn't kick the player out for
 -- continuing a purchase they already legitimately started.
 
-local shop = assert(Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.vendingmachine,
-    'qbinventory vending machine configuration is required')
+local shop = assert(
+    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.vendingmachine,
+    'qbinventory vending machine configuration is required'
+)
 
 local approvals = {} -- source -> GetGameTimer() expiry
 
 local function hasValidCoords(coords)
     return type(coords) == 'table'
-        and type(coords.x) == 'number' and type(coords.y) == 'number' and type(coords.z) == 'number'
+        and type(coords.x) == 'number'
+        and type(coords.y) == 'number'
+        and type(coords.z) == 'number'
 end
 
 local function isNearMachine(source, coords)
@@ -42,17 +46,23 @@ local function access(source, inventory, opts)
     -- client/shops/vendingmachine.lua); a bare open with no coords always
     -- fails here rather than silently falling through to the approval cache.
     if opts and opts.coords ~= nil then
-        if not isNearMachine(source, opts.coords) then return false, 'not at a vending machine' end
+        if not isNearMachine(source, opts.coords) then
+            return false, 'not at a vending machine'
+        end
         approvals[source] = GetGameTimer() + (Config.qbinventory.sessionTtl or 120000)
         return true
     end
 
     local expiry = approvals[source]
-    if not expiry or GetGameTimer() > expiry then return false, 'not at a vending machine' end
+    if not expiry or GetGameTimer() > expiry then
+        return false, 'not at a vending machine'
+    end
     return true
 end
 
-AddEventHandler('playerDropped', function() approvals[source] = nil end)
+AddEventHandler('playerDropped', function()
+    approvals[source] = nil
+end)
 
 local shopKey = exports.qbinventory:RegisterShop(shop.id, {
     label = shop.label,

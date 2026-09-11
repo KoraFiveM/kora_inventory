@@ -16,13 +16,13 @@ H.ok(source:find('QB.placement.isActive()', 1, true), 'TAB defers to an in-progr
 H.ok(source:find("RegisterCommand('closeInv'", 1, true), 'close command')
 H.ok(source:find('QB.keybind.add({', 1, true) and source:find("name = 'openInv'", 1, true),
     'legacy TAB mapping uses QB.keybind')
-H.ok(source:find("openInventory(typeName, id)", 1, true), 'legacy targets route through validated open API')
+H.ok(source:find("inventoryApi.openInventory(typeName, id)", 1, true), 'legacy targets route through validated open API')
 H.ok(source:find('refreshActiveSession()', 1, true), 'updates request an authoritative refresh')
 -- The server emits the legacy qb-inventory:client:updateInventory after every
 -- committed change so third-party scripts hear about it. If this bridge
 -- re-opened the session in response, the player's own UI would be closed and
 -- reissued on every single item change.
-H.ok(source:find('return getCurrentSession() ~= nil', 1, true),
+H.ok(source:find('return inventoryApi.getCurrentSession() ~= nil', 1, true),
     'a legacy update push never re-opens an active session (feedback-loop guard)')
 H.ok(not source:find('SendNUIMessage', 1, true), 'compat bridge has no NUI authority')
 H.ok(not source:find('SetNuiFocus', 1, true), 'compat bridge has no focus authority')

@@ -2,9 +2,9 @@
 -- this is intentionally separate from qbinventory's native export table so
 -- qb-inventory:GetInventory and ox_inventory:GetInventory can retain their
 -- incompatible upstream return shapes.
-local I = assert(QbInventory, 'qbinventory authority missing')
-local qb = assert(I.compat and I.compat.qb, 'qb compatibility missing')
-local ox = assert(I.compat and I.compat.ox, 'ox compatibility missing')
+local inventory = assert(QbInventory, 'qbinventory authority missing')
+local qb = assert(inventory.compat and inventory.compat.qb, 'qb compatibility missing')
+local ox = assert(inventory.compat and inventory.compat.ox, 'ox compatibility missing')
 
 -- GetResourceState('qb-inventory') resolves `provide 'qb-inventory'` back to
 -- THIS resource once qbinventory has started. Looking it up directly therefore
@@ -12,7 +12,11 @@ local ox = assert(I.compat and I.compat.ox, 'ox compatibility missing')
 -- their physical manifest names instead; provided identities are not entries
 -- in that list, while a separately ensured qb-inventory/ox_inventory folder is.
 local function conflicting(name)
-    if type(GetNumResources) ~= 'function' or type(GetResourceByFindIndex) ~= 'function' or type(GetResourceState) ~= 'function' then
+    if
+        type(GetNumResources) ~= 'function'
+        or type(GetResourceByFindIndex) ~= 'function'
+        or type(GetResourceState) ~= 'function'
+    then
         return false
     end
 
@@ -36,7 +40,9 @@ end
 local function register(identity, surface)
     for name, fn in pairs(surface) do
         if type(fn) == 'function' then
-            AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCB) setCB(fn) end)
+            AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCB)
+                setCB(fn)
+            end)
         end
     end
 end

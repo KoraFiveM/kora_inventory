@@ -35,12 +35,16 @@ exports('getConfigWeaponAttachments', legacyAttachmentConfig)
 
 RegisterNetEvent('qb-weapons:client:UseWeapon', function(legacy)
     local slot = slotOf(legacy)
-    if slot then TriggerServerEvent('qbinventory:server:legacyWeaponUse', slot) end
+    if slot then
+        TriggerServerEvent('qbinventory:server:legacyWeaponUse', slot)
+    end
 end)
 
 RegisterNetEvent('qb-weapons:client:AddAmmo', function(_, _, legacy)
     local slot = slotOf(legacy)
-    if slot then TriggerServerEvent('qbinventory:server:legacyWeaponUse', slot) end
+    if slot then
+        TriggerServerEvent('qbinventory:server:legacyWeaponUse', slot)
+    end
 end)
 
 RegisterNetEvent('qb-weapons:client:CheckWeapon', function()
@@ -57,7 +61,9 @@ RegisterNetEvent('qb-weapons:client:SyncRepairShops', function() end)
 -- Tint drawing is harmless presentation and may be sent by a trusted server
 -- after it persisted tint metadata through qbinventory's server-side API.
 RegisterNetEvent('qb-weapons:client:EquipTint', function(weapon, tint)
-    if type(weapon) ~= 'string' and type(weapon) ~= 'number' then return end
+    if type(weapon) ~= 'string' and type(weapon) ~= 'number' then
+        return
+    end
     local index = math.floor(tonumber(tint) or -1)
     if index >= 0 and index <= 32 then
         SetPedWeaponTintIndex(QB.cache.ped(), type(weapon) == 'string' and joaat(weapon) or weapon, index)

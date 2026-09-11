@@ -55,11 +55,11 @@ Config.qbinventory.shops.liquorstore = {
     -- widening the shop's opening surface (see server/shops/liquorstore.lua).
     locations = {
         { name = "Rob's Liquor", x = 1135.81, y = -982.28, z = 46.42, heading = 280.0, bucket = 0 }, -- Little Bighorn Ave
-        { name = "Rob's Liquor", x = -1222.92, y = -906.98, z = 12.33, heading = 30.0, bucket = 0 },  -- Prosperity St, Vespucci
+        { name = "Rob's Liquor", x = -1222.92, y = -906.98, z = 12.33, heading = 30.0, bucket = 0 }, -- Prosperity St, Vespucci
         { name = "Rob's Liquor", x = -1487.55, y = -379.11, z = 40.16, heading = 135.0, bucket = 0 }, -- San Andreas Ave, Morningwood
-        { name = "Rob's Liquor", x = -2968.24, y = 390.91, z = 15.04, heading = 85.0, bucket = 0 },   -- Great Ocean Hwy, Chumash
-        { name = "Rob's Liquor", x = 1166.02, y = 2708.93, z = 38.16, heading = 180.0, bucket = 0 },  -- Route 68, Harmony
-        { name = '24/7', x = 24.50, y = -1346.19, z = 29.50, heading = 266.78, bucket = 0 },           -- Strawberry
-        { name = '24/7', x = 373.18, y = 326.51, z = 103.57, heading = 255.77, bucket = 0 },           -- Clinton Ave
+        { name = "Rob's Liquor", x = -2968.24, y = 390.91, z = 15.04, heading = 85.0, bucket = 0 }, -- Great Ocean Hwy, Chumash
+        { name = "Rob's Liquor", x = 1166.02, y = 2708.93, z = 38.16, heading = 180.0, bucket = 0 }, -- Route 68, Harmony
+        { name = '24/7', x = 24.50, y = -1346.19, z = 29.50, heading = 266.78, bucket = 0 }, -- Strawberry
+        { name = '24/7', x = 373.18, y = 326.51, z = 103.57, heading = 255.77, bucket = 0 }, -- Clinton Ave
     },
 }

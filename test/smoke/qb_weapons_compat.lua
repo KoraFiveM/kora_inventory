@@ -3,12 +3,14 @@
 local H = dofile('test/harness.lua')
 
 local events, callbacks, uses, stateChanges, worn = {}, {}, {}, {}, {}
+local invokingResource
 local inventory = {
     [1] = { slot = 1, name = 'weapon_pistol', info = { ammo = 12, durability = 90 } },
     [2] = { slot = 2, name = 'pistol_ammo', info = {} },
 }
 
 RegisterNetEvent = function(name, fn) events[name] = fn end
+GetInvokingResource = function() return invokingResource end
 QB = { callback = { register = function(name, fn) callbacks[name] = fn end } }
 source = 7
 
@@ -50,6 +52,10 @@ H.equal(callbacks['qb-weapons:server:RepairWeapon'](), false, 'client repair cal
 
 events['qb-weapons:server:UpdateWeaponAmmo']({ slot = 1, name = 'weapon_rpg' }, 4)
 H.equal(inventory[1].info.ammo, 4, 'legacy shot report may lower equipped ammo')
+invokingResource = 'another-server-resource'
+events['qb-weapons:server:UpdateWeaponAmmo']({ slot = 1 }, 1)
+H.equal(inventory[1].info.ammo, 4, 'a server resource cannot invoke the client-only ammo event')
+invokingResource = nil
 events['qb-weapons:server:UpdateWeaponAmmo']({ slot = 1 }, 999)
 H.equal(inventory[1].info.ammo, 4, 'legacy client report cannot mint ammunition')
 events['qb-weapons:server:UpdateWeaponAmmo']({ slot = 2 }, 0)

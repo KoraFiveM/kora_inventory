@@ -14,9 +14,10 @@
 -- test/smoke/contract.lua asserts there is no client-authorised full-inventory
 -- replacement path, and that stays true.
 
-local I = assert(QbInventory, 'qbinventory authority missing')
-local internal = assert(I and I.internal, 'qbinventory internal authority must load before qb event compatibility')
-local api = assert(I.api, 'qbinventory api must load before qb event compatibility')
+local inventory = assert(QbInventory, 'qbinventory authority missing')
+local internal =
+    assert(inventory and inventory.internal, 'qbinventory internal authority must load before qb event compatibility')
+local api = assert(inventory.api, 'qbinventory api must load before qb event compatibility')
 
 local function reject(src, reason)
     TriggerClientEvent('qbinventory:client:rejected', src, reason)
@@ -29,8 +30,12 @@ end
 ---the server itself put in the secondary slot when it opened the session.
 ---@return string|nil
 local function sessionKeyFor(session, identifier)
-    if identifier == nil or identifier == 'player' then return session.primary end
-    if type(identifier) ~= 'string' then return nil end
+    if identifier == nil or identifier == 'player' then
+        return session.primary
+    end
+    if type(identifier) ~= 'string' then
+        return nil
+    end
 
     -- 'otherplayer-<id>' addresses a player inventory; every other upstream
     -- prefix ('drop-', 'shop-', a bare stash name) addresses the secondary.
@@ -55,46 +60,69 @@ local function sessionKeyFor(session, identifier)
     return nil
 end
 
-RegisterNetEvent('qb-inventory:server:SetInventoryData', function(fromInventory, toInventory, fromSlot, toSlot, fromAmount, _toAmount)
-    local src = source
-    local session = internal.sessionOf(src)
-    if not session then return reject(src, 'no open inventory session') end
+RegisterNetEvent(
+    'qb-inventory:server:SetInventoryData',
+    function(fromInventory, toInventory, fromSlot, toSlot, fromAmount, _toAmount)
+        if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+            return
+        end
+        local src = source
+        local session = internal.sessionOf(src)
+        if not session then
+            return reject(src, 'no open inventory session')
+        end
 
-    local fromKey = sessionKeyFor(session, fromInventory)
-    local toKey = sessionKeyFor(session, toInventory)
-    if not fromKey or not toKey then return reject(src, 'inventory not in session') end
+        local fromKey = sessionKeyFor(session, fromInventory)
+        local toKey = sessionKeyFor(session, toInventory)
+        if not fromKey or not toKey then
+            return reject(src, 'inventory not in session')
+        end
 
-    -- Supply the token and CURRENT revisions ourselves: upstream's protocol has
-    -- no concept of either, and a client must never be able to assert them.
-    return internal.transfer(src, {
-        token = session.token,
-        fromInventory = fromKey,
-        toInventory = toKey,
-        fromSlot = fromSlot,
-        toSlot = toSlot,
-        amount = fromAmount,
-        fromRevision = internal.getRevision(fromKey),
-        toRevision = internal.getRevision(toKey),
-    })
-end)
+        -- Supply the token and CURRENT revisions ourselves: upstream's protocol has
+        -- no concept of either, and a client must never be able to assert them.
+        return internal.transfer(src, {
+            token = session.token,
+            fromInventory = fromKey,
+            toInventory = toKey,
+            fromSlot = fromSlot,
+            toSlot = toSlot,
+            amount = fromAmount,
+            fromRevision = internal.getRevision(fromKey),
+            toRevision = internal.getRevision(toKey),
+        })
+    end
+)
 
 RegisterNetEvent('qb-inventory:server:closeInventory', function()
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
     internal.close(source, 'requested')
 end)
 
 RegisterNetEvent('qb-inventory:server:useItem', function(item)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
     local src = source
     -- Only the slot is read. The item's name, weight and metadata are re-read
     -- from qbcore-owned player data by useItem itself, so a forged payload
     -- cannot use an item the player does not hold.
     local slot = tonumber(type(item) == 'table' and item.slot or item)
-    if not slot then return end
+    if not slot then
+        return
+    end
     api.useItem(src, slot)
 end)
 
 RegisterNetEvent('qb-inventory:server:openDrop', function(dropId)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
     local src = source
-    if type(dropId) ~= 'string' and type(dropId) ~= 'number' then return end
+    if type(dropId) ~= 'string' and type(dropId) ~= 'number' then
+        return
+    end
     -- Upstream addresses drops as 'drop-<id>' while qbinventory's key is
     -- key('drop', id), so the prefix has to come off first -- forwarding it
     -- verbatim builds 'drop:drop-<id>' and never resolves.
@@ -104,6 +132,9 @@ RegisterNetEvent('qb-inventory:server:openDrop', function(dropId)
 end)
 
 RegisterNetEvent('qb-inventory:server:openVending', function()
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
     local src = source
     api.OpenInventory(src, 'vending', { type = 'shop', id = 'vending' })
 end)
@@ -111,12 +142,20 @@ end)
 -- Upstream writes Drops[dropId].coords straight from the client. Position is
 -- authority state here (it gates every distance check), so this is accepted as
 -- a deliberate no-op rather than a client-writable field.
-RegisterNetEvent('qb-inventory:server:updateDrop', function() end)
+RegisterNetEvent('qb-inventory:server:updateDrop', function()
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
+end)
 
 -- Upstream's snowball hooks add/remove a weapon on demand from a client event.
 -- Granting an item on client say-so is exactly the shape this resource refuses;
 -- a server-side script wanting it can call AddItem directly.
-RegisterNetEvent('qb-inventory:server:snowball', function() end)
+RegisterNetEvent('qb-inventory:server:snowball', function()
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
+end)
 
-I.compat = I.compat or {}
-I.compat.qbEvents = { sessionKeyFor = sessionKeyFor }
+inventory.compat = inventory.compat or {}
+inventory.compat.qbEvents = { sessionKeyFor = sessionKeyFor }

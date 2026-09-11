@@ -22,9 +22,23 @@ local ITEMS = {
 }
 
 local WEAPONS = { { name = 'weapon_unarmed' }, { name = 'weapon_pistol' }, { name = 'weapon_bat' } }
+local useables = {}
+local removals = {}
+local removeResult = true
 
 QbInventory = {
-    internal = { itemDef = function(name) return ITEMS[name] end },
+    internal = {
+        itemDef = function(name) return ITEMS[name] end,
+        setBuiltInUseable = function(name, fn) useables[name] = fn end,
+    },
+    api = {
+        createUseable = function(name, fn) useables[name] = fn end,
+        removeItem = function(src, name, amount, slot, reason)
+            removals[#removals + 1] = { src = src, name = name, amount = amount, slot = slot, reason = reason }
+            if removeResult ~= true then return false, removeResult end
+            return true
+        end,
+    },
     weaponCarry = nil, -- set per case below
     weapons = {
         getState = function() return { ammo = 0 } end,
@@ -32,18 +46,6 @@ QbInventory = {
         loadRounds = function(_, _, _, count) return true, { ammo = count } end,
     },
 }
-
-local useables = {}
-function setBuiltInUseable(name, fn) useables[name] = fn end
-function createUseable(name, fn) useables[name] = fn end
-
-local removals = {}
-local removeResult = true
-function removeItem(src, name, amount, slot, reason)
-    removals[#removals + 1] = { src = src, name = name, amount = amount, slot = slot, reason = reason }
-    if removeResult ~= true then return false, removeResult end
-    return true
-end
 
 local pushed = {}
 local sharedChangeHandlers = {}

@@ -5,8 +5,10 @@
 -- callback below re-resolves the player's ped, routing bucket and position on
 -- the server before every open and every session revalidation.
 
-local shop = assert(Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.ammunation,
-    'qbinventory Ammu-Nation configuration is required')
+local shop = assert(
+    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.ammunation,
+    'qbinventory Ammu-Nation configuration is required'
+)
 
 local function distanceSquared(a, b)
     local dx, dy, dz = a.x - b.x, a.y - b.y, a.z - b.z
@@ -28,9 +30,14 @@ local function isAtApprovedLocation(source)
         -- Every default entry has an explicit bucket. A missing/invalid bucket
         -- is a configuration error and therefore fails closed instead of
         -- widening the shop's opening surface.
-        if type(location.bucket) == 'number' and playerBucket == location.bucket
-            and type(location.x) == 'number' and type(location.y) == 'number' and type(location.z) == 'number'
-            and distanceSquared(playerCoords, location) <= maximumDistanceSquared then
+        if
+            type(location.bucket) == 'number'
+            and playerBucket == location.bucket
+            and type(location.x) == 'number'
+            and type(location.y) == 'number'
+            and type(location.z) == 'number'
+            and distanceSquared(playerCoords, location) <= maximumDistanceSquared
+        then
             return true
         end
     end

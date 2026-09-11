@@ -68,7 +68,7 @@ local calls = 0
 local handler = funcref(function() calls = calls + 1 end)
 local ok, err = pcall(registered.createUseable, 'handcuffs', handler)
 H.ok(ok, 'createUseable accepts a cross-resource funcref (' .. tostring(err) .. ')')
-H.ok(hasUseable('handcuffs'), 'the funcref handler is actually registered as useable')
+H.ok(QbInventory.internal.hasUseable('handcuffs'), 'the funcref handler is actually registered as useable')
 -- useItem invokes handlers through pcall(handler, src, item); a __call table
 -- must survive that, otherwise registration would succeed but using the item
 -- would fail at runtime instead of at boot.

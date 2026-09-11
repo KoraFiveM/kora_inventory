@@ -7,8 +7,10 @@
 -- selecting this away from a real machine is harmless on its own since the
 -- server still re-derives the player's actual position independently.
 
-local shop = assert(Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.vendingmachine,
-    'qbinventory vending machine configuration is required')
+local shop = assert(
+    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.vendingmachine,
+    'qbinventory vending machine configuration is required'
+)
 
 exports.qbtarget:addModel(shop.models, {
     {

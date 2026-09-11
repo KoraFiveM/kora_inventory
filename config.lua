@@ -216,9 +216,9 @@ Config.qbinventory = {
         -- server is the only code that creates, loads, or consumes them.
         ballistics = {
             enabled = true,
-            maxLoadedRounds = 240,     -- hard metadata cap; keep this close to the weapons used on your server
-            shotCooldown = 65,         -- server-side floor between accepted native shot reports
-            casingOffset = 0.75,       -- metres behind/alongside the shooter for the recovered casing marker
+            maxLoadedRounds = 240, -- hard metadata cap; keep this close to the weapons used on your server
+            shotCooldown = 65, -- server-side floor between accepted native shot reports
+            casingOffset = 0.75, -- metres behind/alongside the shooter for the recovered casing marker
         },
         -- Wear is applied by the SERVER for every accepted round fired.
         -- `perShot` is durability percentage points (0.10 means 1 point per
@@ -308,8 +308,12 @@ Config.qbinventory = {
         -- left out on purpose (a grenade on the spine looks wrong and a
         -- parachute already has its own component).
         tiers = {
-            Rifle = 'back', Shotgun = 'back', SMG = 'back',
-            Sniper = 'back', LMG = 'back', Heavy = 'back',
+            Rifle = 'back',
+            Shotgun = 'back',
+            SMG = 'back',
+            Sniper = 'back',
+            LMG = 'back',
+            Heavy = 'back',
             Melee = 'sling',
             -- Keep sidearms visible with the rest of the carried weapons.
             -- This also uses the back draw/holster animation and attachment
@@ -363,4 +367,6 @@ Config.qbinventory = {
 }
 
 -- Registers this resource-owned configuration with qblib without changing its public Config table.
-if QB and QB.config and QB.config.adopt then Config = QB.config.adopt(Config) end
+if QB and QB.config and QB.config.adopt then
+    Config = QB.config.adopt(Config)
+end

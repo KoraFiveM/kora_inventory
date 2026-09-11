@@ -23,9 +23,9 @@
 -- in-world ped, then restores focus on resolve/cancel.  Keeping focus control
 -- in client/ui.lua preserves qbinventory's NUI ownership boundary.
 
-local GiveTarget = {}
+local giveTarget = {}
 QbInventory = QbInventory or {}
-QbInventory.giveTarget = GiveTarget
+QbInventory.giveTarget = giveTarget
 
 local active
 local availabilityGeneration, lastAvailability = 0, nil
@@ -36,12 +36,16 @@ local function giveDistance()
 end
 
 local function serverIdForPed(ped)
-    if not ped or ped == 0 or ped == QB.cache.ped() then return nil end
+    if not ped or ped == 0 or ped == QB.cache.ped() then
+        return nil
+    end
 
     for _, playerId in ipairs(GetActivePlayers()) do
         if playerId ~= QB.cache.playerId() and GetPlayerPed(playerId) == ped then
             local serverId = GetPlayerServerId(playerId)
-            if type(serverId) == 'number' and serverId > 0 then return serverId end
+            if type(serverId) == 'number' and serverId > 0 then
+                return serverId
+            end
         end
     end
 end
@@ -54,7 +58,9 @@ local function nearbyPlayers()
     local coords = QB.cache.coords()
     local radius = giveDistance()
     local closest = QB.closest.player(coords, radius)
-    if not closest or not closest.id then return {} end
+    if not closest or not closest.id then
+        return {}
+    end
 
     local matches = QB.world.getNearbyEntities('player', coords, radius)
     local recipients, seen = {}, {}
@@ -70,7 +76,9 @@ local function nearbyPlayers()
         end
     end
 
-    table.sort(recipients, function(a, b) return a.distance < b.distance end)
+    table.sort(recipients, function(a, b)
+        return a.distance < b.distance
+    end)
     return recipients
 end
 
@@ -85,18 +93,24 @@ local function emitAvailability()
 end
 
 local function clearTargetRegistration()
-    if not active or not active.registrationId then return end
+    if not active or not active.registrationId then
+        return
+    end
     if GetResourceState('qbtarget') == 'started' then
         -- qbtarget tears down the whole multi-ped registration when passed its
         -- registration id, but its public remover still takes one numeric ped
         -- as the first argument.
-        pcall(function() exports.qbtarget:removeEntity(active.peds[1], active.registrationId) end)
+        pcall(function()
+            exports.qbtarget:removeEntity(active.peds[1], active.registrationId)
+        end)
     end
 end
 
 local function finish(result)
     local current = active
-    if not current then return end
+    if not current then
+        return
+    end
 
     clearTargetRegistration()
     active = nil
@@ -107,8 +121,10 @@ end
 ---Cancel an outstanding multi-player target selection.  This produces no
 ---browser payload; consumers use the local resolved event above.
 ---@param reason? string
-function GiveTarget.cancel(reason)
-    if not active then return false end
+function giveTarget.cancel(reason)
+    if not active then
+        return false
+    end
     finish({ requestId = active.requestId, cancelled = true, reason = reason or 'cancelled' })
     return true
 end
@@ -117,7 +133,7 @@ end
 ---candidate range.  This only answers presentation availability; the server
 ---is the authority for final range and routing-bucket validation.
 ---@return boolean
-function GiveTarget.available()
+function giveTarget.available()
     return availability()
 end
 
@@ -128,9 +144,11 @@ end
 ---@param requestId string|number A browser-local opaque correlation id.
 ---@return boolean started
 ---@return string? reason
-function GiveTarget.request(requestId)
-    if requestId == nil then return false, 'missing give request id' end
-    GiveTarget.cancel('replaced')
+function giveTarget.request(requestId)
+    if requestId == nil then
+        return false, 'missing give request id'
+    end
+    giveTarget.cancel('replaced')
 
     local recipients = nearbyPlayers()
     if #recipients == 0 then
@@ -181,9 +199,13 @@ function GiveTarget.request(requestId)
                     return active and active.allowed[entity] == serverIdForPed(entity)
                 end,
                 onSelect = function(entity)
-                    if not active then return end
+                    if not active then
+                        return
+                    end
                     local target = active.allowed[entity]
-                    if not target or target ~= serverIdForPed(entity) then return end
+                    if not target or target ~= serverIdForPed(entity) then
+                        return
+                    end
                     finish({ requestId = active.requestId, target = target })
                     emitAvailability()
                 end,
@@ -210,14 +232,16 @@ function GiveTarget.request(requestId)
     local expected = active
     CreateThread(function()
         Wait(15000)
-        if active == expected then GiveTarget.cancel('target selection timed out') end
+        if active == expected then
+            giveTarget.cancel('target selection timed out')
+        end
     end)
     return true
 end
 
 AddEventHandler('qbinventory:client:requestGiveAvailability', emitAvailability)
-AddEventHandler('qbinventory:client:requestGiveTarget', GiveTarget.request)
-AddEventHandler('qbinventory:client:cancelGiveTarget', GiveTarget.cancel)
+AddEventHandler('qbinventory:client:requestGiveTarget', giveTarget.request)
+AddEventHandler('qbinventory:client:cancelGiveTarget', giveTarget.cancel)
 AddEventHandler('qbinventory:ui:sessionOpened', function()
     availabilityGeneration = availabilityGeneration + 1
     local generation = availabilityGeneration
@@ -234,11 +258,11 @@ AddEventHandler('qbinventory:ui:sessionOpened', function()
     end)
 end)
 AddEventHandler('qbinventory:ui:sessionClosed', function()
-    GiveTarget.cancel('inventory closed')
+    giveTarget.cancel('inventory closed')
     availabilityGeneration = availabilityGeneration + 1
     lastAvailability = nil
 end)
 
-exports('giveTargetAvailable', GiveTarget.available)
-exports('requestGiveTarget', GiveTarget.request)
-exports('cancelGiveTarget', GiveTarget.cancel)
+exports('giveTargetAvailable', giveTarget.available)
+exports('requestGiveTarget', giveTarget.request)
+exports('cancelGiveTarget', giveTarget.cancel)

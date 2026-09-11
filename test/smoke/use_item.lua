@@ -109,13 +109,13 @@ playersItems[7] = {
 
 -- intentUse response signals whether the client should close the panel -----
 
-local ok, payload = openInventory(7, 'player', 7)
+local ok, payload = QbInventory.internal.openSelf(7)
 H.ok(ok, 'own inventory opens')
 
-createUseable('bandage', function() return true end)
-createUseable('map', function() return true end)
-createUseable('oldflare', function() return true end)
-createUseable('potion', function() return true end)
+QbInventory.api.createUseable('bandage', function() return true end)
+QbInventory.api.createUseable('map', function() return true end)
+QbInventory.api.createUseable('oldflare', function() return true end)
+QbInventory.api.createUseable('potion', function() return true end)
 
 local intent = QBCallbacks['qbinventory:server:intent']
 H.ok(type(intent) == 'function', 'the restricted UI intent callback is registered')
@@ -144,7 +144,7 @@ H.equal(flareResult.preventClose, true, 'legacy shouldClose = false keeps the pa
 
 -- setItems cannot forge preventClose/useTime onto a stored item ------------
 
-local setOK = setItems(7, {
+local setOK = QbInventory.api.setItems(7, {
     [4] = { name = 'potion', amount = 1, slot = 4, preventClose = true, useTime = 999999 },
 })
 H.ok(setOK, 'setItems accepts a validated replacement')

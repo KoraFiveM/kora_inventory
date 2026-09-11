@@ -45,7 +45,9 @@ local function pushConfig()
 end
 
 local function closeSession(reason)
-    if not activeSession then return end
+    if not activeSession then
+        return
+    end
 
     send('qbinventory:nui:sessionClosed', {
         sessionId = activeSession,
@@ -59,11 +61,15 @@ end
 -- Payload is produced by qbinventory only. Expected minimum wire shape is
 -- { sessionId, token, player, secondary?, revision, secondaryRevision? }.
 local function normalizeView(view)
-    if type(view) ~= 'table' then return nil end
+    if type(view) ~= 'table' then
+        return nil
+    end
     -- qbinventory's public view calls the server-side inventory identifier
     -- `key`; the web UI names this transport-only field `id`.
     local out = {}
-    for key, value in pairs(view) do out[key] = value end
+    for key, value in pairs(view) do
+        out[key] = value
+    end
     out.id = view.key or view.id
     return out
 end
@@ -87,7 +93,9 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
         secondary = normalizeView(payload.secondary),
         expires = payload.expires,
     }
-    if not wire.player then return end
+    if not wire.player then
+        return
+    end
     pushTheme()
     pushConfig()
     send('qbinventory:nui:sessionOpened', wire)
@@ -110,7 +118,9 @@ AddEventHandler('qbinventory:ui:sessionPatched', function(payload, legacyPatch)
     else
         patch, token = payload, payload and payload.token
     end
-    if type(patch) ~= 'table' or token ~= activeToken then return end
+    if type(patch) ~= 'table' or token ~= activeToken then
+        return
+    end
 
     -- Accept qbinventory's compact `{ key, revision, inventory }` patch and
     -- the normalized `{ player?, secondary? }` form for future UI consumers.
@@ -124,14 +134,20 @@ AddEventHandler('qbinventory:ui:sessionPatched', function(payload, legacyPatch)
     }
     if patch.inventory then
         local changed = normalizeView(patch.inventory)
-        if changed and changed.id and changed.id:find('player:', 1, true) == 1 then wire.player = changed else wire.secondary = changed end
+        if changed and changed.id and changed.id:find('player:', 1, true) == 1 then
+            wire.player = changed
+        else
+            wire.secondary = changed
+        end
     end
     send('qbinventory:nui:sessionPatched', wire)
 end)
 
 AddEventHandler('qbinventory:ui:sessionClosed', function(payload, legacyReason)
     local token = type(payload) == 'table' and payload.token or payload
-    if token ~= activeToken then return end
+    if token ~= activeToken then
+        return
+    end
     closeSession(type(payload) == 'table' and payload.reason or legacyReason)
 end)
 
@@ -143,7 +159,12 @@ end)
 -- This is a local presentation relay for the server-authoritative receipt
 -- payload. It intentionally works without an open inventory session.
 RegisterNetEvent('qbinventory:client:itemBox', function(payload)
-    if type(payload) ~= 'table' or type(payload.name) ~= 'string' then return end
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
+    if type(payload) ~= 'table' or type(payload.name) ~= 'string' then
+        return
+    end
     send('qbinventory:nui:itemBox', payload)
 end)
 
@@ -151,14 +172,18 @@ end)
 -- target selection is active, relinquish NUI focus so qbtarget can receive
 -- gameplay input; restore it immediately on resolve or cancellation.
 AddEventHandler('qbinventory:ui:giveTargeting', function(payload)
-    if not activeSession or type(payload) ~= 'table' then return end
+    if not activeSession or type(payload) ~= 'table' then
+        return
+    end
     SetNuiFocus(payload.active ~= true, payload.active ~= true)
 end)
 
 -- Only a boolean crosses this presentation boundary.  Player identities and
 -- recipient server ids stay in client/give_target.lua and client.lua.
 AddEventHandler('qbinventory:ui:giveAvailability', function(payload)
-    if not activeSession or type(payload) ~= 'table' then return end
+    if not activeSession or type(payload) ~= 'table' then
+        return
+    end
     send('qbinventory:nui:giveAvailability', { available = payload.available == true })
 end)
 
@@ -168,12 +193,14 @@ end)
 AddEventHandler('qbinventory:client:theme', QBTheme.refresh)
 
 RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
-    if type(data) ~= 'table'
+    if
+        type(data) ~= 'table'
         or data.sessionId ~= activeSession
         or type(data.token) ~= 'string'
         or type(data.intent) ~= 'string'
         or not allowedIntents[data.intent]
-        or type(data.payload) ~= 'table' then
+        or type(data.payload) ~= 'table'
+    then
         cb({ ok = false, error = 'invalid intent' })
         return
     end
@@ -181,7 +208,7 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
     -- Wait for qbinventory's authoritative callback result. This keeps the
     -- browser locked until validation and any yielding useable handler finish,
     -- rather than acknowledging a merely-local hand-off as success.
-    local ok, result = submitIntent({
+    local ok, result = QbInventory.clientApi.submitIntent({
         sessionId = data.sessionId,
         token = data.token,
         intent = data.intent,

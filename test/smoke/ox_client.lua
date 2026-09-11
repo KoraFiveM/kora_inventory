@@ -75,10 +75,12 @@ exports = setmetatable({}, {
     end,
 })
 
--- client.lua's globals. The compat table must call THESE, never re-enter
--- exports.qbinventory:openInventory -- see the file's own header comment.
-function openInventory(invType, data) calls.open[#calls.open + 1] = { invType = invType, data = data } end
-function closeInventory() calls.closed = true end
+-- client.lua's explicit in-resource API. The compat table must call this,
+-- never re-enter exports.qbinventory:openInventory.
+QbInventory.clientApi = {
+    openInventory = function(invType, data) calls.open[#calls.open + 1] = { invType = invType, data = data } end,
+    closeInventory = function() calls.closed = true end,
+}
 
 local progressResult, keyboardResult, progressActive = true, nil, false
 local pedWeapon = 0

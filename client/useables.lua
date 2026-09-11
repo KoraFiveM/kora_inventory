@@ -15,11 +15,16 @@ local DRINK_ANIM = { dict = 'amb@world_human_drinking@coffee@male@idle_a', anim 
 local function flashTimecycle(name, ms)
     SetTimecycleModifier(name)
     SetTimeout(ms, function()
-        if GetTimecycleModifierIndex() ~= -1 then ClearTimecycleModifier() end
+        if GetTimecycleModifierIndex() ~= -1 then
+            ClearTimecycleModifier()
+        end
     end)
 end
 
 RegisterNetEvent('qbinventory:client:consumeEffect', function(_, effects)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
     local ped = QB.cache.ped()
     local anim = (effects.thirst or effects.drunk) and DRINK_ANIM or EAT_ANIM
 

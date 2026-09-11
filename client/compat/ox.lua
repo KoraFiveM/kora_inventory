@@ -8,8 +8,14 @@
 -- has no backing subsystem here it stays a no-op and SAYS SO in a comment -- a
 -- stub that swallows its arguments while looking implemented is exactly how
 -- the inverted Search mode and the missing `strict` argument below survived.
-local function playerData() return exports.qbcore:getPlayerData() or {} end
-local function items() return playerData().items or {} end
+local inventoryApi = assert(QbInventory and QbInventory.clientApi, 'qbinventory client transport must load first')
+
+local function playerData()
+    return exports.qbcore:getPlayerData() or {}
+end
+local function items()
+    return playerData().items or {}
+end
 -- qbcore's registry is named 'items' (lower-case, see qbcore
 -- modules/registry/server.lua:12) and `getShared(name, key)` requires BOTH
 -- arguments -- it returns registries[name].materialised[key]. So the previous
@@ -23,7 +29,9 @@ end
 local function sharedItems()
     local out = {}
     for _, def in ipairs(exports.qbcore:allShared('items') or {}) do
-        if type(def) == 'table' and type(def.name) == 'string' then out[def.name] = def end
+        if type(def) == 'table' and type(def.name) == 'string' then
+            out[def.name] = def
+        end
     end
     return out
 end
@@ -32,7 +40,9 @@ end
 -- GetSlotsWithItem / GetItemCount are gated on it and report "no such item"
 -- (nil / nil / 0) differently from "item exists, you have none" (nil / {} / 0).
 local function itemName(name)
-    if type(name) == 'table' then name = name.name end
+    if type(name) == 'table' then
+        name = name.name
+    end
     return type(name) == 'string' and name:lower() or nil
 end
 local function itemDef(name)
@@ -45,8 +55,12 @@ end
 -- Upstream assertMetadata: a non-table metadata argument is shorthand for
 -- { type = <value> }. Search applies the same rule to a string metadata.
 local function normaliseMetadata(metadata)
-    if metadata == nil then return nil end
-    if type(metadata) == 'table' then return metadata end
+    if metadata == nil then
+        return nil
+    end
+    if type(metadata) == 'table' then
+        return metadata
+    end
     return { type = metadata }
 end
 
@@ -57,20 +71,29 @@ end
 -- This file had no `strict` parameter at all and always compared exactly, so
 -- every ox caller filtering on a single metadata key silently found nothing.
 local function metadataMatches(info, metadata, strict)
-    if metadata == nil then return true end
+    if metadata == nil then
+        return true
+    end
     info = info or {}
-    if strict then return QbInventory.sameInfo(info, metadata) end
-    for key, value in pairs(metadata) do if info[key] ~= value then return false end end
+    if strict then
+        return QbInventory.sameInfo(info, metadata)
+    end
+    for key, value in pairs(metadata) do
+        if info[key] ~= value then
+            return false
+        end
+    end
     return true
 end
 
 local function slotsOf(name, metadata, strict)
     local key = itemName(name)
     local out = {}
-    if not key then return out end
+    if not key then
+        return out
+    end
     for _, item in pairs(items()) do
-        if itemName(item.name) == key
-            and metadataMatches(item.info or item.metadata, metadata, strict) then
+        if itemName(item.name) == key and metadataMatches(item.info or item.metadata, metadata, strict) then
             out[#out + 1] = item
         end
     end
@@ -79,7 +102,9 @@ local function slotsOf(name, metadata, strict)
     -- pairs() order over it is genuinely arbitrary and GetSlotWithItem would
     -- return a different slot from one call to the next. Sorting restores the
     -- "lowest slot first" behaviour upstream gets for free.
-    table.sort(out, function(a, b) return (a.slot or 0) < (b.slot or 0) end)
+    table.sort(out, function(a, b)
+        return (a.slot or 0) < (b.slot or 0)
+    end)
     return out
 end
 
@@ -112,13 +137,23 @@ end
 -- so the documented numeric form is part of the contract. This file branched on
 -- `kind == 'slots'` alone, which made a caller passing the documented 1 receive
 -- COUNTS instead of slots -- a silent, hard break. Same normalisation as
--- server/compat/ox.lua's Ox.Search.
+-- server/compat/ox.lua's ox.Search.
 local function search(kind, requested, metadata)
-    if requested == nil then return false end
-    if kind == 'slots' then kind = 1 elseif kind == 'count' then kind = 2 end
-    if kind ~= 1 and kind ~= 2 then return false end
+    if requested == nil then
+        return false
+    end
+    if kind == 'slots' then
+        kind = 1
+    elseif kind == 'count' then
+        kind = 2
+    end
+    if kind ~= 1 and kind ~= 2 then
+        return false
+    end
     local list = type(requested) == 'string' and { requested } or requested
-    if type(list) ~= 'table' then return false end
+    if type(list) ~= 'table' then
+        return false
+    end
     metadata = normaliseMetadata(metadata)
     -- Upstream measures `#item` AFTER wrapping a bare string, so a ONE-ELEMENT
     -- ARRAY is "single" too and returns the bare value rather than a
@@ -133,8 +168,12 @@ local function search(kind, requested, metadata)
             out[key] = kind == 1 and slotsOf(key, metadata, false) or countOf(key, metadata, false)
         end
     end
-    if not next(out) then return false end
-    if requestedCount == 1 then return out[itemName(list[1])] end
+    if not next(out) then
+        return false
+    end
+    if requestedCount == 1 then
+        return out[itemName(list[1])]
+    end
     return out
 end
 
@@ -143,22 +182,34 @@ end
 -- silently, so the vocabulary is translated rather than passed through.
 local NOTIFY_TYPES = { info = true, success = true, warning = true, error = true }
 local NOTIFY_POSITIONS = {
-    top = 'top-center', bottom = 'bottom-center',
-    ['top-left'] = 'top-left', ['top-right'] = 'top-right',
-    ['bottom-left'] = 'bottom-left', ['bottom-right'] = 'bottom-right',
-    ['center-left'] = 'top-left', ['center-right'] = 'top-right',
+    top = 'top-center',
+    bottom = 'bottom-center',
+    ['top-left'] = 'top-left',
+    ['top-right'] = 'top-right',
+    ['bottom-left'] = 'bottom-left',
+    ['bottom-right'] = 'bottom-right',
+    ['center-left'] = 'top-left',
+    ['center-right'] = 'top-right',
 }
 
 -- ox_lib inputDialog row types mapped onto QB.nui.openInputDialog field types.
 -- Anything outside this set degrades to a text field rather than erroring,
 -- matching how the qb-input compat shim in qblib handles unknown types.
 local KEYBOARD_TYPES = {
-    input = 'text', text = 'text', password = 'password', textarea = 'textarea',
-    number = 'number', checkbox = 'checkbox', select = 'select', ['multi-select'] = 'multiselect',
+    input = 'text',
+    text = 'text',
+    password = 'password',
+    textarea = 'textarea',
+    number = 'number',
+    checkbox = 'checkbox',
+    select = 'select',
+    ['multi-select'] = 'multiselect',
 }
 
 local function progressProps(prop)
-    if type(prop) ~= 'table' then return nil end
+    if type(prop) ~= 'table' then
+        return nil
+    end
     local source = prop.model and { prop } or prop
     local mapped = {}
     for _, entry in ipairs(source) do
@@ -178,7 +229,7 @@ end
 -- Upstream keeps this in a plain local (src/client.lua:22); see setStashTarget.
 local stashTarget
 
-local Ox = {
+local ox = {
     -- Call client.lua's globals directly, NOT exports.qbinventory:openInventory.
     -- This file used to re-enter the export while also registering itself into
     -- the same flat table below, so after load the export resolved back to this
@@ -186,38 +237,59 @@ local Ox = {
     openInventory = function(invType, data)
         -- Read back setStashTarget's stored target. Upstream does the same
         -- substitution from its secondary-inventory keybind (src/client.lua:819).
-        if invType == 'stash' and data == nil and stashTarget then data = stashTarget end
-        return openInventory(invType, data)
+        if invType == 'stash' and data == nil and stashTarget then
+            data = stashTarget
+        end
+        return inventoryApi.openInventory(invType, data)
     end,
-    closeInventory = function() return closeInventory() end,
-    useSlot = function(slot) return exports.qbinventory:submitIntent({ action = 'use', slot = slot }) end,
+    closeInventory = function()
+        return inventoryApi.closeInventory()
+    end,
+    useSlot = function(slot)
+        return exports.qbinventory:submitIntent({ action = 'use', slot = slot })
+    end,
     useItem = function(data, cb)
         local slot = type(data) == 'table' and data.slot or data
         local ok = exports.qbinventory:submitIntent({ action = 'use', slot = slot })
-        if cb then cb(ok) end
+        if cb then
+            cb(ok)
+        end
         return ok
     end,
-    openNearbyInventory = function() return exports.qbinventory:requestGiveTarget() end,
+    openNearbyInventory = function()
+        return exports.qbinventory:requestGiveTarget()
+    end,
     giveItemToTarget = function(serverId, slot, count)
         return exports.qbinventory:submitIntent({
-            action = 'give', target = serverId, slot = slot, amount = count,
+            action = 'give',
+            target = serverId,
+            slot = slot,
+            amount = count,
         })
     end,
-    GetPlayerItems = function() return QbInventory.copy(items()) end,
+    GetPlayerItems = function()
+        return QbInventory.copy(items())
+    end,
     GetPlayerWeight = weight,
     GetPlayerMaxWeight = maxWeight,
     -- (itemName, metadata, strict); strict defaults to PARTIAL metadata
     -- matching, which is upstream's default -- see metadataMatches above.
     GetItemCount = function(name, metadata, strict)
-        if not itemDef(name) then return 0 end
+        if not itemDef(name) then
+            return 0
+        end
         return countOf(name, normaliseMetadata(metadata), strict)
     end,
     GetSlotWithItem = function(name, metadata, strict)
-        if not itemDef(name) then return nil end
+        if not itemDef(name) then
+            return nil
+        end
         return slotsOf(name, normaliseMetadata(metadata), strict)[1]
     end,
     GetSlotIdWithItem = function(name, metadata, strict)
-        if not itemDef(name) then return nil end
+        if not itemDef(name) then
+            return nil
+        end
         local item = slotsOf(name, normaliseMetadata(metadata), strict)[1]
         return item and item.slot
     end,
@@ -226,15 +298,21 @@ local Ox = {
     -- made `if not exports.ox_inventory:GetSlotsWithItem(bad) then` -- the
     -- documented unknown-item guard -- never fire.
     GetSlotsWithItem = function(name, metadata, strict)
-        if not itemDef(name) then return nil end
+        if not itemDef(name) then
+            return nil
+        end
         return slotsOf(name, normaliseMetadata(metadata), strict)
     end,
     Search = search,
     -- Lower-cased like every other lookup in this file: qbcore's shared items
     -- table is keyed lower-case, so `Items('WEAPON_PISTOL')` would otherwise
     -- miss while GetItemCount('WEAPON_PISTOL') resolves it fine.
-    Items = function(name) return name and itemDef(name) or sharedItems() end,
-    ItemList = function(name) return name and itemDef(name) or sharedItems() end,
+    Items = function(name)
+        return name and itemDef(name) or sharedItems()
+    end,
+    ItemList = function(name)
+        return name and itemDef(name) or sharedItems()
+    end,
     setStashTarget = function(id, owner)
         -- Upstream stores this in a local and its SECONDARY-inventory keybind
         -- opens it (src/client.lua:819). qbinventory owns no secondary keybind
@@ -258,7 +336,9 @@ local Ox = {
     -- server deciding to emit. Deliberate no-op.
     suppressItemNotifications = function() end,
     notify = function(data)
-        if type(data) ~= 'table' then return end
+        if type(data) ~= 'table' then
+            return
+        end
         -- Upstream (src/modules/utils/client.lua:Utils.Notify) moves `text`
         -- onto `description` before notifying; this file passed `data` straight
         -- to QB.notify.send, whose body field is `message`, so the notification
@@ -268,9 +348,15 @@ local Ox = {
         local payload = QbInventory.copy(data)
         payload.message = payload.message or payload.description or payload.text
         payload.description, payload.text = nil, nil
-        if payload.type == 'inform' then payload.type = 'info' end
-        if payload.type ~= nil and not NOTIFY_TYPES[payload.type] then payload.type = nil end
-        if payload.position ~= nil then payload.position = NOTIFY_POSITIONS[payload.position] end
+        if payload.type == 'inform' then
+            payload.type = 'info'
+        end
+        if payload.type ~= nil and not NOTIFY_TYPES[payload.type] then
+            payload.type = nil
+        end
+        if payload.position ~= nil then
+            payload.position = NOTIFY_POSITIONS[payload.position]
+        end
         return QB.notify.send(payload)
     end,
     -- Upstream: `local success = lib.progressBar(options); if completed then
@@ -278,7 +364,9 @@ local Ox = {
     -- completed. Dropping it left every ox caller that does its work inside the
     -- callback doing nothing at all.
     Progress = function(options, completed)
-        if type(options) ~= 'table' then return false end
+        if type(options) ~= 'table' then
+            return false
+        end
         local disable = options.disable or {}
         local anim = options.anim
         local scenario = anim and anim.scenario
@@ -289,24 +377,35 @@ local Ox = {
             disable = { move = disable.move, combat = disable.combat, car = disable.car },
             -- ox names the clip `clip`; qb-progressbar callers say `anim`.
             anim = anim and not scenario and {
-                dict = anim.dict, clip = anim.clip or anim.anim, flag = anim.flag,
-                blendIn = anim.blendIn, blendOut = anim.blendOut,
+                dict = anim.dict,
+                clip = anim.clip or anim.anim,
+                flag = anim.flag,
+                blendIn = anim.blendIn,
+                blendOut = anim.blendOut,
             } or nil,
             scenario = scenario and { name = scenario } or nil,
             props = progressProps(options.prop or options.props),
         })
         success = success == true
-        if completed then completed(not success) end
+        if completed then
+            completed(not success)
+        end
         return success
     end,
-    ProgressActive = function() return QB.progressbar.isActive() end,
-    CancelProgress = function() return QB.progressbar.cancel() end,
+    ProgressActive = function()
+        return QB.progressbar.isActive()
+    end,
+    CancelProgress = function()
+        return QB.progressbar.cancel()
+    end,
     -- Upstream is `exports('Keyboard', lib.inputDialog)`: (heading, rows) in,
     -- an array of values POSITIONALLY aligned with `rows` out, or nil on
     -- cancel. qblib's dialog is id-keyed, so the row index is used as the id
     -- and the result is re-flattened back into upstream's array shape.
     Keyboard = function(heading, rows)
-        if type(rows) ~= 'table' then return nil end
+        if type(rows) ~= 'table' then
+            return nil
+        end
         local fields = {}
         for index, row in ipairs(rows) do
             local spec = type(row) == 'table' and row or { label = tostring(row) }
@@ -314,8 +413,12 @@ local Ox = {
                 id = tostring(index),
                 label = spec.label or spec.placeholder or ('Field %d'):format(index),
                 type = KEYBOARD_TYPES[spec.type or 'input'] or 'text',
-                default = spec.default, placeholder = spec.placeholder,
-                required = spec.required, min = spec.min, max = spec.max, options = spec.options,
+                default = spec.default,
+                placeholder = spec.placeholder,
+                required = spec.required,
+                min = spec.min,
+                max = spec.max,
+                options = spec.options,
             }
         end
         local result = QB.nui.openInputDialog(fields, heading)
@@ -323,7 +426,9 @@ local Ox = {
             return nil
         end
         local out = {}
-        for index = 1, #fields do out[index] = result.values[tostring(index)] end
+        for index = 1, #fields do
+            out[index] = result.values[tostring(index)]
+        end
         return out
     end,
     -- No backing subsystem. Upstream blocks the weapon wheel and pickup rewards
@@ -349,14 +454,20 @@ local Ox = {
 -- slot rather than the equipped one. It is still closer than the hardcoded nil
 -- it replaces, which made every ox durability/ammo caller a silent no-op.
 -- Defined outside the table literal so it can walk the raw item list.
-function Ox.getCurrentWeapon()
+function ox.getCurrentWeapon()
     local selected = QB.cache.weapon()
-    if not selected or selected == joaat('weapon_unarmed') then return nil end
+    if not selected or selected == joaat('weapon_unarmed') then
+        return nil
+    end
     local best
     for _, item in pairs(items()) do
         local name = itemName(item.name)
-        if name and name:sub(1, 7) == 'weapon_' and joaat(name) == selected
-            and (not best or (item.slot or 0) < (best.slot or 0)) then
+        if
+            name
+            and name:sub(1, 7) == 'weapon_'
+            and joaat(name) == selected
+            and (not best or (item.slot or 0) < (best.slot or 0))
+        then
             best = item
         end
     end
@@ -371,6 +482,8 @@ end
 -- resource in the server -- client_scripts load client.lua first, so the later
 -- registration won -- and qbpolice, qbambulance, qbclothing and
 -- qblib-playground all call exports.qbinventory:openInventory(...).
-for name, fn in pairs(Ox) do
-    AddEventHandler(('__cfx_export_ox_inventory_%s'):format(name), function(setCB) setCB(fn) end)
+for name, fn in pairs(ox) do
+    AddEventHandler(('__cfx_export_ox_inventory_%s'):format(name), function(setCB)
+        setCB(fn)
+    end)
 end

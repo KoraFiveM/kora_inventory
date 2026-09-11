@@ -22,9 +22,9 @@
 QbInventory = QbInventory or {}
 QbInventory.compat = QbInventory.compat or {}
 
-local I = QbInventory
-local core = assert(I.internal, 'qbinventory ox adapter loaded before server authority')
-local Ox = {}
+local inventory = QbInventory
+local core = assert(inventory.internal, 'qbinventory ox adapter loaded before server authority')
+local ox = {}
 
 local function copy(value)
     return core.copy(value)
@@ -35,22 +35,34 @@ local function countOf(item)
 end
 
 local function itemMetadata(item)
-    if type(item) ~= 'table' then return {} end
+    if type(item) ~= 'table' then
+        return {}
+    end
     return item.metadata or item.info or {}
 end
 
 -- Upstream's assertMetadata: anything that is not a table becomes { type = it }.
 local function normaliseMetadata(metadata)
-    if metadata == nil then return nil end
-    if type(metadata) == 'table' then return copy(metadata) end
+    if metadata == nil then
+        return nil
+    end
+    if type(metadata) == 'table' then
+        return copy(metadata)
+    end
     return { type = metadata }
 end
 
 local function contains(actual, expected)
-    if expected == nil then return true end
-    if type(actual) ~= 'table' or type(expected) ~= 'table' then return actual == expected end
+    if expected == nil then
+        return true
+    end
+    if type(actual) ~= 'table' or type(expected) ~= 'table' then
+        return actual == expected
+    end
     for key, value in pairs(expected) do
-        if not contains(actual[key], value) then return false end
+        if not contains(actual[key], value) then
+            return false
+        end
     end
     return true
 end
@@ -68,8 +80,12 @@ end
 -- upstream (GetItemSlots, RemoveItem) apply that default themselves.
 local function metadataMatches(actual, metadata, strict)
     metadata = normaliseMetadata(metadata)
-    if metadata == nil then return true end
-    if strict then return identical(actual or {}, metadata) end
+    if metadata == nil then
+        return true
+    end
+    if strict then
+        return identical(actual or {}, metadata)
+    end
     return contains(actual or {}, metadata)
 end
 
@@ -89,9 +105,13 @@ local function canonicalName(item)
     elseif type(item) == 'string' then
         name = item
     end
-    if not name then return nil, nil end
+    if not name then
+        return nil, nil
+    end
     local def = core.itemDef(name)
-    if not def then return nil, nil end
+    if not def then
+        return nil, nil
+    end
     return def.name or name:lower(), def
 end
 
@@ -100,7 +120,9 @@ local function itemName(item)
 end
 
 local function toOxItem(item)
-    if not item then return nil end
+    if not item then
+        return nil
+    end
     local out = copy(item)
     out.count = countOf(item)
     out.amount = out.count -- qbinventory callers retain their native field.
@@ -130,7 +152,9 @@ end
 -- persistence markDirty). Callers that only READ the snapshot behave the same
 -- as upstream; callers that mutate it were relying on a hole we will not open.
 local function toOxInventory(key, inv)
-    if not inv then return nil end
+    if not inv then
+        return nil
+    end
     return {
         id = inv.id,
         key = key,
@@ -154,31 +178,45 @@ end
 -- is a server.lua change, not an adapter one.
 local function matchingSlots(inv, requested, metadata, strict)
     local name = itemName(requested)
-    if not inv or not name then return nil end
+    if not inv or not name then
+        return nil
+    end
     local matches = {}
     for rawSlot, slotItem in pairs(inv.items or {}) do
         if slotItem and slotItem.name == name and metadataMatches(itemMetadata(slotItem), metadata, strict) then
             local slot = tonumber(rawSlot) or slotItem.slot
-            if slot then matches[#matches + 1] = { slot = slot, item = slotItem } end
+            if slot then
+                matches[#matches + 1] = { slot = slot, item = slotItem }
+            end
         end
     end
-    table.sort(matches, function(a, b) return a.slot < b.slot end)
+    table.sort(matches, function(a, b)
+        return a.slot < b.slot
+    end)
     return matches
 end
 
 local function mutateItems(reference, callback)
     local key, inv = resolve(reference)
-    if not key or not inv then return false, 'invalid_inventory' end
+    if not key or not inv then
+        return false, 'invalid_inventory'
+    end
     return core.lock({ key }, function()
         -- Resolve inside the lock; player inventory views are rebuilt from
         -- qbcore and must never be retained across the critical section.
         local currentKey, current = resolve(key)
-        if not currentKey or not current then return false, 'invalid_inventory' end
+        if not currentKey or not current then
+            return false, 'invalid_inventory'
+        end
         local items = copy(current.items)
         local ok, result, extra = callback(current, items)
-        if not ok then return false, result end
+        if not ok then
+            return false, result
+        end
         local stored, err = core.setInventoryItems(currentKey, items)
-        if not stored then return false, err or 'inventory_update_failed' end
+        if not stored then
+            return false, err or 'inventory_update_failed'
+        end
         return true, result, extra
     end)
 end
@@ -191,9 +229,13 @@ end
 
 local function changeInventoryDimensions(reference, field, value)
     local key, inv = resolve(reference)
-    if not key or not inv then return end
+    if not key or not inv then
+        return
+    end
     value = math.floor(tonumber(value) or 0)
-    if value <= 0 then return end
+    if value <= 0 then
+        return
+    end
     if inv.type == 'player' then
         -- ACCEPTED DIVERGENCE: player dimensions are qbcore configuration, not a
         -- mutable secondary record. Pretending to accept this would create a
@@ -202,7 +244,9 @@ local function changeInventoryDimensions(reference, field, value)
     end
     core.lock({ key }, function()
         local currentKey, current = resolve(key)
-        if not currentKey or not current then return end
+        if not currentKey or not current then
+            return
+        end
         if field == 'slots' then
             for rawSlot in pairs(current.items or {}) do
                 if (tonumber(rawSlot) or 0) > value then
@@ -220,97 +264,131 @@ end
 
 -- Inventory/getter exports --------------------------------------------------
 
-function Ox.Inventory(reference, owner)
-    return Ox.GetInventory(reference, owner)
+function ox.Inventory(reference, owner)
+    return ox.GetInventory(reference, owner)
 end
 
-function Ox.GetInventory(reference, owner)
+function ox.GetInventory(reference, owner)
     local key, inv = resolve(reference, owner)
     return toOxInventory(key, inv)
 end
 
-function Ox.GetInventoryItems(reference, owner)
+function ox.GetInventoryItems(reference, owner)
     local key, inv = resolve(reference, owner)
-    if not key or not inv then return nil end
+    if not key or not inv then
+        return nil
+    end
     return toOxItems(inv.items)
 end
 
-function Ox.GetSlot(reference, slot)
+function ox.GetSlot(reference, slot)
     local _, inv = resolve(reference)
     slot = math.floor(tonumber(slot) or 0)
     return inv and slot > 0 and toOxItem(inv.items[slot]) or nil
 end
 
-function Ox.GetEmptySlot(reference)
+function ox.GetEmptySlot(reference)
     local _, inv = resolve(reference)
-    if not inv then return nil end
-    for slot = 1, inv.slots do if not inv.items[slot] then return slot end end
+    if not inv then
+        return nil
+    end
+    for slot = 1, inv.slots do
+        if not inv.items[slot] then
+            return slot
+        end
+    end
 end
 
-function Ox.GetSlotForItem(reference, item, metadata)
+function ox.GetSlotForItem(reference, item, metadata)
     local _, inv = resolve(reference)
     local wanted = itemName(item)
-    if not inv or not wanted then return nil end
+    if not inv or not wanted then
+        return nil
+    end
     local empty
     for slot = 1, inv.slots do
         local current = inv.items[slot]
-        if not current and not empty then empty = slot end
+        if not current and not empty then
+            empty = slot
+        end
         -- Upstream gates the stack branch on item.stack and uses table.matches.
-        if current and current.name == wanted and not current.unique
-            and metadataMatches(itemMetadata(current), metadata, true) then
+        if
+            current
+            and current.name == wanted
+            and not current.unique
+            and metadataMatches(itemMetadata(current), metadata, true)
+        then
             return slot
         end
     end
     return empty
 end
 
-function Ox.GetSlotWithItem(reference, item, metadata, strict)
+function ox.GetSlotWithItem(reference, item, metadata, strict)
     local _, inv = resolve(reference)
     local found = matchingSlots(inv, item, metadata, strict)
-    if not found then return nil end
+    if not found then
+        return nil
+    end
     return found[1] and toOxItem(found[1].item) or nil
 end
 
-function Ox.GetSlotIdWithItem(reference, item, metadata, strict)
-    local slot = Ox.GetSlotWithItem(reference, item, metadata, strict)
+function ox.GetSlotIdWithItem(reference, item, metadata, strict)
+    local slot = ox.GetSlotWithItem(reference, item, metadata, strict)
     return slot and slot.slot or nil
 end
 
-function Ox.GetSlotsWithItem(reference, item, metadata, strict)
+function ox.GetSlotsWithItem(reference, item, metadata, strict)
     local _, inv = resolve(reference)
     local found = matchingSlots(inv, item, metadata, strict)
-    if not found then return nil end
+    if not found then
+        return nil
+    end
     local out = {}
-    for _, match in ipairs(found) do out[#out + 1] = toOxItem(match.item) end
+    for _, match in ipairs(found) do
+        out[#out + 1] = toOxItem(match.item)
+    end
     return out
 end
 
-function Ox.GetSlotIdsWithItem(reference, item, metadata, strict)
+function ox.GetSlotIdsWithItem(reference, item, metadata, strict)
     local _, inv = resolve(reference)
     local found = matchingSlots(inv, item, metadata, strict)
-    if not found then return nil end
+    if not found then
+        return nil
+    end
     local out = {}
-    for _, match in ipairs(found) do out[#out + 1] = match.slot end
+    for _, match in ipairs(found) do
+        out[#out + 1] = match.slot
+    end
     return out
 end
 
 -- Unlike the GetSlot* family this returns 0, not nil, for an unresolvable
 -- inventory or item -- upstream's `if not inventory or not item then return 0 end`.
-function Ox.GetItemCount(reference, item, metadata, strict)
+function ox.GetItemCount(reference, item, metadata, strict)
     local _, inv = resolve(reference)
     local found = matchingSlots(inv, item, metadata, strict)
-    if not found then return 0 end
+    if not found then
+        return 0
+    end
     local total = 0
-    for _, match in ipairs(found) do total = total + countOf(match.item) end
+    for _, match in ipairs(found) do
+        total = total + countOf(match.item)
+    end
     return total
 end
 
-function Ox.GetItem(reference, item, metadata, returnsCount)
+function ox.GetItem(reference, item, metadata, returnsCount)
     local name, definition = canonicalName(item)
-    if not name or not definition then return nil end
+    if not name or not definition then
+        return nil
+    end
     -- Upstream counts with table.contains, i.e. partial metadata matching.
-    local count = Ox.GetItemCount(reference, name, metadata, false)
-    if returnsCount then return count end
+    local count = ox.GetItemCount(reference, name, metadata, false)
+    if returnsCount then
+        return count
+    end
     local out = copy(definition)
     out.name = out.name or name
     out.count = count
@@ -321,22 +399,38 @@ end
 -- merely a bare string -- returns the single result directly, anything longer
 -- returns a name-keyed table. Names are lowercased and `weapon_` prefixes are
 -- uppercased before use, and matching is partial (table.contains).
-function Ox.Search(reference, search, items, metadata)
-    if items == nil then return false end
+function ox.Search(reference, search, items, metadata)
+    if items == nil then
+        return false
+    end
     local _, inv = resolve(reference)
-    if not inv then return false end
-    if search == 'slots' then search = 1 elseif search == 'count' then search = 2 end
-    if search ~= 1 and search ~= 2 then return false end
+    if not inv then
+        return false
+    end
+    if search == 'slots' then
+        search = 1
+    elseif search == 'count' then
+        search = 2
+    end
+    if search ~= 1 and search ~= 2 then
+        return false
+    end
     local requested = type(items) == 'string' and { items } or items
-    if type(requested) ~= 'table' then return false end
+    if type(requested) ~= 'table' then
+        return false
+    end
     local itemCount = #requested
     local result, firstKey = {}, nil
     for index = 1, itemCount do
         local raw = requested[index]
         local name = type(raw) == 'string' and raw:lower() or nil
-        if name and name:sub(1, 7) == 'weapon_' then name = name:upper() end
+        if name and name:sub(1, 7) == 'weapon_' then
+            name = name:upper()
+        end
         if name then
-            if not firstKey then firstKey = name end
+            if not firstKey then
+                firstKey = name
+            end
             if search == 1 then
                 local slots = {}
                 for _, match in ipairs(matchingSlots(inv, name, metadata, false) or {}) do
@@ -344,16 +438,20 @@ function Ox.Search(reference, search, items, metadata)
                 end
                 result[name] = slots
             else
-                result[name] = Ox.GetItemCount(inv, name, metadata, false)
+                result[name] = ox.GetItemCount(inv, name, metadata, false)
             end
         end
     end
-    if not next(result) then return false end
+    if not next(result) then
+        return false
+    end
     -- Upstream indexes the single result with the caller's RAW name
     -- (`returnData[items[1]]`), so its own mixed-case input returns nil there.
     -- Use the normalised key instead: same result for well-formed input, and a
     -- useful one instead of nil for 'WATER'.
-    if itemCount == 1 then return result[firstKey] end
+    if itemCount == 1 then
+        return result[firstKey]
+    end
     return result
 end
 
@@ -361,10 +459,12 @@ end
 
 -- Upstream returns nil (not false) when the item or inventory cannot be
 -- resolved, so `== false` and `== nil` mean different things to a caller.
-function Ox.CanCarryItem(reference, item, count, metadata)
+function ox.CanCarryItem(reference, item, count, metadata)
     local name = itemName(item)
     local key = select(1, resolve(reference))
-    if not name or not key then return nil end
+    if not name or not key then
+        return nil
+    end
     -- Weight AND slot capacity are checked by the authority, which is stricter
     -- than upstream's inline arithmetic and is the same check every write uses.
     local ok = core.canAdd(key, name, count or 1, nil, normaliseMetadata(metadata) or {})
@@ -375,20 +475,26 @@ end
 -- with no free-slot term and no clamp at zero, so an overweight inventory
 -- reports a negative figure. Matching that keeps callers that compare against
 -- their own requested count behaving identically.
-function Ox.CanCarryAmount(reference, item)
+function ox.CanCarryAmount(reference, item)
     local _, inv = resolve(reference)
     local _, definition = canonicalName(item)
-    if not inv or not definition then return nil end
+    if not inv or not definition then
+        return nil
+    end
     local weight = tonumber(definition.weight) or 0
     -- Upstream divides unguarded, which yields inf for a zero-weight item.
-    if weight <= 0 then return math.maxinteger end
+    if weight <= 0 then
+        return math.maxinteger
+    end
     return math.floor((inv.maxWeight - core.totalWeight(inv.items)) / weight)
 end
 
-function Ox.CanCarryWeight(reference, weight)
+function ox.CanCarryWeight(reference, weight)
     local _, inv = resolve(reference)
     weight = tonumber(weight)
-    if not inv or not weight then return nil end
+    if not inv or not weight then
+        return nil
+    end
     local available = inv.maxWeight - core.totalWeight(inv.items)
     return available >= weight, available
 end
@@ -396,20 +502,32 @@ end
 -- Mutating item exports. All mutations acquire a single deterministic lock
 -- and use the authority's qbcore-aware write funnel / secondary persistence.
 
-function Ox.AddItem(reference, item, count, metadata, slot, callback)
+function ox.AddItem(reference, item, count, metadata, slot, callback)
     local name = itemName(item)
     count = math.floor(tonumber(count) or 0)
-    if not name then return false, 'invalid_item' end
-    if count <= 0 then return false, 'invalid_count' end
+    if not name then
+        return false, 'invalid_item'
+    end
+    if count <= 0 then
+        return false, 'invalid_count'
+    end
     local key, inv = resolve(reference)
-    if not key or not inv then return false, 'invalid_inventory' end
+    if not key or not inv then
+        return false, 'invalid_inventory'
+    end
     local carried, why = core.canAdd(key, name, count, slot, normaliseMetadata(metadata) or {})
-    if not carried then return false, why or 'inventory_full' end
+    if not carried then
+        return false, why or 'inventory_full'
+    end
     local success, response = core.lock({ key }, function()
         local currentKey, current = resolve(key)
-        if not currentKey or not current then return false, 'invalid_inventory' end
+        if not currentKey or not current then
+            return false, 'invalid_inventory'
+        end
         local ok, result = core.addTo(currentKey, name, count, slot, normaliseMetadata(metadata) or {})
-        if not ok then return false, result end
+        if not ok then
+            return false, result
+        end
         core.bump(currentKey)
         core.broadcast(currentKey)
         local targetSlot = tonumber(result) or tonumber(slot)
@@ -420,7 +538,9 @@ function Ox.AddItem(reference, item, count, metadata, slot, callback)
         end
         return true, toOxItem(itemResult)
     end)
-    if callback then return callback(success, response) end
+    if callback then
+        return callback(success, response)
+    end
     return success, response
 end
 
@@ -428,45 +548,74 @@ end
 -- number that rounds to <= 0 is 'negative_count', and a shortfall in a NAMED
 -- slot is 'not_enough_items_in_slot' rather than the whole-inventory
 -- 'not_enough_items'. Third-party code branches on these strings.
-function Ox.RemoveItem(reference, item, count, metadata, slot, ignoreTotal, strict)
+function ox.RemoveItem(reference, item, count, metadata, slot, ignoreTotal, strict)
     local name = itemName(item)
-    if not name then return false, 'invalid_item' end
-    if tonumber(count) == nil then return false, 'invalid_count' end
+    if not name then
+        return false, 'invalid_item'
+    end
+    if tonumber(count) == nil then
+        return false, 'invalid_count'
+    end
     count = math.floor(tonumber(count) + 0.5)
-    if count <= 0 then return false, 'negative_count' end
+    if count <= 0 then
+        return false, 'negative_count'
+    end
     -- One of only two exports that default to STRICT metadata matching.
-    if strict == nil then strict = true end
+    if strict == nil then
+        strict = true
+    end
     local key, inv = resolve(reference)
-    if not key or not inv then return false, 'invalid_inventory' end
+    if not key or not inv then
+        return false, 'invalid_inventory'
+    end
     return core.lock({ key }, function()
         local currentKey, current = resolve(key)
-        if not currentKey or not current then return false, 'invalid_inventory' end
+        if not currentKey or not current then
+            return false, 'invalid_inventory'
+        end
         local candidates = {}
         if slot then
             slot = math.floor(tonumber(slot) or 0)
             local currentItem = current.items[slot]
-            if not currentItem or currentItem.name ~= name
-                or not metadataMatches(itemMetadata(currentItem), metadata, strict) then
+            if
+                not currentItem
+                or currentItem.name ~= name
+                or not metadataMatches(itemMetadata(currentItem), metadata, strict)
+            then
                 return false, 'no_item_in_slot'
             end
             local held = countOf(currentItem)
-            if count > held and not ignoreTotal then return false, 'not_enough_items_in_slot' end
+            if count > held and not ignoreTotal then
+                return false, 'not_enough_items_in_slot'
+            end
             candidates[1] = { slot = slot, amount = held }
         else
             candidates = matchingSlots(current, name, metadata, strict) or {}
-            for _, candidate in ipairs(candidates) do candidate.amount = countOf(candidate.item) end
+            for _, candidate in ipairs(candidates) do
+                candidate.amount = countOf(candidate.item)
+            end
         end
         local available = 0
-        for _, candidate in ipairs(candidates) do available = available + candidate.amount end
-        if available < count and not ignoreTotal then return false, 'not_enough_items' end
+        for _, candidate in ipairs(candidates) do
+            available = available + candidate.amount
+        end
+        if available < count and not ignoreTotal then
+            return false, 'not_enough_items'
+        end
         local wanted = math.min(count, available)
-        if wanted <= 0 then return false, 'not_enough_items' end
+        if wanted <= 0 then
+            return false, 'not_enough_items'
+        end
         local remaining = wanted
         for _, candidate in ipairs(candidates) do
-            if remaining <= 0 then break end
+            if remaining <= 0 then
+                break
+            end
             local take = math.min(remaining, candidate.amount)
             local ok, err = core.removeFrom(currentKey, candidate.slot, take)
-            if not ok then return false, err or 'remove_failed' end
+            if not ok then
+                return false, err or 'remove_failed'
+            end
             remaining = remaining - take
         end
         core.bump(currentKey)
@@ -475,22 +624,30 @@ function Ox.RemoveItem(reference, item, count, metadata, slot, ignoreTotal, stri
     end)
 end
 
-function Ox.SetItem(reference, item, count, metadata)
+function ox.SetItem(reference, item, count, metadata)
     local name = itemName(item)
     count = math.floor(tonumber(count) or -1)
-    if not name then return false, 'invalid_item' end
-    if count < 0 then return false, 'invalid_count' end
+    if not name then
+        return false, 'invalid_item'
+    end
+    if count < 0 then
+        return false, 'invalid_count'
+    end
     -- Upstream reads the current total through GetItem, i.e. PARTIAL matching.
-    local current = Ox.GetItem(reference, name, metadata, true) or 0
-    if current == count then return true end
-    if current < count then return Ox.AddItem(reference, name, count - current, metadata) end
-    return Ox.RemoveItem(reference, name, current - count, metadata, nil, false, true)
+    local current = ox.GetItem(reference, name, metadata, true) or 0
+    if current == count then
+        return true
+    end
+    if current < count then
+        return ox.AddItem(reference, name, count - current, metadata)
+    end
+    return ox.RemoveItem(reference, name, current - count, metadata, nil, false, true)
 end
 
 -- Upstream returns nothing from SetMetadata/SetDurability; the slot table is
 -- pushed to viewers instead. Anything this adapter refuses is printed, because
 -- a bare `return` would otherwise be indistinguishable from success.
-function Ox.SetMetadata(reference, slot, metadata)
+function ox.SetMetadata(reference, slot, metadata)
     if type(metadata) == 'table' and metadata.weight ~= nil then
         -- ACCEPTED DIVERGENCE: qbinventory's weight accounting uses the shared
         -- item definition only. Honouring metadata_weight_not_supported would
@@ -498,24 +655,32 @@ function Ox.SetMetadata(reference, slot, metadata)
         return warn('metadata_weight_not_supported (slot %s)', tostring(slot))
     end
     slot = math.floor(tonumber(slot) or 0)
-    if slot < 1 then return end
+    if slot < 1 then
+        return
+    end
     local clean = normaliseMetadata(metadata) or {}
     mutateItems(reference, function(_, items)
         local item = items[slot]
-        if not item then return false, 'empty_slot' end
+        if not item then
+            return false, 'empty_slot'
+        end
         item.info = copy(clean)
         item.metadata = copy(clean)
         return true
     end)
 end
 
-function Ox.SetDurability(reference, slot, durability)
+function ox.SetDurability(reference, slot, durability)
     slot = math.floor(tonumber(slot) or 0)
     durability = tonumber(durability)
-    if slot < 1 or not durability then return end
+    if slot < 1 or not durability then
+        return
+    end
     mutateItems(reference, function(_, items)
         local item = items[slot]
-        if not item then return false, 'empty_slot' end
+        if not item then
+            return false, 'empty_slot'
+        end
         local metadata = copy(itemMetadata(item))
         metadata.durability = durability
         item.info = copy(metadata)
@@ -524,11 +689,11 @@ function Ox.SetDurability(reference, slot, durability)
     end)
 end
 
-function Ox.SetSlotCount(reference, slots)
+function ox.SetSlotCount(reference, slots)
     changeInventoryDimensions(reference, 'slots', slots)
 end
 
-function Ox.SetMaxWeight(reference, maxWeight)
+function ox.SetMaxWeight(reference, maxWeight)
     changeInventoryDimensions(reference, 'maxWeight', maxWeight)
 end
 
@@ -537,16 +702,19 @@ end
 -- Callers index it by slot id and read `totalCount`; an array of item tables
 -- (what this used to return) silently reads as empty for both.
 -- One of only two exports that default to strict metadata matching.
-function Ox.GetItemSlots(reference, item, metadata, strict)
+function ox.GetItemSlots(reference, item, metadata, strict)
     local _, inv = resolve(reference)
     local name = itemName(item)
-    if not inv or not inv.slots or not name then return nil end
-    if strict == nil then strict = true end
+    if not inv or not inv.slots or not name then
+        return nil
+    end
+    if strict == nil then
+        strict = true
+    end
     local slots, totalCount, emptySlots = {}, 0, inv.slots
     for rawSlot, slotItem in pairs(inv.items or {}) do
         emptySlots = emptySlots - 1
-        if slotItem and slotItem.name == name
-            and metadataMatches(itemMetadata(slotItem), metadata, strict) then
+        if slotItem and slotItem.name == name and metadataMatches(itemMetadata(slotItem), metadata, strict) then
             local slot = tonumber(rawSlot) or slotItem.slot
             if slot then
                 local held = countOf(slotItem)
@@ -561,15 +729,21 @@ end
 -- Upstream keys the bound container off `metadata.container` and sizes a
 -- missing one from `metadata.size` = { slots, maxWeight }. qbinventory's own
 -- container domain writes `info.containerId`, so both spellings are accepted.
-function Ox.GetContainerFromSlot(reference, slot)
+function ox.GetContainerFromSlot(reference, slot)
     local key, inv = resolve(reference)
     slot = math.floor(tonumber(slot) or 0)
-    if not inv or slot < 1 then return nil end
+    if not inv or slot < 1 then
+        return nil
+    end
     local slotItem = inv.items[slot]
-    if not slotItem then return nil end
+    if not slotItem then
+        return nil
+    end
     local metadata = itemMetadata(slotItem)
     local id = metadata.container or metadata.containerId
-    if id == nil then return nil end
+    if id == nil then
+        return nil
+    end
     local containerKey, container = resolve(core.key('container', id))
     if not container then
         local size = type(metadata.size) == 'table' and metadata.size or {}
@@ -586,13 +760,17 @@ function Ox.GetContainerFromSlot(reference, slot)
         })
         containerKey = container and container.key or nil
     end
-    if not container then return nil end
+    if not container then
+        return nil
+    end
     return toOxInventory(containerKey, container)
 end
 
-function Ox.RemoveInventory(reference)
+function ox.RemoveInventory(reference)
     local key, inv = resolve(reference)
-    if not key or not inv or inv.type == 'player' then return end
+    if not key or not inv or inv.type == 'player' then
+        return
+    end
     core.removeSecondary(key)
 end
 
@@ -603,13 +781,17 @@ end
 -- inventory table into `fromSlot`, where tonumber() produced nil -> 0 and the
 -- call could only ever fail.
 ---@return table|nil fromSlot, table|nil toSlot  (or nil, string on failure)
-function Ox.SwapSlots(fromInventory, toInventory, slot1, slot2)
+function ox.SwapSlots(fromInventory, toInventory, slot1, slot2)
     slot1 = math.floor(tonumber(slot1) or 0)
     slot2 = math.floor(tonumber(slot2) or 0)
-    if slot1 < 1 or slot2 < 1 then return nil, 'invalid_slot' end
+    if slot1 < 1 or slot2 < 1 then
+        return nil, 'invalid_slot'
+    end
     local fromKey = select(1, resolve(fromInventory))
     local toKey = select(1, resolve(toInventory))
-    if not fromKey or not toKey then return nil, 'invalid_inventory' end
+    if not fromKey or not toKey then
+        return nil, 'invalid_inventory'
+    end
     -- core.lock sorts its keys, so taking both here cannot deadlock against a
     -- concurrent transfer that happens to name the same pair the other way up.
     local ok, first, second = core.lock({ fromKey, toKey }, function()
@@ -618,21 +800,31 @@ function Ox.SwapSlots(fromInventory, toInventory, slot1, slot2)
         if not fromCurrentKey or not fromInv or not toCurrentKey or not toInv then
             return false, 'invalid_inventory'
         end
-        if slot1 > fromInv.slots or slot2 > toInv.slots then return false, 'invalid_slot' end
+        if slot1 > fromInv.slots or slot2 > toInv.slots then
+            return false, 'invalid_slot'
+        end
         local sameInventory = fromCurrentKey == toCurrentKey
         local fromItems = copy(fromInv.items)
         local toItems = sameInventory and fromItems or copy(toInv.items)
         local moved, displaced = fromItems[slot1], toItems[slot2]
-        if moved then moved.slot = slot2 end
-        if displaced then displaced.slot = slot1 end
+        if moved then
+            moved.slot = slot2
+        end
+        if displaced then
+            displaced.slot = slot1
+        end
         fromItems[slot1], toItems[slot2] = displaced, moved
         if sameInventory then
             local stored, err = core.setInventoryItems(fromCurrentKey, fromItems)
-            if not stored then return false, err or 'inventory_update_failed' end
+            if not stored then
+                return false, err or 'inventory_update_failed'
+            end
         else
             local previous = copy(fromInv.items)
             local stored, err = core.setInventoryItems(fromCurrentKey, fromItems)
-            if not stored then return false, err or 'inventory_update_failed' end
+            if not stored then
+                return false, err or 'inventory_update_failed'
+            end
             local applied, applyErr = core.setInventoryItems(toCurrentKey, toItems)
             if not applied then
                 -- A half-applied cross-inventory swap duplicates or destroys an
@@ -643,7 +835,9 @@ function Ox.SwapSlots(fromInventory, toInventory, slot1, slot2)
         end
         return true, toOxItem(moved), toOxItem(displaced)
     end)
-    if not ok then return nil, first or 'swap_failed' end
+    if not ok then
+        return nil, first or 'swap_failed'
+    end
     return first, second
 end
 
@@ -651,42 +845,61 @@ end
 -- `testItem` if `firstCount` of `firstItem` left it? The previous "advisory"
 -- stub returned true for any resolvable inventory and two non-nil names, which
 -- is not advisory -- it is an unconditional yes that callers acted on.
-function Ox.CanSwapItem(reference, firstItem, firstCount, testItem, testCount)
+function ox.CanSwapItem(reference, firstItem, firstCount, testItem, testCount)
     local _, inv = resolve(reference)
-    if not inv then return nil end
+    if not inv then
+        return nil
+    end
     local firstName, firstDef = canonicalName(firstItem)
     local _, testDef = canonicalName(testItem)
-    if not firstName or not firstDef or not testDef then return nil end
+    if not firstName or not firstDef or not testDef then
+        return nil
+    end
     firstCount = tonumber(firstCount) or 0
     testCount = tonumber(testCount) or 0
     -- Upstream falls through to nil (not false) when the inventory does not
     -- actually hold enough of the first item to give up.
-    if Ox.GetItemCount(inv, firstName, nil, false) < firstCount then return nil end
-    local weightWithoutFirst = core.totalWeight(inv.items)
-        - ((tonumber(firstDef.weight) or 0) * firstCount)
+    if ox.GetItemCount(inv, firstName, nil, false) < firstCount then
+        return nil
+    end
+    local weightWithoutFirst = core.totalWeight(inv.items) - ((tonumber(firstDef.weight) or 0) * firstCount)
     local weightWithTest = weightWithoutFirst + ((tonumber(testDef.weight) or 0) * testCount)
     return weightWithTest <= inv.maxWeight
 end
 
-function Ox.ClearInventory(reference, keep)
+function ox.ClearInventory(reference, keep)
     local key, inv = resolve(reference)
-    if not key or not inv then return end
+    if not key or not inv then
+        return
+    end
     local retained = {}
     local wanted = type(keep) == 'string' and { [keep] = true } or {}
-    if type(keep) == 'table' then for _, name in ipairs(keep) do wanted[name] = true end end
-    for slot, item in pairs(inv.items or {}) do if wanted[item.name] then retained[slot] = copy(item) end end
-    core.lock({ key }, function() return core.setInventoryItems(key, retained) end)
+    if type(keep) == 'table' then
+        for _, name in ipairs(keep) do
+            wanted[name] = true
+        end
+    end
+    for slot, item in pairs(inv.items or {}) do
+        if wanted[item.name] then
+            retained[slot] = copy(item)
+        end
+    end
+    core.lock({ key }, function()
+        return core.setInventoryItems(key, retained)
+    end)
 end
 
 -- `instance` is upstream's 8th parameter. qbinventory gates stash access on
 -- owner/groups/access plus the LIVE player's routing bucket, not on a value
 -- declared at registration time, so it is recorded on the record for callers
 -- that read it back and is deliberately NOT enforced as an access check.
-function Ox.RegisterStash(id, label, slots, maxWeight, owner, groups, coords, instance)
-    local stashKey = I.api.RegisterStash(id, label, slots, maxWeight, owner, groups, coords)
+function ox.RegisterStash(id, label, slots, maxWeight, owner, groups, coords, instance)
+    local stashKey = inventory.api.RegisterStash(id, label, slots, maxWeight, owner, groups, coords)
     if instance ~= nil and stashKey then
         local _, inv = resolve(stashKey)
-        if inv then inv.instance = instance end
+        if inv then
+            inv.instance = instance
+        end
     end
 end
 
@@ -703,26 +916,36 @@ end
 local function createDrop(prefix, items, coords, slots, maxWeight, instance, model)
     local label = tostring(prefix or 'Drop')
     return core.createSecondary('drop', transientId(label:lower():gsub('[^%w]', '')), {
-        label = label, items = items or {}, coords = coords, slots = slots,
-        maxWeight = maxWeight, temporary = true, instance = instance, model = model,
+        label = label,
+        items = items or {},
+        coords = coords,
+        slots = slots,
+        maxWeight = maxWeight,
+        temporary = true,
+        instance = instance,
+        model = model,
     })
 end
 
-function Ox.CreateTemporaryStash(properties)
+function ox.CreateTemporaryStash(properties)
     properties = type(properties) == 'table' and copy(properties) or {}
     -- Same collision as CustomDrop: server.lua derives its fallback id from a
     -- timestamp, so supply a unique one from here rather than letting two
     -- stashes created in the same tick resolve to one record.
-    if properties.id == nil then properties.id = transientId('temp') end
-    return I.api.CreateTemporaryStash(properties)
+    if properties.id == nil then
+        properties.id = transientId('temp')
+    end
+    return inventory.api.CreateTemporaryStash(properties)
 end
 
-function Ox.RegisterShop(shopType, shopDetails)
-    if type(shopDetails) ~= 'table' then return end
-    I.api.RegisterShop(shopType, shopDetails)
+function ox.RegisterShop(shopType, shopDetails)
+    if type(shopDetails) ~= 'table' then
+        return
+    end
+    inventory.api.RegisterShop(shopType, shopDetails)
 end
 
-function Ox.CustomDrop(prefix, items, coords, slots, maxWeight, instance, model)
+function ox.CustomDrop(prefix, items, coords, slots, maxWeight, instance, model)
     local inv = createDrop(prefix, items, coords, slots, maxWeight, instance, model)
     return inv and inv.id or nil
 end
@@ -731,16 +954,24 @@ end
 -- returning the drop id. Skipping the clear (as this used to) leaves the same
 -- items in both inventories -- a duplication bug, not a cosmetic one. The clear
 -- runs inside the SAME lock as the copy so nothing can be added in between.
-function Ox.CreateDropFromPlayer(playerId)
+function ox.CreateDropFromPlayer(playerId)
     playerId = tonumber(playerId)
-    if not playerId then return nil end
+    if not playerId then
+        return nil
+    end
     local key, inv = resolve(playerId)
-    if not key or not inv or not next(inv.items or {}) then return nil end
+    if not key or not inv or not next(inv.items or {}) then
+        return nil
+    end
     local ok, dropId = core.lock({ key }, function()
         local currentKey, current = resolve(key)
-        if not currentKey or not current or not next(current.items or {}) then return false end
+        if not currentKey or not current or not next(current.items or {}) then
+            return false
+        end
         local drop = createDrop('Drop', copy(current.items), nil, current.slots, current.maxWeight)
-        if not drop then return false end
+        if not drop then
+            return false
+        end
         local cleared = core.setInventoryItems(currentKey, {})
         if not cleared then
             -- Never leave a drop holding a copy of an inventory we failed to empty.
@@ -749,7 +980,9 @@ function Ox.CreateDropFromPlayer(playerId)
         end
         return true, drop.id
     end)
-    if not ok then return nil end
+    if not ok then
+        return nil
+    end
     return dropId
 end
 
@@ -758,11 +991,15 @@ end
 -- server -- adding one means new authority state in server.lua, driven by the
 -- client's weapon events. Until then this reports the first weapon-type slot
 -- found, which answers "is a weapon carried?" but NOT "which is drawn?".
-function Ox.GetCurrentWeapon(reference)
+function ox.GetCurrentWeapon(reference)
     local _, inv = resolve(reference)
-    if not inv then return nil end
+    if not inv then
+        return nil
+    end
     for _, item in pairs(inv.items or {}) do
-        if item.type == 'weapon' then return toOxItem(item) end
+        if item.type == 'weapon' then
+            return toOxItem(item)
+        end
     end
 end
 
@@ -771,8 +1008,12 @@ end
 -- qbinventory keys the same records as trunk:<PLATE> / glovebox:<PLATE>, so the
 -- kind names are mapped here and the plate is normalised the same way.
 local function normalisePlate(value)
-    if I.vehicles then return I.vehicles.normalisePlate(value) end
-    if type(value) ~= 'string' then return nil end
+    if inventory.vehicles then
+        return inventory.vehicles.normalisePlate(value)
+    end
+    if type(value) ~= 'string' then
+        return nil
+    end
     local plate = value:gsub('^%s*(.-)%s*$', '%1'):upper():gsub('%s+', ' ')
     return plate ~= '' and plate or nil
 end
@@ -782,14 +1023,18 @@ end
 -- lookup, session patch and persistence write went to the wrong place.
 -- core.rekeySecondary moves the registry entry, the durable row and any open
 -- viewers together. Returns nothing, like upstream.
-function Ox.UpdateVehicle(oldPlate, newPlate)
+function ox.UpdateVehicle(oldPlate, newPlate)
     local old, new = normalisePlate(oldPlate), normalisePlate(newPlate)
-    if not old or not new or old == new then return end
+    if not old or not new or old == new then
+        return
+    end
     for _, kind in ipairs({ 'trunk', 'glovebox' }) do
         local oldKey = core.key(kind, old)
         if select(2, resolve(oldKey)) then
             local _, err = core.rekeySecondary(oldKey, kind, new)
-            if err then warn('UpdateVehicle could not rekey %s: %s', oldKey, tostring(err)) end
+            if err then
+                warn('UpdateVehicle could not rekey %s: %s', oldKey, tostring(err))
+            end
         end
     end
 end
@@ -797,48 +1042,79 @@ end
 -- Upstream is InspectInventory(playerId, invId): the VIEWER comes FIRST. The
 -- old (target, source) order here inverted every upstream call site, opening
 -- the inspected player's panel on the inspector instead. Returns nothing.
-function Ox.InspectInventory(playerId, invId)
+function ox.InspectInventory(playerId, invId)
     playerId = tonumber(playerId)
-    if not playerId then return end
+    if not playerId then
+        return
+    end
     -- Upstream's `invId ~= playerId` guard: inspecting yourself is a no-op.
-    if invId == playerId or invId == nil then return end
+    if invId == playerId or invId == nil then
+        return
+    end
     local key = select(1, resolve(invId))
-    if not key then return end
+    if not key then
+        return
+    end
     core.open(playerId, key)
 end
 
-function Ox.ConfiscateInventory(source)
-    source = tonumber(source); if not source then return end
-    local key, inv = resolve(source); if not key or not inv then return end
+function ox.ConfiscateInventory(source)
+    source = tonumber(source)
+    if not source then
+        return
+    end
+    local key, inv = resolve(source)
+    if not key or not inv then
+        return
+    end
     -- Copy and clear under one lock, for the same reason CreateDropFromPlayer does.
     core.lock({ key }, function()
         local currentKey, current = resolve(key)
-        if not currentKey or not current then return end
+        if not currentKey or not current then
+            return
+        end
         local stash = core.createSecondary('confiscation', tostring(source), {
-            label = 'Confiscated inventory', items = copy(current.items),
-            slots = current.slots, maxWeight = current.maxWeight,
+            label = 'Confiscated inventory',
+            items = copy(current.items),
+            slots = current.slots,
+            maxWeight = current.maxWeight,
         })
-        if not stash then return end
+        if not stash then
+            return
+        end
         local cleared = core.setInventoryItems(currentKey, {})
-        if not cleared then core.removeSecondary(stash.key) end
+        if not cleared then
+            core.removeSecondary(stash.key)
+        end
     end)
 end
 
-function Ox.ReturnInventory(source)
-    source = tonumber(source); if not source then return end
+function ox.ReturnInventory(source)
+    source = tonumber(source)
+    if not source then
+        return
+    end
     local key, inv = resolve(source)
     local stashKey, stash = resolve('confiscation:' .. tostring(source))
-    if not key or not inv or not stash then return end
+    if not key or not inv or not stash then
+        return
+    end
     core.lock({ key }, function()
-        if core.setInventoryItems(key, copy(stash.items)) then core.removeSecondary(stashKey) end
+        if core.setInventoryItems(key, copy(stash.items)) then
+            core.removeSecondary(stashKey)
+        end
     end)
 end
 
-function Ox.ConvertItems(_, items)
+function ox.ConvertItems(_, items)
     local out, slot = {}, 0
     for name, count in pairs(items or {}) do
         slot = slot + 1
-        if type(count) == 'table' then out[slot] = toOxItem(count) else out[slot] = { slot = slot, name = name, count = count, amount = count, metadata = {} } end
+        if type(count) == 'table' then
+            out[slot] = toOxItem(count)
+        else
+            out[slot] = { slot = slot, name = name, count = count, amount = count, metadata = {} }
+        end
     end
     return out
 end
@@ -854,23 +1130,31 @@ end
 -- the same resolver every other export here uses, then handed to
 -- toOxInventory() directly -- there is nothing to convert, it is already
 -- stored in ox shape.
-function Ox.ConvertInventory(inv)
+function ox.ConvertInventory(inv)
     -- A reference this authority already knows about (a player source, a
     -- registered stash id, an inventory's own `key`/`type`+`id` pair) always
     -- wins: it is already stored in ox shape, so there is nothing to convert.
     local key, resolved = resolve(inv)
-    if resolved then return toOxInventory(key, resolved) end
-    if type(inv) ~= 'table' then return nil end
-    local items = Ox.ConvertItems(nil, inv.items)
+    if resolved then
+        return toOxInventory(key, resolved)
+    end
+    if type(inv) ~= 'table' then
+        return nil
+    end
+    local items = ox.ConvertItems(nil, inv.items)
     local weight = 0
     for _, converted in pairs(items) do
         local _, definition = canonicalName(converted)
         weight = weight + (countOf(converted) * (definition and tonumber(definition.weight) or 0))
     end
     return {
-        id = inv.id, label = inv.label, type = inv.type or 'stash',
-        slots = inv.slots, maxWeight = inv.maxWeight,
-        weight = weight, items = items,
+        id = inv.id,
+        label = inv.label,
+        type = inv.type or 'stash',
+        slots = inv.slots,
+        maxWeight = inv.maxWeight,
+        weight = weight,
+        items = items,
     }
 end
 
@@ -881,19 +1165,25 @@ end
 -- registry name returns nil unconditionally, whichever spelling is used, so the
 -- full-list form has to come from allShared -- which is a dense ARRAY, not the
 -- name-keyed map upstream's Items() returns.
-function Ox.Items(name)
-    if name ~= nil then return copy(core.itemDef(name)) end
+function ox.Items(name)
+    if name ~= nil then
+        return copy(core.itemDef(name))
+    end
     local out = {}
     for _, def in ipairs(exports.qbcore:allShared('items') or {}) do
-        if type(def) == 'table' and type(def.name) == 'string' then out[def.name] = copy(def) end
+        if type(def) == 'table' and type(def.name) == 'string' then
+            out[def.name] = copy(def)
+        end
     end
     return out
 end
-Ox.ItemList = Ox.Items
+ox.ItemList = ox.Items
 
-function Ox.setPlayerInventory(player, data)
+function ox.setPlayerInventory(player, data)
     local source = type(player) == 'table' and player.source or tonumber(player)
-    if not source then return end
+    if not source then
+        return
+    end
     core.setInventoryItems(core.playerKey(source), copy(data or {}))
 end
 
@@ -905,34 +1195,54 @@ end
 -- exact same use-item funnel qbinventory's own api.useItem calls: handler
 -- dispatch, the portable-container bypass and the QBCore:Server:UseItem
 -- legacy fallback all live there and are never reimplemented here.
-function Ox.useItem(source, slot, cb)
+function ox.useItem(source, slot, cb)
     source = tonumber(source)
     if not source then
-        if cb then cb(false, 'invalid_source') end
+        if cb then
+            cb(false, 'invalid_source')
+        end
         return false, 'invalid_source'
     end
-    local ok, err = I.api.useItem(source, slot)
-    if cb then cb(ok, err) end
+    local ok, err = inventory.api.useItem(source, slot)
+    if cb then
+        cb(ok, err)
+    end
     return ok, err
 end
 
-function Ox.forceOpenInventory(source, invType, data) return core.open(source, core.key(invType, type(data) == 'table' and data.id or data)) end
-function Ox.registerHook(event, callback, options) return I.api.registerHook(event, callback, options) end
-function Ox.removeHooks(id) I.api.removeHooks(id) end
+function ox.forceOpenInventory(source, invType, data)
+    return core.open(source, core.key(invType, type(data) == 'table' and data.id or data))
+end
+function ox.registerHook(event, callback, options)
+    return inventory.api.registerHook(event, callback, options)
+end
+function ox.removeHooks(id)
+    inventory.api.removeHooks(id)
+end
 
 -- ACCEPTED DIVERGENCE: upstream registers these in modules/pefcl, against a
 -- pefcl bank/cash account. qbinventory has no pefcl dependency, so they stay
 -- pointed at qbcore's accounts -- the only source of truth for money here.
-function Ox.getCash(source) return exports.qbcore:getMoney(source, 'cash') end
-function Ox.addCash(source, amount, reason) return exports.qbcore:addMoney(source, 'cash', amount, reason or 'ox_inventory') end
-function Ox.removeCash(source, amount, reason) return exports.qbcore:removeMoney(source, 'cash', amount, reason or 'ox_inventory') end
+function ox.getCash(source)
+    return exports.qbcore:getMoney(source, 'cash')
+end
+function ox.addCash(source, amount, reason)
+    return exports.qbcore:addMoney(source, 'cash', amount, reason or 'ox_inventory')
+end
+function ox.removeCash(source, amount, reason)
+    return exports.qbcore:removeMoney(source, 'cash', amount, reason or 'ox_inventory')
+end
 -- Upstream registers this as a literal no-op -- its pefcl module exports a
 -- `function() end` under this name and never fills it in.
 -- Nothing consumes its return, so returning a balance here would be inventing a
 -- contract. qbcore's own money export is the way to read a bank balance.
-function Ox.getBank() end
-function Ox.getCards(_) return {} end
-function Ox.giveCard(...) return false end
+function ox.getBank() end
+function ox.getCards(_)
+    return {}
+end
+function ox.giveCard(...)
+    return false
+end
 
-I.compat.ox = Ox
-return Ox
+inventory.compat.ox = ox
+return ox

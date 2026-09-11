@@ -5,6 +5,7 @@
 -- truth: qbinventory asks its server to resolve every target and the active
 -- session remains the only source of inventory views and mutations.
 
+local inventoryApi = assert(QbInventory and QbInventory.clientApi, 'qbinventory client transport must load first')
 local selfOpening = false
 
 local function setBusy(value)
@@ -15,19 +16,18 @@ local function setBusy(value)
 end
 
 local function validIdentifier(value)
-    return type(value) == 'string'
-        and #value > 0
-        and #value <= 96
-        and value:match('^[%w_%-:]+$') ~= nil
+    return type(value) == 'string' and #value > 0 and #value <= 96 and value:match('^[%w_%-:]+$') ~= nil
 end
 
 local function openSelf()
-    if selfOpening or LocalPlayer.state.inv_busy then return false end
+    if selfOpening or LocalPlayer.state.inv_busy then
+        return false
+    end
     selfOpening = true
     -- qbinventory validates the local player's server ID before granting the
     -- short-lived session. We intentionally do not inspect nearby vehicles,
     -- entities, or any client inventory record here.
-    openInventory('player', QB.cache.serverId())
+    inventoryApi.openInventory('player', QB.cache.serverId())
     return true
 end
 
@@ -35,17 +35,23 @@ local function openLegacyTarget(other)
     -- The first legacy argument is the old player-items table. It is ignored
     -- by design. A second panel's name is only a requested identifier and is
     -- still resolved, access-checked and snapshotted by qbinventory's server.
-    if type(other) ~= 'table' then return openSelf() end
+    if type(other) ~= 'table' then
+        return openSelf()
+    end
 
     local name = other.name
-    if not validIdentifier(name) then return false end
+    if not validIdentifier(name) then
+        return false
+    end
 
     local typeName, id
     if name:sub(1, 6) == 'shop-' then
         typeName, id = 'shop', name:sub(7)
     elseif name:sub(1, 12) == 'otherplayer-' then
         typeName, id = 'player', name:sub(13)
-        if not tonumber(id) then return false end
+        if not tonumber(id) then
+            return false
+        end
     elseif name:sub(1, 5) == 'drop-' then
         typeName, id = 'drop', name:sub(6)
     elseif name:sub(1, 6) == 'trunk-' then
@@ -58,8 +64,10 @@ local function openLegacyTarget(other)
         typeName, id = 'stash', name
     end
 
-    if not validIdentifier(id) then return false end
-    openInventory(typeName, id)
+    if not validIdentifier(id) then
+        return false
+    end
+    inventoryApi.openInventory(typeName, id)
     return true
 end
 
@@ -78,13 +86,15 @@ end
 ---
 ---The legacy payload is ignored either way; it is never a source of truth.
 local function refreshActiveSession()
-    return getCurrentSession() ~= nil
+    return inventoryApi.getCurrentSession() ~= nil
 end
 
 -- A qbinventory session is the single lifecycle authority for inv_busy. The
 -- UI bridge owns focus; this bridge only mirrors the compatibility state bag.
 AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
-    if type(payload) ~= 'table' or type(payload.token) ~= 'string' then return end
+    if type(payload) ~= 'table' or type(payload.token) ~= 'string' then
+        return
+    end
     selfOpening = false
     setBusy(true)
 end)
@@ -102,7 +112,7 @@ RegisterNetEvent('qb-inventory:client:openInventory', function(_, other)
 end)
 
 RegisterNetEvent('qb-inventory:client:closeInv', function()
-    closeInventory()
+    inventoryApi.closeInventory()
 end)
 
 RegisterNetEvent('qb-inventory:client:updateInventory', function()
@@ -113,8 +123,7 @@ end)
 -- resources commonly call this immediately after AddItem; accepting it as a
 -- deliberate no-op avoids duplicate receipts and means resources never need
 -- to carry UI data or decide whether boxes are enabled.
-RegisterNetEvent('qb-inventory:client:ItemBox', function()
-end)
+RegisterNetEvent('qb-inventory:client:ItemBox', function() end)
 
 -- The rest of upstream's client event surface. qbinventory owns its own UI, so
 -- most of these are DELIBERATE no-ops rather than missing work: registering the
@@ -135,11 +144,17 @@ RegisterNetEvent('qb-inventory:client:hotbar', function() end)
 -- does. Skipped in a vehicle, exactly as upstream does.
 RegisterNetEvent('qb-inventory:client:giveAnim', function()
     local ped = QB.cache.ped()
-    if QB.cache.vehicle() then return end
+    if QB.cache.vehicle() then
+        return
+    end
     RequestAnimDict('mp_common')
     local deadline = GetGameTimer() + 1000
-    while not HasAnimDictLoaded('mp_common') and GetGameTimer() < deadline do Wait(0) end
-    if not HasAnimDictLoaded('mp_common') then return end
+    while not HasAnimDictLoaded('mp_common') and GetGameTimer() < deadline do
+        Wait(0)
+    end
+    if not HasAnimDictLoaded('mp_common') then
+        return
+    end
     TaskPlayAnim(ped, 'mp_common', 'givetake1_b', 8.0, -8.0, -1, 49, 0, false, false, false)
 end)
 
@@ -163,23 +178,26 @@ RegisterNetEvent('inventory:client:OpenInventory', function(_, other)
 end)
 
 RegisterNetEvent('inventory:client:closeInv', function()
-    closeInventory()
+    inventoryApi.closeInventory()
 end)
 
 RegisterNetEvent('inventory:client:updateInventory', function()
     refreshActiveSession()
 end)
 
-RegisterNetEvent('inventory:client:ItemBox', function()
-end)
+RegisterNetEvent('inventory:client:ItemBox', function() end)
 
 RegisterCommand('inventory', function()
-    if IsPauseMenuActive() or IsNuiFocused() then return end
+    if IsPauseMenuActive() or IsNuiFocused() then
+        return
+    end
     -- TAB also drives qblib's zone and entity-placement creators;
     -- all are independent keybinds, so an active creator session
     -- must explicitly veto this one rather than relying on FiveM to pick
     -- only one handler for a shared key.
-    if QB.zones.isCreatorActive() or QB.placement.isActive() then return end
+    if QB.zones.isCreatorActive() or QB.placement.isActive() then
+        return
+    end
     openSelf()
 end, false)
 
@@ -191,7 +209,7 @@ end
 RegisterCommand('openInv', openInventoryCommand, false)
 
 RegisterCommand('closeInv', function()
-    closeInventory()
+    inventoryApi.closeInventory()
 end, false)
 
 QB.keybind.add({
@@ -209,11 +227,13 @@ QB.keybind.add({
 -- resets silently never ran on login/logout.
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
     selfOpening = false
-    if not getCurrentSession() then setBusy(false) end
+    if not inventoryApi.getCurrentSession() then
+        setBusy(false)
+    end
 end)
 
 RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
-    closeInventory()
+    inventoryApi.closeInventory()
     selfOpening = false
     -- Preserve qb-inventory's unload behaviour: callers must not treat an
     -- unloading player as ready for an inventory action.
