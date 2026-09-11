@@ -27,7 +27,7 @@ local function conflicting(name)
     return false
 end
 
-for _, name in ipairs({ 'qb-inventory', 'ox_inventory' }) do
+for _, name in ipairs({ 'qb-inventory', 'ox_inventory', 'qb-weapons' }) do
     if conflicting(name) then
         error(('qbinventory provider conflict: %s is running; stop it before starting qbinventory'):format(name))
     end

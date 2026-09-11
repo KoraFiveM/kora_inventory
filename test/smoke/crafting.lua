@@ -22,11 +22,13 @@ Config = {
 local definitions = {
     wood = { name = 'wood', weight = 10 },
     board = { name = 'board', weight = 15 },
+    sawdust = { name = 'sawdust', weight = 1 },
+    nails = { name = 'nails', weight = 1 },
     weapon_pistol = { name = 'weapon_pistol', weight = 100, type = 'weapon', unique = true },
 }
 local state = {
     ['player:7'] = {
-        key = 'player:7', type = 'player', id = 7, slots = 4, maxWeight = 200,
+        key = 'player:7', type = 'player', id = 7, slots = 5, maxWeight = 200,
         items = {
             [1] = { slot = 1, name = 'wood', amount = 3, weight = 10, info = { grade = 'oak' } },
             [2] = { slot = 2, name = 'wood', amount = 1, weight = 10, info = { grade = 'pine' } },
@@ -97,6 +99,43 @@ H.equal(state['player:7'].items[4].name, 'board', 'server recipe defines output'
 H.equal(crafting.craft(7, 'oak_board'), false, 'missing ingredients reject atomically')
 H.equal(state['player:7'].items[4].amount, 1, 'failed craft leaves output unchanged')
 
+state['player:7'].items[1].amount = 6
+state['player:7'].items[4] = nil
+H.equal(crafting.canCraft(7, 'oak_board', 3), true, 'batch feasibility scales ingredients and outputs')
+H.equal(crafting.canCraft(7, 'oak_board', 4), false, 'batch feasibility rejects an unavailable amount')
+local craftedBatch, batchOutput = crafting.craft(7, 'oak_board', nil, 3)
+H.equal(craftedBatch, true, batchOutput)
+H.equal(batchOutput.amount, 3, 'batch craft reports the full output amount')
+H.equal(state['player:7'].items[1].name, 'board', 'batch craft replaces the consumed ingredient slot with its output')
+H.equal(state['player:7'].items[1].amount, 3, 'batch craft grants the scaled output amount atomically')
+H.equal(crafting.craft(7, 'oak_board', nil, 101), false, 'batch amount is server bounded')
+H.equal(crafting.craft(7, 'oak_board', nil, 'many'), false, 'malformed batch amounts are rejected')
+
+state['player:7'].items[1] = { slot = 1, name = 'wood', amount = 3, weight = 10, info = { grade = 'oak' } }
+state['player:7'].items[4] = nil
+H.equal(crafting.register('too_many_outputs', {
+    ingredients = { wood = 2 },
+    outputs = { { name = 'board' }, { name = 'sawdust' }, { name = 'nails' } },
+}), true, 'a recipe may declare several outputs')
+H.equal(crafting.canCraft(7, 'too_many_outputs'), false, 'feasibility rejects when a later output cannot fit')
+H.equal(crafting.craft(7, 'too_many_outputs'), false, 'a later output failure rejects the transaction')
+H.equal(state['player:7'].items[1].amount, 3, 'later output failure does not consume ingredients')
+H.equal(state['player:7'].items[4], nil, 'later output failure does not commit earlier outputs')
+H.equal(crafting.register('board_and_dust', {
+    ingredients = { wood = 2 },
+    outputs = { { name = 'board', amount = 1 }, { name = 'sawdust', amount = 2 } },
+}), true, 'multi-output recipes register')
+H.equal(crafting.canCraft(7, 'board_and_dust'), true, 'craft feasibility is available without committing')
+H.equal(state['player:7'].items[1].amount, 3, 'feasibility does not consume ingredients')
+local craftedMany, outputs = crafting.craft(7, 'board_and_dust')
+H.equal(craftedMany, true, outputs)
+H.equal(#outputs, 2, 'multi-output craft returns all outputs')
+H.equal(state['player:7'].items[4].name, 'board', 'first output is inserted')
+H.equal(state['player:7'].items[5].name, 'sawdust', 'second output is inserted in the same transaction')
+H.equal(state['player:7'].items[1].name, 'wood', 'existing ingredient stack remains in its slot')
+H.equal(state['player:7'].items[2].name, 'wood', 'nonmatching metadata remains after multi-output craft')
+H.equal(state['player:7'].items[1].amount, 1, 'multi-output craft consumes ingredients once')
+
 local denied = crafting.register('denied', {
     ingredients = { wood = 1 }, output = { name = 'board' }, access = function() return false, 'station locked' end,
 })
@@ -106,14 +145,19 @@ H.equal(crafting.craft(7, 'denied'), false, 'server recipe access policy blocks 
 local prepared = assert(weapons.prepareMetadata('weapon_pistol', {}))
 H.ok(prepared.serial:match('^QB%-WEAPONPISTOL%-') ~= nil, 'new weapon metadata receives a server serial')
 H.equal(prepared.durability, 100, 'weapon gets configured default durability')
+H.equal(prepared.quality, 100, 'legacy weapon quality mirrors canonical durability')
 H.equal(prepared.ammo, 0, 'weapon ammo starts at zero')
 H.equal(weapons.prepareMetadata('weapon_pistol', { components = { 'not_allowed' } }), nil, 'unconfigured component is rejected')
 H.equal(weapons.setState(7, 3, { ammo = 500, components = { 'component_at_pi_flsh' } }), true, 'weapon state is committed through authority setter')
 H.equal(state['player:7'].items[3].info.ammo, 250, 'ammo is clamped to server configuration')
 H.equal(state['player:7'].items[3].info.components[1], 'component_at_pi_flsh', 'allowed component is canonicalised')
+H.equal(weapons.setState(7, 3, { tint = 99 }), true, 'weapon tint is set through the server authority')
+H.equal(state['player:7'].items[3].info.tint, 32, 'weapon tint is bounded to GTA tint range')
 H.equal(weapons.consumeDurability(7, 3, 200), true, 'durability may be consumed server-side')
 H.equal(state['player:7'].items[3].info.durability, 0, 'durability cannot become negative')
+H.equal(state['player:7'].items[3].info.quality, 0, 'quality remains mirrored after durability changes')
 H.equal(weapons.setState(7, 1, { ammo = 2 }), false, 'nonweapon slots cannot receive weapon state')
 
-H.ok(type(registered.CraftItem) == 'function' and type(registered.SetWeaponState) == 'function', 'server-only crafting and weapon exports are registered')
+H.ok(type(registered.CraftItem) == 'function' and type(registered.CanCraftRecipe) == 'function'
+    and type(registered.SetWeaponState) == 'function', 'server-only crafting and weapon exports are registered')
 H.finish()

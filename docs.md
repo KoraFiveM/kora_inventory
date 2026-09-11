@@ -1,10 +1,10 @@
 # qbinventory
 
-`qbinventory` is the server-authoritative inventory provider. It provides both
-`qb-inventory` and `ox_inventory` compatibility identities, pinned to the
-contract fixtures in `test/contracts/`. Same-named qb and ox exports retain
-their upstream-specific signatures through separate identity routing. A real
-qb-inventory or ox_inventory resource must not run alongside qbinventory.
+`qbinventory` is the server-authoritative inventory provider. It provides the
+`qb-inventory`, `ox_inventory`, and retired `qb-weapons` compatibility
+identities. Same-named qb and ox exports retain their upstream-specific
+signatures through separate identity routing. A real qb-inventory, ox_inventory
+or qb-weapons resource must not run alongside qbinventory.
 
 ## Ownership and startup
 
@@ -15,18 +15,31 @@ replication and persistence remain single-writer. qbinventory owns secondary
 inventory state (stashes, temporary stashes, drops, and shops), sessions,
 revisions, locks, hook registration, and audit events.
 
+Shared item definitions remain in qbcore's runtime `items` registry and are
+looked up when each inventory operation runs; qbinventory never caches the
+legacy `QBCore.Shared.Items` map. Runtime weapon and ammunition additions are
+observed through registry subscriptions and receive their built-in use handler
+without a resource restart.
+
 `RegisterStash(..., owner = true, ...)` is a private-stash template. It does
 not create a shared stash with a boolean owner flag: on open, qbinventory
 derives the caller's citizen id server-side and uses a separate durable
 `stash:<template>:<citizenid>` record. A caller cannot choose another owner's
 identifier through the client transport.
 
+Registered stash `coords` and shop `data.coords` accept either one `{x,y,z}`
+point or a list of allowed points. The same any-point distance rule runs when a
+session opens and before every mutation. Re-registering an existing id updates
+that live boundary while retaining its durable contents.
+Trusted registrations may put a `distance` override on a list entry when
+different fixtures sharing one inventory need different interaction radii.
+
 ## Crafting and weapons (server-only foundation)
 
 `server/crafting.lua` is a headless, server-only foundation. It deliberately
 registers no network event or NUI callback. A gameplay resource must complete
 its own server-resolved station, job, proximity, routing-bucket and progression
-checks, then call `CraftItem(source, recipeId, trustedContext)`. Do not forward
+checks, then call `CraftItem(source, recipeId, trustedContext, amount)`. Do not forward
 a client recipe, output, item metadata, count or `trustedContext` to this API.
 
 Register a static recipe from its owning server resource:
@@ -34,7 +47,10 @@ Register a static recipe from its owning server resource:
 ```lua
 exports.qbinventory:RegisterCraftRecipe('repair_board', {
   ingredients = { { name = 'wood', amount = 2, metadata = { grade = 'oak' } } },
-  output = { name = 'board', amount = 1, metadata = { quality = 100 } },
+  outputs = {
+    { name = 'board', amount = 1, metadata = { quality = 100 } },
+    { name = 'sawdust', amount = 2 },
+  },
   access = function(source, recipe, context)
     -- `context` is server-owned station state, never a raw client payload.
     return true
@@ -42,22 +58,147 @@ exports.qbinventory:RegisterCraftRecipe('repair_board', {
 })
 ```
 
+The legacy singular `output = { ... }` form remains supported. Use
+`CanCraftRecipe(source, recipeId, amount?)` for a read-only feasibility check;
+it plans
+ingredient removal, all outputs, slots, and weight without running access
+callbacks/hooks or changing the inventory.
+
+`CraftItem(source, recipeId, trustedContext, amount?)` accepts a positive batch
+amount up to `Config.qbinventory.crafting.maxBatchAmount` (100 by default).
+Every ingredient and output is scaled, planned, and committed in the same
+locked transaction; the default amount remains one.
+
 Crafting locks the qbcore-owned player inventory, makes a detached plan,
 validates all recipe ingredients/weight/slots, then commits through
 `qbcore:setPath` via qbinventory's authority seam. A failed recipe changes no
 slots. Hooks can approve/reject a craft but cannot mutate its planned state.
 
 Weapon helpers are also server-only: `PrepareWeaponMetadata`, `GetWeaponState`,
-`SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, and
-`SetWeaponComponents`. New weapon metadata receives a server serial, bounded
-durability and ammo, and only configured components in
+`SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`,
+`SetWeaponComponents`, `LoadWeaponRounds`, and `FireWeaponRound`. New weapon
+metadata receives a server serial, bounded durability and ammo, and only configured components in
 `Config.qbinventory.weapons.components` are accepted. Gameplay weapon-use code
 must invoke durability/ammo changes from validated server actions; do not add a
 generic client event for these exports.
 
-This foundation does not yet supply a crafting UI, station discovery, progress
-timers, GTA weapon-native synchronisation, or ammo-item conversion. Those
-require an explicit server-authoritative integration layer.
+When `Config.qbinventory.weapons.ballistics.enabled` is set (the default), a
+weapon's `info.loadedBullets` contains one generated record for every loaded
+round; a 12-round magazine therefore contributes exactly 12 entries. The
+client only reports that its native ped fired. The server resolves the equipped
+slot, consumes one entry with `FireWeaponRound`, and emits a server-only fired
+round event for an evidence resource. Cartridge IDs are not firearm serials:
+the serial-to-casing link belongs in protected police storage and is revealed
+only after the investigation flow completes.
+
+`Config.qbinventory.weapons.durability` controls normal firing wear. With the
+default `perShot = 0.10`, every ten accepted rounds remove one durability
+point. Set a per-weapon value in `multipliers` (for example, `1.25` for a
+rifle that wears 25% faster), add non-wearing weapons to `excluded`, or set
+`enabled = false` to turn firing wear off. The server derives the number of
+rounds from its own lower-only ammo record, so a client cannot lower wear by
+claiming it fired fewer shots or repair a weapon by claiming extra ammo.
+
+This foundation does not yet supply a crafting UI or station discovery.
+
+### Visible weapon carry and draw pacing
+
+`Config.qbinventory.weaponCarry` turns weapons a player owns but is not
+holding into props on their body, and turns equipping one from an instant
+snap into a timed, animated draw. Set `enabled = false` to switch the whole
+feature off; nothing else about the inventory changes.
+
+`visibility` picks what other players can see:
+
+- `'all'` -- every carryable weapon anywhere in the inventory is rendered.
+- `'hotbar'` (default) -- only weapons in slots `1..Config.qbinventory.hotbarSlots`
+  are rendered. A weapon stowed past that range is genuinely concealed.
+
+`hotbarSlots` is a single top-level value precisely because two features ask
+the same question: `client/hotbar.lua` binds the number keys to exactly that
+range, and this is the range that counts as "openly carried". Two constants
+would silently disagree about which slots a player can actually see.
+
+Drawing costs `drawTime`; holstering costs `holsterTime`. The animation is
+chosen **per weapon class** from `drawAnims`/`holsterAnims`, keyed by the same
+`tiers` entry that decides where the weapon is worn -- so where a weapon sits
+and how it is produced are one decision rather than two that can disagree. A
+rifle coming off the back and a pistol off the hip are different movements, and
+playing the hip draw for both was the clearest sign the animation was
+decorative. A class with no entry falls back to `drawAnim`/`holsterAnim`; an
+entry set to `false` skips the animation for that class while keeping its
+timing. The tier is resolved on the server and sent with the toggle, so the
+client does not look a weapon's class up just to pick an animation.
+
+Drawing a weapon that was *not* openly carried costs
+`concealedDrawTime` on top -- pulling something nobody saw coming takes longer
+than unslinging what was already on your back. That surcharge only applies
+while `visibility = 'hotbar'`: in `'all'` mode (or with the feature disabled)
+a weapon's slot says nothing about whether it was visible, so there is no
+concealment to price. Set the durations to `0` for the previous instant
+toggle. The bar deliberately cannot be cancelled -- a cancellable draw is a
+free way to skip the surcharge by tapping the item repeatedly.
+
+A weapon is classified by its qbcore `weapontype` through `tiers`
+(`back` / `sling` / `hip`), and each tier lists ordered attachment positions
+in `attachments`. A weapon that finds no free position in its tier is simply
+not rendered rather than stacked on top of one that is. `weapons` holds
+per-item overrides: `tier = false` excludes an item entirely, `bone`/`pos`/
+`rot` re-place one item, and `model` renders a plain prop instead of the
+weapon -- which is also how a non-weapon item can be carried, since only
+registry weapons are classified automatically. `components` maps a weapon
+component *item name* to the GTA component it renders as; it is empty by
+default because qbcore's shared registry carries no component-to-native
+mapping and guessing one would attach the wrong part.
+
+The carried list is built on the server from qbcore-owned `PlayerData` and
+published on the replicated player state bag `qbinventory:weaponCarry`
+(cleared with an explicit `false`, never a nil deletion -- a nil write is a
+key deletion and does not replicate like a value change). Clients only
+*render* that bag. A client never submits, extends or edits its own carried
+list, so this can never become a channel for advertising items a player does
+not own or hiding ones they do.
+
+The one thing a client may say is "the draw you asked me for finished"
+(`qbinventory:server:weaponToggled`), and that is matched against a pending
+request this server issued and re-resolved against the real slot before it is
+believed -- a client cannot confirm a weapon it does not have, in a slot it
+was not asked about. `qbinventory:server:weaponUnequipped` carries no payload
+at all and can only ever put a weapon *back* on its own player's body (weapon
+wheel, disarm, death), never take one off. Read-only server exports:
+
+```lua
+exports.qbinventory:GetCarriedWeapons(src)  -- the rendered list
+exports.qbinventory:GetEquippedWeapon(src)  -- { slot, name } or nil
+```
+
+There is deliberately no setter. A resource that wants a different carried
+list changes the player's items, not the render. Equipping still does not
+remove the weapon item from its slot (see `server/useables.lua`).
+
+### Retired `qb-weapons` compatibility
+
+`qbinventory` provides `qb-weapons`, so a resource that only lists it as a
+dependency continues to start without a second weapon controller. It accepts
+the legacy draw, holster, ammo, durability and read-only ammo callback names
+and routes them to the current inventory lifecycle. Legacy client item tables
+are reduced to a slot and the real item is read from the player's inventory;
+reported ammo can only decrease, and reported quality can only consume
+durability. `quality` is retained as a mirror of canonical `durability` for
+old weapon metadata and existing database rows.
+
+The legacy client `getConfigWeaponAttachments` export remains available too.
+It is derived only from the explicit qbinventory component allow-lists, so
+attachment UIs can read it without gaining a metadata or component mutation
+path.
+
+The retired repair-station and attachment-item systems are not recreated:
+they depended on `qb-weapons`' resource-local configuration and accepted
+client-selected station/item data. The old repair and attachment callbacks are
+registered and safely refuse rather than hanging a stale caller. A replacement
+gameplay resource must validate its station/role/cost server-side and then use
+`SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, or
+`SetWeaponComponents`.
 
 Opening another player's inventory is also denied by default: distance and
 routing-bucket checks are necessary but never sufficient. Configure the trusted
@@ -248,7 +389,9 @@ such a lookup reports "no such item" for every item in the game.
   `inv_busy`). Registers no exports.
 - `client/compat/ox.lua` -- the whole `ox_inventory` client identity, including
   its own `openInventory`/`closeInventory` wrappers (which carry the
-  `setStashTarget` substitution).
+  `setStashTarget` substitution). Its UI adapters translate ox notification
+  positions onto qblib's six placements, preserve multi-select input rows, and
+  map progress scenarios and props onto qblib's supported shapes.
 - `client.lua` -- qbinventory's native client exports, and the `qb-inventory`
   identity only.
 
@@ -272,6 +415,93 @@ conflicts with this resource's authority model.
 | ox `SetSlotCount` / `SetMaxWeight` | resizes any inventory | refuses player inventories | qbcore owns player dimensions |
 | ox `SetMetadata` | accepts `metadata.weight` | rejects it | a caller-supplied weight invalidates capacity checks |
 | ox `addCash` / `removeCash` / `getBank` / `getCards` / `giveCard` | operate on `money` / `mastercard` items | routed to qbcore accounts | qbcore owns balances |
+
+## Ammunition
+
+Using an ammo item loads the weapon the player currently has **drawn**.
+
+Which weapon that is, and how many rounds it gets, are both resolved on the
+server: the weapon comes from `server/weaponcarry.lua`'s own record of the draw
+it asked for (only ever set after the client confirmed a draw the server
+initiated, and re-validated against qbcore-owned `PlayerData` at that point),
+and the round count comes from the shared item definition's `rounds`. The
+client's use request contributes a slot and nothing else -- no weapon name,
+hash, ammo type or count crosses the wire inbound.
+
+The magazine's `ammoType` must match the drawn weapon's `ammotype`; a mismatch
+refuses the use and consumes nothing. `server/useables.lua` registers a useable
+for every registry item that has both `ammoType` and a positive `rounds`, so a
+server adding its own magazine gets a working use with no code change. The new
+amount is saved on the weapon before the client is instructed to display it;
+shot reports may only lower that saved amount, and drawing restores the saved
+amount to the GTA weapon.
+
+A weapon must be **drawn**, not merely owned. This keeps magazine use honest:
+the server knows exactly which weapon it is loading and the GTA ped has that
+weapon ready to receive the synchronised amount. Loading a holstered weapon is
+refused and consumes nothing.
+
+## UI presentation config
+
+`Config.qbinventory.ui` is the only config that crosses into the browser,
+pushed on `qbinventory:nui:config` at resource start and on every session open.
+Nothing in it is authority and the inventory engine never reads it.
+
+| Key | Effect |
+| --- | --- |
+| `centreWhenSolo` | With no second inventory open, show only a compact centred player grid; selecting an item slides its inspector and actions out in a drawer. |
+| `showHotbar` | Outline slots `1..hotbarSlots` on the player's own inventory in the accent colour, so the keys `client/hotbar.lua` already binds are visible rather than folklore. |
+| `images` | Item artwork resolution -- see below. |
+
+`hotbarSlots` is sent alongside it because the NUI draws the boundary and cannot
+know where it is otherwise. It stays a read of the same single value
+`client/hotbar.lua` binds its keys from, so the outline and the keys cannot
+disagree.
+
+### Item artwork
+
+Artwork is resolved as an ordered list of candidates, walked on `onError`:
+
+1. the item's own `imageUrl`, if it is `https://` and `allowRemote` is not false
+2. `<localPath>/<item.image>`, when the legacy `image` field carries an extension
+3. `<localPath>/<item.name>.<ext>` for each configured extension, in order
+4. the first letter of the label
+
+Ordered rather than probed: there is no way to ask whether a `nui://` file
+exists without requesting it, and an `<img onError>` chain gets that for free
+with no HEAD requests and no manifest to keep in sync. Set `preferLocal = true`
+to move the remote URL to the end of that list, or `allowRemote = false` to drop
+it entirely.
+
+Local files live in `qbinventory/images/` (see its README) and are served as
+`nui://qbinventory/images/<file>`. That is outside `web/` on purpose: `web/build`
+is Vite's output directory, and artwork a server owner added must not be
+something `pnpm build` can delete.
+
+**Animated WebP and GIF need no special handling** -- CEF animates both in a
+plain `<img>`, so the work is allowing the extension, not a second code path.
+
+The scheme check is an **allowlist**, not decoration. Item definitions come from
+shared registries any resource can extend, so `imageUrl` is untrusted text on
+its way into an `src`; only `https://` is accepted, and a local name must be a
+plain identifier or it is rejected outright rather than escaped.
+
+## Ground drops
+
+Dropping an item creates a temporary `drop` inventory at the player's position
+and leaves a bag prop on the floor (`Config.qbinventory.drops`).
+
+The prop is **presentation only**. It is a local, non-networked object created
+independently on each client; it carries no inventory identity, and interacting
+with it calls the ordinary open path with the drop id the server broadcast. The
+server then re-resolves that drop and repeats its access, distance and
+routing-bucket checks like any other inventory -- so deleting the prop, moving
+it, or fabricating one client-side gains nothing.
+
+`qbinventory:server:drops` returns live drop ids and coordinates so a client
+that connected after a bag landed can still render it. Coordinates are already
+broadcast to every client at drop time; **contents are never included** -- what
+is inside a bag stays a server-side question answered by `open`.
 
 ## Client and renderer contract
 
@@ -320,11 +550,13 @@ gate (`QbInventory.useGate`, defined in `client.lua`) runs before both this NUI
 path and the hotbar keybinds below, so there is exactly one place that decides
 whether a use is allowed to proceed.
 
-Pressing `1`-`5` uses whatever item currently occupies inventory slots 1-5,
-even with the panel closed -- qbinventory has no separate hotbar/quickslot
-data model (see the `qb-inventory:client:hotbar` no-op just below), so the
-first 5 general inventory slots double as the hotbar, matching real
-qb-inventory/ox_inventory. `client/hotbar.lua` registers these through
+Pressing `1`-`5` uses whatever item currently occupies inventory slots
+`1..Config.qbinventory.hotbarSlots`, even with the panel closed -- qbinventory
+has no separate hotbar/quickslot data model (see the
+`qb-inventory:client:hotbar` no-op just below), so the first N general
+inventory slots double as the hotbar, matching real qb-inventory/ox_inventory.
+That same range is what `weaponCarry`'s `'hotbar'` visibility treats as openly
+carried, which is why it is one config value rather than a constant in each. `client/hotbar.lua` registers these through
 `QB.keybind`, does nothing while `IsNuiFocused()`/`IsPauseMenuActive()` (so it
 never fights the panel's own Use action), and reuses the existing legacy
 `QBCore:Server:UseItem` transport -- which already re-resolves the slot from
@@ -385,6 +617,13 @@ row or item data. `server/shops/ammunation.lua` registers the shop with an
 access callback that independently reads the player's server ped coordinates
 and routing bucket, and permits the open only inside a configured counter. A
 forged shop-ID request away from a counter or in another bucket is denied.
+The blip uses the canonical `Weapons` category and the separate storefront
+name `Ammu-Nation`, letting qblib render `Weapons: Ammu-Nation` while grouping
+it with other weapon shops.
+
+The bundled liquor shop follows the same contract. Each location declares its
+own storefront name (`Rob's Liquor` or `24/7`) while all of them use the
+canonical `Liquor` category and the same server-validated shop stock.
 
 The initial catalog includes standard qbcore weapons and the registered
 `pistol_ammo`, `smg_ammo`, `shotgun_ammo`, `rifle_ammo`, `mg_ammo`, and

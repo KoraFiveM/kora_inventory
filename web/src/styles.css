@@ -1,96 +1,155 @@
-:root {
-  --background: 0 0% 6.3%;
-  --surface: 0 0% 9.4% / .97;
-  --surface-raised: 0 0% 12.5%;
-  --foreground: 0 0% 95%;
-  --muted: 0 0% 16%;
-  --muted-foreground: 0 0% 57%;
-  --border: 0 0% 23%;
-  --primary: 348 83.3% 47.1%;
-  --primary-foreground: 0 0% 100%;
-  --ring: 348 83.3% 47.1%;
-  --brand-soft: 348 83.3% 47.1% / .14;
-  --brand-border: 348 83.3% 47.1% / .45;
-  --danger: 0 72% 55%;
-  --radius: 10px;
-  color: hsl(var(--foreground));
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-* { box-sizing: border-box; }
 html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; background: transparent !important; pointer-events: none; }
-button, input { font: inherit; }
-button { color: inherit; }
+#root { position: relative; }
+
+/* FiveM users generally play at a wide range of resolutions.  The inventory
+   should feel like an overlay, not a replacement for the entire game view.
+   Keep scrolling for long inventories, but do not expose browser scrollbars
+   inside the NUI. */
+.inventory-shell, .inventory-panel, .item-detail { scrollbar-width: none; -ms-overflow-style: none; }
+.inventory-shell::-webkit-scrollbar, .inventory-panel::-webkit-scrollbar, .item-detail::-webkit-scrollbar { display: none; }
 
 .inventory-shell {
   pointer-events: auto;
-  position: relative;
+  position: absolute;
   z-index: 1;
-  width: min(1180px, calc(100vw - 40px));
-  min-height: min(600px, calc(100vh - 40px));
-  max-height: calc(100vh - 40px);
-  margin: 20px auto;
-  padding: 10px;
-  overflow: auto;
-  border: 1px solid hsl(var(--border));
-  border-radius: 12px;
-  background: hsl(var(--surface));
-  box-shadow: 0 22px 70px rgb(0 0 0 / 60%);
+  /* Size and centre against the scaled NUI root. Viewport units resolve before
+     scaleNui's transform and make the full inventory too tall and too low. */
+  width: min(1420px, 70%);
+  height: 70%;
+  min-height: 0;
+  max-height: 70%;
+  margin: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 14px;
+  /* The outer frame must never acquire its own scrollbar; slot lists and the
+     inspector handle any overflow within their respective panels. */
+  overflow: hidden;
+  border: 1px solid hsl(var(--border-strong) / .82);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 0 0, hsl(var(--primary) / .11), transparent 29%),
+    linear-gradient(145deg, hsl(var(--surface-raised) / .98), hsl(var(--surface)) 32%, hsl(var(--background) / .98));
+  box-shadow: 0 32px 90px rgb(0 0 0 / 68%), inset 0 1px 0 rgb(255 255 255 / .035);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+}
+.inventory-heading { min-width: 0; display: grid; gap: 12px; }
+
+/* Personal inventory is content-sized and remains centred until an item is
+   selected. The selected item's existing inspector then slides out beside it
+   without leaving a blank column in the resting layout. */
+.inventory-shell-solo {
+  /* Five 90-ish pixel slots plus the panel and shell padding: the frame hugs
+     the grid instead of inheriting the full transfer-window width. */
+  width: min(540px, calc(100vw - 40px));
+  height: fit-content;
+  max-height: 70vh;
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  overflow: visible;
+  transform: translate(-50%, -50%);
+}
+.inventory-shell-solo .inventory-topbar { grid-template-columns: minmax(0, 1fr) auto; }
+.inventory-shell-solo .search, .inventory-shell-solo .session-state { display: none; }
+/* The same Tab key opens this NUI in-game. CEF can immediately transfer that
+   keypress into browser focus, which paints qbtheme's pale focus ring over an
+   inventory control even though the player did not navigate to it. Inventory
+   interactions are mouse/drag driven, so keep focus styling out of this UI. */
+.inventory-shell :is(button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
-.inventory-topbar { display: grid; grid-template-columns: 1fr minmax(200px, 320px) auto; align-items: center; gap: 8px; min-height: 34px; }
-.brand { display: grid; grid-template-columns: 20px auto auto; align-items: center; justify-content: start; gap: 6px; font-size: 12px; font-weight: 800; letter-spacing: .12em; }
-.brand svg { color: hsl(var(--primary)); }
-.brand em { border: 1px solid hsl(var(--brand-border)); border-radius: 4px; padding: 2px 4px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); font-size: 8px; font-style: normal; letter-spacing: .09em; }
-.search { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
-.search input { min-width: 0; height: 28px; border: 0; outline: 0; font-size: 12px; color: hsl(var(--foreground)); background: transparent; }
+.inventory-topbar { display: grid; grid-template-columns: minmax(210px, 1fr) minmax(250px, 390px) auto; align-items: center; gap: 12px; min-height: 38px; padding: 1px 2px; }
+.brand { display: grid; grid-template-columns: 34px auto auto; align-items: center; justify-content: start; gap: 8px; font-size: 12px; font-weight: 850; letter-spacing: .13em; }
+.brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid hsl(var(--brand-border)); border-radius: 10px; color: hsl(var(--primary)); background: linear-gradient(145deg, hsl(var(--brand-soft)), hsl(var(--background) / .45)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .06); }
+.brand em { display: inline-flex; align-items: center; gap: 4px; border: 1px solid hsl(var(--brand-border)); border-radius: 999px; padding: 3px 6px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); font-size: 8px; font-style: normal; letter-spacing: .09em; }
+.brand em i { width: 4px; height: 4px; border-radius: 999px; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.search { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid hsl(var(--border)); border-radius: 9px; background: hsl(var(--background) / .62); color: hsl(var(--muted-foreground)); transition: border-color 120ms ease, background-color 120ms ease; }
+.search:focus-within { border-color: hsl(var(--brand-border)); background: hsl(var(--background) / .9); box-shadow: 0 0 0 3px hsl(var(--brand-soft) / .42); }
+.search input { min-width: 0; height: 34px; border: 0; outline: 0; font-size: 11px; color: hsl(var(--foreground)); background: transparent; }
 .search input::placeholder { color: hsl(var(--muted-foreground)); }
-.close, .quiet-action { border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--muted)); cursor: pointer; }
-.close { width: 30px; height: 30px; display: grid; place-items: center; }
-.close:hover, .quiet-action:hover { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); }
-.notice { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid hsl(0 72% 55% / .45); border-radius: 6px; color: hsl(0 90% 80%); background: hsl(0 72% 25% / .26); font-size: 11px; }
+.topbar-actions { display: flex; align-items: center; justify-content: end; gap: 8px; }
+.session-state { padding: 0 2px; color: hsl(var(--muted-foreground)); font-size: 9px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.close, .quiet-action { border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(var(--muted)); cursor: pointer; }
+.close, .detail-close {
+  box-sizing: border-box;
+  padding: 0;
+  line-height: 0;
+}
+.close { width: 34px; height: 34px; display: grid; place-items: center; background: hsl(var(--background) / .62); }
+.close svg, .detail-close svg { display: block; flex: none; }
+.close:hover, .quiet-action:hover { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.notice { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid hsl(var(--destructive-border)); border-radius: 9px; color: hsl(var(--destructive)); background: hsl(var(--destructive-soft)); font-size: 11px; }
 
-.inventory-layout { min-height: 0; display: grid; grid-template-columns: minmax(260px, 1fr) 195px minmax(260px, 1fr); gap: 8px; }
-.inventory-panel, .item-detail { min-height: 0; overflow: auto; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--surface-raised)); }
-.inventory-panel, .item-detail { scrollbar-width: thin; scrollbar-color: hsl(var(--border-strong)) transparent; }
-.inventory-panel::-webkit-scrollbar, .item-detail::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
-.inventory-panel::-webkit-scrollbar-track, .item-detail::-webkit-scrollbar-track { background: transparent; border: 0; }
-.inventory-panel::-webkit-scrollbar-thumb, .item-detail::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: hsl(var(--border-strong)); background-clip: padding-box; }
-.inventory-panel::-webkit-scrollbar-thumb:hover, .item-detail::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary)); background-clip: padding-box; }
-.inventory-panel::-webkit-scrollbar-button, .item-detail::-webkit-scrollbar-button, .inventory-panel::-webkit-scrollbar-corner, .item-detail::-webkit-scrollbar-corner { display: none; }
-.inventory-panel { padding: 9px; }
-.panel-header { display: grid; grid-template-columns: 1fr minmax(95px, 125px); align-items: center; gap: 9px; margin: 0 0 9px; }
-.eyebrow { margin: 0 0 2px; color: hsl(var(--muted-foreground)); font-size: 9px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+.inventory-layout { min-height: 0; display: grid; grid-template-columns: minmax(310px, 1fr) minmax(250px, 290px) minmax(310px, 1fr); gap: 14px; }
+.inventory-layout-solo {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  justify-self: center;
+}
+.inventory-stage { min-width: 0; min-height: 0; display: grid; }
+.inventory-stage > .inventory-panel { height: 100%;
+}
+.inventory-panel, .item-detail { min-height: 0; overflow: auto; border: 1px solid hsl(var(--border)); border-radius: 14px; background: linear-gradient(155deg, hsl(var(--surface-panel)), hsl(var(--background) / .72)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .025); }
+.inventory-panel { padding: 13px; }
+.inventory-panel-player { position: relative; isolation: isolate; border-color: hsl(var(--border-strong) / .8); box-shadow: 0 18px 44px rgb(0 0 0 / .2); }
+.inventory-panel-player::before { content: ""; position: absolute; z-index: -1; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, hsl(var(--primary) / .1), transparent 34%); }
+.panel-header { display: grid; grid-template-columns: 1fr minmax(118px, 155px); align-items: center; gap: 12px; margin: 0 1px 13px; padding: 0 1px 12px; border-bottom: 1px solid hsl(var(--border) / .85); }
+.eyebrow { margin: 0 0 3px; color: hsl(var(--muted-foreground)); font-size: 9px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
 h1, h2, p { margin-top: 0; }
-h2 { margin-bottom: 0; font-size: 13px; }
-.weight { display: grid; gap: 4px; color: hsl(var(--muted-foreground)); text-align: right; font-size: 9px; }
-.weight i, .durability { height: 3px; overflow: hidden; border-radius: 3px; background: hsl(var(--muted)); }
+h2 { margin-bottom: 0; font-size: 15px; letter-spacing: -.015em; }
+.weight { display: grid; gap: 6px; color: hsl(var(--muted-foreground)); text-align: right; font-size: 9px; font-variant-numeric: tabular-nums; }
+.weight i, .durability { height: 4px; overflow: hidden; border-radius: 999px; background: hsl(var(--muted)); }
 .weight b, .durability i { display: block; height: 100%; border-radius: inherit; background: hsl(var(--primary)); }
-.slot-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; align-content: start; }
-.slot { position: relative; aspect-ratio: 1 / 1; padding: 4px; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--muted-foreground)); background: hsl(var(--background)); cursor: grab; text-align: left; display: grid; grid-template-rows: 1fr auto auto; gap: 2px; touch-action: none; -webkit-user-select: none; user-select: none; }
-.slot:hover, .slot:focus-visible { outline: 0; border-color: hsl(var(--brand-border)); }
-.slot-selected { border-color: hsl(var(--primary)); background: hsl(var(--brand-soft)); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
+.slot-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; align-content: start; }
+.slot { position: relative; aspect-ratio: 1 / 1; padding: 4px; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: 9px; color: hsl(var(--muted-foreground)); background: linear-gradient(145deg, hsl(var(--background)), hsl(var(--card))); cursor: grab; text-align: left; display: grid; grid-template-rows: 1fr auto auto; gap: 2px; touch-action: none; -webkit-user-select: none; user-select: none; transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease, box-shadow 120ms ease; }
+.slot:hover, .slot:focus-visible { outline: 0; border-color: hsl(var(--brand-border)); transform: translateY(-2px); box-shadow: 0 7px 15px rgb(0 0 0 / .22); }
+.inventory-shell .slot:focus-visible { border-color: hsl(var(--border)); transform: none; box-shadow: none; }
+.slot-selected { border-color: hsl(var(--primary)); background: hsl(var(--brand-soft)); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)), 0 7px 16px rgb(0 0 0 / .18); }
 .slot-move-target { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft) / .58); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
 .slot-selected.slot-move-target { border-color: hsl(var(--primary)); }
 .slot-drag-source { cursor: grabbing; opacity: .34; }
+/* Hotbar range (slots 1..Config.qbinventory.hotbarSlots) on the player's own
+   inventory. Drawn as ONE continuous accent frame around the whole run rather
+   than a box per slot: five separate outlines read as five special slots, and
+   the point is that they are one strip. The top and bottom edges run across
+   every slot; the left and right edges are added only at the ends. Uses an
+   inset shadow, not `border`, so it cannot shift the slot's layout by a pixel
+   and cannot fight the selection/drop-target border colours. */
+.slot-hotbar { box-shadow: inset 0 1px 0 hsl(var(--primary)), inset 0 -1px 0 hsl(var(--primary)); }
+.slot-hotbar-first { box-shadow: inset 0 1px 0 hsl(var(--primary)), inset 0 -1px 0 hsl(var(--primary)), inset 1px 0 0 hsl(var(--primary)); }
+.slot-hotbar-last { box-shadow: inset 0 1px 0 hsl(var(--primary)), inset 0 -1px 0 hsl(var(--primary)), inset -1px 0 0 hsl(var(--primary)); }
+/* A selected or targeted hotbar slot keeps its own state shadow: the state is
+   transient and needs to win, and the accent frame is still visible on the
+   slots either side of it. */
+.slot-hotbar.slot-selected, .slot-hotbar.slot-move-target, .slot-hotbar.slot-drop-invalid { box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
 .slot-drop-invalid { border-color: hsl(var(--danger) / .75); box-shadow: inset 0 0 0 1px hsl(var(--danger) / .4); }
 .slot[aria-disabled="true"] { cursor: wait; }
 .slot-filled { color: hsl(var(--foreground)); }
-.slot-number { position: absolute; z-index: 1; top: 3px; left: 4px; color: hsl(var(--muted-foreground)); font-size: 8px; }
+.slot-number { position: absolute; z-index: 1; top: 4px; left: 5px; color: hsl(var(--muted-foreground)); font-size: 8px; font-weight: 700; }
 .item-art, .detail-art { display: grid; place-items: center; overflow: hidden; color: hsl(var(--primary)); font-weight: 800; background: hsl(var(--brand-soft)); }
 .item-art img, .detail-art img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgb(0 0 0 / .35)); }
 /* Artwork is the slot canvas, not a miniature icon. Text and counters sit above it. */
-.item-art { position: absolute; z-index: 0; box-sizing: border-box; inset: 17px 7px 21px; padding: 3px 4px; border-radius: 4px; background: transparent; font-size: 30px; }
+.item-art { position: absolute; z-index: 0; box-sizing: border-box; inset: 21px 7px 22px; padding: 3px 4px; border-radius: 5px; background: transparent; font-size: 30px; }
 .item-art img { transform: scale(1.1); }
 .item-label { position: absolute; z-index: 1; right: 4px; bottom: 3px; left: 5px; overflow: hidden; color: hsl(var(--foreground)); font-size: 10px; font-weight: 650; line-height: 1.15; text-overflow: ellipsis; text-shadow: 0 1px 3px rgb(0 0 0 / .8); white-space: nowrap; }
 .slot-priced .item-label { right: 32px; }
 /* Quantity reads top-right, opposite the slot number; a shop price takes the
    bottom-right corner the quantity used to hold. */
-.item-amount { position: absolute; z-index: 1; top: 3px; right: 4px; border-radius: 3px; padding: 1px 4px; background: hsl(var(--background) / .82); color: hsl(var(--foreground)); font-size: 9px; font-weight: 700; line-height: 1.2; }
-.item-price { position: absolute; z-index: 1; right: 4px; bottom: 3px; border-radius: 3px; padding: 1px 3px; color: hsl(var(--primary)); background: hsl(var(--background) / .9); font-size: 10px; font-weight: 800; line-height: 1.2; text-shadow: 0 1px 2px rgb(0 0 0 / .65); }
+/* The quantity has to be readable against artwork, not merely present. At 9px
+   on a translucent background it sat over the item image and read as absent --
+   which is what "the amount is missing" meant. An opaque chip with a border,
+   a step up in size, and an artwork inset that clears it (see .item-art) fixes
+   legibility without moving it off the corner it belongs in. */
+.item-amount { position: absolute; z-index: 1; top: 3px; right: 4px; border: 1px solid hsl(var(--border-strong)); border-radius: 5px; padding: 0 4px; background: hsl(var(--background) / .94); color: hsl(var(--foreground)); font-size: 11px; font-weight: 800; line-height: 15px; letter-spacing: -.01em; }
+.item-price { position: absolute; z-index: 1; right: 4px; bottom: 4px; border: 1px solid hsl(var(--brand-border) / .58); border-radius: 4px; padding: 1px 3px; color: hsl(var(--primary)); background: hsl(var(--background) / .92); font-size: 10px; font-weight: 800; line-height: 1.2; text-shadow: 0 1px 2px rgb(0 0 0 / .65); }
 .durability { position: absolute; z-index: 1; right: 5px; bottom: 0; left: 5px; }
 /* Only mounted mid-drag (App.tsx), and painted behind the shell so a slot
    under the cursor always wins. The gutter around the shell is the drop area. */
@@ -98,11 +157,10 @@ h2 { margin-bottom: 0; font-size: 13px; }
 .world-drop-zone-armed { border-color: hsl(var(--brand-border)); background: hsl(var(--primary) / .12); }
 .world-drop-hint { position: fixed; z-index: 1200; bottom: 26px; left: 50%; transform: translateX(-50%); margin: 0; border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 5px 12px; color: hsl(var(--muted-foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); font-size: 10px; font-weight: 700; letter-spacing: .04em; pointer-events: none; }
 .world-drop-hint-armed { border-color: hsl(var(--brand-border)); color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
-.inventory-drag-preview { position: fixed; z-index: 1000; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 6px; width: min(170px, 32vw); min-height: 38px; overflow: hidden; border: 1px solid hsl(var(--brand-border)); border-radius: 7px; padding: 4px 6px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); pointer-events: none; font-size: 10px; font-weight: 700; }
-.inventory-drag-preview > span:not(.drag-preview-art) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.inventory-drag-preview b { color: hsl(var(--muted-foreground)); font-size: 9px; }
-.drag-preview-art { display: grid; place-items: center; width: 30px; height: 30px; overflow: hidden; border-radius: 5px; background: hsl(var(--brand-soft)); color: hsl(var(--primary)); }
-.drag-preview-art img { width: 100%; height: 100%; object-fit: contain; }
+/* A real slot-shaped preview, centred on the cursor. `transform` is used here
+   rather than the newer individual `translate` property because CEF builds
+   can otherwise ignore the -50% offset. */
+.inventory-drag-preview { position: fixed; z-index: 1000; width: clamp(56px, 7vw, 86px); min-width: 0; min-height: 0; aspect-ratio: 1 / 1; transform: translate(-50%, -50%); border-color: hsl(var(--brand-border)); background: linear-gradient(145deg, hsl(var(--surface-raised)), hsl(var(--background))); box-shadow: 0 10px 28px rgb(0 0 0 / .48); pointer-events: none; }
 .item-box-stack { position: fixed; z-index: 1100; right: 20px; bottom: 20px; display: grid; width: min(260px, calc(100vw - 32px)); gap: 6px; pointer-events: none; }
 .item-box { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 46px; overflow: hidden; border: 1px solid hsl(var(--border)); border-left: 3px solid hsl(var(--primary)); border-radius: 7px; padding: 5px 8px 5px 5px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); animation: item-box-in 150ms ease-out both; }
 .item-box-art { display: grid; place-items: center; width: 36px; height: 36px; overflow: hidden; border-radius: 5px; padding: 3px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); font-weight: 800; }
@@ -117,30 +175,66 @@ h2 { margin-bottom: 0; font-size: 13px; }
 .item-box-loss .item-box-art { background: hsl(var(--muted)); }
 @keyframes item-box-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-.item-detail { padding: 11px; display: grid; align-content: start; gap: 7px; }
-.item-detail-empty { align-content: center; }
-.item-detail h1 { margin-bottom: 0; font-size: 15px; line-height: 1.08; }
-.item-detail p:not(.eyebrow) { color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.4; }
-.detail-art { width: 100%; min-height: 140px; aspect-ratio: 1 / .82; border: 1px solid hsl(var(--brand-border)); border-radius: 7px; font-size: 40px; }
-.detail-art img { padding: 10px; transform: scale(1.06); }
-dl { display: grid; grid-template-columns: 1fr auto; gap: 5px; margin: 3px 0; border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); padding: 7px 0; color: hsl(var(--muted-foreground)); font-size: 10px; }
+.item-detail { padding: 14px; display: grid; align-content: start; gap: 10px; border-color: hsl(var(--border-strong) / .72); box-shadow: 0 18px 44px rgb(0 0 0 / .16); }
+.item-detail-drawer { position: absolute; box-sizing: border-box; top: 0; left: calc(100% + 14px); width: 270px; height: 100%; max-height: 100%; background: linear-gradient(155deg, hsl(var(--surface-raised)), hsl(var(--background) / .96)); animation: item-drawer-in 160ms ease-out both; }
+@keyframes item-drawer-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
+.detail-header { display: flex; align-items: center; justify-content: space-between; min-height: 22px; padding-bottom: 10px; border-bottom: 1px solid hsl(var(--border) / .85); color: hsl(var(--foreground)); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.detail-header-actions { display: flex; align-items: center; gap: 6px; }
+.detail-header em { border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 3px 5px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .55); font-size: 7px; font-style: normal; letter-spacing: .08em; white-space: nowrap; }
+.detail-close { display: grid; width: 22px; height: 22px; padding: 0; place-items: center; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .55); cursor: pointer; }
+.detail-close:hover { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.item-detail:not(.item-detail-empty) .detail-header em { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.item-detail-empty { grid-template-rows: auto minmax(0, 1fr); align-content: stretch; background: linear-gradient(160deg, hsl(var(--surface-panel)), hsl(var(--background) / .68)); }
+.item-detail h1 { margin-bottom: 0; font-size: 16px; line-height: 1.08; }
+.item-detail p:not(.eyebrow) { color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.45; }
+.detail-art { width: 100%; min-height: 178px; aspect-ratio: 1 / .9; border: 1px solid hsl(var(--brand-border)); border-radius: 11px; font-size: 44px; background: radial-gradient(circle at 50% 30%, hsl(var(--primary) / .18), transparent 63%), hsl(var(--background)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .04); }
+.detail-art img { padding: 12px; transform: scale(1.06); }
+dl { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin: 3px 0; border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); padding: 9px 0; color: hsl(var(--muted-foreground)); font-size: 10px; }
 dd { margin: 0; color: hsl(var(--foreground)); font-weight: 650; }
 .amount-action { display: grid; gap: 6px; }
 .amount-slider { width: 100%; height: 16px; margin: 0; padding: 0; accent-color: hsl(var(--primary)); background: transparent; cursor: pointer; }
 .amount-slider:disabled { cursor: wait; opacity: .55; }
-.primary-action, .quiet-action { min-height: 30px; padding: 6px 9px; font-size: 11px; font-weight: 700; cursor: pointer; }
-.primary-action { border: 1px solid hsl(var(--primary)); border-radius: 6px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
-.primary-action:hover { filter: brightness(1.08); }
+.primary-action, .quiet-action { min-height: 32px; padding: 6px 9px; font-size: 11px; font-weight: 750; cursor: pointer; transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease; }
+.primary-action { border: 1px solid hsl(var(--primary)); border-radius: 7px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); box-shadow: 0 6px 15px hsl(var(--primary) / .18); }
+.primary-action:hover { background: hsl(var(--brand-hover)); transform: translateY(-1px); }
 .primary-action:disabled, .quiet-action:disabled { cursor: wait; opacity: .55; }
-.empty-detail { color: hsl(var(--muted-foreground)); text-align: center; display: grid; justify-items: center; gap: 6px; }
-.empty-detail svg { color: hsl(var(--primary)); }
-.secondary-empty { color: hsl(var(--muted-foreground)); text-align: center; display: grid; align-content: center; justify-items: center; gap: 6px; }
+.empty-detail { max-width: 230px; margin: auto; color: hsl(var(--muted-foreground)); text-align: center; display: grid; justify-items: center; gap: 9px; }
+.empty-detail-icon { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid hsl(var(--brand-border)); border-radius: 15px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .06); }
+.empty-detail-icon svg { width: 28px; height: 28px; }
+.empty-detail h1 { font-size: 17px; }
+.secondary-empty { color: hsl(var(--muted-foreground)); text-align: center; display: grid; align-content: center; justify-items: center; gap: 7px; background: linear-gradient(160deg, hsl(var(--surface-panel)), hsl(var(--background) / .68)); }
 .secondary-empty svg { color: hsl(var(--primary)); }
 .secondary-empty p { max-width: 220px; margin-bottom: 0; font-size: 11px; line-height: 1.4; }
-.shortcut-bar { display: grid; grid-template-columns: repeat(5, auto); justify-content: space-between; gap: 10px; color: hsl(var(--muted-foreground)); font-size: 9px; }
-kbd { border: 1px solid hsl(var(--border)); border-radius: 3px; padding: 1px 4px; color: hsl(var(--foreground)); background: hsl(var(--muted)); font-family: inherit; }
+.shortcut-bar { display: grid; grid-template-columns: repeat(5, auto); justify-content: space-between; gap: 10px; min-height: 28px; border-top: 1px solid hsl(var(--border) / .76); padding: 10px 3px 1px; color: hsl(var(--muted-foreground)); font-size: 9px; }
+kbd { border: 1px solid hsl(var(--border-strong)); border-radius: 4px; padding: 1px 4px; color: hsl(var(--foreground)); background: hsl(var(--background)); font-family: inherit; }
 .dev-launch { pointer-events: auto; display: grid; place-items: center; margin: 24px; border: 1px solid hsl(var(--brand-border)); border-radius: 7px; padding: 9px 12px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); cursor: pointer; }
 
-@media (max-width: 1040px) { .slot-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .inventory-layout { grid-template-columns: minmax(240px, 1fr) 170px; } .inventory-layout > :last-child { grid-column: 1 / -1; min-height: 220px; } }
-@media (max-width: 700px) { .inventory-shell { width: calc(100vw - 20px); min-height: calc(100vh - 20px); max-height: calc(100vh - 20px); margin: 10px auto; padding: 8px; } .inventory-topbar { grid-template-columns: 1fr auto; } .search { grid-column: 1 / -1; grid-row: 2; } .inventory-layout { grid-template-columns: 1fr; } .inventory-layout > :last-child { grid-column: auto; } .item-detail { min-height: 170px; } .shortcut-bar { grid-template-columns: 1fr 1fr; justify-content: initial; } }
+/* The slot grid stays 5 columns wide at every width -- only the surrounding
+   layout reflows. */
+@media (max-width: 1120px) {
+  .inventory-shell { width: 70%; height: 70%; min-height: 0; max-height: 70%; margin: 0; }
+  .inventory-layout { grid-template-columns: minmax(250px, 1fr) minmax(230px, 270px); }
+  .inventory-stage-secondary { grid-column: 1 / -1; min-height: 260px; }
+  .inventory-shell-solo { width: min(480px, calc(100vw - 300px)); height: fit-content; margin: 0; }
+  .inventory-layout-solo { grid-template-columns: minmax(0, 1fr); width: 100%; }
+  .item-detail-drawer { width: 250px; }
+}
+@media (max-width: 700px) {
+  /* On a narrow device the 70% presentation would make controls unusably
+     small, so retain a near-full-screen touch layout. */
+  .inventory-shell { width: calc(100% - 20px); height: calc(100% - 20px); min-height: 0; max-height: calc(100% - 20px); margin: 0; top: 10px; left: 10px; transform: none; padding: 9px; border-radius: 13px; }
+  .inventory-shell-solo { width: calc(100vw - 20px); height: calc(100vh - 20px); margin: 0; top: 10px; left: 10px; transform: none; overflow: hidden; }
+  .inventory-topbar { grid-template-columns: 1fr auto; gap: 8px; }
+  .brand { grid-template-columns: 30px auto; gap: 7px; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 9px; }
+  .brand em, .session-state { display: none; }
+  .search { grid-column: 1 / -1; grid-row: 2; }
+  .inventory-layout, .inventory-layout-solo { grid-template-columns: 1fr; width: 100%; }
+  .inventory-layout-solo { overflow: auto; }
+  .inventory-stage-secondary { grid-column: auto; min-height: 220px; }
+  .item-detail { min-height: 220px; }
+  .item-detail-drawer { position: relative; top: auto; left: auto; width: auto; height: auto; max-height: none; animation-name: item-drawer-in-mobile; }
+  .shortcut-bar { grid-template-columns: 1fr 1fr; justify-content: initial; }
+}
+@keyframes item-drawer-in-mobile { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0ms !important; animation-duration: 0ms !important; } }

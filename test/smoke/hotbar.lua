@@ -40,7 +40,8 @@ H.ok(hotbar:find("TriggerServerEvent('QBCore:Server:UseItem'", 1, true),
     'the hotbar reuses the existing legacy use-item transport rather than a new server event')
 H.ok(hotbar:find('IsNuiFocused()', 1, true),
     'the hotbar does not fire while the inventory panel owns keyboard focus')
-H.ok(hotbar:find('HOTBAR_SLOTS = 5', 1, true), 'five hotbar slots are registered')
+H.ok(hotbar:find('Config.qbinventory.hotbarSlots', 1, true),
+    'the hotbar range comes from config, so weaponCarry\'s hotbar visibility cannot disagree with it')
 H.ok(hotbar:find('for slot = 1, HOTBAR_SLOTS do', 1, true), 'slots 1-5 each register a keybind')
 H.ok(hotbar:find('QB.keybind.add({', 1, true) and hotbar:find('name = command', 1, true),
     'hotbar mappings use QB.keybind lifecycle ownership')

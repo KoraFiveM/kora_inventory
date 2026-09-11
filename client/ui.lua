@@ -20,7 +20,28 @@ local function send(action, data)
 end
 
 local function pushTheme()
-    send('qbinventory:nui:theme', QB.theme.tokens())
+    QBTheme.refresh()
+end
+
+-- The presentation half of Config.qbinventory, and the ONLY config that crosses
+-- into the browser. Sent as a whole table rather than folded into the theme
+-- tokens (which are CSS custom properties, not structured data), and re-sent on
+-- every session open so a UI that reloaded mid-session is never left rendering
+-- defaults.
+--
+-- hotbarSlots is included because the NUI draws the hotbar boundary and cannot
+-- know where it is otherwise; it stays a read of the same single source
+-- client/hotbar.lua binds its keys from, so the outline and the keys cannot
+-- disagree.
+local function pushConfig()
+    local ui = Config.qbinventory.ui or {}
+
+    send('qbinventory:nui:config', {
+        hotbarSlots = Config.qbinventory.hotbarSlots,
+        centreWhenSolo = ui.centreWhenSolo ~= false,
+        showHotbar = ui.showHotbar ~= false,
+        images = ui.images,
+    })
 end
 
 local function closeSession(reason)
@@ -68,6 +89,7 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     }
     if not wire.player then return end
     pushTheme()
+    pushConfig()
     send('qbinventory:nui:sessionOpened', wire)
     SetNuiFocus(true, true)
     TriggerEvent('qbinventory:client:requestGiveAvailability')
@@ -143,7 +165,7 @@ end)
 -- qblib computes the tokens in Lua, so this bridge does not duplicate the
 -- design-system HSL math in TypeScript. qbinventory can trigger this local
 -- event after a live theme change without involving inventory authority.
-AddEventHandler('qbinventory:client:theme', pushTheme)
+AddEventHandler('qbinventory:client:theme', QBTheme.refresh)
 
 RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
     if type(data) ~= 'table'
@@ -183,6 +205,7 @@ end)
 AddEventHandler('onResourceStart', function(resource)
     if resource == GetCurrentResourceName() then
         pushTheme()
+        pushConfig()
     end
 end)
 

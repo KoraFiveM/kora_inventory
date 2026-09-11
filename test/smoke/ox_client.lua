@@ -105,6 +105,7 @@ QB = {
 function PlayerPedId() return 1 end
 function GetSelectedPedWeapon() return pedWeapon end
 function GetHashKey(name) local h = 0; for i = 1, #name do h = (h * 31 + name:byte(i)) % 2 ^ 31 end return h end
+joaat = GetHashKey
 
 -- The compat file publishes ONLY through the ox_inventory export identity.
 -- Capturing it this way asserts the registration path itself, and leaving
@@ -228,6 +229,10 @@ Ox.notify({ title = 'Hi', description = 'From ox_lib.' })
 H.equal(calls.notify[#calls.notify].message, 'From ox_lib.', 'an ox_lib description also lands in the body')
 Ox.notify({ title = 'Hi', text = 'Body', type = 'nonsense' })
 H.equal(calls.notify[#calls.notify].type, nil, 'an unknown type is dropped rather than failing validation')
+Ox.notify({ title = 'Hi', position = 'bottom' })
+H.equal(calls.notify[#calls.notify].position, 'bottom-center', 'the ox bottom position maps to qblib bottom-center')
+Ox.notify({ title = 'Hi', position = 'center-right' })
+H.equal(calls.notify[#calls.notify].position, 'top-right', 'unsupported center-right retains its side without failing validation')
 
 -- --- Progress ---------------------------------------------------------------
 --
@@ -248,6 +253,27 @@ H.equal(payload.label, 'Doing', 'the progress label is forwarded')
 H.equal(payload.anim.clip, 'c', 'the ox anim clip is forwarded')
 H.equal(payload.disable.move, true, 'supported disable flags are forwarded')
 H.equal(payload.disable.mouse, nil, 'the unsupported mouse-disable flag is dropped')
+
+progressResult = true
+Ox.Progress({ label = 'Searching', duration = 1000,
+    anim = { scenario = 'WORLD_HUMAN_WELDING' },
+    prop = {
+        { model = 'prop_tool', bone = 60309, pos = { x = 1, y = 2, z = 3 }, rot = { x = 4, y = 5, z = 6 }, rotOrder = 2 },
+        { model = 'prop_light' },
+    },
+})
+payload = calls.progress[#calls.progress]
+H.equal(payload.anim, nil, 'an ox scenario is not also sent as an animation')
+H.equal(payload.scenario.name, 'WORLD_HUMAN_WELDING', 'an ox scenario maps onto qblib scenario playback')
+H.equal(#payload.props, 2, 'an ox prop array remains an array')
+H.equal(payload.props[1].offset.x, 1, 'ox prop pos maps to qblib offset')
+H.equal(payload.props[1].rotation.z, 6, 'ox prop rot maps to qblib rotation')
+H.equal(payload.props[1].rotationOrder, 2, 'ox prop rotOrder maps to qblib rotationOrder')
+
+Ox.Progress({ label = 'Holding', duration = 1000, prop = { model = 'prop_single' } })
+payload = calls.progress[#calls.progress]
+H.equal(#payload.props, 1, 'a single ox prop is wrapped for qblib')
+H.equal(payload.props[1].model, 'prop_single')
 
 progressResult = false
 H.equal(Ox.Progress({ label = 'Doing', duration = 1000 }, function(cancelled) cancelledArg = cancelled end),
@@ -279,6 +305,12 @@ keyboardResult = { cancelled = true }
 H.equal(Ox.Keyboard('Give', { 'Name' }), nil, 'a cancelled dialog returns nil')
 keyboardResult = nil
 H.equal(Ox.Keyboard('Give', { 'Name' }), nil, 'a timed-out dialog returns nil')
+keyboardResult = { values = { ['1'] = { 'medic', 'pilot' } } }
+answers = Ox.Keyboard('Roles', { { type = 'multi-select', label = 'Roles', options = {
+    { value = 'medic', label = 'Medic' }, { value = 'pilot', label = 'Pilot' },
+} } })
+H.equal(calls.dialog.fields[1].type, 'multiselect', 'ox multi-select remains multi-select')
+H.equal(#answers[1], 2, 'the positional result preserves every selected value')
 
 -- --- setStashTarget ---------------------------------------------------------
 --

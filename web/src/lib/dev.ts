@@ -20,6 +20,5 @@ const sample: SessionSnapshot = {
 
 export function openDevHarness() {
     const post = <T,>(action: string, data: T) => window.postMessage({ action, data } satisfies NuiWireMessage<T>, "*")
-    post("qbinventory:nui:theme", { primary: "348 83% 47%", ring: "348 83% 47%", "brand-soft": "348 83% 47% / .14", "brand-border": "348 83% 47% / .45" })
     post("qbinventory:nui:sessionOpened", sample)
 }

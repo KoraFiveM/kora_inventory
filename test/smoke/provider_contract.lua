@@ -53,11 +53,17 @@ local function capture(eventName, handler)
 end
 
 -- --- shared prerequisites (fxmanifest shared_scripts) ---
+--
+-- Discovered from the manifest rather than listed here: each shop's server
+-- file `assert`s its own config block at load time, so a newly added shop this
+-- list had not been updated for failed the whole test with an assertion from
+-- inside that shop rather than anything about the provider contract.
 Config = { qbinventory = {} }
-dofile('config.lua')
-dofile('config/shops/ammunation.lua')
-dofile('config/shops/vendingmachine.lua')
-dofile('shared.lua')
+for _, path in ipairs(pathsFrom('shared_scripts')) do
+    -- '@resource/file.lua' entries are other resources (qblib, qbsql); the QB
+    -- surface they provide is mocked below.
+    if path:sub(1, 1) ~= '@' then dofile(path) end
+end
 
 QB = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
@@ -74,11 +80,13 @@ QB.target = setmetatable({}, { __index = function() return function() end end })
 QB.nui = setmetatable({}, { __index = function() return function() end end })
 QB.cache = setmetatable({}, { __index = function() return function() end end })
 QB.loops = setmetatable({}, { __index = function() return function() end end })
+QB.state = setmetatable({}, { __index = function() return function() end end })
 QB.entities = setmetatable({}, { __index = function() return function() end end })
 QB.anim = setmetatable({}, { __index = function() return function() end end })
 QB.blips = setmetatable({}, { __index = function() return function() end end })
 QB.theme = setmetatable({}, { __index = function() return function() end end })
 QB.keybind = { add = function() return { remove = function() return true end } end }
+QBTheme = { refresh = function() end, apply = function() return {} end }
 
 GetCurrentResourceName = function() return 'qbinventory' end
 GetInvokingResource = function() return nil end
@@ -130,7 +138,9 @@ exports = setmetatable({}, {
 realm = 'server'
 for _, path in ipairs(pathsFrom('server_scripts')) do dofile(path) end
 realm = 'client'
-for _, path in ipairs(pathsFrom('client_scripts')) do dofile(path) end
+for _, path in ipairs(pathsFrom('client_scripts')) do
+    if path:sub(1, 1) ~= '@' then dofile(path) end
+end
 
 -- Sanity: fail loudly rather than vacuously if the loads above did nothing.
 local function size(t) local n = 0 for _ in pairs(t or {}) do n = n + 1 end return n end

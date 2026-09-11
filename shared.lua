@@ -24,6 +24,28 @@ function I.sameInfo(a, b)
     return true
 end
 
+---Normalises one coordinate or an array of coordinates into an array.
+---`nil` means no coordinate policy; a malformed non-nil value becomes an empty
+---array so callers fail closed rather than accidentally disabling distance.
+---@param coords any
+---@return table[]|nil
+function I.coordinateList(coords)
+    if coords == nil then return nil end
+    local kind = type(coords)
+    if kind ~= 'table' and kind ~= 'vector3' and kind ~= 'vector4' then return {} end
+    if coords.x ~= nil and coords.y ~= nil and coords.z ~= nil then return { coords } end
+
+    local out = {}
+    for _, point in ipairs(coords) do
+        local pointType = type(point)
+        if (pointType == 'table' or pointType == 'vector3' or pointType == 'vector4')
+            and point.x ~= nil and point.y ~= nil and point.z ~= nil then
+            out[#out + 1] = point
+        end
+    end
+    return out
+end
+
 -- FXServer's exports boundary hands a cross-resource function argument back as
 -- a table with a __call metamethod, not a plain Lua function -- so a bare
 -- type(x) == 'function' check rejects a perfectly callable handler registered

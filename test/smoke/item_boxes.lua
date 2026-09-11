@@ -2,10 +2,11 @@ local H = dofile('test/harness.lua')
 
 local config = assert(io.open('config.lua', 'r')):read('*a')
 local server = assert(io.open('server.lua', 'r')):read('*a')
+local compactServer = server:gsub('%s+', ' ')
 
 H.ok(config:find('itemBoxes = {', 1, true), 'item receipt policy is part of qbinventory config')
 H.ok(config:find('enabled = true', config:find('itemBoxes = {', 1, true), true), 'item receipt policy has a server-owner switch')
-H.ok(server:find("emit(src, 'qbinventory:client:itemBox'", 1, true), 'receipts originate from qbinventory authority')
+H.ok(server:find("TriggerClientEvent('qbinventory:client:itemBox', src", 1, true), 'receipts originate from qbinventory authority')
 H.ok(server:find("showItemBox(src, name, amount, 'add')", 1, true), 'public AddItem automatically owns its receipt')
 H.ok(server:find("showItemBox(src, currentItem.name, count, 'purchase')", 1, true), 'shop purchases automatically own their receipt')
 H.ok(server:find("showItemBox(src, name, amount, 'remove')", 1, true), 'public RemoveItem automatically owns its receipt')
@@ -15,7 +16,7 @@ H.ok(server:find("showItemBox(src, item.name, 1, 'use')", 1, true), 'a successfu
 local boxes = config:find('itemBoxes = {', 1, true)
 for _, switch in ipairs({ 'showAdditions', 'showPurchases', 'showRemovals', 'showUses' }) do
     H.ok(config:find(switch, boxes, true), ('item receipt policy exposes %s'):format(switch))
-    H.ok(server:find(('policy.%s ~= true then return end'):format(switch), 1, true),
+    H.ok(compactServer:find(('policy.%s ~= true then return end'):format(switch), 1, true),
         ('%s gates its own receipt action server-side'):format(switch))
 end
 -- A consuming useable already draws a removal receipt through RemoveItem, so

@@ -119,6 +119,13 @@ QB.shared.register('items', 'bandage', {
 `useTime` runs qblib's client progress bar before the use request is ever
 sent to the server; a cancelled bar never reaches your handler.
 
+Item definitions are resolved through qbcore's getter when an operation runs;
+qbinventory does not capture the shared Items table at startup. Definitions can
+therefore be registered, updated, or removed at runtime. Its built-in weapon and
+ammunition handlers also subscribe to those registry changes, so a newly
+registered weapon or magazine is usable immediately without restarting either
+resource.
+
 ### Ground drops
 ```lua
 -- server: drop items at a location (e.g. on player death)
@@ -145,7 +152,7 @@ exports.qbinventory:RegisterCraftRecipe('repair_board', {
 })
 
 -- later, after your resource has resolved station/job/proximity server-side
-exports.qbinventory:CraftItem(source, 'repair_board', trustedContext)
+exports.qbinventory:CraftItem(source, 'repair_board', trustedContext, amount)
 ```
 `server/crafting.lua` registers no NUI callback or network event on its own —
 a gameplay resource supplies the UI and the trusted context.
@@ -185,7 +192,7 @@ qb-style aliases are also exported: `AddItem`, `RemoveItem`, `GetItemByName`,
 exports.qbinventory:stashGet(id)
 exports.qbinventory:stashSet(id, items)
 exports.qbinventory:stashOpen(src, id, opts)
-exports.qbinventory:registerStash(id, label, slots, maxWeight, owner, groups, coords)
+exports.qbinventory:registerStash(id, label, slots, maxWeight, owner, groups, coords, distance)
 exports.qbinventory:createTemporaryStash(properties)          -- returns an inventory key
 exports.qbinventory:registerShop(id, data)                    -- { slots, inventory/items, prices }
 exports.qbinventory:buyItem(src, shopId, slot, count)
@@ -193,6 +200,12 @@ exports.qbinventory:buyItem(src, shopId, slot, count)
 `RegisterStash(..., owner = true, ...)` is a **template**, not a single shared
 stash: each caller gets their own `stash:<template>:<citizenid>` record,
 derived server-side from the caller's own session.
+
+`coords` may be one `{ x, y, z }` point or an array of them. A shop accepts the
+same forms in `data.coords`. The server grants and continuously revalidates a
+session only while the player is within `distance` of at least one registered
+point; re-registering an id moves that boundary without resetting its contents.
+A point in a list may carry its own `distance` override.
 
 ### Drops
 ```lua
@@ -216,13 +229,16 @@ for an authorised police/admin/consent flow.
 exports.qbinventory:RegisterCraftRecipe(id, recipe)
 exports.qbinventory:RemoveCraftRecipe(id)
 exports.qbinventory:GetCraftRecipe(id)
-exports.qbinventory:CraftItem(src, recipeId, trustedContext)
+exports.qbinventory:CanCraftRecipe(src, recipeId, amount)
+exports.qbinventory:CraftItem(src, recipeId, trustedContext, amount)
 exports.qbinventory:RegisterCraftHook(callback)
 exports.qbinventory:RemoveCraftHook(id)
 ```
 Ships no station discovery, progress timers, or UI — a gameplay resource
 resolves its own server-side station/job/proximity checks before calling
-`CraftItem`.
+`CraftItem`. The optional amount defaults to one and is bounded by
+`Config.qbinventory.crafting.maxBatchAmount`; a batch remains one atomic
+ingredient/output transaction.
 
 ### Weapons (server-only)
 ```lua
@@ -235,6 +251,18 @@ exports.qbinventory:SetWeaponComponents(...)
 ```
 New weapon metadata gets a server-generated serial, bounded durability/ammo,
 and only components listed in `Config.qbinventory.weapons.components`.
+
+### Visible weapon carry
+```lua
+exports.qbinventory:GetCarriedWeapons(src)  -- read-only, server-built
+exports.qbinventory:GetEquippedWeapon(src)  -- { slot, name } or nil
+```
+`Config.qbinventory.weaponCarry` renders weapons a player owns but is not
+holding onto their body, and makes equipping one a timed, animated draw.
+`visibility = 'all'` shows every carryable weapon; `'hotbar'` shows only slots
+`1..hotbarSlots` and charges `concealedDrawTime` extra to draw anything stowed
+past them. The carried list is built on the server and pushed out on the
+replicated `qbinventory:weaponCarry` player state bag; clients only render it.
 
 ### Vehicles (trunk/glovebox)
 ```lua
@@ -285,12 +313,20 @@ break the authority model (`qb-inventory:server:updateDrop`,
 `qb-inventory:server:snowball`) — call the real exports from server code
 instead.
 
+The client compatibility helpers also normalize ox-style notifications,
+multi-select input rows, and progress scenarios/props onto qblib. The ox
+`center-left`/`center-right` notification positions retain their horizontal
+side but use qblib's top edge because qblib has no vertically centered toast
+stack.
+
 ## Config highlights (`config.lua`)
 
 `Config.qbinventory.playerSlots` (41), `Config.qbinventory.defaultSlots` (50
 for stashes/shops/drops), `Config.qbinventory.vehicles.classes` (per-class
 trunk/glovebox slots and weight, set a type to `false` to disable it),
 `Config.qbinventory.playerInspection.access`, `Config.qbinventory.weapons.components`,
+`Config.qbinventory.hotbarSlots` (5 -- both the number-key range and what
+counts as openly carried), `Config.qbinventory.weaponCarry`,
 `Config.qbinventory.containers.items` (portable container item definitions,
 e.g. `backpack`), `Config.qbinventory.containers.evidence.access`. Bundled
 Ammu-Nation shop data lives in `config/shops/ammunation.lua`.
