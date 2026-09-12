@@ -674,18 +674,7 @@ local function bootstrap()
         log('1', state.lastError)
         return
     end
-    local migrations = {}
-    for _, migration in ipairs(MIGRATIONS) do
-        local sql = LoadResourceFile(resource, migration.file)
-        if not sql then
-            state.lastError = ('missing migration %s'):format(migration.file)
-            log('1', state.lastError)
-            return
-        end
-        migrations[#migrations + 1] =
-            { version = migration.version, name = migration.name, sql = sql, checksum = checksum(sql) }
-    end
-    local applied, migrationErr = QB.sql.migrate(resource, migrations)
+    local applied, migrationErr = QB.sql.migrateFiles(resource, MIGRATIONS, checksum)
     if migrationErr then
         state.lastError = migrationErr
         log('1', ('schema migration failed: %s'):format(migrationErr))
