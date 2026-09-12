@@ -85,6 +85,9 @@ QbInventory.clientApi = {
 local progressResult, keyboardResult, progressActive = true, nil, false
 local pedWeapon = 0
 QB = {
+    compat = { provideExport = function(identity, name, fn)
+        AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCallback) setCallback(fn) end)
+    end },
     cache = {
         weapon = function() return pedWeapon end,
     },

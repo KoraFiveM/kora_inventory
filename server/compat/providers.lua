@@ -40,9 +40,7 @@ end
 local function register(identity, surface)
     for name, fn in pairs(surface) do
         if type(fn) == 'function' then
-            AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCB)
-                setCB(fn)
-            end)
+            QB.compat.provideExport(identity, name, fn)
         end
     end
 end

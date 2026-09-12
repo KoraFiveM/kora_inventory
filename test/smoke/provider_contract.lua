@@ -66,6 +66,9 @@ for _, path in ipairs(pathsFrom('shared_scripts')) do
 end
 
 QB = {
+    compat = { provideExport = function(identity, name, fn)
+        AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCallback) setCallback(fn) end)
+    end },
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function() end, trigger = function() return nil end },
     notify = { send = function() end },

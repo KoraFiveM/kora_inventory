@@ -483,7 +483,5 @@ end
 -- registration won -- and qbpolice, qbambulance, qbclothing and
 -- qblib-playground all call exports.qbinventory:openInventory(...).
 for name, fn in pairs(ox) do
-    AddEventHandler(('__cfx_export_ox_inventory_%s'):format(name), function(setCB)
-        setCB(fn)
-    end)
+    QB.compat.provideExport('ox_inventory', name, fn)
 end

@@ -63,6 +63,7 @@ end
 -- these files runs inside a function body and is never invoked by merely
 -- loading the module.
 QB = {
+    compat = { provideExport = function() end },
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function() end },
     sql = {},

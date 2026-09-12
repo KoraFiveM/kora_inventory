@@ -279,9 +279,7 @@ exports('HasItem', hasItem)
 -- not. HasItem is a qb-inventory export only; ox has no client HasItem.
 for _, exportName in ipairs({ 'HasItem', 'openInventory', 'closeInventory' }) do
     local fn = exportName == 'HasItem' and hasItem or exportName == 'openInventory' and openInventory or closeInventory
-    AddEventHandler(('__cfx_export_qb-inventory_%s'):format(exportName), function(setCB)
-        setCB(fn)
-    end)
+    QB.compat.provideExport('qb-inventory', exportName, fn)
 end
 
 AddEventHandler('onClientResourceStop', function(name)
