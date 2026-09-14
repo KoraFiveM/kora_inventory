@@ -4,6 +4,31 @@ Config = { qbinventory = {} }
 dofile('config.lua')
 dofile('shared.lua')
 
+QB = { vehicle = {}, world = {} }
+function QB.vehicle.normalizePlate(value, options)
+    if type(value) ~= 'string' then return nil, 'invalid_type' end
+    local plate = value:match('^%s*(.-)%s*$'):upper():gsub('%s+', ' ')
+    if plate == '' then return nil, 'empty' end
+    if #plate > options.maxLength then return nil, 'too_long' end
+    if not plate:match('^[A-Z0-9 ]+$') then return nil, 'invalid_characters' end
+    return plate
+end
+function QB.world.resolveNetworkEntity(src, networkId, options)
+    if type(networkId) ~= 'number' or networkId < 1 then return nil, 'invalid_network_id' end
+    local entity = NetworkGetEntityFromNetworkId(networkId)
+    if entity == 0 or not DoesEntityExist(entity) then return nil, 'entity_unavailable' end
+    if GetEntityType(entity) ~= 2 then return nil, 'wrong_entity_type' end
+    local ped = GetPlayerPed(src)
+    if ped == 0 or not DoesEntityExist(ped) then return nil, 'player_unavailable' end
+    if options.sameBucket and GetPlayerRoutingBucket(src) ~= GetEntityRoutingBucket(entity) then
+        return nil, 'routing_bucket_mismatch'
+    end
+    local a, b = GetEntityCoords(ped), GetEntityCoords(entity)
+    local dx, dy, dz = a.x - b.x, a.y - b.y, a.z - b.z
+    if math.sqrt(dx * dx + dy * dy + dz * dz) > options.maxDistance then return nil, 'too_far' end
+    return entity
+end
+
 -- Deterministic server-native fakes. No data below comes from a client input.
 local entities = {
     [101] = { type = 2, bucket = 1, coords = { x = 1, y = 0, z = 0 }, plate = ' ab  12  ', class = 0 },

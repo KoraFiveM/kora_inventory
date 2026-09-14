@@ -74,14 +74,9 @@ end
 ---Trim native padding, canonicalise whitespace and disallow key separators.
 ---@return string|nil, string|nil
 function vehicles.normalisePlate(value)
-    if type(value) ~= 'string' then
-        return nil, 'invalid vehicle plate'
-    end
-    local plate = value:gsub('^%s*(.-)%s*$', '%1'):upper():gsub('%s+', ' ')
     local maximum = math.max(1, math.floor(tonumber(vehicleConfig.plateMaxLength) or 8))
-    if plate == '' or #plate > maximum or not plate:match('^[A-Z0-9 ]+$') then
-        return nil, 'invalid vehicle plate'
-    end
+    local plate = QB.vehicle.normalizePlate(value, { maxLength = maximum })
+    if not plate then return nil, 'invalid vehicle plate' end
     return plate
 end
 
@@ -188,38 +183,24 @@ function vehicles.validate(src, kind, networkId, expectedPlate)
         return nil, 'invalid vehicle storage type'
     end
     networkId = asInteger(networkId)
-    if not networkId or networkId < 1 or type(NetworkGetEntityFromNetworkId) ~= 'function' then
-        return nil, 'invalid vehicle entity'
-    end
-    local entity = NetworkGetEntityFromNetworkId(networkId)
-    if not entity or entity == 0 or type(DoesEntityExist) ~= 'function' or not DoesEntityExist(entity) then
+    local entity, reason = QB.world.resolveNetworkEntity(src, networkId, {
+        entityType = 'vehicle',
+        maxDistance = accessDistance(),
+        sameBucket = vehicleConfig.requireSameBucket ~= false,
+    })
+    if not entity then
+        if reason == 'invalid_network_id' then return nil, 'invalid vehicle entity' end
+        if reason == 'wrong_entity_type' then return nil, 'entity is not a vehicle' end
+        if reason == 'player_unavailable' then return nil, 'player entity unavailable' end
+        if reason == 'routing_bucket_mismatch' then return nil, 'different routing bucket' end
+        if reason == 'too_far' then return nil, 'too far away' end
         return nil, 'vehicle does not exist'
     end
-    if type(GetEntityType) ~= 'function' or GetEntityType(entity) ~= 2 then
-        return nil, 'entity is not a vehicle'
-    end
-    if type(GetPlayerPed) ~= 'function' or type(GetEntityCoords) ~= 'function' then
-        return nil, 'vehicle validation unavailable'
-    end
     local ped = GetPlayerPed(src)
-    if not ped or ped == 0 or not DoesEntityExist(ped) then
-        return nil, 'player entity unavailable'
-    end
-    if vehicleConfig.requireSameBucket ~= false then
-        if type(GetPlayerRoutingBucket) ~= 'function' or type(GetEntityRoutingBucket) ~= 'function' then
-            return nil, 'routing bucket validation unavailable'
-        end
-        if GetPlayerRoutingBucket(src) ~= GetEntityRoutingBucket(entity) then
-            return nil, 'different routing bucket'
-        end
-    end
     local playerCoords, vehicleCoords = GetEntityCoords(ped), GetEntityCoords(entity)
     local separation = coordsDistance(playerCoords, vehicleCoords)
     if not separation then
         return nil, 'vehicle coordinates unavailable'
-    end
-    if separation > accessDistance() then
-        return nil, 'too far away'
     end
     if type(GetVehicleNumberPlateText) ~= 'function' or type(GetVehicleClass) ~= 'function' then
         return nil, 'vehicle details unavailable'
