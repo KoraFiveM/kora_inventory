@@ -13,4 +13,14 @@ H.ok(source:find("'qbinventory:client:itemBox'", 1, true),
     'relays inventory-owned item receipt payloads to the bundled UI')
 H.ok(source:find("send('qbinventory:nui:itemBox', payload)", 1, true),
     'item receipts can render without an inventory session')
+
+Config = {}
+dofile('config.lua')
+local images = Config.qbinventory.ui.images
+H.equal(images.localPath, 'nui://qbinventory/images', 'artwork uses qbinventory NUI paths')
+H.equal(images.preferLocal, true, 'bundled artwork is preferred over remote fallbacks')
+
+local canonicalImage = io.open('images/advancedlockpick.png', 'rb')
+H.ok(canonicalImage ~= nil, 'canonical qb-inventory artwork is bundled')
+if canonicalImage then canonicalImage:close() end
 H.finish()

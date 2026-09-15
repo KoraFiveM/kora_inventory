@@ -1,5 +1,11 @@
 # Local item artwork
 
+The canonical PNG set from `qbcore-framework/qb-inventory` is bundled here at
+commit `dc3d07fc60139de569df38c5ac178ed4cada4577`. Its filenames match the legacy
+`image` fields imported from qb-core shared items and uppercase extensions were
+normalised for FiveM's case-sensitive NUI paths. qbinventory resolves these
+files directly without a per-item path rewrite.
+
 Drop item images in here and qbinventory's UI finds them by item name, with no
 code change and no outbound request:
 

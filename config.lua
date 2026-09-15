@@ -65,10 +65,10 @@ Config.qbinventory = {
         images = {
             localPath = 'nui://qbinventory/images',
             extensions = { 'webp', 'png', 'gif', 'jpg' },
-            -- Try the local file before the remote URL. Leave false to keep
-            -- qbcore's remote catalogue as the primary source and use local
-            -- files only for items it has no artwork for.
-            preferLocal = false,
+            -- The canonical qb-inventory artwork is bundled in images/, so it
+            -- is the primary source. qbcore's remote catalogue remains a
+            -- fallback for server-specific items not present in that set.
+            preferLocal = true,
             -- Set false to never make an outbound image request at all. Items
             -- with no local file fall back to the first-letter placeholder.
             allowRemote = true,
