@@ -368,5 +368,23 @@ Config.qbinventory = {
 
 -- Registers this resource-owned configuration with qblib without changing its public Config table.
 if QB and QB.config and QB.config.adopt then
+    Config.qbinventory.vehicles.classes = QB.config.map(Config.qbinventory.vehicles.classes, nil, {
+        keyType = 'mixed',
+        requiredKeys = { 'default' },
+        scope = 'server',
+        label = 'Vehicle storage by GTA class',
+        description = 'Defines trusted trunk and glovebox capacities for each GTA vehicle class. Numeric keys are GTA class IDs and “default” is the required fallback. Set trunk or glovebox to false to disable that storage type; slot counts and maximum weights are enforced by the server after qbinventory restarts.',
+    })
+    Config.qbinventory.weapons.components = QB.config.map(Config.qbinventory.weapons.components,
+        QB.config.list({}, QB.config.string('', { minLength = 1 })), {
+            scope = 'server',
+            label = 'Allowed weapon components',
+            description = 'Maps each exact weapon item name to the component item names that may be stored in that weapon’s server-owned metadata. A weapon absent from this map, and with no “default” row, accepts no components. Changes apply after qbinventory restarts.',
+        })
+    Config.qbinventory.weaponCarry.components = QB.config.map(Config.qbinventory.weaponCarry.components,
+        QB.config.string('', { minLength = 1 }), {
+            label = 'Visible carried-weapon components',
+            description = 'Maps an inventory component item name to the exact GTA component model name rendered on a holstered weapon. Only entries in this allow-list are sent to clients, preventing item metadata from requesting arbitrary native components.',
+        })
     Config = QB.config.adopt(Config)
 end
