@@ -35,6 +35,9 @@ local ITEMS = {
     oldflare = { name = 'oldflare', label = 'Old Flare', weight = 50, useable = true, shouldClose = false },
     potion = { name = 'potion', label = 'Potion', weight = 20, useable = true, useTime = 2500.9 },
 }
+local WEAPONS = {
+    weapon_pistol = { name = 'weapon_pistol', label = 'Pistol', type = 'weapon', useable = true, weight = 1000 },
+}
 
 local playersData = { [7] = { citizenid = 'CID-7' } }
 -- Populated below, once buildItem is available, exactly the way every real
@@ -54,6 +57,7 @@ exports = setmetatable({}, {
                         if exportName == 'allShared' then return {} end
                         if exportName == 'getShared' then
                             local registry, itemName = ...
+                            if registry == 'weapons' then return WEAPONS[itemName] end
                             return registry == 'items' and ITEMS[itemName] or nil
                         end
                         if exportName == 'getPlayerData' then
@@ -105,12 +109,15 @@ playersItems[7] = {
     [2] = buildItem('map', 1, 2, {}),
     [3] = buildItem('oldflare', 1, 3, {}),
     [4] = buildItem('potion', 1, 4, {}),
+    -- Simulate a legacy record that did not persist the current useable flag.
+    [5] = { name = 'weapon_pistol', amount = 1, slot = 5, useable = false, info = {} },
 }
 
 -- intentUse response signals whether the client should close the panel -----
 
 local ok, payload = QbInventory.internal.openSelf(7)
 H.ok(ok, 'own inventory opens')
+H.ok(payload.primary.items[5].useable, 'the current weapon definition restores the Use action in the inventory view')
 
 QbInventory.api.createUseable('bandage', function() return true end)
 QbInventory.api.createUseable('map', function() return true end)

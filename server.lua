@@ -452,6 +452,11 @@ local function viewItems(source)
             item.image = def.image or item.image
             item.imageUrl = def.imageUrl or item.imageUrl
             item.container = def.container == true
+            -- Player items can have been created by qbcore or loaded from an
+            -- older persisted shape. Re-derive current usability here so the
+            -- UI does not hide the action for weapons whose stored record
+            -- predates qbinventory's built-in handler.
+            item.useable = def.useable == true or hasUseable(def.name or item.name)
         end
     end
     return items
@@ -968,6 +973,8 @@ local function runHooks(name, src, payload)
                 print(('^3[qbinventory]^7 hook %d failed: %s'):format(hook.id, result))
             elseif result == false then
                 return false, 'action denied by hook'
+            elseif type(result) == 'string' then
+                return false, result
             elseif type(result) == 'table' then
                 payload.metadata = result
             end

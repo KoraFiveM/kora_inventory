@@ -34,6 +34,7 @@ H.ok(compactServer:find("if to.type == 'shop' then return false, 'shop inventory
 H.ok(compactServer:find("if request.action == 'buy' then return intentBuy(src, request) end", 1, true), 'buy uses dedicated server intent')
 H.ok(compactServer:find("if request.action == 'give' then return intentGive(src, request) end", 1, true), 'give uses a dedicated server intent')
 H.ok(compactServer:find("if shop.type ~= 'shop' then return false, 'secondary inventory is not a shop' end", 1, true), 'buy verifies target is a shop')
+H.ok(server:find("elseif type(result) == 'string' then", 1, true), 'buy hooks can provide a user-facing denial reason')
 H.ok(server:find('exports.qbcore:removeMoney', 1, true), 'purchase takes server-side payment')
 H.ok(server:find("'qbinventory-refund'", 1, true), 'failed purchase is refunded server-side')
 H.ok(server:find('local function normaliseShopStock(rows, slots)', 1, true), 'configured shop stock is normalised server-side')

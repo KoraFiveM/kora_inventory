@@ -220,6 +220,9 @@ exports.qbinventory:removeHooks(id)
 exports.qbinventory:registerInspectionAccess(callback)           -- callback(source, target, sourceData, targetData)
 exports.qbinventory:removeInspectionAccess(id)
 ```
+Hooks may return `false` to deny an action with the default reason, or a string
+to deny it with a specific user-facing reason. A table return value continues
+to update purchase metadata where supported.
 Opening another player's inventory is default-deny; a registered inspection
 policy (or `Config.qbinventory.playerInspection.access`) must return `true`
 for an authorised police/admin/consent flow.

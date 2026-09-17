@@ -153,7 +153,11 @@ end)
 
 AddEventHandler('qbinventory:ui:rejected', function(payload)
     local reason = type(payload) == 'table' and payload.reason or payload
-    send('qbinventory:nui:rejected', { reason = tostring(reason or 'Action rejected') })
+    QB.notify.send({
+        title = 'Inventory',
+        message = tostring(reason or 'Action rejected'),
+        type = 'error',
+    })
 end)
 
 -- This is a local presentation relay for the server-authoritative receipt

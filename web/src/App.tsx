@@ -1,5 +1,6 @@
 import { CircleAlert, PackageOpen, Search, X } from "lucide-react"
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd"
 import { TouchBackend } from "react-dnd-touch-backend"
 import { closeSession, sendIntent } from "@/lib/nui"
@@ -283,29 +284,19 @@ function DragPreview({ session }: { session: SessionSnapshot | null }) {
     const source = findInventory(session, item.inventoryId)
     const draggedItem = findItem(source, item.slot)
     if (!source || !draggedItem) return null
-    // The DnD backend reports viewport coordinates, but the preview lives
-    // inside #root, whose NUI-resolution transform scales its coordinate
-    // space. Convert the pointer position back to root coordinates before
-    // assigning left/top; otherwise the preview is multiplied by that scale.
-    const root = document.getElementById("root")
-    const scale = root && root.offsetWidth ? root.getBoundingClientRect().width / root.offsetWidth : 1
-    const previewOffset = {
-        x: clientOffset.x / scale,
-        y: clientOffset.y / scale,
-    }
-
-    // `left`/`top` plus the broadly supported `transform` property keeps the
-    // visual centre at the pointer in CEF as well as current Chromium. Using
-    // the newer standalone `translate` property made older CEF builds ignore
-    // the -50% offset, leaving the preview noticeably down and right.
-    return <div className={`inventory-drag-preview slot slot-filled${source.type === "shop" ? " slot-priced" : ""}`} style={{ left: previewOffset.x, top: previewOffset.y }} aria-hidden="true">
+    // The NUI root is scaled to provide a consistent layout across game
+    // resolutions. Render the preview outside that transformed subtree so the
+    // DnD backend's viewport coordinates can be used directly. Keeping the
+    // preview in #root makes fixed positioning browser-dependent in CEF and
+    // can produce a large horizontal offset at lower resolutions.
+    return createPortal(<div className={`inventory-drag-preview slot slot-filled${source.type === "shop" ? " slot-priced" : ""}`} style={{ left: clientOffset.x, top: clientOffset.y }} aria-hidden="true">
         <span className="slot-number">{draggedItem.slot}</span>
         <ItemArtwork item={draggedItem} className="item-art" />
         <span className="item-label">{draggedItem.label ?? draggedItem.name}</span>
         <span className="item-amount">×{draggedItem.amount}</span>
         {source.type === "shop" && typeof draggedItem.price === "number" && <span className="item-price">${draggedItem.price.toLocaleString()}</span>}
         {typeof draggedItem.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, draggedItem.durability))}%` }} /></span>}
-    </div>
+    </div>, document.body)
 }
 
 interface ActiveItemBox extends ItemBoxReceipt { id: number }

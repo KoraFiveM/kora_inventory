@@ -520,7 +520,7 @@ exports('StartTrainingWeapon', function(src, weaponName, rounds)
     rounds = math.floor(tonumber(rounds) or 0)
     local owner = GetInvokingResource()
     local definition = type(weaponName) == 'string' and internal.itemDef(weaponName) or nil
-    if not src or not owner or not definition or not definition.weapontype then
+    if not src or not owner or not definition or not inventory.weapons.isWeapon(weaponName) then
         return false, 'invalid training weapon'
     end
     if rounds < 1 or rounds > 100 then

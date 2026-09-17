@@ -270,6 +270,8 @@ local function read(path)
 end
 
 local server = read('server/weaponcarry.lua')
+H.ok(server:find('inventory.weapons.isWeapon(weaponName)', 1, true),
+    'training accepts weapons classified through the canonical item registry')
 local client = read('client/weaponcarry.lua')
 local manifest = read('fxmanifest.lua')
 local hotbar = read('client/hotbar.lua')
