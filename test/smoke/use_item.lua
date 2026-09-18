@@ -36,7 +36,7 @@ local ITEMS = {
     potion = { name = 'potion', label = 'Potion', weight = 20, useable = true, useTime = 2500.9 },
 }
 local WEAPONS = {
-    weapon_pistol = { name = 'weapon_pistol', label = 'Pistol', type = 'weapon', useable = true, weight = 1000 },
+    weapon_pistol = { name = 'weapon_pistol', label = 'Pistol', type = 'weapon', useable = false, weight = 1000 },
 }
 
 local playersData = { [7] = { citizenid = 'CID-7' } }

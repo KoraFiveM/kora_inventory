@@ -41,7 +41,11 @@ end
 
 local function refreshWeaponUseable(name, def)
     -- weapon_unarmed isn't a real carryable item -- nothing stocks/loots it.
-    internal.setBuiltInUseable(name, def and name ~= 'weapon_unarmed' and weaponUseable or nil)
+    internal.setBuiltInUseable(
+        name,
+        def and name ~= 'weapon_unarmed' and weaponUseable or nil,
+        'weapon'
+    )
 end
 
 for _, def in ipairs(exports.qbcore:allShared('weapons')) do
@@ -216,7 +220,7 @@ end
 -- own magazine item gets a working use with no change here.
 local function refreshAmmoUseable(name, def)
     local isAmmo = def and def.ammoType and tonumber(def.rounds) and tonumber(def.rounds) > 0
-    internal.setBuiltInUseable(name, isAmmo and ammoUseable or nil)
+    internal.setBuiltInUseable(name, isAmmo and ammoUseable or nil, 'ammo')
 end
 
 for _, def in ipairs(exports.qbcore:allShared('items')) do

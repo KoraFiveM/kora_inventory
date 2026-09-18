@@ -23,13 +23,22 @@ local ITEMS = {
 
 local WEAPONS = { { name = 'weapon_unarmed' }, { name = 'weapon_pistol' }, { name = 'weapon_bat' } }
 local useables = {}
+local useableKinds = {}
 local removals = {}
 local removeResult = true
 
 QbInventory = {
     internal = {
         itemDef = function(name) return ITEMS[name] end,
-        setBuiltInUseable = function(name, fn) useables[name] = fn end,
+        setBuiltInUseable = function(name, fn, kind)
+            useableKinds[name] = useableKinds[name] or {}
+            useableKinds[name][kind or 'default'] = fn
+            local handlers = useableKinds[name]
+            useables[name] = handlers.weapon or handlers.ammo or handlers.default
+            if not useables[name] then
+                useableKinds[name] = nil
+            end
+        end,
     },
     api = {
         createUseable = function(name, fn) useables[name] = fn end,
@@ -85,6 +94,7 @@ H.ok(useables.pistol_ammo, 'a magazine with an ammoType and rounds is useable')
 H.ok(useables.rifle_ammo, 'every such magazine is registered, not a hard-coded list')
 H.equal(useables.dud_ammo, nil, 'an ammoType with no rounds is not registered as usable ammunition')
 H.equal(useables.weapon_unarmed, nil, 'fists are still never a useable item')
+H.ok(useables.weapon_pistol, 'a weapon remains useable when also registered as an item')
 
 ITEMS.runtime_ammo = { name = 'runtime_ammo', label = 'Runtime Magazine', ammoType = 'AMMO_PISTOL', rounds = 6 }
 sharedChangeHandlers.items('add', 'runtime_ammo', ITEMS.runtime_ammo)

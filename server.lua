@@ -141,7 +141,7 @@ local function buildItem(name, amount, slot, metadata)
         metadata = inventory.copy(metadata or {}),
         type = def.type or 'item',
         unique = def.unique or false,
-        useable = def.useable == true or hasUseable(def.name or name),
+        useable = def.type == 'weapon' or def.useable == true or hasUseable(def.name or name),
         container = def.container == true,
         image = def.image,
         imageUrl = def.imageUrl,
@@ -452,12 +452,11 @@ local function viewItems(source)
             item.image = def.image or item.image
             item.imageUrl = def.imageUrl or item.imageUrl
             item.container = def.container == true
-            -- Player items can have been created by qbcore or loaded from an
-            -- older persisted shape. Re-derive current usability here so the
-            -- UI does not hide the action for weapons whose stored record
-            -- predates qbinventory's built-in handler.
-            item.useable = def.useable == true or hasUseable(def.name or item.name)
         end
+        -- Player items can have been created by qbcore or loaded from an older
+        -- persisted shape. Weapon type and the live handler table are
+        -- authoritative so the UI does not hide their Use action.
+        item.useable = (def and (def.type == 'weapon' or def.useable == true)) or hasUseable(item.name)
     end
     return items
 end
@@ -1967,6 +1966,7 @@ local function setItems(src, newItems)
 end
 
 local useables, builtInUseables = {}, {}
+local builtInUseableKinds = {}
 
 -- Useable item API ----------------------------------------------------------
 
@@ -1991,11 +1991,24 @@ end
 -- them. Passing nil removes only the built-in handler.
 ---@param name string
 ---@param handler function|table|nil
-local function setBuiltInUseable(name, handler)
+---@param kind string|nil Optional owner kind for composable built-in handlers.
+local function setBuiltInUseable(name, handler, kind)
     assert(
         type(name) == 'string' and (handler == nil or inventory.isCallable(handler)),
         'name and callable handler are required'
     )
+
+    if kind then
+        builtInUseableKinds[name] = builtInUseableKinds[name] or {}
+        builtInUseableKinds[name][kind] = handler
+        local handlers = builtInUseableKinds[name]
+        builtInUseables[name] = handlers.weapon or handlers.ammo
+        if not builtInUseables[name] then
+            builtInUseableKinds[name] = nil
+        end
+        return
+    end
+
     builtInUseables[name] = handler
 end
 -- Whether clicking Use on this item would do something even without a
