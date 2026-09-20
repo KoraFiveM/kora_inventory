@@ -1280,33 +1280,34 @@ local function intentUse(src, request)
     if slot < 1 or not primary.items[slot] then
         return false, 'invalid item slot'
     end
-    return lock({ session.primary }, function()
-        local currentSession, current = validSession(
-            src,
-            request.token,
-            session.primary,
-            session.primary,
-            request.primaryRevision,
-            request.primaryRevision
-        )
-        if not currentSession or not current then
-            return false, 'stale inventory'
-        end
-        local item = current.items[slot]
-        if not item then
-            return false, 'invalid item slot'
-        end
-        -- Captured before useItem() runs: a successful use can consume the
-        -- item (or the whole stack), so `current.items[slot]` may be gone or
-        -- a different record afterwards.
-        local itemName, preventClose = item.name, item.preventClose == true
-        local ok, err = useItem(src, slot)
-        if not ok then
-            return false, err or 'item cannot be used'
-        end
-        recordAudit('use', src, { item = itemName, slot = slot })
-        return true, { preventClose = preventClose }
-    end)
+    -- Do not hold the session lock while a useable runs. Its handler commonly
+    -- calls AddItem/RemoveItem through this resource's exports; FXServer may
+    -- invoke that export in a distinct coroutine, where a held lock becomes
+    -- a false "inventory busy" rejection.
+    local currentSession, current = validSession(
+        src,
+        request.token,
+        session.primary,
+        session.primary,
+        request.primaryRevision,
+        request.primaryRevision
+    )
+    if not currentSession or not current then
+        return false, 'stale inventory'
+    end
+    local item = current.items[slot]
+    if not item then
+        return false, 'invalid item slot'
+    end
+    -- Captured before useItem() runs: a successful use can consume the item
+    -- (or the whole stack), so `current.items[slot]` may be gone afterwards.
+    local itemName, preventClose = item.name, item.preventClose == true
+    local ok, err = useItem(src, slot)
+    if not ok then
+        return false, err or 'item cannot be used'
+    end
+    recordAudit('use', src, { item = itemName, slot = slot })
+    return true, { preventClose = preventClose }
 end
 
 local function intentDrop(src, request)
@@ -2034,52 +2035,50 @@ end
 ---@return boolean used
 ---@return any result
 useItem = function(src, slotOrName)
-    return lock({ playerKey(src) }, function()
-        local item = type(slotOrName) == 'number' and getItemBySlot(src, slotOrName) or getItemByName(src, slotOrName)
-        if not item then
-            return false, 'item not found'
-        end
-        local allowed, err = runHooks('usingItem', src, {
-            itemName = item.name,
-            item = inventory.copy(item),
-            inventoryId = playerKey(src),
-            inventoryType = 'player',
-        })
-        if not allowed then
-            return false, err
-        end
-        local containers = QbInventory.containers
-        if
-            type(slotOrName) == 'number'
-            and containers
-            and containers.isPortableItem
-            and containers.isPortableItem(item)
-        then
-            local ok, result = containers.openConfiguredItem(src, slotOrName)
-            if ok then
-                TriggerEvent('qbinventory:server:openedContainer', src, item.name, item)
-                return true
-            end
-            return false, result
-        end
-        local handler = useables[item.name] or builtInUseables[item.name]
-        if handler then
-            local ok, result = pcall(handler, src, inventory.copy(item))
-            if not ok then
-                return false, result
-            end
-            if result == false then
-                return false, 'item use was rejected'
-            end
-            TriggerEvent('qbinventory:server:usedItem', src, item.name, item)
-            -- Opening a portable container above is deliberately excluded: it
-            -- consumes nothing and returns before this point.
-            showItemBox(src, item.name, 1, 'use')
+    local item = type(slotOrName) == 'number' and getItemBySlot(src, slotOrName) or getItemByName(src, slotOrName)
+    if not item then
+        return false, 'item not found'
+    end
+    local allowed, err = runHooks('usingItem', src, {
+        itemName = item.name,
+        item = inventory.copy(item),
+        inventoryId = playerKey(src),
+        inventoryType = 'player',
+    })
+    if not allowed then
+        return false, err
+    end
+    local containers = QbInventory.containers
+    if
+        type(slotOrName) == 'number'
+        and containers
+        and containers.isPortableItem
+        and containers.isPortableItem(item)
+    then
+        local ok, result = containers.openConfiguredItem(src, slotOrName)
+        if ok then
+            TriggerEvent('qbinventory:server:openedContainer', src, item.name, item)
             return true
         end
-        TriggerEvent('QBCore:Server:UseItem', src, item)
-        return false, 'no useable registered'
-    end)
+        return false, result
+    end
+    local handler = useables[item.name] or builtInUseables[item.name]
+    if handler then
+        local ok, result = pcall(handler, src, inventory.copy(item))
+        if not ok then
+            return false, result
+        end
+        if result == false then
+            return false, 'item use was rejected'
+        end
+        TriggerEvent('qbinventory:server:usedItem', src, item.name, item)
+        -- Opening a portable container above is deliberately excluded: it
+        -- consumes nothing and returns before this point.
+        showItemBox(src, item.name, 1, 'use')
+        return true
+    end
+    TriggerEvent('QBCore:Server:UseItem', src, item)
+    return false, 'no useable registered'
 end
 
 local function ownedStash(src, identifier, opts)

@@ -119,7 +119,11 @@ local ok, payload = QbInventory.internal.openSelf(7)
 H.ok(ok, 'own inventory opens')
 H.ok(payload.primary.items[5].useable, 'the current weapon definition restores the Use action in the inventory view')
 
-QbInventory.api.createUseable('bandage', function() return true end)
+QbInventory.api.createUseable('bandage', function(src)
+    -- Useables are expected to mutate inventories through the public API.
+    -- This must not be rejected by a use-intent lock.
+    return QbInventory.api.addItem(src, 'potion', 1)
+end)
 QbInventory.api.createUseable('map', function() return true end)
 QbInventory.api.createUseable('oldflare', function() return true end)
 QbInventory.api.createUseable('potion', function() return true end)
@@ -133,7 +137,11 @@ local useOK, useResult = intent(7, {
 })
 H.ok(useOK, 'using a default item succeeds')
 H.equal(useResult.preventClose, false, 'a default item tells the client to close the panel')
+H.equal(playersItems[7][4].name, 'potion', 'a useable can mutate the player inventory through AddItem')
 
+local reopened, refreshed = QbInventory.internal.openSelf(7)
+H.ok(reopened, 'a fresh session opens after the useable mutation')
+payload = refreshed
 local revision = payload.primary.revision
 local mapOK, mapResult = intent(7, {
     token = payload.token, action = 'use',
