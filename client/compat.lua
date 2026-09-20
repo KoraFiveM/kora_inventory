@@ -20,6 +20,10 @@ local function validIdentifier(value)
 end
 
 local function openSelf()
+    if inventoryApi.getCurrentSession() then
+        inventoryApi.closeInventory()
+        return true
+    end
     if selfOpening or LocalPlayer.state.inv_busy then
         return false
     end
@@ -102,6 +106,20 @@ end)
 AddEventHandler('qbinventory:ui:sessionClosed', function()
     selfOpening = false
     setBusy(false)
+end)
+
+-- A normal usable closes the inventory after its server handler returns. Clear
+-- the compatibility lock before that handler runs so its client-side effects
+-- can add or remove items. A rejected use leaves the session open, so restore
+-- the lock in that case.
+AddEventHandler('qbinventory:client:useStarted', function()
+    setBusy(false)
+end)
+
+AddEventHandler('qbinventory:client:useRejected', function()
+    if inventoryApi.getCurrentSession() then
+        setBusy(true)
+    end
 end)
 
 -- Current upstream qb-inventory event names. The item lists passed by legacy

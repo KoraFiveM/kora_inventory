@@ -138,15 +138,19 @@ local function submitIntent(intent)
         return true
     end
     if action == 'use' or action == 'drop' or action == 'buy' then
+        local slot = action == 'use' and math.floor(tonumber(payload.slot) or 0)
+        local item = slot and session.primary.items and session.primary.items[slot]
+        local clearedBusy = item and item.preventClose ~= true
         if action == 'use' then
-            local slot = math.floor(tonumber(payload.slot) or 0)
-            local item = session.primary.items and session.primary.items[slot]
             if not QbInventory.useGate(item) then
                 -- Cancelled (or never started) progress bar: treat exactly
                 -- like a rejected use attempt, without ever contacting the
                 -- server, so the effect can never apply for a bar the player
                 -- did not actually complete.
                 return false, 'cancelled'
+            end
+            if clearedBusy then
+                TriggerEvent('qbinventory:client:useStarted')
             end
         end
         local ok, result = QB.callback.trigger('qbinventory:server:intent', {
@@ -158,6 +162,9 @@ local function submitIntent(intent)
         })
         if not ok then
             TriggerEvent('qbinventory:ui:rejected', { reason = result })
+            if clearedBusy then
+                TriggerEvent('qbinventory:client:useRejected')
+            end
         elseif action == 'use' and (type(result) ~= 'table' or result.preventClose ~= true) then
             -- Default behaviour: close the panel after a completed use
             -- (mirrors real qb-inventory's shouldClose). An item opts out of
