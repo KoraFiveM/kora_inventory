@@ -152,6 +152,7 @@ interface SlotProps {
     onDragEnd: () => void
     onSelect: (item?: InventoryItem) => void
     onActivate: (item: InventoryItem) => void
+    onSplit: (inventory: InventoryView, item: InventoryItem) => void
     /** Part of the hotbar range, so it carries the accent outline. */
     hotbar?: boolean
     /** The last slot of that range, which closes the outline on the right. */
@@ -161,7 +162,7 @@ interface SlotProps {
 /** React DnD's TouchBackend uses global CEF input listeners for both touch and
  * mouse. Unlike HTML5 DnD or source pointer-capture, it resolves the actual
  * destination slot after the cursor leaves the source element. */
-function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate }: SlotProps) {
+function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit }: SlotProps) {
     const target = useMemo<SlotTarget>(() => ({ inventoryId: inventory.id, slot: index }), [index, inventory.id])
     const suppressClick = useRef(false)
     const [{ isDragging }, dragRef] = useDrag<DragSlot, SlotTarget, { isDragging: boolean }>(() => ({
@@ -219,6 +220,11 @@ function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHot
             // the Enter-key shortcut on a selected item -- see activateItem.
             if (!busy && item) onActivate(item)
         }}
+        onContextMenu={(event) => {
+            if (!item || busy) return
+            event.preventDefault()
+            onSplit(inventory, item)
+        }}
         onKeyDown={(event) => {
             if (event.key !== "Enter" && event.key !== " ") return
             event.preventDefault()
@@ -236,7 +242,7 @@ function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHot
     </button>
 }
 
-function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDrop, onDragEnd, onSelect, onActivate }: {
+function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit }: {
     inventory: InventoryView
     selected?: Selection
     busy: boolean
@@ -245,6 +251,7 @@ function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDr
     onDragEnd: () => void
     onSelect: (inventory: InventoryView, item: InventoryItem | undefined, slot: number) => void
     onActivate: (inventory: InventoryView, item: InventoryItem) => void
+    onSplit: (inventory: InventoryView, item: InventoryItem) => void
     /** True for the player's own inventory -- the only one with a hotbar. */
     isPlayer?: boolean
 }) {
@@ -268,7 +275,7 @@ function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDr
             {Array.from({ length: inventory.slots }, (_, offset) => {
                 const slot = offset + 1
                 const item = bySlot.get(slot)
-                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} hotbar={slot <= hotbarCount} lastHotbar={slot === hotbarCount} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} />
+                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} hotbar={slot <= hotbarCount} lastHotbar={slot === hotbarCount} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} onSplit={onSplit} />
             })}
         </div>
     </section>
@@ -359,6 +366,8 @@ function InventoryApp() {
     const [itemBoxes, setItemBoxes] = useState<ActiveItemBox[]>([])
     const [selectedAmount, setSelectedAmount] = useState(1)
     const [uiConfig, setUiConfig] = useState(DEFAULT_UI_CONFIG)
+    const selectedMax = Math.max(1, Math.floor(selected?.item.amount ?? 1))
+    const selectedCount = Math.min(Math.max(1, selectedAmount), selectedMax)
     const pendingInventories = useRef<Set<string> | undefined>()
     const requestPending = useRef(false)
     const nextItemBoxId = useRef(1)
@@ -442,7 +451,7 @@ function InventoryApp() {
         }
     }, [clearPendingMove, movePending, session])
 
-    const move = useCallback((from: InventoryView, fromSlot: number, to: InventoryView, toSlot: number) => {
+    const move = useCallback((from: InventoryView, fromSlot: number, to: InventoryView, toSlot: number, requestedAmount?: number) => {
         const item = findItem(from, fromSlot)
         if (!item || !Number.isFinite(item.amount) || item.amount < 1) {
             setError("That item is no longer available")
@@ -455,7 +464,7 @@ function InventoryApp() {
         }
         if (to.type === "shop") { setError("Shop inventory is read only"); return }
         void submit("move", {
-            fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount: item.amount,
+            fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount: requestedAmount ?? item.amount,
             revision: session?.revision, secondaryRevision: session?.secondaryRevision,
         }, [from.id, to.id])
     }, [session, submit])
@@ -472,8 +481,9 @@ function InventoryApp() {
         if (!source || !session || !canDropSlot(source, target)) return
         const sourceInventory = findInventory(session, source.inventoryId)
         const targetInventory = findInventory(session, target.inventoryId)
-        if (sourceInventory && targetInventory) move(sourceInventory, source.slot, targetInventory, target.slot)
-    }, [canDropSlot, move, session])
+        const amount = selected?.inventory.id === source.inventoryId && selected.item.slot === source.slot ? selectedCount : undefined
+        if (sourceInventory && targetInventory) move(sourceInventory, source.slot, targetInventory, target.slot, amount)
+    }, [canDropSlot, move, selected, selectedCount, session])
 
     // A single click inspects, and only inspects. Moving is drag-only (drag onto
     // a slot to move/stack, drag outside the window to drop), so a click on an
@@ -494,6 +504,23 @@ function InventoryApp() {
         setSelected(undefined)
         void submit("drop", { inventory: source.inventoryId, slot: source.slot, amount: item.amount })
     }, [session, submit])
+    const split = useCallback((inventory: InventoryView, item: InventoryItem, requestedAmount?: number) => {
+        if (!session || inventory.type === "shop" || item.amount < 2) return
+        const amount = Math.floor(requestedAmount ?? selectedCount)
+        const emptySlot = Array.from({ length: inventory.slots }, (_, index) => index + 1).find((slot) => !findItem(inventory, slot))
+        if (!Number.isFinite(amount) || amount < 1 || amount >= item.amount) { setError(`Choose an amount from 1 to ${item.amount - 1}`); return }
+        if (!emptySlot) { setError("No empty slot available to split this stack"); return }
+        move(inventory, item.slot, inventory, emptySlot, amount)
+    }, [move, selectedCount, session])
+    const promptSplit = useCallback((inventory: InventoryView, item: InventoryItem) => {
+        if (inventory.type === "shop" || item.amount < 2) return
+        const answer = window.prompt(`Split ${item.label ?? item.name}: move how many?`, String(Math.floor(item.amount / 2)))
+        if (answer === null) return
+        const amount = Number(answer)
+        setSelected({ inventory, item })
+        setSelectedAmount(amount)
+        split(inventory, item, amount)
+    }, [split])
 
     const use = useCallback((inventory: InventoryView, item: InventoryItem) => {
         if (inventory.id !== session?.player.id) { setError("Only items in your inventory can be used"); return }
@@ -518,7 +545,7 @@ function InventoryApp() {
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
-            if (event.key === "Escape") close()
+            if (event.key === "Escape" || event.key === "Tab") close()
             if (event.key === "Enter" && selected && !movePending) activateSelected(selected)
         }
         window.addEventListener("keydown", onKey)
@@ -533,8 +560,6 @@ function InventoryApp() {
     // A fresh selection always starts at one, so a large slider value can never
     // carry over onto a different stack or shop stock row.
     useEffect(() => { setSelectedAmount(1) }, [selected?.inventory.id, selected?.item.slot])
-    const selectedMax = Math.max(1, Math.floor(filteredSelected?.item.amount ?? 1))
-    const selectedCount = Math.min(Math.max(1, selectedAmount), selectedMax)
     if (!session) return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
 
     // Solo layout starts as the player's inventory alone. Its inspector is a
@@ -552,7 +577,7 @@ function InventoryApp() {
         </div>
         <div className={`inventory-layout${solo ? " inventory-layout-solo" : ""}`}>
             <section className="inventory-stage inventory-stage-player">
-                <InventoryPanel inventory={session.player} isPlayer selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} />
+                <InventoryPanel inventory={session.player} isPlayer selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} onSplit={promptSplit} />
             </section>
             {(!solo || selected) && <aside className={`item-detail${solo ? " item-detail-drawer" : ""}${filteredSelected ? "" : " item-detail-empty"}`} aria-label="Selected item actions">
                 <header className="detail-header"><span>Item inspector</span><span className="detail-header-actions"><em>{filteredSelected ? "Selected" : "Select an item"}</em>{solo && <button className="detail-close" onClick={() => setSelected(undefined)} aria-label="Close item drawer"><X size={14} /></button>}</span></header>
@@ -567,9 +592,10 @@ function InventoryApp() {
                     <button className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item, selectedCount)}>Buy {selectedCount} · ${((filteredSelected.item.price ?? 0) * selectedCount).toLocaleString()}</button>
                 </div> : <>
                     {(filteredSelected.item.useable || filteredSelected.item.container) && <button className="primary-action" disabled={movePending} onClick={() => use(filteredSelected.inventory, filteredSelected.item)}>{filteredSelected.item.container ? `Open ${filteredSelected.item.label ?? "container"}` : "Use item"}</button>}
+                    {selectedMax > 1 && <div className="amount-picker"><input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Amount to move, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} /><input className="amount-input" type="number" min={1} max={selectedMax} value={selectedCount} disabled={movePending} aria-label="Amount to move" onChange={(event) => setSelectedAmount(Number(event.target.value))} /></div>}
+                    {selectedMax > 1 && <button className="quiet-action" disabled={movePending} onClick={() => split(filteredSelected.inventory, filteredSelected.item)}>Split {selectedCount} / {selectedMax - selectedCount}</button>}
                     {filteredSelected.inventory.id === session.player.id && <>
                         <div className="amount-action">
-                            {selectedMax > 1 && <input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Amount to drop, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} />}
                             <button className="quiet-action" disabled={movePending} onClick={() => void submit("drop", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: selectedCount })}>Drop {selectedCount}</button>
                         </div>
                         {giveAvailable && <button className="quiet-action" disabled={movePending} onClick={() => void submit("give", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: 1 })}>Give one</button>}
@@ -577,7 +603,7 @@ function InventoryApp() {
                 </>}
             </> : <div className="empty-detail"><span className="empty-detail-icon"><PackageOpen size={30} /></span><h1>Inspect an item</h1><p>{selected ? `${(selected.item.label ?? selected.item.name)} is hidden by the current search.` : "Select an item to see its details. Drag it between slots to move or stack it, or drag it outside the window to drop it."}</p></div>}</aside>}
             {session.secondary
-                ? <section className="inventory-stage inventory-stage-secondary"><InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} /></section>
+                ? <section className="inventory-stage inventory-stage-secondary"><InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} onSplit={promptSplit} /></section>
                 : solo ? null : <section className="inventory-stage inventory-stage-secondary"><section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section></section>}
         </div>
         <footer className="shortcut-bar"><span><kbd>Esc</kbd> Close</span><span><kbd>↵</kbd> Use selected</span><span><kbd>Drag</kbd> Move or stack</span><span><kbd>Drag out</kbd> Drop</span><span>{movePending ? "Updating inventory…" : `Revision ${session.revision ?? 0}`}</span></footer>
