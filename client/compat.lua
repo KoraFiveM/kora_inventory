@@ -165,12 +165,7 @@ RegisterNetEvent('qb-inventory:client:giveAnim', function()
     if QB.cache.vehicle() then
         return
     end
-    RequestAnimDict('mp_common')
-    local deadline = GetGameTimer() + 1000
-    while not HasAnimDictLoaded('mp_common') and GetGameTimer() < deadline do
-        Wait(0)
-    end
-    if not HasAnimDictLoaded('mp_common') then
+    if not QB.stream.loadAnimDict('mp_common', nil, { timeout = 1000 }) then
         return
     end
     TaskPlayAnim(ped, 'mp_common', 'givetake1_b', 8.0, -8.0, -1, 49, 0, false, false, false)
