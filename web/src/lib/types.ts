@@ -14,6 +14,8 @@ export interface InventoryItem {
     description?: string
     image?: string
     imageUrl?: string
+    /** True when imageUrl came from item metadata rather than the definition. */
+    imageOverride?: boolean
     metadata?: Record<string, unknown>
     displayMeta?: Array<{ key: string; label: string; value: unknown }>
     durability?: number

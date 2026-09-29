@@ -119,6 +119,7 @@ I.internal = {
     playerKey = function(src) return key('player', src) end,
     resolveInventory = resolve,
     copy = I.copy,
+    itemWeight = I.itemWeight,
     totalWeight = I.totalWeight,
     sameInfo = I.sameInfo,
     itemDef = function(name)
@@ -546,8 +547,8 @@ H.equal(#warnings, 2, 'each refused player-dimension change is reported, not sil
 
 reset()
 Ox.SetMetadata('player:1', 3, { weight = 5 })
-H.equal(state['player:1'].items[3].metadata.weight, nil, 'a caller-supplied metadata weight is still rejected')
-H.ok(warnings[1] and warnings[1]:find('metadata_weight_not_supported', 1, true), 'the metadata weight rejection is reported')
+H.equal(state['player:1'].items[3].metadata.weight, 5, 'metadata weight is retained')
+H.equal(I.totalWeight(state['player:1'].items), 55, 'metadata weight changes the authoritative total')
 
 -- --- useItem is published on the SERVER identity too ------------------------
 --

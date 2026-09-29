@@ -488,30 +488,16 @@ local function viewItems(source)
             item.imageUrl = def.imageUrl or item.imageUrl
             item.container = def.container == true
         end
-        local metadata = type(item.info) == 'table' and item.info or item.metadata or {}
-        if type(metadata) ~= 'table' then
-            metadata = {}
-        end
+        local metadata = inventory.itemMetadata(item)
+        local effective = inventory.effectiveItem(item, def)
         item.displayMeta = {}
 
-        -- Metadata is presentation-only here: inventory calculations still
-        -- use the canonical item record. Keep invalid override values from
-        -- replacing a usable definition field in the NUI.
-        if type(metadata.label) == 'string' then
-            item.label = metadata.label
-        end
-        if type(metadata.image) == 'string' then
-            item.image = metadata.image
-        end
-        if type(metadata.imageUrl) == 'string' then
-            item.imageUrl = metadata.imageUrl
-        end
-        if type(metadata.weight) == 'number' then
-            item.weight = metadata.weight
-        end
-        if type(metadata.description) == 'string' then
-            item.description = metadata.description
-        end
+        item.label = effective.label
+        item.image = effective.image
+        item.imageUrl = effective.imageUrl
+        item.imageOverride = type(metadata.imageUrl) == 'string'
+        item.weight = effective.weight
+        item.description = effective.description
 
         local keys = {}
         for key in pairs(metadata) do
@@ -2865,6 +2851,7 @@ inventory.internal = {
         return transfer(src, request)
     end,
     copy = inventory.copy,
+    itemWeight = inventory.itemWeight,
     totalWeight = inventory.totalWeight,
     sameInfo = inventory.sameInfo,
     config = config,

@@ -83,8 +83,43 @@ function inventory.isCallable(value)
     return metatable ~= nil and type(metatable.__call) == 'function'
 end
 
+function inventory.itemMetadata(item)
+    if type(item) ~= 'table' then
+        return {}
+    end
+    if type(item.info) == 'table' then
+        return item.info
+    end
+    return type(item.metadata) == 'table' and item.metadata or {}
+end
+
+---Resolves the metadata fields that change an item's effective properties.
+---@param item table|nil
+---@param definition table|nil
+---@return table
+function inventory.effectiveItem(item, definition)
+    item = item or {}
+    definition = definition or {}
+    local metadata = inventory.itemMetadata(item)
+    local imageUrl
+    if type(metadata.imageUrl) == 'string' then
+        imageUrl = metadata.imageUrl
+    elseif type(metadata.image) ~= 'string' then
+        imageUrl = item.imageUrl or definition.imageUrl
+    end
+    return {
+        label = type(metadata.label) == 'string' and metadata.label or item.label or definition.label,
+        image = type(metadata.image) == 'string' and metadata.image or item.image or definition.image,
+        imageUrl = imageUrl,
+        -- `nil` rather than truthiness is intentional: zero-weight items are valid.
+        weight = type(metadata.weight) == 'number' and metadata.weight >= 0 and metadata.weight < math.huge and metadata.weight
+            or (item.weight ~= nil and item.weight or definition.weight) or 0,
+        description = type(metadata.description) == 'string' and metadata.description or item.description or definition.description,
+    }
+end
+
 function inventory.itemWeight(item)
-    return (tonumber(item and item.weight) or 0) * (tonumber(item and item.amount) or 0)
+    return (tonumber(inventory.effectiveItem(item).weight) or 0) * (tonumber(item and item.amount) or 0)
 end
 
 function inventory.totalWeight(items)

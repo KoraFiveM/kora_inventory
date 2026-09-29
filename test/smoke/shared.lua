@@ -9,6 +9,10 @@ H.ok(I.sameInfo({ serial = 'a' }, { serial = 'a' }), 'matching metadata stacks')
 H.equal(I.stackSlot({ [2] = { name = 'water', amount = 1, info = {} } }, { name = 'water', info = {} }), 2, 'find stack')
 H.equal(I.firstFreeSlot({ [1] = {} }, 3), 2, 'first free slot')
 H.equal(I.totalWeight({ [1] = { weight = 10, amount = 2 } }), 20, 'weight totals')
+H.equal(I.totalWeight({ [1] = { weight = 10, amount = 2, info = { weight = 25 } } }), 50, 'metadata weight totals')
+H.equal(I.totalWeight({ [1] = { weight = 10, amount = 2, info = { weight = 0 } } }), 0, 'zero metadata weight totals')
+H.equal(I.totalWeight({ [1] = { weight = 10, amount = 2, info = { weight = -1 } } }), 20, 'invalid metadata weight falls back')
+H.equal(I.effectiveItem({ image = 'base.png', imageUrl = 'https://base', info = { image = 'override.png' } }).imageUrl, nil, 'metadata image suppresses the base URL')
 local single = { x = 1, y = 2, z = 3 }
 H.equal(I.coordinateList(single)[1], single, 'one coordinate becomes a one-entry list')
 local many = { single, { x = 4, y = 5, z = 6 } }

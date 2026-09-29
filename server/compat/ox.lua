@@ -481,7 +481,8 @@ function ox.CanCarryAmount(reference, item)
     if not inv or not definition then
         return nil
     end
-    local weight = tonumber(definition.weight) or 0
+    local metadata = type(item) == 'table' and (item.info or item.metadata) or nil
+    local weight = core.itemWeight({ weight = definition.weight, amount = 1, info = metadata })
     -- Upstream divides unguarded, which yields inf for a zero-weight item.
     if weight <= 0 then
         return math.maxinteger
@@ -648,12 +649,6 @@ end
 -- pushed to viewers instead. Anything this adapter refuses is printed, because
 -- a bare `return` would otherwise be indistinguishable from success.
 function ox.SetMetadata(reference, slot, metadata)
-    if type(metadata) == 'table' and metadata.weight ~= nil then
-        -- ACCEPTED DIVERGENCE: qbinventory's weight accounting uses the shared
-        -- item definition only. Honouring metadata_weight_not_supported would
-        -- let a caller-supplied weight invalidate every capacity check.
-        return warn('metadata_weight_not_supported (slot %s)', tostring(slot))
-    end
     slot = math.floor(tonumber(slot) or 0)
     if slot < 1 then
         return
@@ -850,9 +845,9 @@ function ox.CanSwapItem(reference, firstItem, firstCount, testItem, testCount)
     if not inv then
         return nil
     end
-    local firstName, firstDef = canonicalName(firstItem)
+    local firstName = canonicalName(firstItem)
     local _, testDef = canonicalName(testItem)
-    if not firstName or not firstDef or not testDef then
+    if not firstName or not testDef then
         return nil
     end
     firstCount = tonumber(firstCount) or 0
@@ -862,8 +857,22 @@ function ox.CanSwapItem(reference, firstItem, firstCount, testItem, testCount)
     if ox.GetItemCount(inv, firstName, nil, false) < firstCount then
         return nil
     end
-    local weightWithoutFirst = core.totalWeight(inv.items) - ((tonumber(firstDef.weight) or 0) * firstCount)
-    local weightWithTest = weightWithoutFirst + ((tonumber(testDef.weight) or 0) * testCount)
+    local remaining, removedWeight = firstCount, 0
+    for _, current in pairs(inv.items) do
+        if remaining > 0 and current.name == firstName then
+            local amount = math.min(countOf(current), remaining)
+            local removed = copy(current)
+            removed.amount = amount
+            removedWeight = removedWeight + core.itemWeight(removed)
+            remaining = remaining - amount
+        end
+    end
+    local weightWithoutFirst = core.totalWeight(inv.items) - removedWeight
+    local weightWithTest = weightWithoutFirst + core.itemWeight({
+        weight = testDef.weight,
+        amount = testCount,
+        info = type(testItem) == 'table' and (testItem.info or testItem.metadata) or nil,
+    })
     return weightWithTest <= inv.maxWeight
 end
 
@@ -1145,7 +1154,11 @@ function ox.ConvertInventory(inv)
     local weight = 0
     for _, converted in pairs(items) do
         local _, definition = canonicalName(converted)
-        weight = weight + (countOf(converted) * (definition and tonumber(definition.weight) or 0))
+        weight = weight + core.itemWeight({
+            weight = definition and definition.weight,
+            amount = countOf(converted),
+            info = converted.info or converted.metadata,
+        })
     end
     return {
         id = inv.id,

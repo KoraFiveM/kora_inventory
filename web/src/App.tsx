@@ -95,7 +95,7 @@ function localImageUrl(base: string | undefined, name: string, extension: string
  * exists without requesting it, and an `<img onError>` chain gets that for free
  * with no HEAD requests and no manifest to keep in sync.
  */
-function artworkCandidates(item: Pick<InventoryItem, "name" | "label" | "image" | "imageUrl">, images: NonNullable<UiConfig["images"]>) {
+function artworkCandidates(item: Pick<InventoryItem, "name" | "label" | "image" | "imageUrl" | "imageOverride">, images: NonNullable<UiConfig["images"]>) {
     const out: string[] = []
 
     // Only https:// remote artwork. The scheme allowlist is the point: an item
@@ -103,7 +103,7 @@ function artworkCandidates(item: Pick<InventoryItem, "name" | "label" | "image" 
     // value in `imageUrl` must never reach an `src`.
     const remote = images.allowRemote !== false && item.imageUrl?.startsWith("https://") ? item.imageUrl : undefined
 
-    if (remote && !images.preferLocal) out.push(remote)
+    if (remote && (item.imageOverride || !images.preferLocal)) out.push(remote)
 
     // qbcore's legacy `image` field is a bare filename ('water_bottle.png'),
     // which is the one case where the extension is already chosen for us.
@@ -119,14 +119,14 @@ function artworkCandidates(item: Pick<InventoryItem, "name" | "label" | "image" 
         if (url && !out.includes(url)) out.push(url)
     }
 
-    if (remote && images.preferLocal) out.push(remote)
+    if (remote && !item.imageOverride && images.preferLocal) out.push(remote)
 
     return out
 }
 
-function ItemArtwork({ item, className }: { item: Pick<InventoryItem, "name" | "label" | "image" | "imageUrl">; className: string }) {
+function ItemArtwork({ item, className }: { item: Pick<InventoryItem, "name" | "label" | "image" | "imageUrl" | "imageOverride">; className: string }) {
     const { images } = useContext(UiConfigContext)
-    const candidates = useMemo(() => artworkCandidates(item, images), [item.name, item.image, item.imageUrl, images])
+    const candidates = useMemo(() => artworkCandidates(item, images), [item.name, item.image, item.imageUrl, item.imageOverride, images])
     const [attempt, setAttempt] = useState(0)
 
     // A different item in the same slot is a different candidate list, so the
