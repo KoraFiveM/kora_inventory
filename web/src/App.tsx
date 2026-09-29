@@ -586,7 +586,7 @@ function InventoryApp() {
                 <p className="eyebrow">{filteredSelected.inventory.type === "shop" ? "shop item" : `slot ${filteredSelected.item.slot}`}</p>
                 <h1>{filteredSelected.item.label ?? filteredSelected.item.name}</h1>
                 <p>{filteredSelected.item.description ?? "No item description available."}</p>
-                <dl><dt>Amount</dt><dd>×{filteredSelected.item.amount}</dd><dt>Weight</dt><dd>{filteredSelected.item.weight ?? 0} g</dd>{filteredSelected.inventory.type === "shop" && <><dt>Price</dt><dd>${(filteredSelected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
+                <dl><dt>Amount</dt><dd>×{filteredSelected.item.amount}</dd><dt>Weight</dt><dd>{filteredSelected.item.weight ?? 0} g</dd>{filteredSelected.item.displayMeta?.map((meta) => <><dt key={`${meta.key}-label`}>{meta.label}</dt><dd key={`${meta.key}-value`}>{typeof meta.value === "object" ? JSON.stringify(meta.value) : String(meta.value)}</dd></>)}{filteredSelected.inventory.type === "shop" && <><dt>Price</dt><dd>${(filteredSelected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
                 {filteredSelected.inventory.type === "shop" ? <div className="amount-action">
                     {selectedMax > 1 && <input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Quantity to buy, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} />}
                     <button className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item, selectedCount)}>Buy {selectedCount} · ${((filteredSelected.item.price ?? 0) * selectedCount).toLocaleString()}</button>

@@ -15,6 +15,7 @@ export interface InventoryItem {
     image?: string
     imageUrl?: string
     metadata?: Record<string, unknown>
+    displayMeta?: Array<{ key: string; label: string; value: unknown }>
     durability?: number
     price?: number
     stack?: boolean

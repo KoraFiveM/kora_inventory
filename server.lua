@@ -438,6 +438,41 @@ local function canAccess(src, inv, opts)
     return true
 end
 
+local presentationFields = {
+    label = true,
+    weight = true,
+    description = true,
+    image = true,
+    imageUrl = true,
+}
+
+local function displayLabel(key)
+    return tostring(key):gsub('(%l)(%u)', '%1 %2'):gsub('_', ' '):gsub('^%l', string.upper)
+end
+
+local function displayValue(value)
+    if type(value) ~= 'table' then
+        return value
+    end
+    if value.show == false then
+        return nil
+    end
+    if value.value ~= nil and type(value.value) ~= 'table' then
+        return value.value
+    end
+
+    local displayed = {}
+    for key, nested in pairs(value) do
+        if key ~= 'show' then
+            local formatted = displayValue(nested)
+            if formatted ~= nil then
+                displayed[key] = formatted
+            end
+        end
+    end
+    return next(displayed) and displayed or nil
+end
+
 local function viewItems(source)
     local items = inventory.copy(source or {})
     -- Older player records predate `imageUrl`. Resolve presentation fields from
@@ -452,6 +487,46 @@ local function viewItems(source)
             item.image = def.image or item.image
             item.imageUrl = def.imageUrl or item.imageUrl
             item.container = def.container == true
+        end
+        local metadata = type(item.info) == 'table' and item.info or item.metadata or {}
+        if type(metadata) ~= 'table' then
+            metadata = {}
+        end
+        item.displayMeta = {}
+
+        -- Metadata is presentation-only here: inventory calculations still
+        -- use the canonical item record. Keep invalid override values from
+        -- replacing a usable definition field in the NUI.
+        if type(metadata.label) == 'string' then
+            item.label = metadata.label
+        end
+        if type(metadata.image) == 'string' then
+            item.image = metadata.image
+        end
+        if type(metadata.imageUrl) == 'string' then
+            item.imageUrl = metadata.imageUrl
+        end
+        if type(metadata.weight) == 'number' then
+            item.weight = metadata.weight
+        end
+        if type(metadata.description) == 'string' then
+            item.description = metadata.description
+        end
+
+        local keys = {}
+        for key in pairs(metadata) do
+            if key ~= 'show' and not presentationFields[key] then
+                keys[#keys + 1] = key
+            end
+        end
+        table.sort(keys, function(left, right)
+            return tostring(left) < tostring(right)
+        end)
+        for _, key in ipairs(keys) do
+            local value = displayValue(metadata[key])
+            if value ~= nil then
+                item.displayMeta[#item.displayMeta + 1] = { key = key, label = displayLabel(key), value = value }
+            end
         end
         -- Player items can have been created by qbcore or loaded from an older
         -- persisted shape. Weapon type and the live handler table are
