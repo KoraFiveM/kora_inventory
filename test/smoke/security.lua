@@ -44,11 +44,11 @@ H.ok(compactServer:find("if not amount or not price or price < 0 then return nil
 -- A lease grants access to exactly two server-resolved inventories. Both
 -- revisions are checked before and again inside the lock, so stale viewers do
 -- not overwrite newer slots.
-H.ok(compactServer:find("if not session or token ~= session.token then return nil, 'invalid session' end", 1, true), 'session token is verified')
+H.ok(compactServer:find("if not session or token ~= session.token then return nil, nil, 'invalid session' end", 1, true), 'session token is verified')
 H.ok(compactServer:find("if now() > session.expires then close(src, 'expired')", 1, true), 'expired session is closed')
-H.ok(server:find("return nil, 'inventory not in session'", 1, true), 'session limits inventory keys')
-H.ok(server:find("return nil, 'stale source inventory'", 1, true), 'source revision is checked')
-H.ok(server:find("return nil, 'stale target inventory'", 1, true), 'target revision is checked')
+H.ok(server:find("return nil, nil, 'inventory not in session'", 1, true), 'session limits inventory keys')
+H.ok(server:find("return nil, nil, 'stale source inventory'", 1, true), 'source revision is checked')
+H.ok(server:find("return nil, nil, 'stale target inventory'", 1, true), 'target revision is checked')
 H.ok(server:find('return lock({ fromKey, toKey }, function()', 1, true), 'transfer uses deterministic lock wrapper')
 H.ok(compactServer:find('local session, currentFrom, currentTo = validSession', 1, true), 'transfer revalidates inside lock')
 H.ok(server:find("if not sameBucket(src, inv.source)", 1, true), 'player inspection checks routing bucket')

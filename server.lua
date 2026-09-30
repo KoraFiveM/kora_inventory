@@ -1141,36 +1141,37 @@ local function openSelf(src)
 end
 
 local function validSession(src, token, fromKey, toKey, expectedFrom, expectedTo)
+    -- Keep the inventory slots nil on failure; callers read the reason as the third value.
     local session = sessions[src]
     if not session or token ~= session.token then
-        return nil, 'invalid session'
+        return nil, nil, 'invalid session'
     end
     if now() > session.expires then
         close(src, 'expired')
-        return nil, 'session expired'
+        return nil, nil, 'session expired'
     end
     if
         (fromKey ~= session.primary and fromKey ~= session.secondary)
         or (toKey ~= session.primary and toKey ~= session.secondary)
     then
-        return nil, 'inventory not in session'
+        return nil, nil, 'inventory not in session'
     end
     local from, to = getInventory(fromKey), getInventory(toKey)
     local ok, err = canAccess(src, from)
     if not ok then
         close(src, err)
-        return nil, err
+        return nil, nil, err
     end
     ok, err = canAccess(src, to)
     if not ok then
         close(src, err)
-        return nil, err
+        return nil, nil, err
     end
     if expectedFrom ~= nil and tonumber(expectedFrom) ~= revision(fromKey) then
-        return nil, 'stale source inventory'
+        return nil, nil, 'stale source inventory'
     end
     if expectedTo ~= nil and tonumber(expectedTo) ~= revision(toKey) then
-        return nil, 'stale target inventory'
+        return nil, nil, 'stale target inventory'
     end
     return session, from, to
 end

@@ -102,14 +102,14 @@ confiscated.type = 'stash'
 local ok, session = callbacks['qbinventory:server:open'](other, 'stash', { key = confiscated.key })
 H.equal(ok, true, 'controlled pre-policy lease exists')
 confiscated.type = 'confiscation'
--- Assert only mutation/lease denial here. Normalising rejection responses in
--- validSession consumers is a separate pre-existing issue, so a thrown error
--- is neither required nor treated as the expected transport return contract.
-pcall(callbacks['qbinventory:server:transfer'], other, {
+local returned, denied, denial = pcall(callbacks['qbinventory:server:transfer'], other, {
     token = session.token, fromInventory = session.secondary.key, toInventory = session.primary.key,
     fromSlot = 1, toSlot = 1, amount = 1,
     fromRevision = session.secondary.revision, toRevision = session.primary.revision,
 })
+H.equal(returned, true, 'revoked access returns normally')
+H.equal(denied, false, 'revoked access rejects the transfer')
+H.equal(denial, 'access denied', 'revoked access keeps the failure reason')
 H.equal(I.internal.sessionOf(other), nil, 'revoked lease is closed')
 H.equal(next(Core.player.getPlayerData(other, { 'items' })), nil, 'denied transfer adds no items')
 H.equal(json.encode(confiscated.items), expected, 'denied transfer leaves exact storage contents')
@@ -130,4 +130,56 @@ H.equal(json.encode(Core.player.getPlayerData(victim, { 'items' })), expected, '
 H.equal(select(2, I.internal.resolveInventory(confiscated.key)), nil, 'trusted return removes private storage')
 H.equal(argc(restore(victim)), 0, 'missing confiscation return stays a no-op')
 H.equal(argc(confiscate('invalid')), 0, 'invalid confiscation source stays a no-op')
+-- Rejections must leave inventory values nil to every validator consumer.
+local clock = 12345
+env.GetGameTimer = function() return clock end
+env.GetPlayerPed = function(src) return src end
+env.GetEntityCoords = function() return { x = 0, y = 0, z = 0 } end
+env.GetPlayerRoutingBucket = function() return 0 end
+env.QB.distance = { player = function() return true end }
+local stash = I.internal.createSecondary('stash', 'session-rejection', {
+    items = { [1] = assert(I.internal.buildItem('water_bottle', 2, 1, {})) },
+})
+for _, rejection in ipairs({ 'token', 'key', 'fromRevision', 'toRevision', 'expiry' }) do
+    clock = 12345
+    local opened, lease = callbacks['qbinventory:server:open'](other, 'stash', stash.id)
+    H.equal(opened, true, 'rejection fixture opens a real lease')
+    local request = { token = lease.token, fromInventory = stash.key, toInventory = lease.primary.key,
+        fromSlot = 1, amount = 1, fromRevision = lease.secondary.revision, toRevision = lease.primary.revision }
+    local expectedReason
+    if rejection == 'token' then request.token = 'invalid'; expectedReason = 'invalid session'
+    elseif rejection == 'key' then request.fromInventory = 'stash:outside'; expectedReason = 'inventory not in session'
+    elseif rejection == 'fromRevision' then request.fromRevision = request.fromRevision + 1; expectedReason = 'stale source inventory'
+    elseif rejection == 'toRevision' then request.toRevision = request.toRevision + 1; expectedReason = 'stale target inventory'
+    else clock = clock + env.Config.qbinventory.sessionTtl + 1; expectedReason = 'session expired' end
+    local normal, accepted, reason = pcall(callbacks['qbinventory:server:transfer'], other, request)
+    H.equal(normal, true, rejection .. ' returns normally')
+    H.equal(accepted, false, rejection .. ' rejects')
+    H.equal(reason, expectedReason, rejection .. ' keeps the reason')
+    H.equal(stash.items[1].amount, 2, rejection .. ' removes no stash items')
+    H.equal(next(Core.player.getPlayerData(other, { 'items' })), nil, rejection .. ' adds no player items')
+end
+clock = 12345
+for _, action in ipairs({ 'use', 'drop', 'give' }) do
+    local _, lease = callbacks['qbinventory:server:open'](victim, 'player', victim)
+    local normal, accepted, reason = pcall(callbacks['qbinventory:server:intent'], victim, {
+        token = lease.token, action = action, primaryRevision = lease.primary.revision + 1,
+        payload = { slot = 1, amount = 1, target = other },
+    })
+    H.equal(normal, true, action .. ' stale validation returns normally')
+    H.equal(accepted, false, action .. ' stale validation rejects')
+    H.equal(reason, 'stale inventory', action .. ' retains its existing rejection text')
+    H.equal(json.encode(Core.player.getPlayerData(victim, { 'items' })), expected, action .. ' changes no items')
+end
+local shop = I.internal.createSecondary('shop', 'session-rejection', { stock = stash.items })
+local _, lease = callbacks['qbinventory:server:open'](victim, 'shop', shop.id)
+local normal, accepted, reason = pcall(callbacks['qbinventory:server:intent'], victim, {
+    token = lease.token, action = 'buy', primaryRevision = lease.primary.revision,
+    secondaryRevision = lease.secondary.revision + 1, payload = { slot = 1, amount = 1 },
+})
+H.equal(normal, true, 'buy stale validation returns normally')
+H.equal(accepted, false, 'buy stale validation rejects')
+H.equal(reason, 'stale source inventory', 'buy retains the validator failure reason')
+H.equal(shop.stock[1].amount, 2, 'rejected buy changes no stock')
+H.equal(json.encode(Core.player.getPlayerData(victim, { 'items' })), expected, 'rejected buy changes no player items')
 H.finish()
