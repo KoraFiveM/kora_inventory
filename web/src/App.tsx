@@ -1,5 +1,5 @@
 import { CircleAlert, PackageOpen, Search, X } from "lucide-react"
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd"
 import { TouchBackend } from "react-dnd-touch-backend"
@@ -193,8 +193,6 @@ function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHot
     }, [dragRef, dropRef])
     const classes = [
         "slot", item && "slot-filled", selected && "slot-selected", isDragging && "slot-drag-source",
-        // A shop slot puts a price where the label would otherwise end, so the
-        // label reserves that room only where a price is actually rendered.
         inventory.type === "shop" && "slot-priced",
         // Accent outline on the hotbar range. `hotbar` is decided by the panel,
         // not here: the range only means anything on the player's own
@@ -234,9 +232,11 @@ function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHot
         <span className="slot-number">{index}</span>
         {item && <>
             <ItemArtwork item={item} className="item-art" />
-            <span className="item-label">{item.label ?? item.name}</span>
+            <span className="item-footer">
+                <span className="item-label" title={item.label ?? item.name}>{item.label ?? item.name}</span>
+                {inventory.type === "shop" && typeof item.price === "number" && <span className="item-price">${item.price.toLocaleString()}</span>}
+            </span>
             <span className="item-amount">×{item.amount}</span>
-            {inventory.type === "shop" && typeof item.price === "number" && <span className="item-price">${item.price.toLocaleString()}</span>}
             {typeof item.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, item.durability))}%` }} /></span>}
         </>}
     </button>
@@ -299,9 +299,11 @@ function DragPreview({ session }: { session: SessionSnapshot | null }) {
     return createPortal(<div className={`inventory-drag-preview slot slot-filled${source.type === "shop" ? " slot-priced" : ""}`} style={{ left: clientOffset.x, top: clientOffset.y }} aria-hidden="true">
         <span className="slot-number">{draggedItem.slot}</span>
         <ItemArtwork item={draggedItem} className="item-art" />
-        <span className="item-label">{draggedItem.label ?? draggedItem.name}</span>
+        <span className="item-footer">
+            <span className="item-label">{draggedItem.label ?? draggedItem.name}</span>
+            {source.type === "shop" && typeof draggedItem.price === "number" && <span className="item-price">${draggedItem.price.toLocaleString()}</span>}
+        </span>
         <span className="item-amount">×{draggedItem.amount}</span>
-        {source.type === "shop" && typeof draggedItem.price === "number" && <span className="item-price">${draggedItem.price.toLocaleString()}</span>}
         {typeof draggedItem.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, draggedItem.durability))}%` }} /></span>}
     </div>, document.body)
 }
@@ -586,7 +588,7 @@ function InventoryApp() {
                 <p className="eyebrow">{filteredSelected.inventory.type === "shop" ? "shop item" : `slot ${filteredSelected.item.slot}`}</p>
                 <h1>{filteredSelected.item.label ?? filteredSelected.item.name}</h1>
                 <p>{filteredSelected.item.description ?? "No item description available."}</p>
-                <dl><dt>Amount</dt><dd>×{filteredSelected.item.amount}</dd><dt>Weight</dt><dd>{filteredSelected.item.weight ?? 0} g</dd>{filteredSelected.item.displayMeta?.map((meta) => <><dt key={`${meta.key}-label`}>{meta.label}</dt><dd key={`${meta.key}-value`}>{typeof meta.value === "object" ? JSON.stringify(meta.value) : String(meta.value)}</dd></>)}{filteredSelected.inventory.type === "shop" && <><dt>Price</dt><dd>${(filteredSelected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
+                <dl><dt>Amount</dt><dd>×{filteredSelected.item.amount}</dd><dt>Weight</dt><dd>{filteredSelected.item.weight ?? 0} g</dd>{filteredSelected.item.displayMeta?.map((meta, index) => <Fragment key={index}><dt>{meta.label}</dt><dd>{typeof meta.value === "object" ? JSON.stringify(meta.value) : String(meta.value)}</dd></Fragment>)}{filteredSelected.inventory.type === "shop" && <><dt>Price</dt><dd>${(filteredSelected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
                 {filteredSelected.inventory.type === "shop" ? <div className="amount-action">
                     {selectedMax > 1 && <input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Quantity to buy, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} />}
                     <button className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item, selectedCount)}>Buy {selectedCount} · ${((filteredSelected.item.price ?? 0) * selectedCount).toLocaleString()}</button>

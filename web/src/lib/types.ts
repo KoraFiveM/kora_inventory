@@ -72,6 +72,7 @@ export interface ItemBoxReceipt {
     imageUrl?: string
     amount: number
     action: "add" | "purchase" | "remove" | "use"
+    imageOverride?: boolean
     duration?: number
 }
 

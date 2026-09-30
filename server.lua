@@ -163,11 +163,9 @@ local function buildItem(name, amount, slot, metadata)
     }
 end
 
--- Presentation is deliberately derived from the canonical item definition,
--- not from an arbitrary resource's ItemBox payload.  This keeps qbinventory
--- headless at its API boundary while its optional UI remains consistent and
--- prevents an external resource from spoofing receipt labels, images or text.
-local function showItemBox(src, name, amount, action)
+-- Resolve presentation from the committed instance and the current definition,
+-- never from a client-provided ItemBox payload.
+local function showItemBox(src, name, amount, action, item)
     local policy = config.itemBoxes
     if type(policy) ~= 'table' or policy.enabled ~= true then
         return
@@ -189,11 +187,13 @@ local function showItemBox(src, name, amount, action)
     if not def then
         return
     end
+    local effective = inventory.effectiveItem(item, def)
     local payload = {
         name = def.name or tostring(name):lower(),
-        label = def.label or tostring(name),
-        image = def.image,
-        imageUrl = def.imageUrl,
+        label = effective.label or tostring(name),
+        image = effective.image,
+        imageUrl = effective.imageUrl,
+        imageOverride = type(inventory.itemMetadata(item).imageUrl) == 'string',
         amount = amount,
         action = action,
         duration = math.max(750, math.floor(tonumber(policy.duration) or 2600)),
@@ -450,27 +450,25 @@ local function displayLabel(key)
     return tostring(key):gsub('(%l)(%u)', '%1 %2'):gsub('_', ' '):gsub('^%l', string.upper)
 end
 
-local function displayValue(value)
-    if type(value) ~= 'table' then
-        return value
-    end
-    if value.show == false then
-        return nil
-    end
-    if value.value ~= nil and type(value.value) ~= 'table' then
-        return value.value
-    end
-
-    local displayed = {}
-    for key, nested in pairs(value) do
-        if key ~= 'show' then
-            local formatted = displayValue(nested)
-            if formatted ~= nil then
-                displayed[key] = formatted
-            end
+local function appendDisplayMetadata(displayed, metadata, topLevel)
+    local keys = {}
+    for key in pairs(metadata) do
+        if key ~= 'show' and not (topLevel and presentationFields[key]) then
+            keys[#keys + 1] = key
         end
     end
-    return next(displayed) and displayed or nil
+    table.sort(keys, function(left, right)
+        return tostring(left) < tostring(right)
+    end)
+    for _, key in ipairs(keys) do
+        local value = metadata[key]
+        if type(value) ~= 'table' then
+            displayed[#displayed + 1] = { key = key, label = displayLabel(key), value = value }
+        elseif value.show == true then
+            -- Visible tables are containers; only their children are metadata.
+            appendDisplayMetadata(displayed, value)
+        end
+    end
 end
 
 local function viewItems(source)
@@ -499,21 +497,7 @@ local function viewItems(source)
         item.weight = effective.weight
         item.description = effective.description
 
-        local keys = {}
-        for key in pairs(metadata) do
-            if key ~= 'show' and not presentationFields[key] then
-                keys[#keys + 1] = key
-            end
-        end
-        table.sort(keys, function(left, right)
-            return tostring(left) < tostring(right)
-        end)
-        for _, key in ipairs(keys) do
-            local value = displayValue(metadata[key])
-            if value ~= nil then
-                item.displayMeta[#item.displayMeta + 1] = { key = key, label = displayLabel(key), value = value }
-            end
-        end
+        appendDisplayMetadata(item.displayMeta, metadata, true)
         -- Player items can have been created by qbcore or loaded from an older
         -- persisted shape. Weapon type and the live handler table are
         -- authoritative so the UI does not hide their Use action.
@@ -736,20 +720,22 @@ local function addPlayer(src, name, amount, slot, metadata, reason)
             items[free] = one
             placed[#placed + 1] = free
         end
-        return true
+        return true, nil, items[placed[1]]
     end
     local stack = slot and items[slot] and items[slot].name == name and slot or inventory.stackSlot(items, item)
     if stack then
         local nextItem = inventory.copy(items[stack])
         nextItem.amount = nextItem.amount + amount
-        return playerSetPath(src, { 'items', stack }, nextItem)
+        local ok, err = playerSetPath(src, { 'items', stack }, nextItem)
+        return ok, err, ok and nextItem or nil
     end
     slot = slot or inventory.firstFreeSlot(items, config.playerSlots)
     if not slot or items[slot] then
         return false, 'no free slot'
     end
     item.slot = slot
-    return playerSetPath(src, { 'items', slot }, item)
+    local ok, err = playerSetPath(src, { 'items', slot }, item)
+    return ok, err, ok and item or nil
 end
 
 local function removePlayer(src, slot, amount)
@@ -817,14 +803,14 @@ local function physicalCashBalance(src, policy)
 end
 
 local function physicalCashCredit(src, policy, account, amount, reason)
-    local ok, addErr = addPlayer(src, policy.item, amount, nil, {}, 'qbcore-cash:' .. tostring(reason or 'add'))
+    local ok, addErr, added = addPlayer(src, policy.item, amount, nil, {}, 'qbcore-cash:' .. tostring(reason or 'add'))
     if not ok then
         return false, addErr
     end
     bump(playerKey(src))
     broadcast(playerKey(src))
     recordAudit('cash-add', src, { account = account, amount = amount, reason = reason })
-    showItemBox(src, policy.item, amount, 'add')
+    showItemBox(src, policy.item, amount, 'add', added)
     return true
 end
 
@@ -867,15 +853,18 @@ local function physicalCashDebit(src, policy, account, amount, reason)
         return false, 'insufficient funds'
     end
     for _, part in ipairs(planned) do
-        local ok, removeErr = removePlayer(src, part.slot, part.amount)
+        local ok, removeErr, removed = removePlayer(src, part.slot, part.amount)
         if not ok then
             return false, removeErr
         end
+        part.item = removed
     end
     bump(playerKey(src))
     broadcast(playerKey(src))
     recordAudit('cash-remove', src, { account = account, amount = amount, reason = reason })
-    showItemBox(src, policy.item, amount, 'remove')
+    for _, part in ipairs(planned) do
+        showItemBox(src, policy.item, part.amount, 'remove', part.item)
+    end
     return true
 end
 
@@ -988,7 +977,8 @@ local function addTo(inventoryKey, name, amount, slot, metadata, reason)
         return false, 'shop inventory is read only'
     end
     if inv.type == 'player' then
-        return addPlayer(inv.source, name, amount, slot, metadata, reason)
+        local ok, err = addPlayer(inv.source, name, amount, slot, metadata, reason)
+        return ok, err
     end
     return addSecondary(inv, name, amount, slot, metadata)
 end
@@ -1632,7 +1622,7 @@ local function intentBuy(src, request)
             end
             purchaseInfo = prepared
         end
-        local added, addErr = addPlayer(src, currentItem.name, count, nil, purchaseInfo, 'purchase')
+        local added, addErr, addedItem = addPlayer(src, currentItem.name, count, nil, purchaseInfo, 'purchase')
         if not added then
             if price > 0 then
                 exports.qbcore:addMoney(
@@ -1662,7 +1652,7 @@ local function intentBuy(src, request)
             price = price * count,
             serverData = inventory.copy(currentItem.serverData),
         })
-        showItemBox(src, currentItem.name, count, 'purchase')
+        showItemBox(src, currentItem.name, count, 'purchase', addedItem)
         TriggerEvent('qbinventory:server:itemPurchased', src, {
             shopId = currentShop.id,
             itemName = currentItem.name,
@@ -1758,12 +1748,12 @@ local function addItem(src, name, amount, slot, info, reason)
         if not ok then
             return false, err
         end
-        local done, why = addPlayer(src, name, amount, slot, info, reason)
+        local done, why, added = addPlayer(src, name, amount, slot, info, reason)
         if done then
             bump(playerKey(src))
             broadcast(playerKey(src))
             recordAudit('add', src, { item = name, amount = amount, reason = reason })
-            showItemBox(src, name, amount, 'add')
+            showItemBox(src, name, amount, 'add', added)
         end
         return done, why
     end)
@@ -1789,12 +1779,12 @@ local function removeItem(src, name, amount, slot, reason)
             if not items[slot] or items[slot].name ~= name then
                 return false, 'item not in slot'
             end
-            local ok, err = removePlayer(src, slot, amount)
+            local ok, err, removed = removePlayer(src, slot, amount)
             if ok then
                 bump(playerKey(src))
                 broadcast(playerKey(src))
                 recordAudit('remove', src, { item = name, amount = amount, slot = slot, reason = reason })
-                showItemBox(src, name, amount, 'remove')
+                showItemBox(src, name, amount, 'remove', removed)
             end
             return ok, err
         end
@@ -1813,12 +1803,15 @@ local function removeItem(src, name, amount, slot, reason)
             return false, 'not enough of item'
         end
         for _, part in ipairs(planned) do
-            removePlayer(src, part.slot, part.amount)
+            local _, _, removed = removePlayer(src, part.slot, part.amount)
+            part.item = removed
         end
         bump(playerKey(src))
         broadcast(playerKey(src))
         recordAudit('remove', src, { item = name, amount = amount, reason = reason })
-        showItemBox(src, name, amount, 'remove')
+        for _, part in ipairs(planned) do
+            showItemBox(src, name, part.amount, 'remove', part.item)
+        end
         return true
     end)
 end
@@ -2135,7 +2128,7 @@ useItem = function(src, slotOrName)
         TriggerEvent('qbinventory:server:usedItem', src, item.name, item)
         -- Opening a portable container above is deliberately excluded: it
         -- consumes nothing and returns before this point.
-        showItemBox(src, item.name, 1, 'use')
+        showItemBox(src, item.name, 1, 'use', item)
         return true
     end
     TriggerEvent('QBCore:Server:UseItem', src, item)
