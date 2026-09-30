@@ -222,4 +222,38 @@ handlers.playerDropped[#handlers.playerDropped]()
 first = #clientEvents
 tick()
 check(not eventSince(first, 'qbinventory:client:dropsUpdated', 10), 'disconnected viewer is no longer refreshed')
+
+-- Returning before cleanup must not retain bags seen during a brief visit.
+env.Config.qbinventory.requireSameBucket = true
+buckets[7] = 44
+callbacks['qbinventory:server:drops'](7)
+buckets[7] = 77
+first = #clientEvents
+local briefVisit = inventory.api.dropCreate(positions[7], {}, 77)
+check(eventSince(first, 'qbinventory:client:dropCreated', 7), 'brief visit receives matching live bag')
+local anotherVisit = inventory.api.dropCreate(positions[7], {}, 77)
+buckets[7] = 44
+local returnedBag = inventory.api.dropCreate(positions[7], {}, 44)
+first = #clientEvents
+tick()
+local replacement = eventSince(first, 'qbinventory:client:dropsUpdated', 7)
+check(replacement and not includes(replacement.args[1], briefVisit)
+    and not includes(replacement.args[1], anotherVisit) and includes(replacement.args[1], returnedBag),
+    'roundtrip cleanup removes brief-visit bags and retains current bags')
+first = #clientEvents
+tick()
+check(#clientEvents == first, 'completed roundtrip refresh does not repeat')
+
+-- Hydration can perform that same pending refresh before the cleanup tick.
+buckets[7] = 77
+local hydrateVisit = inventory.api.dropCreate(positions[7], {}, 77)
+buckets[7] = 44
+inventory.api.dropCreate(positions[7], {}, 44)
+first = #clientEvents
+callbacks['qbinventory:server:drops'](7)
+replacement = eventSince(first, 'qbinventory:client:dropsUpdated', 7)
+check(replacement and not includes(replacement.args[1], hydrateVisit), 'hydration preserves a pending roundtrip refresh')
+first = #clientEvents
+tick()
+check(#clientEvents == first, 'hydration clears the pending refresh once')
 print(('drop_buckets: %d actual-source checks passed; Core writes=%d'):format(checks, writes))

@@ -2299,7 +2299,12 @@ dropCreate = function(coords, items, bucket)
         for _, player in ipairs(GetPlayers()) do
             local src = tonumber(player)
             if sameDropBucket(src, inv) then
-                dropViewers[src] = dropViewers[src] or bucket
+                if dropViewers[src] ~= nil and dropViewers[src] ~= bucket then
+                    -- Retain a pending refresh even if the player returns before cleanup.
+                    dropViewers[src] = false
+                else
+                    dropViewers[src] = bucket
+                end
                 TriggerClientEvent('qbinventory:client:dropCreated', src, id, coords)
             end
         end
