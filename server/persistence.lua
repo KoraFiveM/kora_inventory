@@ -116,6 +116,7 @@ local function safeProperties(inv)
         prices = inv.prices,
         currency = inv.currency,
         access = nil,
+        accessRequired = inv.accessRequired == true or not not inv.access,
     }
 end
 
@@ -321,6 +322,9 @@ function persistence.load(kind, id)
         stock = row.inventory_type == 'shop' and (stock or items) or nil,
         prices = properties.prices,
         currency = properties.currency,
+        -- Historical rows cannot identify an omitted callback. Preserve their
+        -- semantics; trusted registrations mark callbacks on future saves.
+        accessRequired = properties.accessRequired == true,
     }
 end
 

@@ -208,6 +208,26 @@ end
 
 -- Inventory registry and access --------------------------------------------
 
+local secondaryOptionFields = { 'label', 'coords', 'distance', 'groups', 'owner', 'prices', 'currency' }
+
+local function applySecondaryOptions(inv, opts, supplied)
+    for _, field in ipairs(secondaryOptionFields) do
+        if supplied[field] then
+            inv[field] = inventory.copy(opts[field])
+        end
+    end
+    if supplied.slots then
+        inv.slots = math.floor(tonumber(opts.slots) or inv.slots)
+    end
+    if supplied.maxWeight then
+        inv.maxWeight = tonumber(opts.maxWeight or opts.maxweight) or inv.maxWeight
+    end
+    if supplied.access then
+        inv.access = opts.access
+        inv.accessRequired = not not opts.access
+    end
+end
+
 local function secondary(kind, id, opts)
     local inventoryKey = key(kind, id)
     local inv = inventories[inventoryKey]
@@ -217,6 +237,17 @@ local function secondary(kind, id, opts)
     if inv then
         return inv, true
     end
+    local supplied
+    if opts then
+        supplied = {
+            slots = opts.slots ~= nil or nil,
+            maxWeight = (opts.maxWeight ~= nil or opts.maxweight ~= nil) or nil,
+            access = opts.access ~= nil or nil,
+        }
+        for _, field in ipairs(secondaryOptionFields) do
+            if opts[field] ~= nil then supplied[field] = true end
+        end
+    end
     opts = opts or {}
     -- Hydrate qbinventory-owned storage only after the persistence bootstrap
     -- has completed. Player inventories are intentionally never read here.
@@ -225,19 +256,10 @@ local function secondary(kind, id, opts)
         local restored, restoreErr = persistence.load(kind, id)
         if restored then
             restored.key = inventoryKey
+            restored._suppliedOptions = supplied
             -- Registration-time policy (especially a non-serialisable access
             -- callback) is authoritative over persisted descriptive state.
-            for _, field in ipairs({ 'label', 'coords', 'distance', 'groups', 'owner', 'access', 'prices', 'currency' }) do
-                if opts[field] ~= nil then
-                    restored[field] = inventory.copy(opts[field])
-                end
-            end
-            if opts.slots ~= nil then
-                restored.slots = math.floor(tonumber(opts.slots) or restored.slots)
-            end
-            if opts.maxWeight ~= nil or opts.maxweight ~= nil then
-                restored.maxWeight = tonumber(opts.maxWeight or opts.maxweight) or restored.maxWeight
-            end
+            if supplied then applySecondaryOptions(restored, opts, supplied) end
             inventories[inventoryKey] = restored
             return restored, true
         elseif restoreErr then
@@ -262,6 +284,8 @@ local function secondary(kind, id, opts)
         prices = opts.prices,
         currency = opts.currency or 'money',
         access = opts.access,
+        accessRequired = not not opts.access,
+        _suppliedOptions = supplied,
     }
     inventories[inventoryKey] = inv
     if persistence and persistence.markDirty then
@@ -419,6 +443,9 @@ local function canAccess(src, inv, opts)
             return false, 'too far away'
         end
         return mayInspectPlayer(src, inv.source)
+    end
+    if inv.accessRequired and not inv.access then
+        return false, 'access policy unavailable'
     end
     if inv.owner then
         local data = playerData(src)
@@ -2317,6 +2344,9 @@ local function refreshRegistration(inv, opts)
     inv.groups = inventory.copy(opts.groups)
     inv.owner = opts.owner
     inv.access = opts.access
+    inv.accessRequired = not not opts.access
+    inv._registered = true
+    inv._suppliedOptions = nil
     if inv.type == 'shop' then
         inv.prices = opts.prices or inv.prices or {}
         inv.currency = opts.currency or 'money'
@@ -3045,6 +3075,34 @@ AddEventHandler('qbinventory:server:persistenceReady', function()
     end
     for _, inv in ipairs(restored) do
         inv.key = key(inv.type, inv.id)
+        local current = inventories[inv.key]
+        if current then
+            if current._registered then
+                inv.temporary = current.temporary
+                refreshRegistration(inv, current)
+                if current.accessRequired and not current.access then
+                    -- Keep a required callback unless re-registration removed it.
+                    inv.accessRequired = true
+                    if persistence.markDirty then persistence.markDirty(inv) end
+                end
+            else
+                inv._suppliedOptions = current._suppliedOptions
+                if current._suppliedOptions then
+                    applySecondaryOptions(inv, current, current._suppliedOptions)
+                end
+                -- Domain open flows may have rebound a callback after loading.
+                if current.access then
+                    inv.access = current.access
+                    inv.accessRequired = true
+                elseif current.accessRequired then
+                    inv.accessRequired = true
+                end
+                if persistence.markDirty then
+                    -- Replace startup snapshots with the hydrated contents.
+                    persistence.markDirty(inv)
+                end
+            end
+        end
         inventories[inv.key] = inv
     end
     for _, bad in ipairs(rejected or {}) do
