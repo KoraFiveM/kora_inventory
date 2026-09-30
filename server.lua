@@ -792,9 +792,9 @@ local function physicalCashCanImport(src, account, amount)
     return canCarry(src, policy.item, amount)
 end
 
-local function physicalCashBalance(src, policy)
+local function physicalCashBalance(src, policy, items)
     local total = 0
-    for _, item in pairs(playerItems(src)) do
+    for _, item in pairs(items or playerItems(src)) do
         if type(item.name) == 'string' and item.name:lower() == policy.item then
             total = total + (tonumber(item.amount) or 0)
         end
@@ -1982,14 +1982,9 @@ end
 ---@param newItems table<integer, table>
 ---@return boolean replaced
 ---@return string|nil reason
-local function setItems(src, newItems)
+local function replacePlayerItems(src, newItems)
     if type(newItems) ~= 'table' then
         return false, 'items must be a table'
-    end
-    -- A whole-inventory replacement cannot prove that its proposed cash stack
-    -- matches the ledger. Reject it instead of permitting a mint/burn bypass.
-    if cashItemsActive then
-        return false, 'SetInventory is unavailable while cash is an item'
     end
     local checked = {}
     for slot, item in pairs(newItems) do
@@ -2010,6 +2005,14 @@ local function setItems(src, newItems)
         return false, 'over weight'
     end
     return lock({ playerKey(src) }, function()
+        if cashItemsActive then
+            local policy = cashPolicy()
+            -- Trusted item mutations may rebuild slots, but only the cash
+            -- bridge may change the balance read from the locked player state.
+            if not policy or physicalCashBalance(src, policy, checked) ~= physicalCashBalance(src, policy) then
+                return false, 'physical cash cannot be changed by an inventory replacement'
+            end
+        end
         local ok, err = playerSetPath(src, { 'items' }, checked)
         if not ok then
             return false, err
@@ -2018,6 +2021,17 @@ local function setItems(src, newItems)
         broadcast(playerKey(src))
         return true
     end)
+end
+
+local function setItems(src, newItems)
+    if type(newItems) ~= 'table' then
+        return false, 'items must be a table'
+    end
+    -- Public wholesale replacements stay disabled while cash is an item.
+    if cashItemsActive then
+        return false, 'SetInventory is unavailable while cash is an item'
+    end
+    return replacePlayerItems(src, newItems)
 end
 
 local useables, builtInUseables = {}, {}
@@ -2766,7 +2780,7 @@ setInventoryItems = function(reference, items)
         return false, 'items must be a table'
     end
     if inv.type == 'player' then
-        return setItems(inv.source, items)
+        return replacePlayerItems(inv.source, items)
     end
     local checked = {}
     for rawSlot, rawItem in pairs(items) do
