@@ -87,7 +87,14 @@ end
 
 H.ok(api.AddItem(1, 'card', 1, 1, { image = 'charizard.png' }), 'first card instance')
 H.ok(api.AddItem(1, 'card', 2, 2, { image = 'pikachu.png' }), 'second card instance')
-H.ok(api.AddItem(1, 'card', 1, 2, { image = 'other.png' }), 'explicit-slot stack follows existing behaviour')
+local beforeRejected = #receipts
+local rejected = table.pack(api.AddItem(1, 'card', 1, 2, { image = 'other.png' }))
+H.equal(rejected[1], false, 'explicit slot cannot discard different artwork metadata')
+H.equal(rejected[2], 'no free slot', 'occupied incompatible slot keeps its failure reason')
+H.equal(rejected.n, 2, 'rejected AddItem keeps its return contract')
+H.equal(#receipts, beforeRejected, 'rejected grant produces no receipt')
+H.equal(player.items[2].amount, 2, 'rejected grant keeps the existing quantity')
+H.ok(api.AddItem(1, 'card', 1, 2, { image = 'pikachu.png' }), 'matching explicit-slot stack succeeds')
 H.equal(receipts[#receipts].image, 'pikachu.png', 'receipt uses the committed stack, not supplied metadata')
 H.ok(api.RemoveItem(1, 'card', 2), 'remove spans differently styled cards')
 H.equal(receipts[#receipts - 1].image, 'charizard.png', 'first removed stack uses its own artwork')
@@ -101,7 +108,34 @@ player.items = {}
 definition.unique = true
 H.ok(api.AddItem(1, 'card', 2, nil, { image = 'charizard.png' }), 'unique multi-item grant')
 H.equal(receipts[#receipts].image, 'charizard.png', 'unique grants retain instance artwork')
+beforeRejected = #receipts
+local beforeRevision = internal.getRevision('player:1')
+H.equal(api.AddItem(1, 'card', 1, 1, { image = 'charizard.png' }), false, 'amount-one unique grant cannot merge into an occupied slot')
+H.equal(player.items[1].amount, 1, 'first unique instance remains separate')
+H.equal(player.items[2].amount, 1, 'other unique instance remains separate')
+H.equal(internal.getRevision('player:1'), beforeRevision, 'rejected unique grant does not publish a revision')
+H.equal(#receipts, beforeRejected, 'rejected unique grant produces no receipt')
+
+local stash = internal.createSecondary('stash', 'slot-stacking', {
+    slots = 4, maxWeight = 1000, items = { [1] = internal.buildItem('card', 1, 1, { serial = 'A' }) },
+})
+H.equal(internal.addTo(stash.key, 'card', 1, 1, { serial = 'B' }), false, 'storage keeps unique instances separate')
+H.equal(stash.items[1].amount, 1, 'rejected storage grant preserves quantity')
+H.equal(stash.items[1].info.serial, 'A', 'rejected storage grant preserves identity')
 definition.unique = false
+stash.items = {
+    [1] = internal.buildItem('card', 1, 1, { image = 'first.png' }),
+    [3] = internal.buildItem('card', 1, 3, { image = 'other.png' }),
+}
+local redirected, redirectedSlot = internal.addTo(stash.key, 'card', 1, 1, { image = 'other.png' })
+H.equal(redirected, true, 'existing compatible-stack fallback is preserved')
+H.equal(redirectedSlot, 3, 'fallback selects a compatible stack')
+H.equal(stash.items[1].amount, 1, 'fallback leaves incompatible slot untouched')
+H.equal(stash.items[3].amount, 2, 'fallback adds to matching metadata')
+stash.items[3] = nil
+H.equal(internal.addTo(stash.key, 'card', 1, 1, { image = 'other.png' }), false, 'storage refuses incompatible metadata without a matching stack')
+H.equal(stash.items[1].info.image, 'first.png', 'refused storage grant preserves metadata')
+
 player.items = {}
 H.ok(api.AddItem(1, 'card', 1, 1, {
     label = 'Charizard', image = 'charizard.png', weight = 0, description = 'Custom',

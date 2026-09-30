@@ -138,6 +138,14 @@ function inventory.firstFreeSlot(items, slots)
     end
 end
 
+function inventory.canStack(current, item)
+    return current ~= nil
+        and current.name == item.name
+        and not current.unique
+        and not item.unique
+        and inventory.sameInfo(current.info, item.info)
+end
+
 function inventory.stackSlot(items, item)
     if item.unique then
         return nil
@@ -145,9 +153,7 @@ function inventory.stackSlot(items, item)
     local best
     for slot, current in pairs(items or {}) do
         if
-            current.name == item.name
-            and not current.unique
-            and inventory.sameInfo(current.info, item.info)
+            inventory.canStack(current, item)
             and (not best or slot < best)
         then
             best = slot

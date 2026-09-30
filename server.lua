@@ -648,7 +648,7 @@ local function addSecondary(inv, name, amount, slot, metadata)
         end
         return true, placed[1]
     end
-    local stack = slot and inv.items[slot] and inv.items[slot].name == name and slot
+    local stack = slot and inventory.canStack(inv.items[slot], item) and slot
         or inventory.stackSlot(inv.items, item)
     if stack then
         inv.items[stack].amount = inv.items[stack].amount + amount
@@ -764,7 +764,7 @@ local function addPlayer(src, name, amount, slot, metadata, reason)
         end
         return true, nil, items[placed[1]]
     end
-    local stack = slot and items[slot] and items[slot].name == name and slot or inventory.stackSlot(items, item)
+    local stack = slot and inventory.canStack(items[slot], item) and slot or inventory.stackSlot(items, item)
     if stack then
         local nextItem = inventory.copy(items[stack])
         nextItem.amount = nextItem.amount + amount
