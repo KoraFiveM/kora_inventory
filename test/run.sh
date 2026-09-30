@@ -32,6 +32,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/ox_adapter.lua
 "${LUA:-lua}" test/smoke/confiscation.lua
 "${LUA:-lua}" test/smoke/crafting.lua
+"${LUA:-lua}" test/smoke/craft_capacity.lua
 "${LUA:-lua}" test/smoke/ammunation.lua
 "${LUA:-lua}" test/smoke/ammunation_client.lua
 "${LUA:-lua}" test/smoke/liquorstore.lua

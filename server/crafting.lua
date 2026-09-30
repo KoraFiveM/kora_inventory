@@ -66,7 +66,7 @@ local function invoke(callback, ...)
     return true
 end
 
-local function normaliseIngredients(raw)
+local function normaliseIngredients(raw, allowEmpty)
     local out = {}
     if type(raw) ~= 'table' then
         return nil, 'recipe ingredients are required'
@@ -92,7 +92,7 @@ local function normaliseIngredients(raw)
         end
         out[#out + 1] = { name = name, amount = amount, metadata = copy(row.metadata or row.info or {}) }
     end
-    if #out == 0 then
+    if #out == 0 and not allowEmpty then
         return nil, 'recipe ingredients are required'
     end
     table.sort(out, function(a, b)
@@ -386,7 +386,7 @@ function weapons.prepareMetadata(name, metadata)
     return info
 end
 
-local function insertOutput(items, slots, output)
+local function insertOutput(items, slots, output, preserveMetadata)
     local metadata = copy(output.metadata)
     if weapons.isWeapon(output.name) then
         local prepared, err = weapons.prepareMetadata(output.name, metadata)
@@ -415,7 +415,9 @@ local function insertOutput(items, slots, output)
             individual.amount, individual.slot = 1, slot
             -- Unique weapons must never receive a duplicated serial.
             if weapons.isWeapon(individual.name) then
-                individual.info = assert(weapons.prepareMetadata(individual.name, {}))
+                local info = preserveMetadata and copy(metadata) or {}
+                if preserveMetadata and output.amount > 1 then info.serial = nil end
+                individual.info = assert(weapons.prepareMetadata(individual.name, info))
                 individual.metadata = copy(individual.info)
             end
             items[slot] = individual
@@ -468,7 +470,7 @@ local function scaledEntry(entry, amount)
     return scaled
 end
 
-local function planCraft(src, recipe, amount)
+local function planCraft(src, recipe, amount, preserveMetadata)
     local primary = internal.playerKey(src)
     local key, inventory = internal.resolveInventory(primary)
     if key ~= primary or not inventory then
@@ -482,7 +484,7 @@ local function planCraft(src, recipe, amount)
         end
     end
     for _, output in ipairs(recipe.outputs) do
-        local inserted, insertErr = insertOutput(planned, inventory.slots, scaledEntry(output, amount))
+        local inserted, insertErr = insertOutput(planned, inventory.slots, scaledEntry(output, amount), preserveMetadata)
         if not inserted then
             return nil, insertErr
         end
@@ -491,6 +493,40 @@ local function planCraft(src, recipe, amount)
         return nil, 'over weight'
     end
     return planned, nil, primary
+end
+
+---Check a trusted craft's combined capacity without changing items. Inputs
+---match by name; output metadata controls weight and stacking. This server-only
+---query does not reserve capacity or replace the owning resource's operations.
+function crafting.canCraftItems(src, ingredients, outputs)
+    src = tonumber(src)
+    if not src then return false, 'source is required' end
+    local needed, ingredientErr = normaliseIngredients(ingredients, true)
+    if not needed then return false, ingredientErr end
+    local produced, outputErr = normaliseOutputs({ outputs = outputs })
+    if not produced then return false, outputErr end
+    for _, ingredient in ipairs(needed) do ingredient.metadata = {} end
+
+    return internal.lock({ internal.playerKey(src) }, function()
+        local cash = type(Config.qbinventory.cash) == 'table' and Config.qbinventory.cash or nil
+        local cashItem = cash and type(cash.item) == 'string' and cash.item:lower()
+        local cashAccount = cash and type(cash.account) == 'string' and cash.account:lower()
+        if cash and cash.asItem == true and cashItem and cashAccount and exports.qbcore:isPhysicalCash(cashAccount) then
+            local netOutputs = {}
+            for _, output in ipairs(produced) do
+                if output.name == cashItem then
+                    -- Cash item grants ignore item metadata and award the net
+                    -- amount through addMoney, once per configured output.
+                    output.metadata = {}
+                    output.amount = output.amount - exports.qbcore:getTransactionTax(output.amount, cashAccount, 'add')
+                end
+                if output.amount > 0 then netOutputs[#netOutputs + 1] = output end
+            end
+            produced = netOutputs
+        end
+        local planned, err = planCraft(src, { ingredients = needed, outputs = produced }, 1, true)
+        return planned ~= nil, err
+    end)
 end
 
 ---Report whether the current inventory can complete a registered transaction.
@@ -730,6 +766,7 @@ exports('RegisterCraftRecipe', crafting.register)
 exports('RemoveCraftRecipe', crafting.remove)
 exports('GetCraftRecipe', crafting.get)
 exports('CanCraftRecipe', crafting.canCraft)
+exports('CanCraftItems', crafting.canCraftItems)
 exports('CraftItem', crafting.craft)
 exports('RegisterCraftHook', crafting.registerHook)
 exports('RemoveCraftHook', crafting.removeHook)
