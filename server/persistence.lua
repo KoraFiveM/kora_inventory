@@ -246,7 +246,10 @@ function persistence.flush()
     for inventoryKey, inv in pairs(dirty) do
         local ok, err = persistence.save(inv)
         if ok then
-            dirty[inventoryKey] = nil
+            -- A mutation may have replaced this snapshot while SQL was pending.
+            if dirty[inventoryKey] == inv then
+                dirty[inventoryKey] = nil
+            end
         else
             failed[#failed + 1] = { key = inventoryKey, error = err }
             log('1', ('save failed for %s: %s'):format(inventoryKey, tostring(err)))
