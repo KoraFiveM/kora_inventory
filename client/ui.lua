@@ -3,6 +3,8 @@
 -- translates its local client events into this resource's NUI wire contract.
 local activeSession
 local activeToken
+local activePlayerId
+local activeSecondaryId
 
 local allowedIntents = {
     close = true,
@@ -55,6 +57,8 @@ local function closeSession(reason)
     })
     activeSession = nil
     activeToken = nil
+    activePlayerId = nil
+    activeSecondaryId = nil
     SetNuiFocus(false, false)
 end
 
@@ -96,6 +100,8 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     if not wire.player then
         return
     end
+    activePlayerId = wire.player.id
+    activeSecondaryId = wire.secondary and wire.secondary.id
     pushTheme()
     pushConfig()
     send('qbinventory:nui:sessionOpened', wire)
@@ -134,10 +140,17 @@ AddEventHandler('qbinventory:ui:sessionPatched', function(payload, legacyPatch)
     }
     if patch.inventory then
         local changed = normalizeView(patch.inventory)
-        if changed and changed.id and changed.id:find('player:', 1, true) == 1 then
+        if not changed or not changed.id then
+            return
+        end
+        if changed.id == activePlayerId then
             wire.player = changed
-        else
+        elseif changed.id == activeSecondaryId then
             wire.secondary = changed
+            wire.secondaryRevision = patch.revision or patch.secondaryRevision
+            wire.revision = nil
+        else
+            return
         end
     end
     send('qbinventory:nui:sessionPatched', wire)
