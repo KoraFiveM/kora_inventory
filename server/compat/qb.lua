@@ -393,7 +393,7 @@ api.CreateShop = function(first, second)
 end
 
 api.OpenShop = function(source, name)
-    return native.OpenInventory(source, 'shop', name)
+    return native.OpenInventory(source, name, { type = 'shop', id = name })
 end
 api.OpenInventory = function(source, identifier, data)
     return native.OpenInventory(source, identifier, data)

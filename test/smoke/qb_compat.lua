@@ -175,6 +175,24 @@ H.ok(calls.shops['vending'] ~= nil and calls.shops['hardware'] ~= nil, 'CreateSh
 registered.CreateShop('legacy', { label = 'Legacy' })
 H.ok(calls.shops['legacy'] ~= nil, 'CreateShop still accepts the name+data form')
 
+-- OpenShop(source, name) must enter the native typed-shop path.
+H.equal(registered.OpenShop(7, 'ammunation'), true, 'OpenShop forwards native success')
+H.equal(calls.open.src, 7, 'OpenShop preserves source')
+H.equal(calls.open.a, 'ammunation', 'OpenShop forwards the actual shop identifier')
+H.equal(calls.open.b.type, 'shop', 'OpenShop requests the shop path')
+H.equal(calls.open.b.id, 'ammunation', 'OpenShop selects the registered shop')
+local originalOpen = QbInventory.api.OpenInventory
+local nativePayload = { token = 'shop-session' }
+QbInventory.api.OpenInventory = function() return true, nativePayload end
+local shopOK, shopResult = registered.OpenShop(7, 'ammunation')
+H.equal(shopOK, true, 'OpenShop preserves success boolean')
+H.equal(shopResult, nativePayload, 'OpenShop preserves native payload identity')
+QbInventory.api.OpenInventory = function() return false, 'access denied' end
+shopOK, shopResult = registered.OpenShop(7, 'ammunation')
+H.equal(shopOK, false, 'OpenShop preserves failure boolean')
+H.equal(shopResult, 'access denied', 'OpenShop preserves native failure reason')
+QbInventory.api.OpenInventory = originalOpen
+
 -- UseItem(itemName, source, itemData): the FIRST argument is the item name.
 registered.UseItem('bandage', 7, { slot = 3 })
 H.equal(calls.useItem.src, 7, 'UseItem reads the source from the second argument')
