@@ -16,6 +16,7 @@ local dropConfig = (Config.qbinventory and Config.qbinventory.drops) or {}
 
 -- id -> { entity = number|nil, target = integer }
 local drops = {}
+local dropGeneration = 0
 
 ---Drop coordinates are the dropping player's ped position, which sits about a
 ---metre above the floor. A downward trace puts the bag on the surface; a failed
@@ -84,22 +85,51 @@ local function addDrop(id, coords)
     -- Registered BEFORE the model finishes streaming. QB.entities.create waits
     -- on the model, and a drop emptied during that wait would otherwise land its
     -- removal before this record existed and leave the prop orphaned.
-    drops[stringId] = { coords = placed }
-    drops[stringId].target = addDropTarget(stringId, placed)
+    local record = { coords = placed }
+    drops[stringId] = record
+    record.target = addDropTarget(stringId, placed)
 
-    local entity = QB.entities.create(dropConfig.model or 'prop_med_bag_01b', placed, { freeze = true })
-    local record = drops[stringId]
-
-    if not record then
-        -- Removed while the model was streaming.
-        if entity then
-            QB.entities.remove(entity)
+    -- Keep snapshot reconciliation synchronous while the model streams.
+    CreateThread(function()
+        local entity = QB.entities.create(dropConfig.model or 'prop_med_bag_01b', placed, { freeze = true })
+        if drops[stringId] ~= record then
+            -- Removed or replaced while the model was streaming.
+            if entity then
+                QB.entities.remove(entity)
+            end
+            return
         end
+        record.entity = entity or nil
+    end)
+end
+
+local function syncDrops(list)
+    local visible = {}
+    for _, entry in ipairs(list) do
+        if entry and entry.id ~= nil then
+            visible[tostring(entry.id)] = entry.coords
+        end
+    end
+    for id in pairs(drops) do
+        if not visible[id] then
+            removeDrop(id)
+        end
+    end
+    for id, coords in pairs(visible) do
+        addDrop(id, coords)
+    end
+end
+
+RegisterNetEvent('qbinventory:client:dropsUpdated', function(list)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
-
-    record.entity = entity or nil
-end
+    if type(list) ~= 'table' then
+        return
+    end
+    dropGeneration = dropGeneration + 1
+    syncDrops(list)
+end)
 
 RegisterNetEvent('qbinventory:client:dropCreated', function(id, coords)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
@@ -126,18 +156,17 @@ end)
 
 -- Hydration. `dropCreated` is a one-shot broadcast, so a player connecting (or
 -- a client resource restarting) after a bag landed would never render it. The
--- callback returns ids and coordinates only -- both already broadcast to every
--- client at drop time -- never contents.
+-- callback returns ids and coordinates in this player's bucket, never contents.
 local function hydrate()
     if dropConfig.enabled == false then
         return
     end
 
+    local generation = dropGeneration
     local list = QB.callback.trigger('qbinventory:server:drops')
-    if type(list) ~= 'table' then
+    if type(list) ~= 'table' or generation ~= dropGeneration then
         return
     end
-
     for _, entry in ipairs(list) do
         if entry and entry.id ~= nil then
             addDrop(entry.id, entry.coords)

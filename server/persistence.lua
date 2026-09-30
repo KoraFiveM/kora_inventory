@@ -108,6 +108,7 @@ local function safeProperties(inv)
     -- are supplied again by registerStash/registerShop on boot.
     return {
         coords = inv.coords,
+        bucket = inv.bucket,
         distance = inv.distance,
         groups = inv.groups,
         owner = inv.owner,
@@ -318,6 +319,7 @@ function persistence.load(kind, id)
         revision = tonumber(row.revision) or 0,
         items = items,
         coords = properties.coords,
+        bucket = properties.bucket,
         distance = properties.distance,
         groups = properties.groups,
         owner = properties.owner,

@@ -498,10 +498,18 @@ server then re-resolves that drop and repeats its access, distance and
 routing-bucket checks like any other inventory -- so deleting the prop, moving
 it, or fabricating one client-side gains nothing.
 
-`qbinventory:server:drops` returns live drop ids and coordinates so a client
-that connected after a bag landed can still render it. Coordinates are already
-broadcast to every client at drop time; **contents are never included** -- what
-is inside a bag stays a server-side question answered by `open`.
+Player-created drops belong to the player's server-resolved routing bucket.
+Opening, transferring and receiving item updates recheck that bucket.
+`qbinventory:server:drops` and the legacy drop list return matching drop ids and
+coordinates; **contents are never included**. Live creation reaches matching
+players. After a bucket change, the existing five-second session cleanup tick
+closes old drop sessions and refreshes the local bags and interaction targets.
+
+Trusted server calls to `dropCreate(coords, items)` retain their global scope.
+Its optional third `bucket` argument restricts a drop; ox-compatible
+`CustomDrop` uses its existing `instance` argument for that restriction, and
+`CreateDropFromPlayer` resolves the source player's bucket. Setting the existing
+`requireSameBucket` option to false preserves cross-bucket behavior.
 
 ## Client and renderer contract
 

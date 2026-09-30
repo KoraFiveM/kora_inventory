@@ -42,6 +42,7 @@ local ITEMS = {
     backpack = { name = 'backpack', label = 'Backpack', weight = 1, container = true },
     weapon_pistol = { name = 'weapon_pistol', label = 'Pistol', weight = 100, type = 'weapon' },
 }
+GetPlayerRoutingBucket = function(src) return src == 1 and 55 or 0 end
 
 local state, locks, lockOrder, writes, opened, created, removedKeys
 
@@ -181,7 +182,7 @@ core.createSecondary = function(kind, id, opts)
     if state[k] then return state[k], true end
     local inv = inventory(k, kind, id, math.floor(tonumber(opts.slots) or 50),
         tonumber(opts.maxWeight or opts.maxweight) or 100000, I.copy(opts.items or {}),
-        { label = opts.label, owner = opts.owner, coords = opts.coords, temporary = opts.temporary == true })
+        { label = opts.label, owner = opts.owner, coords = opts.coords, bucket = opts.bucket, temporary = opts.temporary == true })
     state[k] = inv
     created[#created + 1] = { key = k, kind = kind, id = id, opts = I.copy(opts), locked = heldKeys() }
     return inv
@@ -327,6 +328,7 @@ H.ok(dropId ~= nil, 'CreateDropFromPlayer returns a drop id')
 H.equal(next(state['player:1'].items), nil, 'the player inventory is left EMPTY, not duplicated')
 local drop = state[key('drop', dropId)]
 H.ok(drop ~= nil, 'the drop inventory exists under its own key')
+H.equal(drop.bucket, 55, 'player-originated drops retain the server-resolved bucket')
 H.equal(count(drop.items), 3, 'every player slot was copied into the drop')
 H.equal(created[1].locked, 'player:1', 'the drop is created while the player key is locked')
 H.equal(writes[#writes].key, 'player:1', 'the last write clears the player')
@@ -449,6 +451,8 @@ H.equal(Ox.GetContainerFromSlot('player:1', 3), nil, 'a slot with no container m
 reset()
 local dropA = Ox.CustomDrop('loot', {}, nil, 5, 100)
 local dropB = Ox.CustomDrop('loot', {}, nil, 5, 100)
+local scopedDrop = Ox.CustomDrop('loot', {}, nil, 5, 100, 22)
+H.equal(state[key('drop', scopedDrop)].bucket, 22, 'CustomDrop preserves the trusted instance restriction')
 H.ok(dropA ~= dropB, 'two CustomDrop calls in the same second produce different ids')
 H.ok(state[key('drop', dropA)] ~= nil and state[key('drop', dropB)] ~= nil, 'both drops exist as separate inventories')
 Ox.CreateTemporaryStash({ label = 'A' })

@@ -200,4 +200,24 @@ do
     H.equal(#f.calls, 3, 'replacement still gets its own save')
     assertWrite(f.calls[3], 'overlap', 2, 3)
 end
+-- Opt-in persisted drops must retain their bucket after save/load.
+do
+    local f = setup()
+    f.env.Config.qbinventory.persistence.persistDrops = true
+    f.env.Config.qbinventory.persistence.persistTemporary = true
+    local drop = record('drop', 'scoped', 1, 4)
+    drop.bucket, drop.temporary = 11, true
+    H.equal(f.persistence.markDirty(drop), true, 'scoped drop is queued under existing opt-in durability')
+    H.equal(f.persistence.flush(), true, 'scoped drop save succeeds')
+    local params = f.calls[1].params
+    H.equal(json.decode(params[8]).bucket, 11, 'bucket is stored in existing properties JSON')
+    local row = { inventory_type = 'drop', inventory_id = 'scoped', label = 'Drop',
+        slots = 10, max_weight = 100000, revision = 1, items = params[7], properties = params[8] }
+    f.env.exports.qbsql.query = function(_, statement, args, callback) callback({ row }) end
+    local restored = assert(f.persistence.load('drop', 'scoped'))
+    H.equal(restored.bucket, 11, 'bucket survives actual persistence loading')
+    row.properties = '{}'
+    restored = assert(f.persistence.load('drop', 'scoped'))
+    H.equal(restored.bucket, nil, 'historical unscoped records retain their behavior')
+end
 H.finish()

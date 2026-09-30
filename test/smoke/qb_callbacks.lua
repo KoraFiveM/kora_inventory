@@ -67,6 +67,9 @@ QbInventory = {
         playerKey = function(src) return 'player:' .. src end,
         resolveInventory = function(ref) return ref, inventories[ref] end,
         sessionOf = function() return session end,
+        sameDropBucket = function(src, inv)
+            return inv.bucket == nil or inv.bucket == GetPlayerRoutingBucket(src)
+        end,
         copy = copy,
         config = { interactionDistance = 3.0, requireSameBucket = true },
         lock = function(keys, fn) return fn(keys) end,
@@ -87,12 +90,12 @@ QbInventory = {
             if not addSucceeds and reason ~= 'give-rollback' then return false, 'no room' end
             return true
         end,
-        dropCreate = function(coords, items)
+        dropCreate = function(coords, items, bucket)
             local id = nextDropId
             nextDropId = nextDropId + 1
             inventories['drop:' .. id] = { key = 'drop:' .. id, type = 'drop', id = id, label = 'Ground drop',
-                slots = 50, maxWeight = 100000, coords = coords, items = items }
-            dropped[#dropped + 1] = { id = id, coords = coords, items = items }
+                slots = 50, maxWeight = 100000, coords = coords, items = items, bucket = bucket }
+            dropped[#dropped + 1] = { id = id, coords = coords, items = items, bucket = bucket }
             return id
         end,
         BuyItem = function(src, shopId, slot, amount)
@@ -146,6 +149,7 @@ H.equal(dropped[1].items[1].info.serial, 'AAA', 'metadata comes from the source 
 H.equal(dropped[1].items[1].amount, 2, 'the dropped amount matches what was removed')
 H.equal(dropped[1].items[1].slot, 1, 'the drop is normalised to slot 1')
 H.equal(dropped[1].coords, pedCoords[70], 'the drop position is read from the ped, never from the client')
+H.equal(dropped[1].bucket, buckets[7], 'the drop bucket is read from the server')
 
 -- Over-drawing and bad slots are refused.
 removed = {}
@@ -167,6 +171,10 @@ H.equal(drops['1'].name, 'drop-1', 'the drop carries its upstream name')
 H.ok(drops['1'].items == nil, 'drop contents are never handed to a client that has no session for them')
 H.equal(drops['1'].coords, pedCoords[70], 'the already-broadcast coords are reported')
 H.equal(drops['1'].entityId, 0, 'the bag prop is local to each client, so there is no network id to hand out')
+buckets[9] = 22
+H.equal(next(handlers['qb-inventory:server:GetCurrentDrops'](9)), nil, 'foreign-bucket drops are not listed')
+H.ok(handlers['qb-inventory:server:GetCurrentDrops'](7)['1'], 'a foreign read cannot prune a live drop')
+buckets[9] = 0
 
 -- A drop taken from the authority stops being reported.
 inventories['drop:1'] = nil

@@ -102,8 +102,7 @@ local bridgeDrops = {}
 -- Upstream keeps a server-side `Drops` table and hands the WHOLE thing --
 -- including every drop's full item list -- to any client that asks for it.
 -- Inventory contents are session-gated here, so this returns positional
--- metadata only; the coordinates are already broadcast to everyone by
--- dropCreate, so nothing new is disclosed.
+-- metadata only, filtered to the caller's routing bucket.
 --
 -- Two further divergences, both consequences of drops being server-resolved in
 -- this resource (see client/compat.lua's setupDropTarget note): the map is keyed
@@ -117,11 +116,11 @@ local bridgeDrops = {}
 -- does not exist, which is still the intended outcome here: a legacy client
 -- rendering its own duplicate bag on top of ours is worse than it rendering
 -- none, and either way the drop opens by id.
-QB.callback.register('qb-inventory:server:GetCurrentDrops', function()
+QB.callback.register('qb-inventory:server:GetCurrentDrops', function(src)
     local drops = {}
     for id, createdTime in pairs(bridgeDrops) do
         local _, inventory = internal.resolveInventory(internal.key('drop', id), 'drop')
-        if inventory then
+        if inventory and internal.sameDropBucket(src, inventory) then
             drops[id] = {
                 name = 'drop-' .. id,
                 label = inventory.label or 'Drop',
@@ -131,7 +130,7 @@ QB.callback.register('qb-inventory:server:GetCurrentDrops', function()
                 maxweight = inventory.maxWeight,
                 slots = inventory.slots,
             }
-        else
+        elseif not inventory then
             bridgeDrops[id] = nil
         end
     end
@@ -189,7 +188,7 @@ QB.callback.register('qb-inventory:server:createDrop', function(src, item)
             if not api.RemoveItem(src, owned.name, amount, slot, 'dropped item') then
                 return reject(src, 'could not drop item')
             end
-            local id = api.dropCreate(coords, { [1] = dropped })
+            local id = api.dropCreate(coords, { [1] = dropped }, GetPlayerRoutingBucket(src))
             bridgeDrops[tostring(id)] = os.time()
             -- Upstream returns the bag prop's NETWORK id and its client appends
             -- 'drop-'. qbinventory's bag (client/drops.lua) is local to each

@@ -9,6 +9,7 @@ local resourceName = GetCurrentResourceName()
 
 local inventories = {}
 local sessions = {}
+local dropViewers = {}
 local hooks = {}
 local audit = {}
 local locks = {}
@@ -208,7 +209,7 @@ end
 
 -- Inventory registry and access --------------------------------------------
 
-local secondaryOptionFields = { 'label', 'coords', 'distance', 'groups', 'owner', 'prices', 'currency' }
+local secondaryOptionFields = { 'label', 'coords', 'distance', 'bucket', 'groups', 'owner', 'prices', 'currency' }
 
 local function applySecondaryOptions(inv, opts, supplied)
     for _, field in ipairs(secondaryOptionFields) do
@@ -277,6 +278,7 @@ local function secondary(kind, id, opts)
         revision = 0,
         coords = opts.coords,
         distance = tonumber(opts.distance) or config.interactionDistance,
+        bucket = opts.bucket,
         groups = opts.groups,
         owner = opts.owner,
         temporary = opts.temporary == true,
@@ -383,6 +385,12 @@ local function sameBucket(src, target)
     return not config.requireSameBucket or GetPlayerRoutingBucket(src) == GetPlayerRoutingBucket(target)
 end
 
+local function sameDropBucket(src, inv)
+    if not inv then return false end
+    return inv.type ~= 'drop' or not config.requireSameBucket or inv.bucket == nil
+        or inv.bucket == GetPlayerRoutingBucket(src)
+end
+
 local function mayInspectPlayer(src, target)
     local policy = config.playerInspection or {}
     local allowed = false
@@ -431,6 +439,9 @@ local function canAccess(src, inv, opts)
     end
     if inv.type == 'confiscation' then
         return false, 'access denied'
+    end
+    if not sameDropBucket(src, inv) then
+        return false, 'different routing bucket'
     end
     if inv.type == 'player' then
         if inv.source == src then
@@ -563,7 +574,8 @@ end
 local function broadcast(inventoryKey)
     local update = patchView(inventoryKey)
     for src, session in pairs(sessions) do
-        if session.primary == inventoryKey or session.secondary == inventoryKey then
+        if (session.primary == inventoryKey or session.secondary == inventoryKey)
+            and sameDropBucket(src, getInventory(inventoryKey)) then
             TriggerClientEvent('qbinventory:client:sessionPatched', src, session.token, update)
             -- Legacy qb-inventory dependants listen for this to re-read their
             -- own PlayerData after a change. qbinventory's own client bridge
@@ -1432,7 +1444,7 @@ local function intentDrop(src, request)
             return false, removedErr
         end
         removed.slot = 1
-        local id = dropCreate(GetEntityCoords(ped), { [1] = removed })
+        local id = dropCreate(GetEntityCoords(ped), { [1] = removed }, GetPlayerRoutingBucket(src))
         bump(session.primary)
         broadcast(session.primary)
         recordAudit('drop', src, { id = id, item = removed.name, amount = amount })
@@ -2266,45 +2278,61 @@ local function stashOpen(src, identifier, opts)
 end
 ---@param coords vector3|table
 ---@param items table<integer, table>
+---@param bucket integer|nil Trusted bucket; omitted retains global server-created drops.
 ---@return integer id
-dropCreate = function(coords, items)
+dropCreate = function(coords, items, bucket)
+    bucket = bucket or nil
     local id = nextDropId
     nextDropId = nextDropId + 1
     local inv = secondary('drop', id, {
         label = 'Ground drop',
         coords = coords,
+        bucket = bucket,
         distance = config.dropDistance,
         slots = config.defaultSlots,
         items = items,
         temporary = true,
     })
-    TriggerClientEvent('qbinventory:client:dropCreated', -1, id, coords)
+    if bucket == nil or not config.requireSameBucket then
+        TriggerClientEvent('qbinventory:client:dropCreated', -1, id, coords)
+    else
+        for _, player in ipairs(GetPlayers()) do
+            local src = tonumber(player)
+            if sameDropBucket(src, inv) then
+                dropViewers[src] = dropViewers[src] or bucket
+                TriggerClientEvent('qbinventory:client:dropCreated', src, id, coords)
+            end
+        end
+    end
     return id
 end
 
----Every live ground drop, as { { id, coords }, ... }.
+---Live ground drops in the caller's bucket, as { { id, coords }, ... }.
 ---
 ---Exists so client/drops.lua can render the props for drops that already
 ---existed when a player connected -- `dropCreated` is a one-shot broadcast, so
 ---without this a bag is visible only to whoever was online when it landed.
 ---
----Deliberately IDs and coordinates only, never contents: the position of a
----dropped bag is already broadcast to every client the moment it is created,
----but what is inside one is not, and must stay a server-side question answered
----by `open`'s own access and distance checks.
+---IDs and coordinates only; contents remain behind open's access checks.
 ---@return table[]
-local function dropList()
+local function dropList(src)
     local out = {}
     for _, inv in pairs(inventories) do
-        if inv.type == 'drop' and inv.coords then
+        if inv.type == 'drop' and inv.coords and sameDropBucket(src, inv) then
             out[#out + 1] = { id = inv.id, coords = inv.coords }
         end
     end
     return out
 end
 
-QB.callback.register('qbinventory:server:drops', function(_src)
-    return dropList()
+QB.callback.register('qbinventory:server:drops', function(src)
+    local bucket = GetPlayerRoutingBucket(src)
+    local list = dropList(src)
+    if dropViewers[src] ~= nil and dropViewers[src] ~= bucket then
+        TriggerClientEvent('qbinventory:client:dropsUpdated', src, list)
+    end
+    dropViewers[src] = bucket
+    return list
 end)
 ---@param src integer
 ---@param id integer|string
@@ -2865,6 +2893,7 @@ inventory.internal = {
     openSelf = openSelf,
     close = close,
     canAccess = canAccess,
+    sameDropBucket = sameDropBucket,
     hasUseable = hasUseable,
     setBuiltInUseable = setBuiltInUseable,
     registerInspectionAccess = registerInspectionAccess,
@@ -3128,6 +3157,7 @@ AddEventHandler('qbcore:server:inventoryChanged', function(src)
 end)
 
 AddEventHandler('playerDropped', function()
+    dropViewers[source] = nil
     close(source, 'disconnected')
 end)
 AddEventHandler('onResourceStop', function(name)
@@ -3181,6 +3211,19 @@ CreateThread(function()
         for src, session in pairs(sessions) do
             if now() > session.expires then
                 close(src, 'expired')
+            elseif session.secondary then
+                local inv = getInventory(session.secondary)
+                if inv and not sameDropBucket(src, inv) then
+                    close(src, 'different routing bucket')
+                end
+            end
+        end
+        -- Reuse cleanup to refresh local bags when another resource changes a bucket.
+        for src, bucket in pairs(dropViewers) do
+            local current = GetPlayerRoutingBucket(src)
+            if current ~= bucket then
+                dropViewers[src] = current
+                TriggerClientEvent('qbinventory:client:dropsUpdated', src, dropList(src))
             end
         end
     end

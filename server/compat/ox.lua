@@ -932,6 +932,7 @@ local function createDrop(prefix, items, coords, slots, maxWeight, instance, mod
         maxWeight = maxWeight,
         temporary = true,
         instance = instance,
+        bucket = instance or nil,
         model = model,
     })
 end
@@ -977,7 +978,7 @@ function ox.CreateDropFromPlayer(playerId)
         if not currentKey or not current or not next(current.items or {}) then
             return false
         end
-        local drop = createDrop('Drop', copy(current.items), nil, current.slots, current.maxWeight)
+        local drop = createDrop('Drop', copy(current.items), nil, current.slots, current.maxWeight, GetPlayerRoutingBucket(playerId))
         if not drop then
             return false
         end
