@@ -405,6 +405,9 @@ local function canAccess(src, inv, opts)
     if not inv then
         return false, 'inventory not found'
     end
+    if inv.type == 'confiscation' then
+        return false, 'access denied'
+    end
     if inv.type == 'player' then
         if inv.source == src then
             return true
