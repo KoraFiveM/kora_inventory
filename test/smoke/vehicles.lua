@@ -4,7 +4,7 @@ Config = { qbinventory = {} }
 dofile('config.lua')
 dofile('shared.lua')
 
-QB = { vehicle = {}, world = {} }
+QB = { vehicle = {}, world = {}, lookup = {} }
 function QB.vehicle.normalizePlate(value, options)
     if type(value) ~= 'string' then return nil, 'invalid_type' end
     local plate = value:match('^%s*(.-)%s*$'):upper():gsub('%s+', ' ')
@@ -45,7 +45,9 @@ GetEntityCoords = function(entity)
     return entities[entity] and entities[entity].coords
 end
 GetVehicleNumberPlateText = function(entity) return entities[entity].plate end
-GetVehicleClass = function(entity) return entities[entity].class end
+GetVehicleClass = nil
+GetEntityModel = function(entity) return entity end
+QB.lookup.vehicle = function(model) return { metadata = { class = entities[model].class } } end
 
 local V = dofile('server/vehicles.lua')
 H.equal(V.normalisePlate('  ab   12  '), 'AB 12', 'plate whitespace is canonical')
@@ -57,7 +59,16 @@ H.equal(assert(V.capacity('trunk', 0)).slots, 30, 'configured class capacity is 
 H.equal(V.capacity('trunk', 8), nil, 'motorcycle trunk is disabled')
 local vehicle = assert(V.validate(7, 'trunk', 101))
 H.equal(vehicle.plate, 'AB 12', 'native plate is resolved server-side')
-H.equal(vehicle.class, 0, 'native class is resolved server-side')
+H.equal(vehicle.class, 0, 'class comes from server model metadata')
+entities[101].class = 'compact'
+H.equal(assert(V.validate(7, 'trunk', 101)).class, 0, 'streamed class names are supported')
+entities[101].class = 'sports'
+H.equal(assert(V.validate(7, 'trunk', 101)).class, 6, 'documented lookup class overrides are supported')
+entities[101].class = 'MOTORCYCLE'
+H.equal(V.validate(7, 'trunk', 101), nil, 'model class still enforces disabled storage')
+entities[101].class = 'unknown'
+H.equal(V.validate(7, 'trunk', 101), nil, 'unknown model classes cannot bypass capacity policy')
+entities[101].class = 0
 H.equal(V.validate(7, 'trunk', 102), nil, 'non-vehicle entity is rejected')
 entities[101].bucket = 2
 H.equal(V.validate(7, 'trunk', 101), nil, 'routing bucket is enforced')

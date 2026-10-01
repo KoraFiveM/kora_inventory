@@ -193,6 +193,15 @@ H.equal(carry.equippedWeapon(7), nil, 'a confirmation for a different slot is re
 netEvents['qbinventory:server:weaponToggled'](9)
 H.equal(carry.equippedWeapon(7).name, 'weapon_bat', 'the confirmed draw equips that weapon')
 H.equal(carry.equippedWeapon(7).slot, 9, 'the confirmed slot is recorded')
+cfg.components.test_suppressor = 'COMPONENT_AT_PI_SUPP'
+playersItems[7][9].info.components = { 'test_suppressor', 'unmapped_component' }
+local equippedSnapshot = registered.GetEquippedWeapon(7)
+H.equal(#equippedSnapshot.components, 1, 'equipped components use the trusted component mapping')
+H.equal(equippedSnapshot.components[1], 'COMPONENT_AT_PI_SUPP', 'server inventory metadata supplies the component')
+equippedSnapshot.components[1] = 'changed'
+H.equal(registered.GetEquippedWeapon(7).components[1], 'COMPONENT_AT_PI_SUPP', 'equipped components are returned as a copy')
+playersItems[7][9].info.components = {}
+cfg.components.test_suppressor = nil
 
 netEvents['qbinventory:server:weaponAmmoConsumed'](9, 3)
 H.equal(QbInventory.weapons.getState(7, 9).ammo, 3, 'a shot report lowers durable ammo for the equipped weapon')

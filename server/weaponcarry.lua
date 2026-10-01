@@ -502,9 +502,16 @@ inventory.weaponCarry = {
     damageSettings = damageSettings,
     stateKey = STATE_KEY,
     ---@param src integer
-    ---@return table|nil  -- { slot, name } or nil when empty-handed
+    ---@return table|nil  -- { slot, name, components? } or nil when empty-handed
     equippedWeapon = function(src)
-        return equipped[src] and internal.copy(equipped[src]) or nil
+        local holding = equipped[src]
+        if not holding then return nil end
+        local result = internal.copy(holding)
+        local item = inventory.api.getItemBySlot(src, holding.slot)
+        if item and item.name == holding.name then
+            result.components = renderableComponents(item.info or item.metadata)
+        end
+        return result
     end,
 }
 

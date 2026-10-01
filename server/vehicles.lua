@@ -9,6 +9,14 @@ inventory.vehicles = vehicles
 
 local vehicleConfig = (Config.qbinventory and Config.qbinventory.vehicles) or {}
 local accessHooks, nextHookId = {}, 1
+-- Lookup metadata uses GTA's vehicleClass names (including streamed addons).
+local vehicleClasses = {
+    COMPACT = 0, SEDAN = 1, SUV = 2, COUPE = 3, MUSCLE = 4,
+    SPORT_CLASSIC = 5, SPORT = 6, SPORTS = 6, SUPER = 7, MOTORCYCLE = 8,
+    OFF_ROAD = 9, INDUSTRIAL = 10, UTILITY = 11, VAN = 12, CYCLE = 13,
+    BOAT = 14, HELICOPTER = 15, PLANE = 16, SERVICE = 17, EMERGENCY = 18,
+    MILITARY = 19, COMMERCIAL = 20, RAIL = 21, OPEN_WHEEL = 22,
+}
 
 local function asInteger(value)
     local number = tonumber(value)
@@ -202,7 +210,7 @@ function vehicles.validate(src, kind, networkId, expectedPlate)
     if not separation then
         return nil, 'vehicle coordinates unavailable'
     end
-    if type(GetVehicleNumberPlateText) ~= 'function' or type(GetVehicleClass) ~= 'function' then
+    if type(GetVehicleNumberPlateText) ~= 'function' or type(GetEntityModel) ~= 'function' then
         return nil, 'vehicle details unavailable'
     end
     local plate, plateErr = vehicles.normalisePlate(GetVehicleNumberPlateText(entity))
@@ -212,7 +220,10 @@ function vehicles.validate(src, kind, networkId, expectedPlate)
     if expectedPlate and plate ~= expectedPlate then
         return nil, 'vehicle changed'
     end
-    local class = asInteger(GetVehicleClass(entity))
+    local record = QB.lookup.vehicle(GetEntityModel(entity))
+    local metadataClass = record and record.metadata and record.metadata.class
+    local class = asInteger(metadataClass)
+        or (type(metadataClass) == 'string' and vehicleClasses[metadataClass:upper()] or nil)
     local capacity, capacityErr = vehicles.capacity(kind, class)
     if not capacity then
         return nil, capacityErr

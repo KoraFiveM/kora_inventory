@@ -258,7 +258,7 @@ and only components listed in `Config.qbinventory.weapons.components`.
 ### Visible weapon carry
 ```lua
 exports.qbinventory:GetCarriedWeapons(src)  -- read-only, server-built
-exports.qbinventory:GetEquippedWeapon(src)  -- { slot, name } or nil
+exports.qbinventory:GetEquippedWeapon(src)  -- { slot, name, components? } or nil; mapped components from server-owned item metadata
 ```
 `Config.qbinventory.weaponCarry` renders weapons a player owns but is not
 holding onto their body, and makes equipping one a timed, animated draw.
