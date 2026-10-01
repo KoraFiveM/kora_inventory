@@ -220,4 +220,60 @@ do
     restored = assert(f.persistence.load('drop', 'scoped'))
     H.equal(restored.bucket, nil, 'historical unscoped records retain their behavior')
 end
+-- A successful delete clears only its captured snapshot; failures keep it queued.
+do
+    local f = setup()
+    assert(f.persistence.markDirty(record('stash', 'deleted', 1, 4)))
+    H.equal(f.persistence.delete('stash', 'deleted'), true, 'ordinary delete succeeds')
+    H.equal(f.persistence.flush(), true, 'deleted snapshot is no longer queued')
+    H.equal(#f.calls, 1, 'ordinary deletion is not followed by an obsolete save')
+    assert(f.persistence.markDirty(record('stash', 'failed-delete', 2, 3)))
+    f.fail = 'execute'
+    local ok, err = f.persistence.delete('stash', 'failed-delete')
+    H.equal(ok, nil, 'delete preserves the actual SQL nil-error contract')
+    H.equal(err, 'controlled SQL failure', 'delete forwards the SQL error')
+    H.equal(f.persistence.flush(), true, 'failed deletion leaves its snapshot available')
+    assertWrite(f.calls[3], 'failed-delete', 2, 3)
+end
+
+-- A trusted same-key recreation can occur after SQL deletes the old row but
+-- before its callback resumes RemoveInventory. Test both queued and saved originals.
+for _, savedFirst in ipairs({ false, true }) do
+    local f = setup()
+    local env, registered = f.env, {}
+    env.QB.resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end }
+    env.QB.callback = { register = function() end }
+    env.RegisterNetEvent = function() end
+    local providers = env.exports
+    -- Capture the native export registrar only during module loading; SQL has
+    -- already captured its real local consumer driver and does not use this.
+    env.exports = function(name, fn) registered[name] = fn end
+    assert(loadfile('server.lua', 't', env))()
+    assert(loadfile('server/compat/qb.lua', 't', env))()
+    env.exports = providers
+    -- Controlled durable-row absence after DELETE's effect, before its response.
+    providers.qbsql.query = function(_, _, _, callback) callback({}) end
+    local internal, api = env.QbInventory.internal, env.QbInventory.compat.qb
+    H.equal(api.CreateInventory('recreated', { items = record('stash', 'recreated', 0, 2).items }), nil,
+        'legacy creation keeps its no-value return')
+    if savedFirst then H.equal(f.persistence.flush(), true, 'old inventory can already be saved') end
+    local before = #f.calls
+    f.hold = 'execute'
+    local thread = coroutine.create(function() return api.RemoveInventory('recreated') end)
+    local ok, wait = coroutine.resume(thread)
+    assert(ok, wait)
+    H.equal(coroutine.status(thread), 'suspended', 'real consumer awaits delete response')
+    H.ok(f.pending.statement:find('DELETE FROM', 1, true), 'held write is the actual DELETE')
+    H.equal(internal.getInventory('stash:recreated'), nil, 'old live record was evicted')
+    api.CreateInventory('recreated', { items = record('stash', 'recreated', 0, 7).items })
+    local replacement = assert(internal.getInventory('stash:recreated'))
+    H.equal(replacement.items[1].amount, 7, 'trusted recreation is live before old delete returns')
+    H.equal(f.complete(thread, { affectedRows = 1 }), true, 'RemoveInventory keeps its success return')
+    H.equal(internal.getInventory('stash:recreated'), replacement, 'old completion preserves live replacement')
+    H.equal(f.persistence.flush(), true, 'recreated snapshot flushes')
+    H.equal(#f.calls, before + 2, 'old delete completion must not discard the replacement save')
+    assertWrite(f.calls[#f.calls], 'recreated', 0, 7)
+    H.equal(f.persistence.flush(), true, 'replacement is cleared after its own save')
+    H.equal(#f.calls, before + 2, 'replacement is not saved twice')
+end
 H.finish()

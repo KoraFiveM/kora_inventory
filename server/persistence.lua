@@ -267,6 +267,8 @@ function persistence.delete(kind, id)
         return false, state.lastError or 'persistence is not ready'
     end
     local cleanKind, cleanId = cleanType(kind), tostring(id)
+    local inventoryKey = ('%s:%s'):format(cleanKind, cleanId)
+    local snapshot = dirty[inventoryKey]
     local ok, err = db(
         'DELETE FROM `qbinventory_inventories` WHERE `inventory_type` = ? AND `inventory_id` = ?',
         { cleanKind, cleanId }
@@ -274,7 +276,10 @@ function persistence.delete(kind, id)
     if not ok then
         return ok, err
     end
-    dirty[('%s:%s'):format(cleanKind, cleanId)] = nil
+    -- A recreation may have replaced this snapshot while SQL was pending.
+    if dirty[inventoryKey] == snapshot then
+        dirty[inventoryKey] = nil
+    end
     if cleanKind == 'shop' then
         return db('DELETE FROM `qbinventory_shop_stock` WHERE `shop_id` = ?', { cleanId })
     end
