@@ -1,7 +1,6 @@
 local H = dofile('test/harness.lua')
 
 local registered = {}
-exports = function(name, fn) registered[name] = fn end
 AddEventHandler = function() end
 GetCurrentResourceName = function() return 'qbinventory' end
 GetInvokingResource = function() return 'crafting-test' end
@@ -43,6 +42,15 @@ local function copy(value)
     for key, nested in pairs(value) do out[key] = copy(nested) end
     return out
 end
+exports = setmetatable({ qbcore = {
+    getPlayerData = function(_, src, path)
+        local player = state['player:' .. src]
+        if not player then return nil end
+        if path[1] == 'citizenid' then return 'CID' .. src end
+        if path[2] then return copy(player.items[path[2]]) end
+        return copy(player.items)
+    end,
+} }, { __call = function(_, name, fn) registered[name] = fn end })
 local function totalWeight(items)
     local total = 0
     for _, item in pairs(items or {}) do total = total + (item.weight or 0) * (item.amount or 0) end
@@ -79,6 +87,11 @@ I.resolveInventory = function(key) return key, state[key] end
 I.totalWeight = totalWeight
 I.lock = function(_, fn) return fn() end
 I.setInventoryItems = function(key, items) state[key].items = copy(items); return true end
+I.setPlayerItemInfo = function(src, slot, info)
+    local item = state[I.playerKey(src)].items[slot]
+    item.info, item.metadata = copy(info), copy(info)
+    return true
+end
 
 local module = dofile('server/crafting.lua')
 local crafting, weapons = module.crafting, module.weapons

@@ -83,7 +83,11 @@ exports = setmetatable({}, {
                         end
                         if exportName == 'getPlayerData' then
                             local src, fields = ...
-                            if fields and fields[1] == 'items' then return playersItems[src] end
+                            if fields and fields[1] == 'items' then
+                                if fields[2] then return playersItems[src] and playersItems[src][fields[2]] end
+                                return playersItems[src]
+                            end
+                            if fields then return playersData[src] and playersData[src][fields[1]] end
                             return playersData[src]
                         end
                         if exportName == 'setPath' then

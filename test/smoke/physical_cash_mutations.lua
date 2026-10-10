@@ -49,7 +49,12 @@ exports = setmetatable({}, {
                         end
                         return definitions[field]
                     end
-                    if name == 'getPlayerData' then return field and data[source].items or data[source] end
+                    if name == 'getPlayerData' then
+                        local player = data[source]
+                        if not player or not field then return player end
+                        if field[1] == 'items' and field[2] then return player.items[field[2]] end
+                        return player[field[1]]
+                    end
                     if name == 'setPath' then
                         writes = writes + 1
                         if field[2] then data[source].items[field[2]] = value else data[source].items = value end

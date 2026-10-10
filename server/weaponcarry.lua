@@ -448,14 +448,19 @@ end)
 -- for qbinventory's own transfers as well as another resource's AddItem, so
 -- one handler covers picking a rifle up, dropping it, and moving it in or out
 -- of the hotbar range.
-AddEventHandler('qbcore:server:inventoryChanged', function(src)
+AddEventHandler('qbcore:server:inventoryChanged', function(src, path, value)
     if not enabled() then
         return
     end
     local holding = equipped[src]
     if holding then
+        -- Metadata on the held weapon cannot change the list worn on the body.
+        if type(path) == 'table' and #path == 2 and path[1] == 'items' and path[2] == holding.slot
+            and type(value) == 'table' and value.name == holding.name then
+            return
+        end
         -- The held weapon may have just been moved, dropped or given away.
-        local owned = inventory.api.getItemBySlot(src, holding.slot)
+        local owned = exports.qbcore:getPlayerData(src, { 'items', holding.slot })
         if not owned or owned.name ~= holding.name then
             equipped[src] = nil
         end

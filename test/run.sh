@@ -27,6 +27,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/use_item.lua
 "${LUA:-lua}" test/smoke/hotbar.lua
 "${LUA:-lua}" test/smoke/weapon_carry.lua
+"${LUA:-lua}" test/smoke/weapon_shooting_performance.lua
 "${LUA:-lua}" test/smoke/weapon_damage_client.lua
 "${LUA:-lua}" test/smoke/ox_client.lua
 "${LUA:-lua}" test/smoke/ox_adapter.lua

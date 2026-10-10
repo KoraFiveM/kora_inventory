@@ -605,11 +605,10 @@ local function replaceWeaponState(src, slot, mutate)
     end
     local primary = internal.playerKey(src)
     return internal.lock({ primary }, function()
-        local key, inventory = internal.resolveInventory(primary)
-        if key ~= primary or not inventory then
+        local item = exports.qbcore:getPlayerData(src, { 'items', slot })
+        if not item and not exports.qbcore:getPlayerData(src, { 'citizenid' }) then
             return false, 'player inventory not found'
         end
-        local item = inventory.items[slot]
         if not item or not weapons.isWeapon(item) then
             return false, 'weapon not found'
         end
@@ -622,9 +621,7 @@ local function replaceWeaponState(src, slot, mutate)
         if not prepared then
             return false, prepareErr
         end
-        local planned = copy(inventory.items)
-        planned[slot].info, planned[slot].metadata = prepared, copy(prepared)
-        local committed, commitErr = internal.setInventoryItems(primary, planned)
+        local committed, commitErr = internal.setPlayerItemInfo(src, slot, prepared)
         if not committed then
             return false, commitErr
         end
@@ -685,8 +682,11 @@ function weapons.consumeDurability(src, slot, amount)
 end
 
 function weapons.getState(src, slot)
-    local _, inventory = internal.resolveInventory(internal.playerKey(tonumber(src)))
-    local item = inventory and inventory.items[tonumber(slot)] or nil
+    src, slot = tonumber(src), tonumber(slot)
+    if not src or not slot then
+        return nil
+    end
+    local item = exports.qbcore:getPlayerData(src, { 'items', slot })
     return item and weapons.isWeapon(item) and copy(item.info or item.metadata or {}) or nil
 end
 

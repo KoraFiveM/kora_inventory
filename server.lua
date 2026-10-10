@@ -572,10 +572,11 @@ local function patchView(inventoryKey)
 end
 
 local function broadcast(inventoryKey)
-    local update = patchView(inventoryKey)
+    local update
     for src, session in pairs(sessions) do
         if (session.primary == inventoryKey or session.secondary == inventoryKey)
             and sameDropBucket(src, getInventory(inventoryKey)) then
+            update = update or patchView(inventoryKey)
             TriggerClientEvent('qbinventory:client:sessionPatched', src, session.token, update)
             -- Legacy qb-inventory dependants listen for this to re-read their
             -- own PlayerData after a change. qbinventory's own client bridge
@@ -2021,6 +2022,52 @@ local function clearInventory(src, keep)
         return true
     end)
 end
+
+-- Weapon state writes rebuild only their slot instead of every inventory item.
+local function setPlayerItemInfo(src, slot, info)
+    src, slot = tonumber(src), tonumber(slot)
+    if not src or src < 1 or src % 1 ~= 0 or not slot or slot < 1 or slot % 1 ~= 0 or slot > config.playerSlots then
+        return false, 'invalid item slot'
+    end
+    if type(info) ~= 'table' then
+        return false, 'invalid item metadata'
+    end
+    return lock({ playerKey(src) }, function()
+        local item = exports.qbcore:getPlayerData(src, { 'items', slot })
+        if type(item) ~= 'table' or not itemDef(item.name) or not inventory.amount(item.amount, 1) then
+            return false, 'invalid item table'
+        end
+        local updated, err = buildItem(item.name, inventory.amount(item.amount, 1), slot, info)
+        if not updated then
+            return false, err
+        end
+        copyItemExtensions(updated, item)
+        local items = playerItems(src)
+        items[slot] = updated
+        if inventory.totalWeight(items) > config.playerMaxWeight then
+            return false, 'over weight'
+        end
+        if cashItemsActive then
+            local policy = cashPolicy()
+            if not policy then
+                return false, 'physical cash cannot be changed by an inventory replacement'
+            end
+            local previousCash = item.name:lower() == policy.item and (tonumber(item.amount) or 0) or 0
+            local updatedCash = updated.name:lower() == policy.item and updated.amount or 0
+            if previousCash ~= updatedCash then
+                return false, 'physical cash cannot be changed by an inventory replacement'
+            end
+        end
+        local ok, err = playerSetPath(src, { 'items', slot }, updated)
+        if not ok then
+            return false, err
+        end
+        bump(playerKey(src))
+        broadcast(playerKey(src))
+        return true
+    end)
+end
+
 ---@param src integer
 ---@param newItems table<integer, table>
 ---@return boolean replaced
@@ -2883,6 +2930,7 @@ inventory.internal = {
     resolveInventory = resolveInventoryRef,
     createSecondary = secondary,
     setInventoryItems = setInventoryItems,
+    setPlayerItemInfo = setPlayerItemInfo,
     removeSecondary = removeSecondaryInventory,
     rekeySecondary = rekeySecondary,
     canAdd = canAddToInventory,
