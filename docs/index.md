@@ -251,9 +251,17 @@ exports.qbinventory:SetWeaponState(...)
 exports.qbinventory:ConsumeWeaponDurability(...)
 exports.qbinventory:SetWeaponAmmo(...)
 exports.qbinventory:SetWeaponComponents(...)
+exports.qbinventory:FireWeaponRound(src, slot) -- consumes ammo only; returns true, round
 ```
 New weapon metadata gets a server-generated serial, bounded durability/ammo,
 and only components listed in `Config.qbinventory.weapons.components`.
+
+Native shot reports use `Config.qbinventory.weapons.ballistics.shotCooldown`
+on both client and server. Each accepted shot consumes one server-owned round
+and its configured wear in one weapon-slot commit, followed by one final
+`qbinventory:server:weaponStateChanged` and one
+`qbinventory:server:weaponRoundFired` notification. Ammo and durability remain
+authoritative immediately; `FireWeaponRound` retains its ammo-only contract.
 
 ### Visible weapon carry
 ```lua

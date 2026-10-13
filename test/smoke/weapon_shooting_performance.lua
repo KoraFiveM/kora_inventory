@@ -57,6 +57,7 @@ items[1] = internal.buildItem('weapon_pistol', 1, 1, assert(inventory.weapons.pr
     ammo = 4, durability = 100, serial = 'SHOOTING-PISTOL',
 })))
 items[1].integrationData = { owner = 'another-resource' }
+local initialRounds = Core.util.deepClone(items[1].info.loadedBullets)
 items[2] = internal.buildItem('weapon_carbinerifle', 1, 2, { ammo = 0, serial = 'CARRIED-RIFLE' })
 items[20] = internal.buildItem('cash', 100, 20, { origin = 'existing-cash' })
 H.ok(Core.player.setPath(1, { 'items' }, items))
@@ -96,26 +97,26 @@ local function events(name)
     end
     return out
 end
-local function assertShot(ammo, durability)
-    H.equal(#writes, 2, 'the existing ammo and durability mutations remain separate')
+local function assertShot(ammo, durability, roundId)
+    H.equal(#writes, 1, 'native ammo and durability changes share one mutation')
     for _, write in ipairs(writes) do
         H.equal(#write.path, 2, 'each mutation replaces one slot, not all items')
         H.equal(write.path[1], 'items')
         H.equal(write.path[2], 1)
         H.equal(write.value.info.ammo, ammo)
     end
-    H.ok(math.abs(writes[1].value.info.durability - durability - 0.1) < 0.000001)
-    H.ok(math.abs(writes[2].value.info.durability - durability) < 0.000001)
-    H.equal(#changes, 2, 'observers retain both committed changes')
+    H.ok(math.abs(writes[1].value.info.durability - durability) < 0.000001)
+    H.ok(math.abs(writes[1].value.info.quality - durability) < 0.000001)
+    H.equal(#changes, 1, 'observers receive the complete shot state once')
     H.equal(changes[1].ammo, ammo)
-    H.ok(math.abs(changes[1].durability - durability - 0.1) < 0.000001)
-    H.ok(math.abs(changes[2].durability - durability) < 0.000001)
+    H.ok(math.abs(changes[1].durability - durability) < 0.000001)
     H.equal(#rounds, 1)
     H.equal(rounds[1].weaponSerial, 'SHOOTING-PISTOL')
-    H.equal(#states, 2, 'the public state-change event retains both payloads')
+    H.equal(rounds[1].id, roundId, 'shots consume traceable rounds in FIFO order')
+    H.equal(#states, 1, 'the public state-change event carries the final shot state')
     H.equal(states[1].ammo, ammo)
-    H.ok(math.abs(states[1].durability - durability - 0.1) < 0.000001)
-    H.ok(math.abs(states[2].durability - durability) < 0.000001)
+    H.ok(math.abs(states[1].durability - durability) < 0.000001)
+    H.equal(#changes + #states + #rounds, 3, 'one native shot emits three local server events')
     H.ok(player._dirty.inventory, 'weapon metadata remains dirty for persistence')
     local batches = events('qbcore:rep:delta')
     H.equal(#batches, 1)
@@ -149,7 +150,7 @@ clock = clock + 100
 mock.fireEvent('qbinventory:server:weaponFired', 1)
 mock.drainTimeouts()
 debug.sethook()
-assertShot(3, 99.9)
+assertShot(3, 99.9, initialRounds[1].id)
 H.equal(viewCalls, 0, 'shooting does not build a view when no inventory is open')
 H.equal(#events('qbinventory:client:sessionPatched'), 0)
 H.equal(#events('qb-inventory:client:updateInventory'), 0)
@@ -161,6 +162,8 @@ mock.drainTimeouts()
 H.equal(#writes, 0, 'cooldown replays and unknown players do not mutate items')
 H.equal(#rounds, 0)
 H.equal(#events('qbcore:rep:delta'), 0)
+H.ok(math.abs(player.PlayerData.items[1].info.durability - 99.9) < 0.000001,
+    'rejected cooldown reports do not apply wear')
 
 H.ok(inventory.api.OpenInventory(1))
 mock.drainTimeouts()
@@ -169,18 +172,19 @@ reset()
 clock = clock + 100
 mock.fireEvent('qbinventory:server:weaponFired', 1)
 mock.drainTimeouts()
-assertShot(2, 99.8)
-H.equal(internal.getRevision('player:1'), revision + 2, 'both existing commits advance the open session')
+assertShot(2, 99.8, initialRounds[2].id)
+H.equal(internal.getRevision('player:1'), revision + 1, 'the combined shot advances the open session once')
 local patches = events('qbinventory:client:sessionPatched')
-H.equal(#patches, 2)
+H.equal(#patches, 1)
 H.equal(patches[1].args[2].revision, revision + 1)
-H.equal(patches[2].args[2].revision, revision + 2)
-H.equal(patches[2].args[2].inventory.items[1].info.ammo, 2)
-H.ok(math.abs(patches[2].args[2].inventory.items[1].info.durability - 99.8) < 0.000001)
-H.equal(#events('qb-inventory:client:updateInventory'), 2, 'existing open-view refresh events remain')
+H.equal(patches[1].args[2].inventory.items[1].info.ammo, 2)
+H.ok(math.abs(patches[1].args[2].inventory.items[1].info.durability - 99.8) < 0.000001)
+H.equal(#events('qb-inventory:client:updateInventory'), 1, 'open viewers receive one complete refresh')
 internal.close(1, 'test')
 
-H.ok(inventoryExports.FireWeaponRound(1, 1, 500), 'the public round export remains supported')
+local publicFired, publicRound = inventoryExports.FireWeaponRound(1, 1, 500)
+H.ok(publicFired, 'the public round export remains supported')
+H.equal(publicRound.id, initialRounds[3].id, 'the public round export preserves FIFO consumption')
 H.equal(player.PlayerData.items[1].info.ammo, 1)
 H.ok(math.abs(player.PlayerData.items[1].info.durability - 99.8) < 0.000001,
     'public fireRound retains its ammo-only contract, including ignored extra arguments')
@@ -201,8 +205,12 @@ mock.drainTimeouts()
 H.equal(#writes, 0, 'legacy ammo increases and empty native shots cannot commit')
 H.equal(#rounds, 0)
 H.equal(player.PlayerData.items[20].amount, 100)
+H.ok(math.abs(player.PlayerData.items[1].info.durability - 99.7) < 0.000001,
+    'empty shots and rejected ammo increases do not apply wear')
 H.equal(inventoryExports.FireWeaponRound(999, 1), false, 'unknown players cannot fire a round')
 
+Config.qbinventory.weapons.ballistics.enabled = true
+H.ok(inventory.weapons.setAmmo(1, 1, 1))
 local heavy = Core.util.deepClone(otherItems[3])
 heavy.amount = Config.qbinventory.playerMaxWeight
 H.ok(Core.player.setPath(1, { 'items', 3 }, heavy))
@@ -212,9 +220,34 @@ local ok, reason = inventory.weapons.setAmmo(1, 1, 5)
 H.equal(ok, false, 'weapon metadata cannot bypass the inventory weight limit')
 H.equal(reason, 'over weight')
 H.equal(#writes, 0)
-H.equal(player.PlayerData.items[1].info.ammo, 0)
+H.equal(player.PlayerData.items[1].info.ammo, 1)
+local rejectedState = mocks.stableEncode(player.PlayerData.items[1].info)
+clock = clock + 100
+mock.fireEvent('qbinventory:server:weaponFired', 1)
+mock.drainTimeouts()
+H.equal(#writes, 0, 'an overweight native shot does not commit ammo or wear')
+H.equal(#changes + #states + #rounds, 0, 'failed shots emit no committed-state or evidence events')
+H.equal(mocks.stableEncode(player.PlayerData.items[1].info), rejectedState,
+    'failed shots retain their round records and durability')
 H.ok(Core.player.setPath(1, { 'items', 3 }, otherItems[3]))
 mock.drainTimeouts()
+
+local legacy = Core.player.getPlayerData(1, { 'items', 1 })
+legacy.info.durability, legacy.info.quality = nil, 80
+legacy.metadata = Core.util.deepClone(legacy.info)
+H.ok(Core.player.setPath(1, { 'items', 1 }, legacy))
+H.ok(internal.fireWeaponShot(1, 1, 0.1))
+H.ok(math.abs(player.PlayerData.items[1].info.durability - 79.9) < 0.000001,
+    'combined wear retains legacy quality-only durability')
+H.ok(inventory.weapons.setAmmo(1, 1, 1))
+legacy = Core.player.getPlayerData(1, { 'items', 1 })
+legacy.info.durability = 120
+legacy.metadata = Core.util.deepClone(legacy.info)
+H.ok(Core.player.setPath(1, { 'items', 1 }, legacy))
+H.ok(internal.fireWeaponShot(1, 1, 0.1))
+H.ok(math.abs(player.PlayerData.items[1].info.durability - 99.9) < 0.000001,
+    'combined wear clamps old durability before subtracting wear')
+
 local definitions = {}
 for _, registry in ipairs({ 'items', 'weapons' }) do
     definitions[registry] = Core.registry.getShared(registry, 'weapon_pistol')

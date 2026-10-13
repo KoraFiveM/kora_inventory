@@ -730,7 +730,7 @@ end
 ---Consume exactly one server-owned round.  It returns the round plus the
 ---weapon's opaque identifiers for the police evidence subsystem; callers
 ---must not expose the returned firearm serial to a client.
-function weapons.fireRound(src, slot)
+local function fireWeaponRound(src, slot, wear)
     local fired
     local ok, stateOrErr = replaceWeaponState(src, slot, function(info, item)
         local bullets = type(info.loadedBullets) == 'table' and copy(info.loadedBullets) or {}
@@ -741,6 +741,11 @@ function weapons.fireRound(src, slot)
         info.loadedBullets, info.ammo = bullets, #bullets
         fired.weapon = item.name
         fired.weaponSerial = info.serial
+        if wear and wear > 0 then
+            local durability = tonumber(info.durability) or tonumber(info.quality)
+                or tonumber(weaponConfig.defaultDurability) or 100
+            info.durability = math.max(0, math.min(100, durability) - wear)
+        end
         return true
     end)
     if not ok then
@@ -748,6 +753,13 @@ function weapons.fireRound(src, slot)
     end
     return true, fired
 end
+
+function weapons.fireRound(src, slot)
+    return fireWeaponRound(src, slot)
+end
+
+-- Native shots already write ammo; apply their wear in the same transaction.
+internal.fireWeaponShot = fireWeaponRound
 
 AddEventHandler('onResourceStop', function(name)
     for id, recipeOwner in pairs(recipeOwners) do

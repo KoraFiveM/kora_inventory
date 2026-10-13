@@ -217,7 +217,7 @@ Config.qbinventory = {
         ballistics = {
             enabled = true,
             maxLoadedRounds = 240, -- hard metadata cap; keep this close to the weapons used on your server
-            shotCooldown = 65, -- server-side floor between accepted native shot reports
+            shotCooldown = 65, -- client/server floor between native shot reports
             casingOffset = 0.75, -- metres behind/alongside the shooter for the recovered casing marker
         },
         -- Wear is applied by the SERVER for every accepted round fired.

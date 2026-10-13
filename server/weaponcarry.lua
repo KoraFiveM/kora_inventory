@@ -424,7 +424,7 @@ RegisterNetEvent('qbinventory:server:weaponFired', function()
     end
 
     local holding = equipped[src]
-    if not holding or not inventory.weapons or not inventory.weapons.fireRound then
+    if not holding or not internal.fireWeaponShot then
         return
     end
     local now = GetGameTimer()
@@ -432,15 +432,11 @@ RegisterNetEvent('qbinventory:server:weaponFired', function()
     if lastShotAt[src] and now - lastShotAt[src] < minGap then
         return
     end
-    local fired, round = inventory.weapons.fireRound(src, holding.slot)
+    local fired, round = internal.fireWeaponShot(src, holding.slot, shotWear(holding.name, 1))
     if not fired then
         return
     end
     lastShotAt[src] = now
-    local wear = shotWear(holding.name, 1)
-    if wear > 0 and inventory.weapons.consumeDurability then
-        inventory.weapons.consumeDurability(src, holding.slot, wear)
-    end
     TriggerEvent('qbinventory:server:weaponRoundFired', src, round)
 end)
 

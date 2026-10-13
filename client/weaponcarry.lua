@@ -28,6 +28,12 @@ local toggling = false
 local trainingWeapon
 local modifiedWeapon
 local criticalHitsDisabled = false
+local lastShotAt
+local lastShotPed
+
+local function resetShotCadence()
+    lastShotAt, lastShotPed = nil, nil
+end
 
 -- Damage tuning is applied as part of a confirmed inventory draw rather than
 -- in a polling loop. Reset it immediately when that weapon leaves the hand so
@@ -66,6 +72,7 @@ local function reportUnequipped()
     clearDamageSettings()
     drawn = nil
     drawnSlot = nil
+    resetShotCadence()
     TriggerServerEvent('qbinventory:server:weaponUnequipped')
 end
 
@@ -159,6 +166,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
     -- Re-read the ped: a respawn during a long concealed draw would have
     -- replaced the handle the bar started with.
     ped = QB.cache.ped()
+    resetShotCadence()
     if action == 'holster' then
         SetCurrentPedWeapon(ped, joaat('weapon_unarmed'), true)
         clearDamageSettings()
@@ -250,6 +258,7 @@ RegisterNetEvent('qbinventory:client:startTrainingWeapon', function(name, rounds
         return
     end
     local ped = QB.cache.ped()
+    resetShotCadence()
     trainingWeapon = joaat(name)
     GiveWeaponToPed(ped, trainingWeapon, math.max(0, math.floor(tonumber(rounds) or 0)), false, true)
     SetCurrentPedWeapon(ped, trainingWeapon, true)
@@ -266,6 +275,7 @@ RegisterNetEvent('qbinventory:client:stopTrainingWeapon', function()
     clearDamageSettings()
     RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
     trainingWeapon = nil
+    resetShotCadence()
 end)
 
 -- A drawn weapon can leave the player's hands without a holster: the weapon
@@ -279,6 +289,7 @@ end)
 QB.cache.onChange('isDead', function(isDead)
     if isDead then
         reportUnequipped()
+        resetShotCadence()
         if trainingWeapon then
             clearDamageSettings()
             RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
@@ -291,19 +302,25 @@ end)
 -- slot and its own equipped record, and refuses any report that would raise
 -- ammo, so this cannot turn the native client weapon count into an item-mint.
 AddEventHandler('CEventGunShot', function(_, eventEntity)
-    if eventEntity ~= QB.cache.ped() then
+    if not trainingWeapon and (not drawn or not drawnSlot) then
         return
     end
-    if trainingWeapon then
-        TriggerServerEvent('qbinventory:server:weaponFired')
+    local ped = PlayerPedId()
+    if eventEntity ~= ped then
         return
     end
-    if not drawn or not drawnSlot then
-        return
-    end
+    local ballistics = ((config.weapons or {}).ballistics or {})
     -- The server already knows the equipped slot. Never submit a claimed ammo
     -- amount, weapon hash, coordinates, serial, or casing from this client.
-    if ((config.weapons or {}).ballistics or {}).enabled == true then
+    if trainingWeapon or ballistics.enabled == true then
+        local now = GetGameTimer()
+        local minGap = math.max(0, math.floor(tonumber(ballistics.shotCooldown) or 65))
+        -- GTA can deliver several gunshot callbacks. Avoid sending reports
+        -- inside the same cadence floor the server already enforces.
+        if lastShotPed == ped and lastShotAt and now - lastShotAt < minGap then
+            return
+        end
+        lastShotAt, lastShotPed = now, ped
         TriggerServerEvent('qbinventory:server:weaponFired')
     else
         -- Retain the older lower-only persistence path when a server owner
@@ -311,7 +328,7 @@ AddEventHandler('CEventGunShot', function(_, eventEntity)
         TriggerServerEvent(
             'qbinventory:server:weaponAmmoConsumed',
             drawnSlot,
-            GetAmmoInPedWeapon(QB.cache.ped(), drawn) or 0
+            GetAmmoInPedWeapon(ped, drawn) or 0
         )
     end
 end)
