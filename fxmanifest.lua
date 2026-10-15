@@ -37,6 +37,7 @@ server_scripts {
     -- import. It is deliberately loaded before the inventory authority.
     'server/persistence.lua',
     'server.lua',
+    'server/recovery.lua',
     'server/crafting.lua',
     -- Weapon/consumable use handlers.  This follows crafting.lua because the
     -- ammunition loader uses its server-only per-round ballistics API.
@@ -102,6 +103,7 @@ client_scripts {
 ui_page 'web/build/index.html'
 
 files {
+    'sql/*.sql',
     'web/build/index.html',
     'web/build/assets/**/*',
     -- Locally hosted item artwork, served as nui://qbinventory/images/<file>.

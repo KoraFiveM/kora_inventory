@@ -15,6 +15,23 @@ local resource = GetCurrentResourceName()
 local persistenceConfig = (Config.qbinventory and Config.qbinventory.persistence) or {}
 local state = { ready = false, migrating = false, lastError = nil, lastMigration = nil }
 local dirty = {}
+local writes, inflight = {}, {}
+
+function persistence.withLock(kind, id, handler)
+    local inventoryKey, owner = ('%s:%s'):format(kind, tostring(id)), coroutine.running() or 'main'
+    if inflight[inventoryKey] then return false, 'inventory persistence busy' end
+    if writes[inventoryKey] and writes[inventoryKey] ~= owner then return false, 'inventory persistence busy' end
+    local nested = writes[inventoryKey] ~= nil
+    writes[inventoryKey] = owner
+    local results = table.pack(pcall(handler))
+    if not nested then writes[inventoryKey] = nil end
+    if not results[1] then return false, tostring(results[2]) end
+    return table.unpack(results, 2, results.n)
+end
+
+function persistence.committed(inv)
+    dirty[('%s:%s'):format(inv.type, tostring(inv.id))] = nil
+end
 
 local function log(level, message)
     print(('^%s[qbinventory:persistence]^7 %s'):format(level, message))
@@ -37,6 +54,7 @@ end
 
 local MIGRATIONS = {
     { version = 1, name = 'secondary_inventories', file = 'sql/001_secondary_inventories.sql' },
+    { version = 2, name = 'recovery_operations', file = 'sql/002_recovery_operations.sql' },
 }
 
 local function encode(value)
@@ -118,6 +136,8 @@ local function safeProperties(inv)
         currency = inv.currency,
         access = nil,
         accessRequired = inv.accessRequired == true or not not inv.access,
+        policyOwner = inv.policyOwner,
+        blocked = inv.blocked == true,
     }
 end
 
@@ -192,7 +212,7 @@ end
 -- Save a fully-formed secondary inventory after server.lua has committed its
 -- mutation. This never inspects player inventories and returns errors instead
 -- of silently falling back to volatile state.
-function persistence.save(inv)
+local function saveInventory(inv)
     if not persistence.shouldPersist(inv) then
         return true
     end
@@ -226,6 +246,25 @@ function persistence.save(inv)
         return false, err
     end
     return saveShopStock(inv)
+end
+
+function persistence.save(inv)
+    local inventoryKey = ('%s:%s'):format(inv.type, tostring(inv.id))
+    if not inv.policyOwner then
+        if writes[inventoryKey] and writes[inventoryKey] ~= (coroutine.running() or 'main') then return false, 'inventory persistence busy' end
+        inflight[inventoryKey] = (inflight[inventoryKey] or 0) + 1
+        local results = table.pack(pcall(saveInventory, inv))
+        inflight[inventoryKey] = inflight[inventoryKey] - 1
+        if inflight[inventoryKey] == 0 then inflight[inventoryKey] = nil end
+        if not results[1] then return false, tostring(results[2]) end
+        return table.unpack(results, 2, results.n)
+    end
+    return persistence.withLock(inv.type, inv.id, function()
+        local snapshot = dirty[inventoryKey]
+        local ok, err = saveInventory(inv)
+        if ok and dirty[inventoryKey] == snapshot then dirty[inventoryKey] = nil end
+        return ok, err
+    end)
 end
 
 -- Queue a snapshot after a committed secondary mutation. It is intentionally
@@ -335,6 +374,9 @@ function persistence.load(kind, id)
         -- Historical rows cannot identify an omitted callback. Preserve their
         -- semantics; trusted registrations mark callbacks on future saves.
         accessRequired = properties.accessRequired == true,
+        policyOwner = properties.policyOwner,
+        _policyPersisted = properties.policyOwner ~= nil,
+        blocked = properties.blocked == true,
     }
 end
 

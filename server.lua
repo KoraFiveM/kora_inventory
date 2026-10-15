@@ -209,9 +209,10 @@ end
 
 -- Inventory registry and access --------------------------------------------
 
-local secondaryOptionFields = { 'label', 'coords', 'distance', 'bucket', 'groups', 'owner', 'prices', 'currency' }
+local secondaryOptionFields = { 'label', 'coords', 'distance', 'bucket', 'groups', 'owner', 'prices', 'currency', 'policyOwner' }
 
 local function applySecondaryOptions(inv, opts, supplied)
+    if inv.policyOwner then return end
     for _, field in ipairs(secondaryOptionFields) do
         if supplied[field] then
             inv[field] = inventory.copy(opts[field])
@@ -264,6 +265,7 @@ local function secondary(kind, id, opts)
             inventories[inventoryKey] = restored
             return restored, true
         elseif restoreErr then
+            if opts._requirePersistence then return nil, false, restoreErr end
             print(('^3[qbinventory]^7 could not restore %s: %s'):format(inventoryKey, tostring(restoreErr)))
         end
     end
@@ -287,6 +289,7 @@ local function secondary(kind, id, opts)
         currency = opts.currency or 'money',
         access = opts.access,
         accessRequired = not not opts.access,
+        policyOwner = opts.policyOwner,
         _suppliedOptions = supplied,
     }
     inventories[inventoryKey] = inv
@@ -433,7 +436,7 @@ end
 -- during in-session transfer revalidation, see validSession below) -- an
 -- access callback that depends on it must treat a missing opts as "already
 -- gated at open time", not as a reason to fail an otherwise-valid session.
-local function canAccess(src, inv, opts)
+local function canAccess(src, inv, opts, recovery)
     if not inv then
         return false, 'inventory not found'
     end
@@ -455,7 +458,9 @@ local function canAccess(src, inv, opts)
         end
         return mayInspectPlayer(src, inv.source)
     end
-    if inv.accessRequired and not inv.access then
+    if inv.blocked then return false, 'inventory is locked' end
+    if inv.durablePending then return false, 'inventory recovery is being reconciled' end
+    if (inv.accessRequired or inv.policyOwner) and not inv.access then
         return false, 'access policy unavailable'
     end
     if inv.owner then
@@ -468,7 +473,7 @@ local function canAccess(src, inv, opts)
         return false, 'not authorised'
     end
     if inv.access then
-        local ok, allowed = pcall(inv.access, src, inv, opts)
+        local ok, allowed = pcall(inv.access, src, inv, opts, recovery and { recovery = true } or nil)
         if not ok or not allowed then
             return false, 'access denied'
         end
@@ -623,6 +628,8 @@ local function lock(keys, transaction)
 end
 
 local function addSecondary(inv, name, amount, slot, metadata)
+    if inv.blocked then return false, 'inventory is locked' end
+    if inv.durablePending then return false, 'inventory recovery is being reconciled' end
     local item, err = buildItem(name, amount, slot, metadata)
     if not item then
         return false, err
@@ -682,6 +689,8 @@ end
 ---@return string|nil err
 ---@return table|nil removed
 local function removeSecondary(inv, slot, amount)
+    if inv.blocked then return false, 'inventory is locked' end
+    if inv.durablePending then return false, 'inventory recovery is being reconciled' end
     local item = inv.items[slot]
     if not item then
         return false, 'empty slot'
@@ -2416,7 +2425,7 @@ end
 
 -- Registration and shops ---------------------------------------------------
 -- Ox-style inventory constructors and shops.
-local function refreshRegistration(inv, opts)
+local function refreshRegistration(inv, opts, skipDirty)
     inv.label = opts.label or inv.label
     inv.slots = math.floor(tonumber(opts.slots) or inv.slots)
     inv.maxWeight = tonumber(opts.maxWeight or opts.maxweight) or inv.maxWeight
@@ -2426,13 +2435,14 @@ local function refreshRegistration(inv, opts)
     inv.owner = opts.owner
     inv.access = opts.access
     inv.accessRequired = not not opts.access
+    inv.policyOwner = opts.policyOwner or inv.policyOwner
     inv._registered = true
     inv._suppliedOptions = nil
     if inv.type == 'shop' then
         inv.prices = opts.prices or inv.prices or {}
         inv.currency = opts.currency or 'money'
     end
-    if inventory.persistence and inventory.persistence.markDirty then
+    if not skipDirty and inventory.persistence and inventory.persistence.markDirty then
         inventory.persistence.markDirty(inv)
     end
 end
@@ -2461,10 +2471,87 @@ local function registerStash(id, label, slots, maxWeight, owner, groups, coords,
         return key('stash', id)
     end
     local inv = secondary('stash', id, opts)
+    if inv.policyOwner then return inv.key end
     -- Re-registration retains contents but refreshes the live access boundary.
     -- This matters for resources whose fixtures can be edited at runtime.
     refreshRegistration(inv, opts)
     return inv.key
+end
+
+local function registerStashPolicy(id, options, callback)
+    if type(id) ~= 'string' or #id < 1 or #id > 128 or type(options) ~= 'table' or not inventory.isCallable(callback) then
+        return false, 'stash id, options and callable policy are required'
+    end
+    local persistence = inventory.persistence
+    if not persistence or not persistence.getStatus().ready or config.persistence.enabled == false then return false, 'inventory persistence unavailable' end
+    local owner = GetInvokingResource() or resourceName
+    if options.slots ~= nil and (type(options.slots) ~= 'number' or options.slots % 1 ~= 0 or options.slots < 1 or options.slots > 10000) then return false, 'invalid stash slots' end
+    if options.maxWeight ~= nil and (type(options.maxWeight) ~= 'number' or options.maxWeight ~= options.maxWeight or options.maxWeight < 0 or options.maxWeight == math.huge) then return false, 'invalid stash weight' end
+    if options.coords ~= nil then
+        local points = inventory.coordinateList(options.coords)
+        if #points == 0 then return false, 'invalid stash coordinates' end
+        for _, point in ipairs(points) do
+            for _, axis in ipairs({ 'x', 'y', 'z' }) do
+                local value = point[axis]
+                if type(value) ~= 'number' or value ~= value or math.abs(value) == math.huge then return false, 'invalid stash coordinates' end
+            end
+        end
+    end
+    if options.distance ~= nil and (type(options.distance) ~= 'number' or options.distance ~= options.distance or options.distance <= 0 or options.distance == math.huge) then return false, 'invalid stash distance' end
+    return lock({ key('stash', id) }, function()
+        local inv, _, restoreErr = secondary('stash', id, { _requirePersistence = true })
+        if not inv then return false, restoreErr end
+        if inv.id ~= id then return false, 'stash identifier collides with existing storage' end
+        if inv.policyOwner and inv.policyOwner ~= owner then return false, 'stash policy belongs to another resource' end
+        if inv.durablePending then return false, 'inventory recovery is being reconciled' end
+        local prepared = inventory.copy(inv)
+        refreshRegistration(prepared, options, true)
+        prepared.access, prepared.accessRequired, prepared.policyOwner = callback, true, owner
+        inv.access, inv.accessRequired, inv.policyOwner = nil, true, owner
+        local saved, err = persistence.save(prepared)
+        if not saved then return false, err end
+        prepared._policyPersisted = true
+        inventories[inv.key] = prepared
+        for src, session in pairs(sessions) do
+            if session.secondary == inv.key then close(src, 'stash policy updated') end
+        end
+        return true, inv.key
+    end)
+end
+
+local function rebindStashPolicy(id, callback)
+    if type(id) ~= 'string' or not inventory.isCallable(callback) then return false, 'stash id and callable policy are required' end
+    local inv, _, restoreErr = secondary('stash', id, { _requirePersistence = true })
+    if not inv then return false, restoreErr end
+    if inv.id ~= id or not inv._policyPersisted or inv.policyOwner ~= (GetInvokingResource() or resourceName) then return false, 'persisted stash policy is not owned by this resource' end
+    -- Recovery may still own the durable source transition. Rebinding only the
+    -- handler must never flush its pre-commit item snapshot over that result.
+    inv.access, inv.accessRequired = callback, true
+    for src, session in pairs(sessions) do if session.secondary == inv.key then close(src, 'stash policy rebound') end end
+    return true, inv.key
+end
+
+local function unregisterStashPolicy(id)
+    local inv = inventories[key('stash', id)]
+    if not inv or inv.policyOwner ~= (GetInvokingResource() or resourceName) then return false, 'stash policy is not owned by this resource' end
+    inv.access, inv.accessRequired = nil, true
+    for src, session in pairs(sessions) do if session.secondary == inv.key then close(src, 'stash policy unavailable') end end
+    return true
+end
+
+local function setStashBlocked(id, blocked)
+    local inv = inventories[key('stash', id)]
+    if type(blocked) ~= 'boolean' or not inv or inv.policyOwner ~= (GetInvokingResource() or resourceName) then return false, 'stash policy is not owned by this resource' end
+    if inv.durablePending then return false, 'inventory recovery is being reconciled' end
+    return lock({ inv.key }, function()
+        local prepared = inventory.copy(inv)
+        prepared.blocked = blocked
+        local saved, err = inventory.persistence.save(prepared)
+        if not saved then return false, err end
+        inv.blocked = blocked
+        for src, session in pairs(sessions) do if session.secondary == inv.key then close(src, 'stash state changed') end end
+        return true
+    end)
 end
 ---@param properties table|nil
 ---@return string inventoryKey
@@ -2890,6 +2977,8 @@ setInventoryItems = function(reference, items)
     if not inventoryKey or not inv then
         return false, 'inventory not found'
     end
+    if inv.durablePending then return false, 'inventory recovery is being reconciled' end
+    if inv.blocked then return false, 'inventory is locked' end
     if type(items) ~= 'table' then
         return false, 'items must be a table'
     end
@@ -2935,6 +3024,7 @@ inventory.internal = {
     rekeySecondary = rekeySecondary,
     canAdd = canAddToInventory,
     addTo = addTo,
+    addSecondary = addSecondary,
     removeFrom = removeFrom,
     buildItem = buildItem,
     itemDef = itemDef,
@@ -3032,6 +3122,10 @@ local api = {
     GetStashItems = stashGet,
     SetStashItems = stashSet,
     RegisterStash = registerStash,
+    RegisterStashPolicy = registerStashPolicy,
+    RebindStashPolicy = rebindStashPolicy,
+    UnregisterStashPolicy = unregisterStashPolicy,
+    SetStashBlocked = setStashBlocked,
     GetShopItems = shopGet,
     SetShopItems = shopSet,
     CreateTemporaryStash = createTemporaryStash,
@@ -3055,6 +3149,10 @@ local api = {
 -- so both cases stay the same function object. test/smoke/contract.lua asserts
 -- the pairing, so a future one-cased addition fails the suite.
 api.registerStash = api.RegisterStash
+api.registerStashPolicy = api.RegisterStashPolicy
+api.rebindStashPolicy = api.RebindStashPolicy
+api.unregisterStashPolicy = api.UnregisterStashPolicy
+api.setStashBlocked = api.SetStashBlocked
 api.getShopItems = api.GetShopItems
 api.setShopItems = api.SetShopItems
 api.createTemporaryStash = api.CreateTemporaryStash
@@ -3214,6 +3312,12 @@ AddEventHandler('playerDropped', function()
     close(source, 'disconnected')
 end)
 AddEventHandler('onResourceStop', function(name)
+    for _, inv in pairs(inventories) do
+        if inv.policyOwner == name then
+            inv.access, inv.accessRequired = nil, true
+            for src, session in pairs(sessions) do if session.secondary == inv.key then close(src, 'stash policy unavailable') end end
+        end
+    end
     if name == resourceName then
         -- Do not unregister physical cash here. A restart gap must fail closed
         -- in qbcore rather than silently create a second ledger balance.

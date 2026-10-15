@@ -9,6 +9,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/persistence.lua
 "${LUA:-lua}" test/smoke/persistence_flush.lua
 "${LUA:-lua}" test/smoke/restored_access.lua
+"${LUA:-lua}" test/smoke/housing.lua
 "${LUA:-lua}" test/smoke/client_compat.lua
 "${LUA:-lua}" test/smoke/ui_bridge.lua
 "${LUA:-lua}" test/smoke/item_boxes.lua

@@ -83,6 +83,38 @@ exports.qbinventory:openInventory('stash', 'house_stash')
 the caller's own session server-side — a client can never open another
 player's copy of the template by supplying a different identifier.
 
+### Resource-owned property storage
+
+`RegisterStashPolicy(id, options, callback)` returns `true, inventoryKey` or
+`false, error`. Options use `label`, `slots`, `maxWeight`, `owner`, `groups`,
+`coords`, and `distance`. The callback receives `(source, inventory, options)`
+and must return `true`. The invoking resource owns the policy. Registration
+persists a required-policy marker before opening access, safely refreshes an
+existing/restored stash, and closes existing sessions. Every subsequent
+transfer checks the current callback. A stopped/missing provider denies access.
+The optional fourth callback argument is trusted inventory context. Only
+`ClaimStash` sets `{ recovery = true }` there; client open options cannot forge it.
+
+`RebindStashPolicy(id, callback)` only replaces an already persisted policy's
+callback for its owning resource. It does not save contents or capacity and is
+safe while a recovery outcome is pending. `UnregisterStashPolicy(id)` closes
+access and retains the required marker.
+
+`SetStashBlocked(id, boolean)` returns `true` only after the owner acquires the
+same stash lock used by transfers and durably saves the block. It closes
+sessions. A busy stash returns `false, error`; callers must retry before checking
+emptiness or completing a sale. The block survives restart and policy refresh.
+
+`ClaimStash(source, id, operationKey)` moves all stash items to that player and
+returns `true, receipt` or `false, error`. This trusted owner-only API commits
+the stash, `players.inventory`, and an operation receipt in one checked SQL
+transaction, coordinated with qbcore's inventory persistence fence. Reuse the
+same key after an uncertain result. A completed key returns its original
+receipt without delivering again or touching later deposits. A clean capacity
+rejection may retry with the same key after making room. Pending operations
+keep affected inventory locked until receipt reconciliation succeeds. These
+APIs also have lowercase-first aliases.
+
 ### Register a shop and let players buy from it
 ```lua
 -- server, e.g. a 24/7 store resource
