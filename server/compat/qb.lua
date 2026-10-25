@@ -318,16 +318,32 @@ api.LoadInventory = function(source, _citizenid)
     return inventory.copy(native.GetInventory(source) or {})
 end
 
----Upstream: SaveInventory(source, offline). Player items are written through
----qbcore's own mutation funnel, so there is nothing to flush for a player.
----Secondary inventories DO have durable state of their own, so honour the call
----by flushing them rather than pretending the whole thing is a no-op.
-api.SaveInventory = function(_source, _offline)
-    local persistence = inventory.persistence
-    if persistence and type(persistence.flush) == 'function' then
-        pcall(persistence.flush)
+---Upstream: SaveInventory(source, offline). Keep player persistence inside
+---qbcore's authority; an offline snapshot may only replace its inventory field.
+---Success has no return value, while durable failures remain observable.
+api.SaveInventory = function(source, offline)
+    local called, saved, err = pcall(function()
+        if offline then
+            if type(source) ~= 'table' or type(source.citizenid) ~= 'string'
+                or (source.items ~= nil and type(source.items) ~= 'table') then
+                return false, 'invalid offline player inventory'
+            end
+            return exports.qbcore:saveOfflinePlayer({ citizenid = source.citizenid,
+                items = inventory.copy(source.items or {}) }, { 'items' })
+        end
+        return exports.qbcore:savePlayer(source, 'items')
+    end)
+    if not called then return false, tostring(saved) end
+    if saved ~= true then
+        if not offline and err == 'no such player' then return end
+        return false, err or 'player inventory could not be saved'
     end
-    return true
+    if not offline then
+        local flushed
+        called, flushed, err = pcall(QB.sql.flush, 'players')
+        if not called then return false, tostring(flushed) end
+        if flushed ~= true then return false, err or 'player inventory flush failed' end
+    end
 end
 
 ---Upstream: SetInventory(identifier, items, reason). The identifier may be a

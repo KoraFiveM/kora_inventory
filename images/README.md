@@ -37,3 +37,9 @@ Files here are served to the browser as `nui://qbinventory/images/<file>`, which
 is why `images/**/*` is listed in `fxmanifest.lua`. It sits outside `web/` on
 purpose: a Vite build owns everything under `web/build`, and artwork a server
 owner added must not be something `pnpm build` can delete.
+
+Legacy consumers use `nui://qb-inventory/html/images/<file>`. The manifest also
+packs `html/images/**/*` through the relative `html/images -> ../images` link,
+so both paths share the same artwork, including server-owner additions. Preserve
+that link when packaging/deploying the resource. Real FXServer file loading is
+checked separately from connected-client NUI rendering.

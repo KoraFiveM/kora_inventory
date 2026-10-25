@@ -75,6 +75,8 @@ Config.qbinventory = {
         },
     },
     auditLimit = 1000,
+    -- Trusted server domains only; client intent must be validated by the caller.
+    exchangeCallers = { qbdrugs = true },
     requireSameBucket = true,
     -- Physical cash is opt-in. When enabled, the configured qbcore account is
     -- represented exclusively by this stackable item: it can be given, moved,

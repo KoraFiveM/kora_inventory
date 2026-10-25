@@ -89,4 +89,18 @@ H.ok(type(hookId) == 'number', 'registerHook accepts a cross-resource funcref')
 H.ok(not pcall(registered.registerHook, 'swapItems', {}), 'registerHook still rejects a non-callable')
 H.ok(not pcall(registered.registerHook, 42, function() end), 'registerHook still rejects a non-string event')
 
+local useable = registered.getUseable('handcuffs')
+H.ok(useable and useable.func == handler, 'getUseable returns the authoritative cross-resource callback')
+H.ok(useable.resource == 'qbpolice', 'getUseable preserves registration ownership')
+H.ok(registered.getUseable('unregistered') == nil, 'getUseable returns nil for an unregistered item')
+useable.func(1, {})
+H.ok(calls == 2, 'the legacy CanUseItem record callback remains callable')
+
+GetInvokingResource = function() return 'qbcore' end
+registered.createUseable('forwarded', handler, 'legacy_shop')
+H.ok(registered.getUseable('forwarded').resource == 'legacy_shop', 'trusted core gateway preserves the original owner')
+GetInvokingResource = function() return 'other_resource' end
+registered.createUseable('untrusted_override', handler, 'legacy_shop')
+H.ok(registered.getUseable('untrusted_override').resource == 'other_resource', 'other resources cannot spoof registration ownership')
+
 H.finish()

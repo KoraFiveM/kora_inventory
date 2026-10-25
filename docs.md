@@ -687,3 +687,16 @@ an allowed action. `server.lua` contains no NUI calls or callbacks.
 The bundled `client/ui.lua` bridge owns the NUI page and translates its
 restricted intent envelope back to the headless client API. Browser state is
 never treated as authoritative.
+
+
+## Durable player exchanges
+
+`ExecutePlayerExchange(source, operationKey, request)` is a native server-only export for trusted gameplay domains listed in `Config.qbinventory.exchangeCallers` (default: `qbdrugs`). The calling resource owns its key namespace. The request requires `citizenid` and accepts `take = {{ name, amount }}`, `give = {{ name, amount, info = {} }}`, nonnegative whole `cash`, signed whole `dealerRep`, and `reason`. Inputs are objects with named fields; omitted lists and amounts default empty/zero. Weapon outputs and direct physical-currency item legs are rejected; use `cash` for physical cash. Reputation updates `metadata.rep.dealer`, with negative results clamped to zero. The gameplay caller must authorize the interaction and choose all terms on the server; no client event exposes this API.
+
+The export plans against the current inventory, validates capacity, and uses qbcore's durable inventory/money/metadata fences. One SQL transaction writes the player values and a permanent, resource-scoped receipt. It returns the receipt on success or `(nil, code, message)` on failure. Reusing a key with identical canonical terms and recipient returns the original receipt; changing terms or recipient returns `conflict`. `GetPlayerExchange(operationKey)` retrieves and reconciles the calling resource's receipt, returning `not_found` only after the previous worker has settled and a locking read confirms no receipt. Unknown outcomes remain fenced; callers must retry the same key, not create a new reward key. Native recovery also reconciles pending operations after provider/core restarts, including offline recipients.
+
+Cash rewards honor the configured item-backed cash authority and retain a zero ledger mirror. Nonzero cash transaction tax is currently rejected explicitly because the configurable tax collector has no durable collector transaction contract; equivalent dealer profiles require tax disabled for those rewards. Marked-bill output metadata is preserved, but the item must exist in the authoritative item registry. The receipt includes provider, operation key, citizen ID, cash, reputation delta, canonical request fingerprint and completion time.
+
+Validation: `lua test/smoke/player_exchange.lua` exercises the actual qbcore fences and inventory planners with a controlled SQL transport, including repeated/changed requests, cash items, marked bills, capacity, source reuse, unknown commits, delayed workers, offline restart recovery and ordinary writes blocked by all three fences.
+
+Run `python3 test/exchange_database.py` for the optional database check. It starts a disposable socket-only MariaDB instance, captures the actual exchange planner SQL, and executes it with qbsql's checked transaction runner. It verifies receipt/player atomicity, duplicate rejection after restart, precondition rollback, missing commit acknowledgements, and recovery reads waiting for older transactions. It does not exercise a connected FiveM player.

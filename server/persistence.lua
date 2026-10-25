@@ -55,6 +55,7 @@ end
 local MIGRATIONS = {
     { version = 1, name = 'secondary_inventories', file = 'sql/001_secondary_inventories.sql' },
     { version = 2, name = 'recovery_operations', file = 'sql/002_recovery_operations.sql' },
+    { version = 3, name = 'player_exchanges', file = 'sql/003_player_exchanges.sql' },
 }
 
 local function encode(value)
@@ -325,6 +326,55 @@ function persistence.delete(kind, id)
     return true
 end
 
+-- The stock police trash command deletes native storage, not the archival
+-- import source. Commit a tombstone with the delete so a later import/retry
+-- cannot restore the old contents after a restart.
+function persistence.deleteLegacyPoliceTrash()
+    -- Every deletion needs its own receipt: an older permanent tombstone does
+    -- not establish whether this attempt committed after a connection failure.
+    local token, tokenError = QB.sql.scalar("SELECT REPLACE(UUID(),'-','')")
+    if type(token) ~= 'string' or #token ~= 32 or token:find('[^%x]') then
+        return false, tokenError or 'inventory deletion receipt could not be created'
+    end
+    local called, result, err = pcall(QB.sql.transactionChecked, {
+        { query = [[INSERT INTO `qbinventory_migration_rows`
+            (`source_name`,`source_key`,`source_checksum`,`inventory_type`,`inventory_id`,`status`)
+            VALUES ('inventories','stash:policetrash',?,'stash','policetrash','deleted'),
+                   ('stashitems','stash:policetrash',?,'stash','policetrash','deleted')
+            ON DUPLICATE KEY UPDATE `status`='deleted', `imported_at`=CURRENT_TIMESTAMP]],
+          values = { string.rep('0', 64), string.rep('0', 64) } },
+        { query = [[DELETE FROM `qbinventory_inventories`
+            WHERE `inventory_type` = 'stash' AND `inventory_id` = 'policetrash']] },
+        -- ROW_COUNT() is the immediately preceding DELETE's durable result.
+        { query = [[UPDATE `qbinventory_migration_rows` SET `source_checksum`=CONCAT(?,':',ROW_COUNT())
+            WHERE `source_name`='inventories' AND `source_key`='stash:policetrash']], values = { token }, expectedRows = 1 },
+    })
+    if not called then err, result = tostring(result), nil end
+    if result and result.success then return true, nil, result.results[2].affectedRows end
+    local failure = err or (result and result.message) or 'inventory deletion could not be confirmed'
+    if result and result.code ~= 'indeterminate' then return false, failure end
+
+    -- The caller retains the mutation and persistence locks while this yields.
+    -- A locking read on the write pool waits for the original transaction even
+    -- if its COMMIT acknowledgement was lost. Never release old dirty snapshots
+    -- until this attempt's commit/rollback is known; another UUID is not ours.
+    log('3', 'policetrash deletion is awaiting durable reconciliation')
+    while true do
+        local readOK, snapshot = pcall(QB.sql.transactionChecked, {
+            { query = [[SELECT `source_checksum` FROM `qbinventory_migration_rows`
+                WHERE `source_name`='inventories' AND `source_key`='stash:policetrash' FOR UPDATE]] },
+        })
+        if readOK and snapshot and snapshot.success then
+            local row = snapshot.results[1][1]
+            local receipt = row and row.source_checksum
+            if receipt == token .. ':0' then return true, nil, 0 end
+            if receipt == token .. ':1' then return true, nil, 1 end
+            return false, failure
+        end
+        Wait(1000)
+    end
+end
+
 function persistence.load(kind, id)
     if kind == 'player' then
         return nil, 'player inventories are owned by qbcore'
@@ -570,7 +620,7 @@ local function emitProgress(report, source, phase, row)
     )
 end
 
-local function importLegacyRow(source, defaultType, row, opts, report)
+local function importLegacyRowUnlocked(source, defaultType, row, opts, report)
     local id = tostring(row.legacy_id or '')
     local kind = cleanType(defaultType == 'kind' and row.legacy_type or defaultType)
     local sourceKey = ('%s:%s'):format(kind, id)
@@ -586,6 +636,10 @@ local function importLegacyRow(source, defaultType, row, opts, report)
     local old, oldErr = migrationRow(source, sourceKey)
     if not old and oldErr then
         error(oldErr)
+    end
+    if old and old.status == 'deleted' then
+        report.skipped = report.skipped + 1
+        return
     end
     if old and old.status == 'imported' and old.source_checksum == digest then
         report.skipped = report.skipped + 1
@@ -635,6 +689,18 @@ local function importLegacyRow(source, defaultType, row, opts, report)
     if not done then
         error(doneErr)
     end
+end
+
+-- Hold the same persistence lock through the import decision and save. A
+-- deletion must not race a pending legacy read and resurrect its old items.
+local function importLegacyRow(source, defaultType, row, opts, report)
+    local id = tostring(row.legacy_id or '')
+    local kind = cleanType(defaultType == 'kind' and row.legacy_type or defaultType)
+    local ok, err = persistence.withLock(kind, id, function()
+        importLegacyRowUnlocked(source, defaultType, row, opts, report)
+        return true
+    end)
+    if not ok then error(err) end
 end
 
 -- Idempotent, non-destructive import. It never deletes or modifies a legacy

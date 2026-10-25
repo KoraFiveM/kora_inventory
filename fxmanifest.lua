@@ -38,6 +38,7 @@ server_scripts {
     'server/persistence.lua',
     'server.lua',
     'server/recovery.lua',
+    'server/exchange.lua',
     'server/crafting.lua',
     -- Weapon/consumable use handlers.  This follows crafting.lua because the
     -- ammunition loader uses its server-only per-round ballistics API.
@@ -111,5 +112,8 @@ files {
     -- a server owner dropped in must not be something `pnpm build` can delete.
     --
     -- '**/*' is the recursive form FiveM honours; a bare '**' matches nothing.
-    'images/**/*'
+    'images/**/*',
+    -- Legacy consumers embed this path directly in their own NUI. The relative
+    -- directory link keeps custom artwork shared with the native image path.
+    'html/images/**/*'
 }

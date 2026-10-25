@@ -8,6 +8,7 @@ local resourceName = GetCurrentResourceName()
 -- Runtime state -------------------------------------------------------------
 
 local inventories = {}
+local secondaryGenerations = {}
 local sessions = {}
 local dropViewers = {}
 local hooks = {}
@@ -16,6 +17,7 @@ local locks = {}
 local ownPlayerWrites = {}
 local inspectionHooks = {}
 local ownedStashTemplates = {}
+local persistenceHydrated, persistenceRestoreError = false, nil
 
 local nextHookId = 1
 local nextDropId = 1
@@ -255,7 +257,14 @@ local function secondary(kind, id, opts)
     -- has completed. Player inventories are intentionally never read here.
     local persistence = inventory.persistence
     if persistence and persistence.getStatus and persistence.getStatus().ready then
+        local generation = secondaryGenerations[inventoryKey] or 0
         local restored, restoreErr = persistence.load(kind, id)
+        -- A legacy delete may commit while this SELECT is in flight. Never
+        -- install that stale result over its blocked record or new generation.
+        if (secondaryGenerations[inventoryKey] or 0) ~= generation then
+            return secondary(kind, id, opts)
+        end
+        if inventories[inventoryKey] then return inventories[inventoryKey], true end
         if restored then
             restored.key = inventoryKey
             restored._suppliedOptions = supplied
@@ -2134,6 +2143,7 @@ local function setItems(src, newItems)
 end
 
 local useables, builtInUseables = {}, {}
+local useableResources = {}
 local builtInUseableKinds = {}
 
 -- Useable item API ----------------------------------------------------------
@@ -2144,15 +2154,26 @@ local builtInUseableKinds = {}
 -- index would not surface until then.
 local useableOwners = QB.resources.serverRegistry(function(name)
     useables[name] = nil
+    useableResources[name] = nil
 end)
 
 ---@param name string
 ---@param handler function|table
-local function createUseable(name, handler)
+local function createUseable(name, handler, originalResource)
     assert(type(name) == 'string' and inventory.isCallable(handler), 'name and handler are required')
     local owner = GetInvokingResource() or resourceName
+    -- Only the trusted core gateway may preserve a caller across its export hop.
+    if owner == 'qbcore' and type(originalResource) == 'string' and originalResource ~= '' then
+        owner = originalResource
+    end
     useables[name] = handler
+    useableResources[name] = owner
     useableOwners.track(owner, name)
+end
+
+local function getUseable(name)
+    local handler = useables[name] or builtInUseables[name]
+    if handler then return { func = handler, resource = useableResources[name] or resourceName } end
 end
 -- Internal, registry-driven handlers (weapons/ammunition) live below explicit
 -- resource registrations so a gameplay resource can intentionally override
@@ -2911,6 +2932,7 @@ local function rekeySecondary(reference, newKind, newId)
     if inv.type == 'player' then
         return nil, 'player inventories cannot be rekeyed'
     end
+    if inv._legacyDeletePending then return nil, 'inventory busy' end
 
     local newKey = key(newKind or inv.type, newId)
     if newKey == oldKey then
@@ -2958,6 +2980,7 @@ local function removeSecondaryInventory(reference)
     if inv.type == 'player' then
         return false, 'player inventories are owned by qbcore'
     end
+    if inv._legacyDeletePending then return false, 'inventory busy' end
 
     inventories[inventoryKey] = nil
     if inventory.persistence and inventory.persistence.delete then
@@ -3071,6 +3094,92 @@ inventory.internal = {
     persistence = inventory.persistence,
 }
 
+-- The schema event precedes yielding restoreAll. Consumers that depend on
+-- inventories being authoritative must wait for both phases.
+local function getPersistenceStatus()
+    local status = inventory.persistence and inventory.persistence.getStatus() or {}
+    local enabled = config.persistence.enabled == true
+    return {
+        ready = enabled and status.ready == true and persistenceHydrated,
+        schemaReady = status.ready == true,
+        restoring = enabled and status.ready == true and not persistenceHydrated and not persistenceRestoreError,
+        enabled = enabled,
+        lastError = persistenceRestoreError or (not persistenceHydrated and status.lastError or nil),
+    }
+end
+
+-- Stock qb-policejob deletes its trash stash with a legacy SQL statement.
+-- qbsql translates only that reviewed command into this fixed-identity bridge;
+-- no client or arbitrary SQL can choose an inventory here.
+local function deleteLegacyPoliceTrash(callback)
+    assert(inventory.isCallable(callback), 'delete callback is required')
+    if GetInvokingResource() ~= 'qbsql' then
+        callback(nil, 'legacy inventory SQL bridge is restricted to qbsql')
+        return
+    end
+    CreateThread(function()
+        local deadline = now() + 60000
+        local function delete()
+            while true do
+                local status = getPersistenceStatus()
+                if not status.enabled then return nil, 'inventory persistence is disabled' end
+                if status.lastError then return nil, status.lastError end
+                if status.ready then break end
+                if now() >= deadline then return nil, 'inventory persistence readiness timed out' end
+                Wait(0)
+            end
+            local inventoryKey, persistence = key('stash', 'policetrash'), inventory.persistence
+            while true do
+                local ok, err, affectedRows = lock({ inventoryKey }, function()
+                    local original = inventories[inventoryKey]
+                    if original and original.durablePending then return false, 'inventory recovery is being reconciled' end
+                    -- Keep a blocked record visible while SQL yields. A trusted
+                    -- registration cannot reload stale storage into this key.
+                    local inv = original or {
+                        key = inventoryKey, type = 'stash', id = 'policetrash', label = 'policetrash',
+                        slots = config.defaultSlots, maxWeight = config.defaultMaxWeight, items = {}, revision = 0,
+                    }
+                    local wasBlocked = inv.blocked
+                    inv.blocked, inv._legacyDeletePending = true, true
+                    inventories[inventoryKey] = inv
+                    local deleted, deleteError, rows
+                    repeat
+                        deleted, deleteError, rows = persistence.withLock('stash', 'policetrash', function()
+                            return persistence.deleteLegacyPoliceTrash()
+                        end)
+                        if deleteError ~= 'inventory persistence busy' then break end
+                        if now() >= deadline then deleteError = 'inventory persistence drain timed out'; break end
+                        Wait(0)
+                    until false
+                    inv.blocked, inv._legacyDeletePending = wasBlocked, nil
+                    if not deleted then
+                        inventories[inventoryKey] = original
+                        return false, deleteError
+                    end
+                    -- The mutation lock excluded new item changes while every
+                    -- earlier save drained. Discard registration-only snapshots
+                    -- too, so none can recreate the deleted item contents.
+                    persistence.committed(inv)
+                    secondaryGenerations[inventoryKey] = (secondaryGenerations[inventoryKey] or 0) + 1
+                    inventories[inventoryKey] = nil
+                    for src, session in pairs(sessions) do
+                        if session.secondary == inventoryKey then close(src, 'inventory deleted') end
+                    end
+                    return true, nil, rows
+                end)
+                if ok then return affectedRows end
+                if err ~= 'inventory busy' then return nil, err end
+                if now() >= deadline then return nil, 'inventory mutation drain timed out' end
+                Wait(0)
+            end
+        end
+        local ok, affectedRows, err = xpcall(delete, debug.traceback)
+        if not ok then affectedRows, err = nil, affectedRows end
+        local replied, replyError = pcall(callback, affectedRows, err)
+        if not replied then print(('^3[qbinventory]^7 legacy SQL reply unavailable: %s'):format(tostring(replyError))) end
+    end)
+end
+
 -- Public exports ------------------------------------------------------------
 
 -- Compatibility aliases. The matching __cfx handlers below make these callable
@@ -3090,6 +3199,7 @@ local api = {
     clearInventory = clearInventory,
     setItems = setItems,
     createUseable = createUseable,
+    getUseable = getUseable,
     useItem = useItem,
     stashGet = stashGet,
     stashSet = stashSet,
@@ -3178,6 +3288,8 @@ end
 for name, fn in pairs(physicalCashApi) do
     exports(name, fn)
 end
+exports('getPersistenceStatus', getPersistenceStatus)
+exports('deleteLegacyPoliceTrash', deleteLegacyPoliceTrash)
 inventory.api = api
 
 -- Network transport ---------------------------------------------------------
@@ -3251,7 +3363,8 @@ AddEventHandler('qbinventory:server:persistenceReady', function()
     end
     local restored, rejected = persistence.restoreAll()
     if not restored then
-        print(('^1[qbinventory]^7 secondary inventory restore failed: %s'):format(tostring(rejected)))
+        persistenceRestoreError = tostring(rejected or 'secondary inventory restore failed')
+        print(('^1[qbinventory]^7 secondary inventory restore failed: %s'):format(persistenceRestoreError))
         return
     end
     for _, inv in ipairs(restored) do
@@ -3290,7 +3403,9 @@ AddEventHandler('qbinventory:server:persistenceReady', function()
         print(('^3[qbinventory]^7 ignored malformed persisted %s:%s (%s)'):format(bad.type, bad.id, bad.reason))
         TriggerEvent('qbinventory:server:persistenceRejected', inventory.copy(bad))
     end
+    persistenceHydrated, persistenceRestoreError = true, nil
     print(('^2[qbinventory]^7 restored %d secondary inventories.'):format(#restored))
+    TriggerEvent('qbinventory:server:ready', getPersistenceStatus())
 end)
 
 -- Writes made by another server resource through qbcore's public mutation

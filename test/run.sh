@@ -8,6 +8,8 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/contract.lua
 "${LUA:-lua}" test/smoke/persistence.lua
 "${LUA:-lua}" test/smoke/persistence_flush.lua
+"${LUA:-lua}" test/smoke/legacy_sql.lua
+"${LUA:-lua}" test/smoke/save_inventory.lua
 "${LUA:-lua}" test/smoke/restored_access.lua
 "${LUA:-lua}" test/smoke/housing.lua
 "${LUA:-lua}" test/smoke/client_compat.lua
@@ -47,3 +49,5 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/export_collisions.lua
 "${LUA:-lua}" test/smoke/providers.lua
 "${LUA:-lua}" test/smoke/provider_contract.lua
+
+"${LUA:-lua}" test/smoke/player_exchange.lua
