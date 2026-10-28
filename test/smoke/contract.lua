@@ -19,4 +19,7 @@ H.ok(source:find("'qbinventory:server:intent'", 1, true), 'restricted UI intent 
 H.ok(source:find("shop items must be purchased", 1, true), 'shop cannot use generic transfer')
 H.ok(not source:find("inventory:server:SetInventoryData", 1, true), 'no client-authorised full inventory replacement')
 H.ok(not source:find('SendNUIMessage', 1, true), 'server remains headless')
+H.ok(source:find('PhoneItemTransaction = phoneItemTransaction', 1, true), 'phone gateway export')
+H.ok(source:find('api.phoneItemTransaction = api.PhoneItemTransaction', 1, true), 'phone gateway lowercase alias')
+H.ok(source:find('phoneCallers[GetInvokingResource()]', 1, true), 'phone gateway is restricted to the phone resource')
 H.finish()

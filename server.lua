@@ -3180,11 +3180,207 @@ local function deleteLegacyPoliceTrash(callback)
     end)
 end
 
+-- A handset's inserted SIM lives in its metadata, so consuming/returning the
+-- loose SIM and changing the handset commit together in one inventory write.
+-- kora_phone-stevie is this server's folder name; kora_phone is the name its
+-- install guide documents, so a reinstall under that name keeps working.
+local phoneCallers = { ['kora_phone-stevie'] = true, kora_phone = true }
+local phoneHandsets = { phone = true, phone_standard = true, phone_flip = true, phone_fold = true }
+local function phoneItemTransaction(src, request)
+    if not phoneCallers[GetInvokingResource()] then
+        return false, 'phone integration only'
+    end
+    if type(src) ~= 'number' or src < 1 or src % 1 ~= 0 or type(request) ~= 'table' then
+        return false, 'invalid phone transaction'
+    end
+    local function validId(value)
+        return type(value) == 'string' and #value >= 16 and #value <= 64 and value:match('^[%w%-_]+$') ~= nil
+    end
+    local function validSlot(slot)
+        return type(slot) == 'number' and slot >= 1 and slot % 1 == 0 and slot <= config.playerSlots
+    end
+    local op = request.op
+    local slot = op == 'bindSim' and request.simSlot or request.handsetSlot
+    local serial = op == 'bindSim' and request.simId or request.handsetId
+    if not validSlot(slot) or not validId(serial) then
+        return false, 'invalid phone identity'
+    end
+    if op ~= 'bindHandset' and op ~= 'bindSim' and op ~= 'insertSim' and op ~= 'removeSim' and op ~= 'resell' and op ~= 'replaceSim' then
+        return false, 'unknown phone operation'
+    end
+    if request.legacySimId ~= nil and (op ~= 'bindHandset' or not validId(request.legacySimId)) then
+        return false, 'invalid legacy SIM identity'
+    end
+    local moneyAmount = op == 'resell' and request.payout or op == 'replaceSim' and request.fee or nil
+    if (op == 'resell' or op == 'replaceSim') and (type(moneyAmount) ~= 'number'
+        or moneyAmount < 0 or moneyAmount > 100000000 or moneyAmount % 1 ~= 0) then
+        return false, 'invalid phone service amount'
+    end
+    if op == 'replaceSim' and (not validId(request.newSimId) or request.newSimId == request.simId) then
+        return false, 'invalid replacement SIM identity'
+    end
+    local saleShopKey
+    local lockKeys = { playerKey(src) }
+    if request.shopId ~= nil then
+        if op ~= 'resell' or type(request.shopId) ~= 'string' or #request.shopId > 128
+            or request.shopId:sub(1,8) ~= 'qbphone:' or type(request.salePrice) ~= 'number'
+            or request.salePrice < 0 or request.salePrice > 100000000 or request.salePrice % 1 ~= 0 then
+            return false, 'invalid phone resale shop'
+        end
+        saleShopKey = key('shop', request.shopId)
+        lockKeys[#lockKeys+1] = saleShopKey
+    end
+    return lock(lockKeys, function()
+        if not playerData(src) then return false, 'player unavailable' end
+        local items = inventory.copy(playerItems(src))
+        local handset = items[slot]
+        if not handset or handset.amount ~= 1 then return false, 'item missing or stacked' end
+        local def = itemDef(handset.name)
+        local isSim = op == 'bindSim'
+        if not def or def.unique ~= true or (isSim and handset.name ~= 'phone_sim')
+            or (not isSim and not phoneHandsets[handset.name]) then
+            return false, 'unsupported phone item'
+        end
+        handset.info = inventory.copy(handset.info or handset.metadata or {})
+        local idField = isSim and 'simId' or 'handsetId'
+        local returnedSim
+        if op == 'bindHandset' or isSim then
+            if request.itemName ~= handset.name then return false, 'item changed' end
+            local currentId = handset.info[idField]
+            if currentId ~= nil then
+                if currentId ~= serial then return false, 'identity already bound' end
+                return true, nil, inventory.copy(handset)
+            end
+            if op == 'bindHandset' and request.legacySimId then
+                if handset.info.phoneSimId ~= nil then return false, 'SIM slot occupied' end
+                handset.info.phoneSimId = request.legacySimId
+                handset.info.phoneSimInfo = { simId = request.legacySimId }
+            end
+            handset.info[idField] = serial
+        else
+            if handset.info.handsetId ~= serial then return false, 'handset changed' end
+            if op == 'resell' then
+                if handset.info.phoneSimId ~= nil or handset.info.phoneSimInfo ~= nil then
+                    return false, 'remove SIM before resale'
+                end
+                if request.itemName and request.itemName ~= handset.name then return false, 'item changed' end
+            elseif not (op == 'replaceSim' and (request.simId == nil or request.simId == '')) and not validId(request.simId) then
+                return false, 'invalid SIM identity'
+            end
+            if op == 'resell' then
+                items[slot] = nil
+            elseif op == 'replaceSim' then
+                local expectedEmpty = request.simId == nil or request.simId == ''
+                if expectedEmpty then
+                    if handset.info.phoneSimId ~= nil or handset.info.phoneSimInfo ~= nil then
+                        return false, 'inserted SIM changed'
+                    end
+                elseif handset.info.phoneSimId ~= request.simId or type(handset.info.phoneSimInfo) ~= 'table'
+                    or handset.info.phoneSimInfo.simId ~= request.simId then
+                    return false, 'inserted SIM changed'
+                end
+                handset.info.phoneSimId = request.newSimId
+                handset.info.phoneSimInfo = { simId = request.newSimId }
+            elseif op == 'insertSim' then
+                if handset.info.phoneSimId ~= nil then return false, 'SIM slot occupied' end
+                local simSlot = request.simSlot
+                if not validSlot(simSlot) or simSlot == slot then return false, 'invalid SIM slot' end
+                local sim = items[simSlot]
+                local simDef = sim and itemDef(sim.name)
+                local simInfo = sim and (sim.info or sim.metadata)
+                if not sim or sim.name ~= 'phone_sim' or sim.amount ~= 1 or not simDef or simDef.unique ~= true
+                    or type(simInfo) ~= 'table' or simInfo.simId ~= request.simId then
+                    return false, 'SIM changed'
+                end
+                handset.info.phoneSimId = request.simId
+                handset.info.phoneSimInfo = inventory.copy(simInfo)
+                items[simSlot] = nil
+            else
+                if handset.info.phoneSimId ~= request.simId or type(handset.info.phoneSimInfo) ~= 'table'
+                    or handset.info.phoneSimInfo.simId ~= request.simId then
+                    return false, 'inserted SIM changed'
+                end
+                local freeSlot = inventory.firstFreeSlot(items, config.playerSlots)
+                if not freeSlot then return false, 'no free slot' end
+                local err
+                returnedSim, err = buildItem('phone_sim', 1, freeSlot, handset.info.phoneSimInfo)
+                if not returnedSim or not returnedSim.unique then return false, err or 'unsupported SIM item' end
+                items[freeSlot] = returnedSim
+                handset.info.phoneSimId, handset.info.phoneSimInfo = nil, nil
+            end
+        end
+        handset.metadata = inventory.copy(handset.info)
+        if op ~= 'resell' then items[slot] = handset end
+        local saleShop, saleStock
+        if saleShopKey then
+            saleShop = getInventory(saleShopKey)
+            if not saleShop or saleShop.type ~= 'shop' then return false, 'shop not found' end
+            local allowed, accessErr = canAccess(src, saleShop)
+            if not allowed then return false, accessErr end
+            saleStock = inventory.copy(saleShop.stock or saleShop.items or {})
+            for _, stocked in pairs(saleStock) do
+                local metadata = stocked.info or stocked.metadata
+                if metadata and metadata.handsetId == serial then return false, 'handset already stocked' end
+            end
+            local saleSlot = inventory.firstFreeSlot(saleStock, saleShop.slots)
+            if not saleSlot then return false, 'phone shop is full' end
+            local stockItem, stockErr = buildItem(handset.name, 1, saleSlot, handset.info)
+            if not stockItem then return false, stockErr end
+            copyItemExtensions(stockItem, handset)
+            stockItem.price = request.salePrice
+            saleStock[saleSlot] = stockItem
+            if inventory.totalWeight(saleStock) > saleShop.maxWeight then return false, 'phone shop is over weight' end
+        end
+        -- Phone-service amounts are exact, untaxed amounts, including refunds.
+        -- No yielded SQL belongs inside this bounded inventory/money operation.
+        local moneyAction = op == 'resell' and 'addMoney' or 'removeMoney'
+        local refundAction = op == 'resell' and 'removeMoney' or 'addMoney'
+        local beforeRevision = revision(playerKey(src))
+        local beforeShopRevision = saleShopKey and revision(saleShopKey)
+        if moneyAmount and moneyAmount > 0 then
+            local paid, err = exports.kora_core[moneyAction](exports.kora_core, src, 'bank', moneyAmount, 'qbphone-' .. op, true)
+            if not paid then return false, err or 'bank service unavailable' end
+        end
+        local function refund()
+            if moneyAmount and moneyAmount > 0 then
+                local refunded = exports.kora_core[refundAction](exports.kora_core, src, 'bank', moneyAmount, 'qbphone-service-rollback', true)
+                if not refunded then print('^1[qbinventory]^7 phone bank compensation failed for player ' .. src) end
+                return refunded
+            end
+            return true
+        end
+        -- Money change event subscribers may run synchronously; never overwrite
+        -- an inventory they changed while observing the payment.
+        if revision(playerKey(src)) ~= beforeRevision or (saleShopKey and revision(saleShopKey) ~= beforeShopRevision) then
+            if not refund() then return false, 'bank compensation failed' end
+            return false, 'inventory changed during payment'
+        end
+        -- replacePlayerItems validates all registry definitions, capacity and
+        -- unchanged physical cash before its single kora_core funnel write.
+        local ok, err = replacePlayerItems(src, items)
+        if not ok then
+            if not refund() then return false, 'bank compensation failed' end
+            return false, err
+        end
+        if saleShop then
+            -- Same committed stock/persistence path as BuyItem; retain the
+            -- individual serial instead of turning this handset into a template.
+            saleShop.stock, saleShop.items = saleStock, saleStock
+            bump(saleShopKey)
+            broadcast(saleShopKey)
+            recordAudit('phoneResale', src, { shop = request.shopId, item = handset.name,
+                handsetId = serial, payout = moneyAmount, price = request.salePrice })
+        end
+        return true, nil, inventory.copy(op == 'resell' and handset or items[slot]), inventory.copy(returnedSim)
+    end)
+end
+
 -- Public exports ------------------------------------------------------------
 
 -- Compatibility aliases. The matching __cfx handlers below make these callable
 -- through the qb-inventory and ox_inventory provided identities as well.
 local api = {
+    PhoneItemTransaction = phoneItemTransaction,
     getWeight = getWeight,
     canCarry = canCarry,
     addItem = addItem,
@@ -3258,6 +3454,7 @@ local api = {
 -- "No such export". Alias by reference rather than re-declaring the closure,
 -- so both cases stay the same function object. test/smoke/contract.lua asserts
 -- the pairing, so a future one-cased addition fails the suite.
+api.phoneItemTransaction = api.PhoneItemTransaction
 api.registerStash = api.RegisterStash
 api.registerStashPolicy = api.RegisterStashPolicy
 api.rebindStashPolicy = api.RebindStashPolicy
