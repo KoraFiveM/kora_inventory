@@ -6,7 +6,7 @@ local function setup()
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
     env.Config = { qbinventory = { drops = { placeOnGround = false } } }
-    env.GetCurrentResourceName = function() return 'qbinventory' end
+    env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.GetInvokingResource = function() return f.invoker end
     env.NetworkIsSessionStarted = function() return true end
     env.Wait = function(ms) return coroutine.yield(ms) end
@@ -15,7 +15,7 @@ local function setup()
     env.AddEventHandler = function(name, cb) f.events[name] = cb end
     local nextZone, nextEntity = 0, 0
     env.exports = {
-        qbtarget = {
+        kora_target = {
             addSphereZone = function(_, options)
                 nextZone = nextZone + 1; f.zones[nextZone] = options; return nextZone
             end,
@@ -24,7 +24,7 @@ local function setup()
                 f.zones[id] = nil; f.removedZones[#f.removedZones + 1] = id
             end,
         },
-        qbinventory = { openInventory = function(_, kind, id) f.opened[#f.opened + 1] = { kind = kind, id = id } end },
+        kora_inventory = { openInventory = function(_, kind, id) f.opened[#f.opened + 1] = { kind = kind, id = id } end },
     }
     env.QB = {
         entities = {

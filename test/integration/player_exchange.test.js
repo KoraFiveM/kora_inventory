@@ -6,8 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
-const mysql = require(path.join(root, '../qbsql/node_modules/mysql2/promise'));
-const { TransactionRunner } = require(path.join(root, '../qbsql/server/js/transaction'));
+const mysql = require(path.join(root, '../kora_sql/node_modules/mysql2/promise'));
+const { TransactionRunner } = require(path.join(root, '../kora_sql/server/js/transaction'));
 function emittedStatements() {
     const capture = spawnSync('lua', ['-'], { cwd: root, encoding: 'utf8', input: `
         local f=dofile('test/exchange_fixture.lua')(); assert(f.login(1,'CID1'))

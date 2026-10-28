@@ -5,7 +5,7 @@
 -- must never receive a player list, a player name, a ped handle, or a server
 -- id.  A trusted client transport receives the resolved server id over the
 -- local `qbinventory:client:giveTargetResolved` event and submits the bounded
--- intent to qbinventory's server authority, which still validates range,
+-- intent to kora_inventory's server authority, which still validates range,
 -- bucket, session, source slot and amount immediately before transfer.
 --
 -- Integration contract (implemented by client.lua/client/ui.lua):
@@ -19,9 +19,9 @@
 --   TriggerEvent('qbinventory:client:cancelGiveTarget', reason?)
 --
 -- `qbinventory:ui:giveTargeting` contains only `{ active = boolean }`.  The
--- UI bridge uses it to relinquish NUI focus while qbtarget is selecting an
+-- UI bridge uses it to relinquish NUI focus while kora_target is selecting an
 -- in-world ped, then restores focus on resolve/cancel.  Keeping focus control
--- in client/ui.lua preserves qbinventory's NUI ownership boundary.
+-- in client/ui.lua preserves kora_inventory's NUI ownership boundary.
 
 local giveTarget = {}
 QbInventory = QbInventory or {}
@@ -50,7 +50,7 @@ local function serverIdForPed(ped)
     end
 end
 
--- Query closest first.  `QB.closest.player` is qblib's established mapping
+-- Query closest first.  `QB.closest.player` is kora_lib's established mapping
 -- from a nearby player ped to a FiveM player id; the full world query is only
 -- used after that to distinguish a single unambiguous recipient from several
 -- targetable peds.  Neither result crosses the Lua/NUI boundary.
@@ -96,12 +96,12 @@ local function clearTargetRegistration()
     if not active or not active.registrationId then
         return
     end
-    if GetResourceState('qbtarget') == 'started' then
-        -- qbtarget tears down the whole multi-ped registration when passed its
+    if GetResourceState('kora_target') == 'started' then
+        -- kora_target tears down the whole multi-ped registration when passed its
         -- registration id, but its public remover still takes one numeric ped
         -- as the first argument.
         pcall(function()
-            exports.qbtarget:removeEntity(active.peds[1], active.registrationId)
+            exports.kora_target:removeEntity(active.peds[1], active.registrationId)
         end)
     end
 end
@@ -139,7 +139,7 @@ end
 
 ---Resolve one recipient without exposing player identity to the browser.
 ---With exactly one nearby player it resolves immediately.  With multiple
----nearby players it starts qbtarget on exactly those peds, requiring the
+---nearby players it starts kora_target on exactly those peds, requiring the
 ---player to point at and select their intended recipient in the game world.
 ---@param requestId string|number A browser-local opaque correlation id.
 ---@return boolean started
@@ -170,7 +170,7 @@ function giveTarget.request(requestId)
         return true
     end
 
-    if GetResourceState('qbtarget') ~= 'started' then
+    if GetResourceState('kora_target') ~= 'started' then
         TriggerEvent('qbinventory:client:giveTargetResolved', {
             requestId = requestId,
             cancelled = true,
@@ -187,7 +187,7 @@ function giveTarget.request(requestId)
 
     active = { requestId = requestId, peds = peds, allowed = allowed }
     local ok, registrationId = pcall(function()
-        return exports.qbtarget:addEntity(peds, {
+        return exports.kora_target:addEntity(peds, {
             {
                 label = 'Give selected item',
                 icon = 'HandHeart',

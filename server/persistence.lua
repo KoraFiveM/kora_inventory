@@ -1,8 +1,8 @@
 -- Durable storage for SECONDARY inventories only.
 --
--- Player slots deliberately do not appear here. qbcore remains the sole owner
+-- Player slots deliberately do not appear here. kora_core remains the sole owner
 -- of PlayerData.items and players.inventory; this module only persists the
--- inventory records qbinventory owns (stashes, vehicle stores, containers and
+-- inventory records kora_inventory owns (stashes, vehicle stores, containers and
 -- shops). All writes are explicit and revisioned so callers can keep mutation
 -- locks in server.lua around their state transition.
 
@@ -181,7 +181,7 @@ local function dbUpsert(tableName, conflictKey, rows, opts)
 end
 
 -- One multi-row upsert per shop save instead of one query per stock slot.
--- QB.sql.upsert (qbsql's batched-upsert builder, the same one behind
+-- QB.sql.upsert (kora_sql's batched-upsert builder, the same one behind
 -- enqueueMany/the hot player-save path) takes the composite `(shop_id, slot)`
 -- primary key as `pk` per row and flushes a single
 -- `INSERT ... VALUES (...),(...) ON DUPLICATE KEY UPDATE ...` statement.
@@ -646,7 +646,7 @@ local function importLegacyRowUnlocked(source, defaultType, row, opts, report)
         return
     end
     if old and old.status == 'imported' and old.source_checksum ~= digest then
-        -- Never overwrite an inventory qbinventory may already have changed.
+        -- Never overwrite an inventory kora_inventory may already have changed.
         report.skipped = report.skipped + 1
         if not opts.dryRun then
             writeMigrationRow(source, sourceKey, digest, 'changed', kind, id, 'legacy data changed after import')
@@ -706,7 +706,7 @@ end
 -- Idempotent, non-destructive import. It never deletes or modifies a legacy
 -- table. A changed row after a successful import is reported and left alone;
 -- use an explicit operational migration rather than silently overwriting live
--- qbinventory data.
+-- kora_inventory data.
 function persistence.migrateLegacy(opts)
     opts = opts or {}
     if state.migrating then
@@ -878,7 +878,7 @@ AddEventHandler('onResourceStop', function(stopped)
         return
     end
     -- Resource-stop handlers may not yield safely, so flush in a dedicated
-    -- coroutine. qbsql's queue will still drain before its own shutdown when
+    -- coroutine. kora_sql's queue will still drain before its own shutdown when
     -- the configured startup order is respected.
     CreateThread(function()
         persistence.flush()

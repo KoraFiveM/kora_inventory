@@ -28,7 +28,7 @@ Config.qbinventory.shops.ammunation = {
         name = 'Ammu-Nation',
     },
 
-    -- Each row is a real qbcore shared weapon or ammo item. Keep native
+    -- Each row is a real kora_core shared weapon or ammo item. Keep native
     -- AMMO_* values out of shop stock: players buy the registered inventory
     -- packs (for example `pistol_ammo`), never synthetic ammo identifiers.
     inventory = {
@@ -57,7 +57,7 @@ Config.qbinventory.shops.ammunation = {
         { name = 'weapon_sniperrifle', amount = 4, price = 90000 },
         { name = 'weapon_marksmanrifle', amount = 4, price = 75000 },
 
-        -- Standard qbcore ammunition packs
+        -- Standard kora_core ammunition packs
         { name = 'pistol_ammo', amount = 160, price = 450 },
         { name = 'smg_ammo', amount = 120, price = 700 },
         { name = 'shotgun_ammo', amount = 120, price = 650 },

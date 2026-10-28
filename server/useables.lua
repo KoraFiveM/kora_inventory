@@ -1,11 +1,11 @@
 -- Use-item handlers: weapon equip/holster toggle, and a generic data-driven
 -- consumable effect handler (food/drink/alcohol/drugs). Registered here via
--- qbinventory's explicit server API (defined in server.lua and available by
+-- kora_inventory's explicit server API (defined in server.lua and available by
 -- this file's manifest load position) rather than
--- exports.qbcore:createUseable: qbinventory's OWN useables table is what
+-- exports.kora_core:createUseable: kora_inventory's OWN useables table is what
 -- actually powers the NUI's Use button (see hasUseable/buildItem in
--- server.lua); a handler registered on qbcore's separate useables table is
--- never consulted by qbinventory's use flow.
+-- server.lua); a handler registered on kora_core's separate useables table is
+-- never consulted by kora_inventory's use flow.
 
 local api = assert(QbInventory and QbInventory.api, 'qbinventory server authority must load before useables')
 local internal = assert(QbInventory.internal, 'qbinventory internal API must load before useables')
@@ -48,19 +48,19 @@ local function refreshWeaponUseable(name, def)
     )
 end
 
-for _, def in ipairs(exports.qbcore:allShared('weapons')) do
+for _, def in ipairs(exports.kora_core:allShared('weapons')) do
     refreshWeaponUseable(def.name, def)
 end
-exports.qbcore:onSharedChange('weapons', function(_, name, def)
+exports.kora_core:onSharedChange('weapons', function(_, name, def)
     refreshWeaponUseable(name, def)
 end)
 
 -- --- consumables ---
 
 -- name -> { hunger?, thirst?, stress?, drunk?, high? } deltas, applied via
--- exports.qbcore:incrementMetaData (clamped 0-100). drunk/high are new
+-- exports.kora_core:incrementMetaData (clamped 0-100). drunk/high are new
 -- metadata keys -- no existing convention to clash with. Unlike hunger/
--- thirst (see qbcore/modules/needs), nothing decays them passively yet;
+-- thirst (see kora_core/modules/needs), nothing decays them passively yet;
 -- that's a natural follow-up if permanent drunk/high stacking is unwanted.
 local CONSUMABLE_EFFECTS = {
     -- food
@@ -89,19 +89,19 @@ local function consumableUseable(src, item)
     end
 
     if effects.hunger then
-        exports.qbcore:incrementMetaData(src, 'hunger', effects.hunger, 0, 100)
+        exports.kora_core:incrementMetaData(src, 'hunger', effects.hunger, 0, 100)
     end
     if effects.thirst then
-        exports.qbcore:incrementMetaData(src, 'thirst', effects.thirst, 0, 100)
+        exports.kora_core:incrementMetaData(src, 'thirst', effects.thirst, 0, 100)
     end
     if effects.stress then
-        exports.qbcore:incrementMetaData(src, 'stress', effects.stress, 0, 100)
+        exports.kora_core:incrementMetaData(src, 'stress', effects.stress, 0, 100)
     end
     if effects.drunk then
-        exports.qbcore:incrementMetaData(src, 'drunk', effects.drunk, 0, 100)
+        exports.kora_core:incrementMetaData(src, 'drunk', effects.drunk, 0, 100)
     end
     if effects.high then
-        exports.qbcore:incrementMetaData(src, 'high', effects.high, 0, 100)
+        exports.kora_core:incrementMetaData(src, 'high', effects.high, 0, 100)
     end
 
     TriggerClientEvent('qbinventory:client:consumeEffect', src, item.name, effects)
@@ -118,7 +118,7 @@ end
 --
 -- Before this, no ammo useable was registered at all: `pistol_ammo` and the
 -- rest were stocked by Ammu-Nation, defined with an `ammoType` and a `rounds`
--- count in qbcore's shared items, and completely inert -- every weapon sat at
+-- count in kora_core's shared items, and completely inert -- every weapon sat at
 -- zero rounds forever with no way to load one.
 --
 -- Which weapon is being loaded is resolved on the SERVER, from
@@ -223,9 +223,9 @@ local function refreshAmmoUseable(name, def)
     internal.setBuiltInUseable(name, isAmmo and ammoUseable or nil, 'ammo')
 end
 
-for _, def in ipairs(exports.qbcore:allShared('items')) do
+for _, def in ipairs(exports.kora_core:allShared('items')) do
     refreshAmmoUseable(def.name, def)
 end
-exports.qbcore:onSharedChange('items', function(_, name, def)
+exports.kora_core:onSharedChange('items', function(_, name, def)
     refreshAmmoUseable(name, def)
 end)

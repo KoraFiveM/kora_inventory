@@ -1,5 +1,5 @@
 -- Client weapon-damage settings are presentation-side native calls, but they
--- must be bound to qbinventory's draw lifecycle rather than a permanent loop.
+-- must be bound to kora_inventory's draw lifecycle rather than a permanent loop.
 local H = dofile('test/harness.lua')
 
 local events, cacheHandlers, damageCalls, criticalCalls, sent = {}, {}, {}, {}, {}
@@ -32,7 +32,7 @@ end
 SetPedSuffersCriticalHits = function(_, enabled) criticalCalls[#criticalCalls + 1] = enabled end
 GetAmmoInPedWeapon = function() return 0 end
 RemoveWeaponFromPed = function() end
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 
 dofile('client/weaponcarry.lua')
 

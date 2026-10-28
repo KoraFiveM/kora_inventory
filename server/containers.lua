@@ -27,7 +27,7 @@ local function cleanId(value)
 end
 
 local function playerData(source)
-    return exports.qbcore:getPlayerData(source)
+    return exports.kora_core:getPlayerData(source)
 end
 
 local function citizenId(source)
@@ -61,7 +61,7 @@ end
 -- Portable access is deliberately possession-based rather than owner-based:
 -- handing a unique backpack to another player transfers the ability to open
 -- it, but a copied/out-of-date item record cannot. This predicate reads the
--- current qbcore player slots each time core revalidates a session.
+-- current kora_core player slots each time core revalidates a session.
 local function carrierHasContainer(source, containerId, expectedName)
     local _, inventoryRecord = currentPlayer(source)
     if not inventoryRecord then
@@ -220,8 +220,8 @@ function containers.open(source, id)
     return inventoryApi.open(source, containerKey)
 end
 
----Bind a container to an item currently held in a player's qbcore inventory.
----The identifier is generated server-side and written through qbcore's item
+---Bind a container to an item currently held in a player's kora_core inventory.
+---The identifier is generated server-side and written through kora_core's item
 ---mutation funnel; callers cannot select another player's item or owner.
 function containers.bindItem(source, slot, options)
     source, slot = whole(source), whole(slot)
@@ -292,7 +292,7 @@ function containers.openItem(source, slot)
 end
 
 ---Open a configured portable container from a real, current player slot.
----This is the only item-driven entry point used by qbinventory's use action:
+---This is the only item-driven entry point used by kora_inventory's use action:
 ---the browser provides merely a slot and the definition/access proof is
 ---resolved entirely on the server.
 function containers.openConfiguredItem(source, slot)

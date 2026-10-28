@@ -3,13 +3,13 @@ local H = dofile('test/harness.lua')
 local handlers = {}
 _G.QbInventory = { compat = { qb = { GetInventory = function() end }, ox = { GetInventory = function() end } } }
 _G.AddEventHandler = function(name, handler) handlers[name] = handler end
-_G.GetCurrentResourceName = function() return 'qbinventory' end
+_G.GetCurrentResourceName = function() return 'kora_inventory' end
 _G.QB = { compat = { provideExport = function(identity, name, fn)
     AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCallback) setCallback(fn) end)
 end } }
 
 _G.GetNumResources = function() return 1 end
-_G.GetResourceByFindIndex = function() return 'qbinventory' end
+_G.GetResourceByFindIndex = function() return 'kora_inventory' end
 -- This is the bug regression: Cfx resolves the provided alias to us.
 _G.GetResourceState = function(name)
     if name == 'qb-inventory' or name == 'ox_inventory' then return 'started' end

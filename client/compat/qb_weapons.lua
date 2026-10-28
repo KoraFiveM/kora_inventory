@@ -2,7 +2,7 @@
 --
 -- These names are registered because older resources commonly TriggerEvent
 -- them.  They never consume a client-provided weapon table locally: the table
--- is reduced to a slot and qbinventory's server re-resolves the real item.
+-- is reduced to a slot and kora_inventory's server re-resolves the real item.
 
 local function slotOf(value)
     local slot = math.floor(tonumber(type(value) == 'table' and value.slot or value) or 0)
@@ -10,7 +10,7 @@ local function slotOf(value)
 end
 
 -- qb-weapons exposed this client export for attachment UIs. Build the old
--- item -> weapon -> native-component shape from qbinventory's two explicit
+-- item -> weapon -> native-component shape from kora_inventory's two explicit
 -- allow-lists; nothing inferred from a caller reaches the result.
 local function legacyAttachmentConfig()
     local weapons = (Config.qbinventory.weapons or {}).components or {}
@@ -52,14 +52,14 @@ RegisterNetEvent('qb-weapons:client:CheckWeapon', function()
 end)
 
 -- The two events below used to maintain qb-weapons' private client state.
--- qbinventory owns that state in client/weaponcarry.lua; accepting them as
+-- kora_inventory owns that state in client/weaponcarry.lua; accepting them as
 -- no-ops avoids a stale resource error without creating competing controllers.
 RegisterNetEvent('qb-weapons:client:SetCurrentWeapon', function() end)
 RegisterNetEvent('qb-weapons:client:SetWeaponQuality', function() end)
 RegisterNetEvent('qb-weapons:client:SyncRepairShops', function() end)
 
 -- Tint drawing is harmless presentation and may be sent by a trusted server
--- after it persisted tint metadata through qbinventory's server-side API.
+-- after it persisted tint metadata through kora_inventory's server-side API.
 RegisterNetEvent('qb-weapons:client:EquipTint', function(weapon, tint)
     if type(weapon) ~= 'string' and type(weapon) ~= 'number' then
         return

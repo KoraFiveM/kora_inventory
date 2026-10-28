@@ -1,13 +1,13 @@
 -- Real core fences, player funnel and inventory planner with SQL transport mocked.
 return function(database)
-    local mocks = dofile('../qbcore/test/mocks.lua').install()
-    dofile('../qbcore/config.lua')
-    for _,name in ipairs({'items','jobs','gangs','weapons','vehicles','locations'}) do dofile('../qbcore/shared/'..name..'.lua') end
-    for _,path in ipairs({'util/shared','registry/shared','registry/server','player/shared','inventory/shared','replication/server','persistence/server','persistence/operations','player/server','money/server','metadata/server','inventory/server'}) do dofile('../qbcore/modules/'..path..'.lua') end
-    local f={db=database or {players={},fences={},receipts={}},provided={},threads={},caller='qbdrugs',core=Core,mocks=mocks}
+    local mocks = dofile('../kora_core/test/mocks.lua').install()
+    dofile('../kora_core/config.lua')
+    for _,name in ipairs({'items','jobs','gangs','weapons','vehicles','locations'}) do dofile('../kora_core/shared/'..name..'.lua') end
+    for _,path in ipairs({'util/shared','registry/shared','registry/server','player/shared','inventory/shared','replication/server','persistence/server','persistence/operations','player/server','money/server','metadata/server','inventory/server'}) do dofile('../kora_core/modules/'..path..'.lua') end
+    local f={db=database or {players={},fences={},receipts={}},provided={},threads={},caller='kora_drugs',core=Core,mocks=mocks}
     local function copy(v) return Core.util.deepClone(v) end
     GetInvokingResource=function() return f.caller end
-    GetCurrentResourceName=function() return 'qbinventory' end
+    GetCurrentResourceName=function() return 'kora_inventory' end
     GetResourceState=function() return 'started' end
     RegisterCommand=function() end
     CreateThread=function(fn) f.threads[#f.threads+1]=fn end
@@ -16,16 +16,16 @@ return function(database)
     for _,module in pairs(Core) do
         for name,fn in pairs(module) do
             if type(fn)=='function' and name:sub(1,1)~='_' then native[name]=function(_, ...)
-                local old=f.caller;f.caller='qbinventory'
+                local old=f.caller;f.caller='kora_inventory'
                 local values=table.pack(pcall(fn,...));f.caller=old
                 if not values[1] then error(values[2]) end
                 return table.unpack(values,2,values.n)
             end end
         end
     end
-    exports=setmetatable({qbcore=native,qbsql={hasActivePlayerOperation=function() return false end}}, {__call=function(_,name,fn) f.provided[name]=fn end})
-    exports.qbinventory=setmetatable({}, {__index=function(_,name) return function(_, ...)
-        local old=f.caller;f.caller='qbcore';local values=table.pack(pcall(f.provided[name],...));f.caller=old
+    exports=setmetatable({kora_core=native,kora_sql={hasActivePlayerOperation=function() return false end}}, {__call=function(_,name,fn) f.provided[name]=fn end})
+    exports.kora_inventory=setmetatable({}, {__index=function(_,name) return function(_, ...)
+        local old=f.caller;f.caller='kora_core';local values=table.pack(pcall(f.provided[name],...));f.caller=old
         if not values[1] then error(values[2]) end;return table.unpack(values,2,values.n)
     end end})
     local sql=QB.sql
@@ -114,9 +114,9 @@ return function(database)
         return Core.player.login(src,cid,data)
     end
     function f.execute(key,terms)
-        f.caller='qbdrugs';return f.provided.ExecutePlayerExchange(1,key,terms)
+        f.caller='kora_drugs';return f.provided.ExecutePlayerExchange(1,key,terms)
     end
-    function f.get(key) f.caller='qbdrugs';return f.provided.GetPlayerExchange(key) end
+    function f.get(key) f.caller='kora_drugs';return f.provided.GetPlayerExchange(key) end
     function f.data() return Core.player.getPlayerData(1) end
     function f.count(name)
         local count=0;for _,item in pairs(f.data().items) do if item.name==name then count=count+item.amount end end;return count

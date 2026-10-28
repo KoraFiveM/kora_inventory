@@ -1,6 +1,6 @@
 -- Contract coverage for the qb-inventory callback bridge.
 --
--- Two things matter here. First, the handlers must be registered in qblib's
+-- Two things matter here. First, the handlers must be registered in kora_lib's
 -- RETURN-VALUE form: upstream's `function(source, cb, ...)` shape would bind
 -- `cb` to the first real argument and nothing would ever resolve on the client.
 -- Second, and security-critical: upstream takes the item name, amount, price
@@ -32,7 +32,7 @@ local metadata = {
 GetPlayerPed = function(src) return peds[src] or 0 end
 GetEntityCoords = function(ped) return pedCoords[ped] end
 GetPlayerRoutingBucket = function(src) return buckets[src] end
-exports = { qbcore = { getPlayerData = function(_, src, fields)
+exports = { kora_core = { getPlayerData = function(_, src, fields)
     if fields and fields[1] == 'metadata' then return metadata[src] end
     return nil
 end } }
@@ -114,7 +114,7 @@ for _, name in ipairs({
     H.ok(type(handlers[name]) == 'function', 'registers upstream callback ' .. name)
 end
 
--- Registration form: qblib calls handler(src, ...) and uses the RETURN value.
+-- Registration form: kora_lib calls handler(src, ...) and uses the RETURN value.
 -- If the bridge had copied upstream's (source, cb, item) signature, the second
 -- positional argument would be the item, so this call would explode.
 H.equal(handlers['qb-inventory:server:createDrop'](7, 'not-a-table'), false,

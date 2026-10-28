@@ -1,4 +1,4 @@
--- Repeated qbtarget starts must replace, not duplicate, liquor-store options.
+-- Repeated kora_target starts must replace, not duplicate, liquor-store options.
 local H = dofile('test/harness.lua')
 
 Config = { qbinventory = {} }
@@ -18,8 +18,8 @@ AddEventHandler = function(name, callback)
 end
 
 exports = {
-    qbinventory = { openInventory = function() end },
-    qbtarget = {
+    kora_inventory = { openInventory = function() end },
+    kora_target = {
         addSphereZone = function(_, options)
             nextId = nextId + 1
             activeZones[nextId] = options
@@ -47,8 +47,8 @@ local function activeZoneCount()
     return count
 end
 
-for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('qbtarget') end
-for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('qbtarget') end
+for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('kora_target') end
+for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('kora_target') end
 H.equal(activeZoneCount(), #shop.locations, 'repeated target starts leave one liquor option at each counter')
 H.equal(createdBlips[1].category, 'Liquor', 'Rob\'s and 24/7 share the Liquor category')
 H.equal(createdBlips[1].name, "Rob's Liquor", 'the first blip uses its location storefront')

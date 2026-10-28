@@ -18,7 +18,7 @@ QB = {
     callback = { register = function() end },
     sql = {},
 }
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 GetInvokingResource = function() return nil end
 CreateThread = function() end
 RegisterCommand = function() end
@@ -32,7 +32,7 @@ exports = setmetatable({}, {
         return setmetatable({}, {
             __index = function(_, exportName)
                 return function(_, ...)
-                    if resourceName == 'qbcore' and exportName == 'allShared' then return {} end
+                    if resourceName == 'kora_core' and exportName == 'allShared' then return {} end
                     local fn = registered[exportName]
                     if fn then return fn(...) end
                     return nil
@@ -75,7 +75,7 @@ local same = internal.rekeySecondary(newKey, 'trunk', 'NEWPLATE')
 H.equal(same, newKey, 'renaming to the same identity is a no-op')
 H.ok(select(2, internal.resolveInventory(newKey)) ~= nil, 'the inventory survives a no-op rename')
 
--- Player inventories are owned by qbcore and are not re-keyable.
+-- Player inventories are owned by kora_core and are not re-keyable.
 local refused, refusedErr = internal.rekeySecondary(internal.playerKey(1), 'trunk', 'NOPE')
 H.equal(refused, nil, 'refuses to rekey a player inventory')
 H.ok(refusedErr ~= nil, 'and says why')

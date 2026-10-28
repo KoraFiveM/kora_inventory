@@ -43,14 +43,14 @@ local function removeDrop(id)
     end
 
     drops[tostring(id)] = nil
-    exports.qbtarget:removeZone(record.target)
+    exports.kora_target:removeZone(record.target)
     if record.entity then
         QB.entities.remove(record.entity)
     end
 end
 
 local function addDropTarget(id, coords)
-    return exports.qbtarget:addSphereZone({
+    return exports.kora_target:addSphereZone({
         coords = coords,
         radius = dropConfig.interactionDistance or 1.5,
         options = {
@@ -58,7 +58,7 @@ local function addDropTarget(id, coords)
                 label = dropConfig.label or 'Pick up',
                 icon = dropConfig.icon or 'package',
                 onSelect = function()
-                    exports.qbinventory:openInventory('drop', id)
+                    exports.kora_inventory:openInventory('drop', id)
                 end,
             },
         },
@@ -146,7 +146,7 @@ RegisterNetEvent('qbinventory:client:dropRemoved', function(id)
 end)
 
 AddEventHandler('onClientResourceStart', function(resource)
-    if resource ~= 'qbtarget' then
+    if resource ~= 'kora_target' then
         return
     end
     for id, record in pairs(drops) do

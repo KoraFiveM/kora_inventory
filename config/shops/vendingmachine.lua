@@ -31,7 +31,7 @@ Config.qbinventory.shops.vendingmachine = {
         'prop_vend_coffe_01',
     },
 
-    -- Reuses this project's own item catalogue (qbcore/shared/items.lua)
+    -- Reuses this project's own item catalogue (kora_core/shared/items.lua)
     -- rather than porting upstream's `kurkakola` name verbatim -- this
     -- registry already departs from upstream naming elsewhere (e.g.
     -- `water_bottle` is labelled "Water", not "Bottle of Water").

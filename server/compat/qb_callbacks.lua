@@ -5,23 +5,23 @@
 -- names in qb_events.lua is not enough on its own: an unmodified qb-inventory
 -- client hangs on the callback until something answers it.
 --
--- REGISTRATION. qbcore's compat exposes
+-- REGISTRATION. kora_core's compat exposes
 -- `QBCore.Functions.CreateCallback(name, fn)` as a one-line wrapper over
 -- `QB.callback.register(name, fn)` which forwards the handler's RETURN VALUES.
 -- It deliberately does NOT hand the handler upstream's `cb` continuation, so
 -- writing upstream's literal `function(source, cb, item)` shape here would bind
 -- `cb` to the first real argument and the client's callback would never
 -- resolve. The bodies below are therefore upstream's logic in return-value
--- form, registered straight onto qblib -- the same registry the client compat's
+-- form, registered straight onto kora_lib -- the same registry the client compat's
 -- TriggerCallback actually awaits, and one fewer load-order dependency than
--- reaching through the qbcore compat resource for an identical wrapper.
+-- reaching through the kora_core compat resource for an identical wrapper.
 --
 -- SECURITY: identical posture to qb_events.lua. The client supplies intent only
 -- -- a slot, an amount, a target server id -- and every item name, weight,
 -- price, metadata blob and inventory key is re-read from authoritative state
 -- inside the lock that commits the change. Nothing here is a new mutation
 -- primitive: drops, purchases and gives are composed from the public funnel
--- (RemoveItem/AddItem/dropCreate/BuyItem), so qbcore keeps ownership of player
+-- (RemoveItem/AddItem/dropCreate/BuyItem), so kora_core keeps ownership of player
 -- items and the revision bump, live broadcast and audit entry stay intact.
 
 local inventory = assert(QbInventory, 'qbinventory authority missing')
@@ -72,9 +72,9 @@ local function sameBucket(sourcePlayer, targetPlayer)
 end
 
 ---Upstream blocks a give while either party is dead, downed or cuffed. The
----metadata comes from qbcore, which owns it -- never from the payload.
+---metadata comes from kora_core, which owns it -- never from the payload.
 local function incapacitated(src)
-    local metadata = exports.qbcore:getPlayerData(src, { 'metadata' })
+    local metadata = exports.kora_core:getPlayerData(src, { 'metadata' })
     if type(metadata) ~= 'table' then
         return true
     end
@@ -106,10 +106,10 @@ local bridgeDrops = {}
 --
 -- Two further divergences, both consequences of drops being server-resolved in
 -- this resource (see client/compat.lua's setupDropTarget note): the map is keyed
--- by the bare qbinventory drop id, because upstream's client feeds that key
+-- by the bare kora_inventory drop id, because upstream's client feeds that key
 -- straight back to `qb-inventory:server:openDrop`, and `entityId` is 0.
 --
--- `entityId` stays 0 even though qbinventory now DOES render a bag on the floor
+-- `entityId` stays 0 even though kora_inventory now DOES render a bag on the floor
 -- (client/drops.lua). That prop is a local, non-networked object created
 -- independently on each client, so it has no network id to hand out and no
 -- meaning on any other machine. Upstream's client skips a drop whose entity
@@ -191,7 +191,7 @@ QB.callback.register('qb-inventory:server:createDrop', function(src, item)
             local id = api.dropCreate(coords, { [1] = dropped }, GetPlayerRoutingBucket(src))
             bridgeDrops[tostring(id)] = os.time()
             -- Upstream returns the bag prop's NETWORK id and its client appends
-            -- 'drop-'. qbinventory's bag (client/drops.lua) is local to each
+            -- 'drop-'. kora_inventory's bag (client/drops.lua) is local to each
             -- client and has no network id, so this is the drop's own id, which is
             -- what its open path expects back.
             return id
@@ -206,7 +206,7 @@ end)
 --
 -- Divergence: upstream's hardcoded 10.0 shop distance is replaced by the shop
 -- inventory's own configured `distance`, enforced by canAccess inside BuyItem
--- along with its group/owner policy -- the same gate qbinventory's own shop UI
+-- along with its group/owner policy -- the same gate kora_inventory's own shop UI
 -- passes through.
 QB.callback.register('qb-inventory:server:attemptPurchase', function(src, data)
     if type(data) ~= 'table' or type(data.item) ~= 'table' then
@@ -256,7 +256,7 @@ end)
 --
 -- Divergence: upstream's hardcoded 5.0 give distance is replaced by
 -- Config.qbinventory.interactionDistance (3.0 by default), which is what
--- qbinventory's own give intent enforces; the routing bucket is checked too,
+-- kora_inventory's own give intent enforces; the routing bucket is checked too,
 -- which upstream does not do at all.
 QB.callback.register('qb-inventory:server:giveItem', function(src, target, item, amount, slot, _info)
     local session = internal.sessionOf(src)

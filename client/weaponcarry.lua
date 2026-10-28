@@ -19,7 +19,7 @@ end
 
 -- --- draw / holster ---------------------------------------------------------
 
--- The weapon this client believes it is holding because of a qbinventory
+-- The weapon this client believes it is holding because of a kora_inventory
 -- draw. Used only to notice the weapon leaving their hands by some other
 -- route (weapon wheel, disarm, death) so the server can put the prop back.
 local drawn
@@ -240,7 +240,7 @@ RegisterNetEvent('qbinventory:client:addAmmo', function(request)
     local target = math.floor(tonumber(request.ammo) or -1)
     if target < 0 then
         -- Backwards-compatible shape for callers from before ammo was
-        -- persisted by the server. qbinventory itself sends `ammo` above.
+        -- persisted by the server. kora_inventory itself sends `ammo` above.
         target = (GetAmmoInPedWeapon(ped, hash) or 0) + rounds
     end
     if maxAmmo and maxAmmo > 0 then
@@ -592,7 +592,7 @@ AddEventHandler('onClientResourceStop', function(name)
     rendered = {}
 end)
 
--- Catch-up for `ensure qbinventory` while players are already in the world:
+-- Catch-up for `ensure kora_inventory` while players are already in the world:
 -- their bags were set before this handler existed, so nothing would arrive
 -- until their next inventory change.
 CreateThread(function()

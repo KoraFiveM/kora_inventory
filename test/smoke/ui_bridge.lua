@@ -19,7 +19,7 @@ H.ok(source:find("QB.notify.send({", 1, true),
 Config = {}
 dofile('config.lua')
 local images = Config.qbinventory.ui.images
-H.equal(images.localPath, 'nui://qbinventory/images', 'artwork uses qbinventory NUI paths')
+H.equal(images.localPath, 'nui://kora_inventory/images', 'artwork uses kora_inventory NUI paths')
 H.equal(images.preferLocal, true, 'bundled artwork is preferred over remote fallbacks')
 
 local canonicalImage = io.open('images/advancedlockpick.png', 'rb')
@@ -33,7 +33,7 @@ RegisterNetEvent = AddEventHandler
 RegisterNUICallback = function() end
 SetNuiFocus, TriggerEvent = function() end, function() end
 SendNUIMessage = function(message) messages[#messages + 1] = message end
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 QBTheme = { refresh = function() end }
 QB = { notify = { send = function() end } }
 dofile(arg[1] or 'client/ui.lua')

@@ -1,5 +1,5 @@
 -- Provider identity router. Cfx exposes aliases through __cfx_export events;
--- this is intentionally separate from qbinventory's native export table so
+-- this is intentionally separate from kora_inventory's native export table so
 -- qb-inventory:GetInventory and ox_inventory:GetInventory can retain their
 -- incompatible upstream return shapes.
 local inventory = assert(QbInventory, 'qbinventory authority missing')
@@ -7,7 +7,7 @@ local qb = assert(inventory.compat and inventory.compat.qb, 'qb compatibility mi
 local ox = assert(inventory.compat and inventory.compat.ox, 'ox compatibility missing')
 
 -- GetResourceState('qb-inventory') resolves `provide 'qb-inventory'` back to
--- THIS resource once qbinventory has started. Looking it up directly therefore
+-- THIS resource once kora_inventory has started. Looking it up directly therefore
 -- falsely reports a conflict with our own alias. Enumerate real resources by
 -- their physical manifest names instead; provided identities are not entries
 -- in that list, while a separately ensured qb-inventory/ox_inventory folder is.

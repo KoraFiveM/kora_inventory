@@ -1,5 +1,5 @@
--- ox_inventory client provider surface. All state is read from qbcore's
--- replicated mirror or qbinventory's server-issued session; no browser state
+-- ox_inventory client provider surface. All state is read from kora_core's
+-- replicated mirror or kora_inventory's server-issued session; no browser state
 -- is ever treated as inventory authority.
 --
 -- Behaviour is matched against ox_inventory's own src/modules/inventory/
@@ -11,12 +11,12 @@
 local inventoryApi = assert(QbInventory and QbInventory.clientApi, 'qbinventory client transport must load first')
 
 local function playerData()
-    return exports.qbcore:getPlayerData() or {}
+    return exports.kora_core:getPlayerData() or {}
 end
 local function items()
     return playerData().items or {}
 end
--- qbcore's registry is named 'items' (lower-case, see qbcore
+-- kora_core's registry is named 'items' (lower-case, see kora_core
 -- modules/registry/server.lua:12) and `getShared(name, key)` requires BOTH
 -- arguments -- it returns registries[name].materialised[key]. So the previous
 -- `getShared('Items')` resolved no registry AND supplied no key: it returned
@@ -24,11 +24,11 @@ end
 -- item". `allShared('items')` is the dense ARRAY of records, so the name-keyed
 -- map upstream's Items() hands back has to be rebuilt from it.
 local function itemDefByName(name)
-    return exports.qbcore:getShared('items', name)
+    return exports.kora_core:getShared('items', name)
 end
 local function sharedItems()
     local out = {}
-    for _, def in ipairs(exports.qbcore:allShared('items') or {}) do
+    for _, def in ipairs(exports.kora_core:allShared('items') or {}) do
         if type(def) == 'table' and type(def.name) == 'string' then
             out[def.name] = def
         end
@@ -98,7 +98,7 @@ local function slotsOf(name, metadata, strict)
         end
     end
     -- Upstream does NOT sort: its inventory is a dense slot array, so pairs()
-    -- already yields ascending slots. qbcore's items table is SPARSE, so
+    -- already yields ascending slots. kora_core's items table is SPARSE, so
     -- pairs() order over it is genuinely arbitrary and GetSlotWithItem would
     -- return a different slot from one call to the next. Sorting restores the
     -- "lowest slot first" behaviour upstream gets for free.
@@ -121,7 +121,7 @@ local function weight()
 end
 
 local function maxWeight()
-    local active = exports.qbinventory:getCurrentSession()
+    local active = exports.kora_inventory:getCurrentSession()
     if active and active.primary and tonumber(active.primary.maxWeight) then
         return tonumber(active.primary.maxWeight)
     end
@@ -177,7 +177,7 @@ local function search(kind, requested, metadata)
     return out
 end
 
--- ox_lib's neutral notify variant is 'inform'; qblib's is 'info'. An
+-- ox_lib's neutral notify variant is 'inform'; kora_lib's is 'info'. An
 -- unrecognised type fails QB.notify.assert, which drops the whole toast
 -- silently, so the vocabulary is translated rather than passed through.
 local NOTIFY_TYPES = { info = true, success = true, warning = true, error = true }
@@ -194,7 +194,7 @@ local NOTIFY_POSITIONS = {
 
 -- ox_lib inputDialog row types mapped onto QB.nui.openInputDialog field types.
 -- Anything outside this set degrades to a text field rather than erroring,
--- matching how the qb-input compat shim in qblib handles unknown types.
+-- matching how the qb-input compat shim in kora_lib handles unknown types.
 local KEYBOARD_TYPES = {
     input = 'text',
     text = 'text',
@@ -230,7 +230,7 @@ end
 local stashTarget
 
 local ox = {
-    -- Call client.lua's globals directly, NOT exports.qbinventory:openInventory.
+    -- Call client.lua's globals directly, NOT exports.kora_inventory:openInventory.
     -- This file used to re-enter the export while also registering itself into
     -- the same flat table below, so after load the export resolved back to this
     -- wrapper -- unbounded recursion on every stash/shop/evidence-locker open.
@@ -246,21 +246,21 @@ local ox = {
         return inventoryApi.closeInventory()
     end,
     useSlot = function(slot)
-        return exports.qbinventory:submitIntent({ action = 'use', slot = slot })
+        return exports.kora_inventory:submitIntent({ action = 'use', slot = slot })
     end,
     useItem = function(data, cb)
         local slot = type(data) == 'table' and data.slot or data
-        local ok = exports.qbinventory:submitIntent({ action = 'use', slot = slot })
+        local ok = exports.kora_inventory:submitIntent({ action = 'use', slot = slot })
         if cb then
             cb(ok)
         end
         return ok
     end,
     openNearbyInventory = function()
-        return exports.qbinventory:requestGiveTarget()
+        return exports.kora_inventory:requestGiveTarget()
     end,
     giveItemToTarget = function(serverId, slot, count)
-        return exports.qbinventory:submitIntent({
+        return exports.kora_inventory:submitIntent({
             action = 'give',
             target = serverId,
             slot = slot,
@@ -304,7 +304,7 @@ local ox = {
         return slotsOf(name, normaliseMetadata(metadata), strict)
     end,
     Search = search,
-    -- Lower-cased like every other lookup in this file: qbcore's shared items
+    -- Lower-cased like every other lookup in this file: kora_core's shared items
     -- table is keyed lower-case, so `Items('WEAPON_PISTOL')` would otherwise
     -- miss while GetItemCount('WEAPON_PISTOL') resolves it fine.
     Items = function(name)
@@ -315,7 +315,7 @@ local ox = {
     end,
     setStashTarget = function(id, owner)
         -- Upstream stores this in a local and its SECONDARY-inventory keybind
-        -- opens it (src/client.lua:819). qbinventory owns no secondary keybind
+        -- opens it (src/client.lua:819). kora_inventory owns no secondary keybind
         -- -- client/compat.lua maps only the primary TAB open -- so the stored
         -- target is read back by openInventory('stash') with no id above,
         -- preserving the same "open the stash this resource pointed me at"
@@ -325,11 +325,11 @@ local ox = {
         stashTarget = id and { id = id, owner = owner } or nil
     end,
     -- No backing subsystem. Upstream pushes a metadata-key -> display-label map
-    -- into its own NUI (src/modules/items/client.lua:51). qbinventory's NUI
+    -- into its own NUI (src/modules/items/client.lua:51). kora_inventory's NUI
     -- wire contract (web/src/lib/types.ts) has no such message and renders raw
     -- metadata keys, so there is nothing to forward this to. Deliberate no-op.
     displayMetadata = function() end,
-    -- No backing subsystem. qbinventory's item receipts are SERVER-authored and
+    -- No backing subsystem. kora_inventory's item receipts are SERVER-authored and
     -- gated server-side by Config.qbinventory.itemBoxes; the client only relays
     -- 'qbinventory:client:itemBox' (client/ui.lua). There is no client-side
     -- suppression switch to flip, and a local flag here would not stop the
@@ -400,7 +400,7 @@ local ox = {
     end,
     -- Upstream is `exports('Keyboard', lib.inputDialog)`: (heading, rows) in,
     -- an array of values POSITIONALLY aligned with `rows` out, or nil on
-    -- cancel. qblib's dialog is id-keyed, so the row index is used as the id
+    -- cancel. kora_lib's dialog is id-keyed, so the row index is used as the id
     -- and the result is re-flattened back into upstream's array shape.
     Keyboard = function(heading, rows)
         if type(rows) ~= 'table' then
@@ -433,12 +433,12 @@ local ox = {
     end,
     -- No backing subsystem. Upstream blocks the weapon wheel and pickup rewards
     -- through per-frame natives inside its own control loop
-    -- (src/modules/utils/client.lua:144). qbinventory runs no per-frame control
-    -- loop and qblib has no weapon-wheel module, so there is nothing to route
+    -- (src/modules/utils/client.lua:144). kora_inventory runs no per-frame control
+    -- loop and kora_lib has no weapon-wheel module, so there is nothing to route
     -- this to. Deliberate no-op.
     weaponWheel = function() end,
     -- No backing subsystem, BY DESIGN. Upstream uses this hook to format the
-    -- player names shown in its give/trade UI. qbinventory deliberately never
+    -- player names shown in its give/trade UI. kora_inventory deliberately never
     -- sends a player name, ped or server id across the NUI boundary -- see
     -- client/give_target.lua's header -- so there is no name to format.
     -- Deliberate no-op.
@@ -446,7 +446,7 @@ local ox = {
 }
 
 -- Upstream tracks the weapon ITS OWN equip flow armed (src/client.lua:10).
--- qbinventory records no equip state -- client/useables.lua just toggles the
+-- kora_inventory records no equip state -- client/useables.lua just toggles the
 -- ped's weapon -- so the ped's selected weapon is the only client-side truth
 -- available, matched back to an owned item. CAVEAT, and why this is not a
 -- drop-in equivalent: it also reports a weapon armed by another resource, and
@@ -474,14 +474,14 @@ function ox.getCurrentWeapon()
     return best
 end
 
--- Register under the ox_inventory identity ONLY, never into qbinventory's own
+-- Register under the ox_inventory identity ONLY, never into kora_inventory's own
 -- flat export table. This mirrors the server-side rule in
 -- server/compat/providers.lua: a compat module builds a table and the provider
 -- identity publishes it; compat never calls exports(). Calling exports() here
 -- silently overwrote client.lua's own openInventory/closeInventory for every
 -- resource in the server -- client_scripts load client.lua first, so the later
--- registration won -- and qbpolice, qbambulance, qbclothing and
--- qblib-playground all call exports.qbinventory:openInventory(...).
+-- registration won -- and kora_police, kora_ambulance, kora_clothing and
+-- kora_lib-playground all call exports.kora_inventory:openInventory(...).
 for name, fn in pairs(ox) do
     QB.compat.provideExport('ox_inventory', name, fn)
 end

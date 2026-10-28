@@ -2,7 +2,7 @@ local H = dofile('test/harness.lua')
 
 local registered = {}
 AddEventHandler = function() end
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 GetInvokingResource = function() return 'crafting-test' end
 TriggerEvent = function() end
 
@@ -42,7 +42,7 @@ local function copy(value)
     for key, nested in pairs(value) do out[key] = copy(nested) end
     return out
 end
-exports = setmetatable({ qbcore = {
+exports = setmetatable({ kora_core = {
     getPlayerData = function(_, src, path)
         local player = state['player:' .. src]
         if not player then return nil end

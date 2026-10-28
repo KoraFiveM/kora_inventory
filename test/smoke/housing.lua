@@ -1,5 +1,5 @@
 local H = dofile('test/harness.lua')
-local jsonTools = dofile('../qbcore/test/mocks.lua')
+local jsonTools = dofile('../kora_core/test/mocks.lua')
 local json = { encode = jsonTools.stableEncode, decode = jsonTools.simpleDecode }
 local function copy(value) return json.decode(json.encode(value)) end
 
@@ -9,7 +9,7 @@ local function setup(database, skipRestore)
     } }
     local env = {}; for key, value in pairs(_G) do env[key] = value end
     env.json, env.Config, env.QbInventory = json, {}, nil
-    env.GetCurrentResourceName = function() return 'qbinventory' end
+    env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.GetInvokingResource = function() return f.caller or 'housing' end
     env.GetGameTimer = function() return 100 end
     env.GetPlayerPed = function(src) return src end
@@ -52,7 +52,7 @@ local function setup(database, skipRestore)
         f.tokens[token] = nil
         return true
     end
-    env.exports = setmetatable({ qbcore = core }, { __call = function(_, name, fn) f.provided[name] = fn end })
+    env.exports = setmetatable({ kora_core = core }, { __call = function(_, name, fn) f.provided[name] = fn end })
     env.QB = {
         resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
         callback = { register = function() end }, distance = { player = function() return not f.far end }, sql = {},

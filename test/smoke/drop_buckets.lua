@@ -26,7 +26,7 @@ env.Core = {
     replication = { _queueOp = noop },
 }
 env.CoreInternal = { player = { COLUMN_FOR = { items = 'inventory' } } }
-env.GetCurrentResourceName = function() return 'qbinventory' end
+env.GetCurrentResourceName = function() return 'kora_inventory' end
 env.GetInvokingResource = function() return nil end
 env.GetGameTimer = function() return 1000 end
 env.GetPlayerRoutingBucket = function(src) return assert(buckets[tonumber(src)], 'unknown source bucket') end
@@ -48,9 +48,9 @@ end
 env.TriggerClientEvent = function(name, target, ...)
     clientEvents[#clientEvents + 1] = { name = name, target = target, args = table.pack(...) }
 end
-assert(loadfile(root .. 'qblib/modules/util/shared.lua', 't', env))()
-assert(loadfile(root .. 'qbcore/modules/util/shared.lua', 't', env))()
-assert(loadfile(root .. 'qbcore/modules/player/server.lua', 't', env))()
+assert(loadfile(root .. 'kora_lib/modules/util/shared.lua', 't', env))()
+assert(loadfile(root .. 'kora_core/modules/util/shared.lua', 't', env))()
+assert(loadfile(root .. 'kora_core/modules/player/server.lua', 't', env))()
 assert(loadfile(resource .. '/config.lua', 't', env))()
 assert(loadfile(resource .. '/shared.lua', 't', env))()
 local water = { name = 'water_bottle', label = 'Water', weight = 500, type = 'item' }
@@ -60,7 +60,7 @@ local coreExports = {
     getPlayerData = function(_, ...) return env.Core.player.getPlayerData(...) end,
     setPath = function(_, ...) return env.Core.player.setPath(...) end,
 }
-env.exports = setmetatable({ qbcore = coreExports }, { __call = function(_, name, callback) registered[name] = callback end })
+env.exports = setmetatable({ kora_core = coreExports }, { __call = function(_, name, callback) registered[name] = callback end })
 assert(loadfile(resource .. '/server.lua', 't', env))()
 assert(loadfile(resource .. '/server/compat/qb_callbacks.lua', 't', env))()
 assert(loadfile(resource .. '/server/compat/ox.lua', 't', env))()

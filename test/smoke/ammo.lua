@@ -67,7 +67,7 @@ exports = setmetatable({}, {
         return setmetatable({}, {
             __index = function(_, name)
                 return function(_, registry, handler)
-                    if resource == 'qbcore' and name == 'allShared' then
+                    if resource == 'kora_core' and name == 'allShared' then
                         if registry == 'weapons' then return WEAPONS end
                         if registry == 'items' then
                             local out = {}
@@ -75,7 +75,7 @@ exports = setmetatable({}, {
                             return out
                         end
                     end
-                    if resource == 'qbcore' and name == 'onSharedChange' then
+                    if resource == 'kora_core' and name == 'onSharedChange' then
                         sharedChangeHandlers[registry] = handler
                         return 1
                     end

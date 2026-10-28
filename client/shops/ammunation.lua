@@ -1,5 +1,5 @@
 -- Ammu-Nation world presentation. These zones are UX only: selecting this
--- option supplies just the fixed shop ID to qbinventory's normal transport.
+-- option supplies just the fixed shop ID to kora_inventory's normal transport.
 -- The server repeats all location and routing-bucket validation before it
 -- opens the session, so triggering this event away from a counter is harmless.
 
@@ -10,7 +10,7 @@ local shop = assert(
 local targetIds = {}
 
 local function openAmmunation()
-    exports.qbinventory:openInventory('shop', shop.id)
+    exports.kora_inventory:openInventory('shop', shop.id)
 end
 
 RegisterNetEvent('qbinventory:client:openAmmunation', function()
@@ -22,12 +22,12 @@ end)
 
 local function registerAmmunationTargets()
     for _, targetId in ipairs(targetIds) do
-        exports.qbtarget:removeZone(targetId)
+        exports.kora_target:removeZone(targetId)
     end
     targetIds = {}
 
     for _, location in ipairs(shop.locations or {}) do
-        targetIds[#targetIds + 1] = exports.qbtarget:addSphereZone({
+        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone({
             coords = { x = location.x, y = location.y, z = location.z },
             radius = shop.interactionDistance,
             options = {
@@ -43,15 +43,15 @@ end
 
 registerAmmunationTargets()
 AddEventHandler('onClientResourceStart', function(resource)
-    if resource == 'qbtarget' then
+    if resource == 'kora_target' then
         registerAmmunationTargets()
     end
 end)
 
 AddEventHandler('onClientResourceStop', function(resource)
-    -- qbtarget removes every zone it owns on stop. Forget the stale IDs so a
-    -- new qbtarget instance cannot mistake a reused ID for one of ours.
-    if resource == 'qbtarget' then
+    -- kora_target removes every zone it owns on stop. Forget the stale IDs so a
+    -- new kora_target instance cannot mistake a reused ID for one of ours.
+    if resource == 'kora_target' then
         targetIds = {}
     end
 end)

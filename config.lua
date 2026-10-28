@@ -63,10 +63,10 @@ Config.qbinventory = {
         -- special handling -- CEF animates both in a plain <img> -- so they are
         -- listed purely to allow the extension.
         images = {
-            localPath = 'nui://qbinventory/images',
+            localPath = 'nui://kora_inventory/images',
             extensions = { 'webp', 'png', 'gif', 'jpg' },
             -- The canonical qb-inventory artwork is bundled in images/, so it
-            -- is the primary source. qbcore's remote catalogue remains a
+            -- is the primary source. kora_core's remote catalogue remains a
             -- fallback for server-specific items not present in that set.
             preferLocal = true,
             -- Set false to never make an outbound image request at all. Items
@@ -76,25 +76,25 @@ Config.qbinventory = {
     },
     auditLimit = 1000,
     -- Trusted server domains only; client intent must be validated by the caller.
-    exchangeCallers = { qbdrugs = true },
+    exchangeCallers = { kora_drugs = true },
     requireSameBucket = true,
-    -- Physical cash is opt-in. When enabled, the configured qbcore account is
+    -- Physical cash is opt-in. When enabled, the configured kora_core account is
     -- represented exclusively by this stackable item: it can be given, moved,
-    -- stashed and dropped like any other inventory item. qbcore remains the
-    -- only money API; qbinventory's AddItem/RemoveItem cash compatibility
+    -- stashed and dropped like any other inventory item. kora_core remains the
+    -- only money API; kora_inventory's AddItem/RemoveItem cash compatibility
     -- calls are routed back through it so no second balance can be minted.
     -- Enabling/disabling this on an established server is a data migration:
-    -- qbinventory converts ledger cash when it activates and deliberately
+    -- kora_inventory converts ledger cash when it activates and deliberately
     -- fails closed if its provider is stopped. Do not flip it mid-session.
     cash = {
         asItem = false,
         item = 'cash',
         account = 'cash',
     },
-    -- Item receipts are owned by qbinventory, never by the resource which
+    -- Item receipts are owned by kora_inventory, never by the resource which
     -- grants an item.  Leave this disabled for a completely silent/headless
     -- inventory, or tune the single presentation policy here for every
-    -- compatible AddItem/RemoveItem caller, qbinventory shop purchase and
+    -- compatible AddItem/RemoveItem caller, kora_inventory shop purchase and
     -- (opt-in) item use.
     itemBoxes = {
         enabled = true,
@@ -184,7 +184,7 @@ Config.qbinventory = {
             -- (source, action, context). Return true to grant; false, reason
             -- to deny. It must enforce job/ACE/restraint/consent policy.
             --
-            -- Supplied by qbpolice (resources/[test]/qbpolice) per its own
+            -- Supplied by kora_police (resources/[test]/qbpolice) per its own
             -- design doc: "qbpolice only supplies the access-policy callback
             -- and the UI wiring" for the evidence/confiscation system already
             -- built here. Config is a resource-local Lua global with no
@@ -194,7 +194,7 @@ Config.qbinventory = {
             -- On-duty is required, not just job membership, so an officer who
             -- clocks off loses evidence access immediately.
             access = function(source, action, context)
-                local job = exports.qbcore:getJob(source)
+                local job = exports.kora_core:getJob(source)
                 if not job or job.name ~= 'police' or not job.onduty then
                     return false, 'not an on-duty police officer'
                 end
@@ -202,7 +202,7 @@ Config.qbinventory = {
             end,
         },
     },
-    -- Recipes are registered only by server resources. qbinventory has no
+    -- Recipes are registered only by server resources. kora_inventory has no
     -- craft net event: callers must validate their station/role server-side
     -- and invoke the headless CraftItem export with trusted context.
     crafting = {
@@ -302,10 +302,10 @@ Config.qbinventory = {
             sling = { dict = 'melee@holster', clip = 'holster', flag = 49 },
             hip = { dict = 'reaction@intimidation@cop@unarmed', clip = 'outro', flag = 49 },
         },
-        -- Freeze/disable policy passed to qblib's progress bar while drawing.
+        -- Freeze/disable policy passed to kora_lib's progress bar while drawing.
         -- Combat is disabled so a draw cannot be used as an instant attack.
         disable = { move = false, combat = true, car = false },
-        -- qbcore shared/weapons.lua `weapontype` -> attachment tier. A type
+        -- kora_core shared/weapons.lua `weapontype` -> attachment tier. A type
         -- that is absent here is never carried: Throwable and Equipment are
         -- left out on purpose (a grenade on the spine looks wrong and a
         -- parachute already has its own component).
@@ -362,13 +362,13 @@ Config.qbinventory = {
         -- Weapon component item name -> the GTA component this renders as, so
         -- an attached scope/suppressor shows on the carried weapon. Values are
         -- component names ('COMPONENT_AT_AR_SUPP_02') or hashes. Empty by
-        -- default: qbcore's shared registry carries no component -> native
+        -- default: kora_core's shared registry carries no component -> native
         -- mapping, and guessing one would attach the wrong part.
         components = {},
     },
 }
 
--- Registers this resource-owned configuration with qblib without changing its public Config table.
+-- Registers this resource-owned configuration with kora_lib without changing its public Config table.
 if QB and QB.config and QB.config.adopt then
     Config.qbinventory.vehicles.classes = QB.config.map(Config.qbinventory.vehicles.classes, nil, {
         keyType = 'mixed',

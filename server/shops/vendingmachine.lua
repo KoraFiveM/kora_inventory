@@ -15,7 +15,7 @@
 -- coordinate still has to be within `shop.interactionDistance` of where the
 -- server independently believes the player is. Once verified, the approval
 -- is remembered for a short window so mid-purchase session revalidation
--- (qbinventory's own validSession, which re-checks access on every transfer
+-- (kora_inventory's own validSession, which re-checks access on every transfer
 -- but has no fresh client data to offer) doesn't kick the player out for
 -- continuing a purchase they already legitimately started.
 
@@ -64,7 +64,7 @@ AddEventHandler('playerDropped', function()
     approvals[source] = nil
 end)
 
-local shopKey = exports.qbinventory:RegisterShop(shop.id, {
+local shopKey = exports.kora_inventory:RegisterShop(shop.id, {
     label = shop.label,
     slots = shop.slots,
     maxWeight = shop.maxWeight,

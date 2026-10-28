@@ -38,7 +38,7 @@ GetAmmoInPedWeapon = function(_, weapon)
 end
 GetMaxAmmo = function() return true, 300 end
 RemoveWeaponFromPed = function(_, weapon) ammo[weapon] = nil end
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 
 dofile('client/weaponcarry.lua')
 

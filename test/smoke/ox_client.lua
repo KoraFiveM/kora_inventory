@@ -25,7 +25,7 @@ local session = nil
 
 local playerItems = {
     [1] = { slot = 1, name = 'water', amount = 2, weight = 10, info = { quality = 100 } },
-    -- Sparse and out of ascending order on purpose: qbcore's items table is a
+    -- Sparse and out of ascending order on purpose: kora_core's items table is a
     -- slot-keyed map, so pairs() order over it is arbitrary.
     [4] = { slot = 4, name = 'water', amount = 3, weight = 10, info = { quality = 50, brand = 'ecola' } },
     [2] = { slot = 2, name = 'bread', amount = 1, weight = 20, info = { type = 'toast' } },
@@ -43,9 +43,9 @@ exports = setmetatable({}, {
     __index = function(_, resource)
         return setmetatable({}, { __index = function(_, exportName)
             return function(_, ...)
-                if resource == 'qbcore' and exportName == 'getPlayerData' then
+                if resource == 'kora_core' and exportName == 'getPlayerData' then
                     return { items = playerItems }
-                elseif resource == 'qbcore' and exportName == 'getShared' then
+                elseif resource == 'kora_core' and exportName == 'getShared' then
                     -- Mirror the REAL contract: getShared(name, key) needs BOTH
                     -- arguments and returns registries[name].materialised[key].
                     -- A mock that returned the whole list for any call is how
@@ -54,7 +54,7 @@ exports = setmetatable({}, {
                     local registry, key = ...
                     if registry ~= 'items' or key == nil then return nil end
                     return sharedItemList[key]
-                elseif resource == 'qbcore' and exportName == 'allShared' then
+                elseif resource == 'kora_core' and exportName == 'allShared' then
                     -- The real allShared returns the DENSE ARRAY of records,
                     -- not a name-keyed map.
                     local registry = ...
@@ -63,9 +63,9 @@ exports = setmetatable({}, {
                     for _, def in pairs(sharedItemList) do list[#list + 1] = def end
                     table.sort(list, function(a, b) return a.name < b.name end)
                     return list
-                elseif resource == 'qbinventory' and exportName == 'getCurrentSession' then
+                elseif resource == 'kora_inventory' and exportName == 'getCurrentSession' then
                     return session
-                elseif resource == 'qbinventory' and exportName == 'submitIntent' then
+                elseif resource == 'kora_inventory' and exportName == 'submitIntent' then
                     calls.intents[#calls.intents + 1] = ...
                     return true
                 end
@@ -76,7 +76,7 @@ exports = setmetatable({}, {
 })
 
 -- client.lua's explicit in-resource API. The compat table must call this,
--- never re-enter exports.qbinventory:openInventory.
+-- never re-enter exports.kora_inventory:openInventory.
 QbInventory.clientApi = {
     openInventory = function(invType, data) calls.open[#calls.open + 1] = { invType = invType, data = data } end,
     closeInventory = function() calls.closed = true end,
@@ -214,7 +214,7 @@ session = nil
 
 -- --- notify -----------------------------------------------------------------
 --
--- Upstream moves data.text onto data.description before notifying. qblib's
+-- Upstream moves data.text onto data.description before notifying. kora_lib's
 -- toast body field is `message`, so passing the ox payload through untouched
 -- rendered a title-only notification and silently lost the text.
 
@@ -225,7 +225,7 @@ H.equal(sent.message, 'Item added.', 'notify remaps text onto the notification b
 H.equal(sent.text, nil, 'the ox-only text field is not forwarded')
 H.equal(sent.description, nil, 'the ox_lib description field is not forwarded either')
 H.equal(sent.title, 'Inventory', 'the title survives the remap')
--- ox_lib's neutral variant is 'inform'; qblib validates against 'info' and
+-- ox_lib's neutral variant is 'inform'; kora_lib validates against 'info' and
 -- silently drops a payload whose type it does not recognise.
 H.equal(sent.type, 'info', 'the inform notification type is translated to info')
 H.equal(original.text, 'Item added.', 'the caller table is never mutated')
@@ -356,7 +356,7 @@ pedWeapon = 0
 
 -- --- documented no-ops ------------------------------------------------------
 --
--- These four have no backing subsystem in qbinventory/qblib and each carries a
+-- These four have no backing subsystem in kora_inventory/qblib and each carries a
 -- comment in client/compat/ox.lua saying which upstream feature it stands in
 -- for and why nothing can back it. They must stay CALLABLE (an ox dependant
 -- calling one must not error) and must stay COMMENTED, so a future reader

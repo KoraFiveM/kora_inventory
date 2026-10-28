@@ -12,7 +12,7 @@ local function receipt(provider, operationKey)
 end
 
 local function activeToken(operation)
-    local rows, err = exports.qbcore:getPlayerColumnOperations()
+    local rows, err = exports.kora_core:getPlayerColumnOperations()
     if type(rows) ~= 'table' then return false, err or 'Player recovery locks are unavailable.' end
     for _, row in ipairs(rows) do
         if row.operationKey == operation then return row.token end
@@ -26,7 +26,7 @@ local function finish(inv, row, token)
     if token then
         local items = persistence.normaliseItems(row.destination_items)
         if not items then return false, 'The recovery receipt requires repair.' end
-        local finished, err = exports.qbcore:finishPlayerColumnOperation(token, { [row.citizenid] = { inventory = items } })
+        local finished, err = exports.kora_core:finishPlayerColumnOperation(token, { [row.citizenid] = { inventory = items } })
         if not finished then return false, err end
     end
     if token or inv.durablePending then
@@ -47,7 +47,7 @@ local function claim(source, id, operationKey)
     if type(id) ~= 'string' or type(operationKey) ~= 'string' or #operationKey < 1 or #operationKey > 128 then return false, 'Invalid recovery request.' end
     if not persistence.getStatus().ready or Config.qbinventory.persistence.enabled == false then return false, 'Inventory persistence is unavailable.' end
     local _, inv = core.resolveInventory('stash:' .. id)
-    local data = exports.qbcore:getPlayerData(source)
+    local data = exports.kora_core:getPlayerData(source)
     if not inv or inv.policyOwner ~= provider or not data or type(data.citizenid) ~= 'string' then return false, 'Recovery is unavailable.' end
     local cid, operation = data.citizenid, 'recovery:' .. provider .. ':' .. operationKey
     local context = { key = 'qbinventory:' .. provider .. ':' .. operationKey,
@@ -69,7 +69,7 @@ local function claim(source, id, operationKey)
             if row and row.status == 'complete' then return finish(inv, row, token) end
             if row and row.status ~= 'pending' then return false, 'The recovery receipt requires repair.' end
             if token then
-                local aborted, err = exports.qbcore:abortPlayerColumnOperation(token)
+                local aborted, err = exports.kora_core:abortPlayerColumnOperation(token)
                 if not aborted then return false, err end
             end
             inv.durablePending = nil
@@ -80,14 +80,14 @@ local function claim(source, id, operationKey)
             local allowed, accessErr = core.canAccess(source, accessInventory, { recovery = true }, true)
             if not allowed then return false, accessErr end
             if not next(inv.items) then return false, 'Recovery storage is empty.' end
-            local locked, code, lockErr = exports.qbcore:beginPlayerColumnOperation(operation, { cid }, { 'inventory' })
+            local locked, code, lockErr = exports.kora_core:beginPlayerColumnOperation(operation, { cid }, { 'inventory' })
             if not locked then return false, lockErr or code end
             local function reject(message)
-                local released, releaseErr = exports.qbcore:abortPlayerColumnOperation(locked)
+                local released, releaseErr = exports.kora_core:abortPlayerColumnOperation(locked)
                 if not released then inv.durablePending = true; return false, releaseErr or 'Recovery lock release is pending. Retry the same claim.' end
                 return false, message
             end
-            data = exports.qbcore:getPlayerData(source)
+            data = exports.kora_core:getPlayerData(source)
             if not data or data.citizenid ~= cid then return reject('Your character changed. Try again.') end
             local destination = { items = inventory.copy(data.items or {}), slots = Config.qbinventory.playerSlots, maxWeight = Config.qbinventory.playerMaxWeight }
             local count = 0

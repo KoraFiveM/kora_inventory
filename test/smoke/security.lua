@@ -35,7 +35,7 @@ H.ok(compactServer:find("if request.action == 'buy' then return intentBuy(src, r
 H.ok(compactServer:find("if request.action == 'give' then return intentGive(src, request) end", 1, true), 'give uses a dedicated server intent')
 H.ok(compactServer:find("if shop.type ~= 'shop' then return false, 'secondary inventory is not a shop' end", 1, true), 'buy verifies target is a shop')
 H.ok(server:find("elseif type(result) == 'string' then", 1, true), 'buy hooks can provide a user-facing denial reason')
-H.ok(server:find('exports.qbcore:removeMoney', 1, true), 'purchase takes server-side payment')
+H.ok(server:find('exports.kora_core:removeMoney', 1, true), 'purchase takes server-side payment')
 H.ok(server:find("'qbinventory-refund'", 1, true), 'failed purchase is refunded server-side')
 H.ok(server:find('local function normaliseShopStock(rows, slots)', 1, true), 'configured shop stock is normalised server-side')
 H.ok(server:find('local item, err = buildItem(row.name, amount, slot, row.info or row.metadata)', 1, true), 'shop stock uses canonical shared item definitions')
@@ -65,10 +65,10 @@ H.ok(server:find("local currentTargetPed = GetPlayerPed(target)", 1, true), 'giv
 H.ok(server:find("local function recipientCanReceive(inv, sourceItem)", 1, true), 'give verifies recipient capacity before source removal')
 H.ok(server:find("recordAudit('give'", 1, true), 'give is audited')
 
--- qbcore remains the sole player data owner. Secondary persistence has a
+-- kora_core remains the sole player data owner. Secondary persistence has a
 -- separate schema and operational, non-destructive migration path.
-H.ok(server:find('exports.qbcore:getPlayerData', 1, true), 'player state is read from qbcore')
-H.ok(server:find('exports.qbcore:setPath', 1, true), 'player mutation uses qbcore funnel')
+H.ok(server:find('exports.kora_core:getPlayerData', 1, true), 'player state is read from qbcore')
+H.ok(server:find('exports.kora_core:setPath', 1, true), 'player mutation uses qbcore funnel')
 H.ok(not server:find('INSERT INTO `players`', 1, true) and not server:find('UPDATE `players`', 1, true), 'authority does not write players table')
 H.ok(persistence:find("inv.type == 'player'", 1, true), 'persistence excludes player inventories')
 H.ok(persistence:find("RegisterCommand('qbinventory-migrate'", 1, true), 'migration is an explicit operator command')
@@ -88,6 +88,6 @@ H.ok(client:find("TriggerServerEvent('qbinventory:server:intent'", 1, true), 'cl
 H.ok(client:find("TriggerEvent('qbinventory:client:requestGiveTarget'", 1, true), 'client resolves a give recipient locally before server intent')
 H.ok(client:find("action = 'give'", 1, true), 'client submits only the resolved give recipient')
 H.ok(manifest:find("'client/ui.lua'", 1, true) and manifest:find("ui_page 'web/build/index.html'", 1, true), 'bundled UI is isolated to its client bridge')
-H.ok(not manifest:find("'@qbcore/init.lua'", 1, true), 'inventory does not load qbcore\'s unused optional registry mirror')
+H.ok(not manifest:find("'@kora_core/init.lua'", 1, true), 'inventory does not load qbcore\'s unused optional registry mirror')
 
 H.finish()

@@ -53,12 +53,12 @@ Config = { qbinventory = {} }
 
 local sharedBlock = assert(manifest:match('shared_scripts%s*{(.-)\n}'), 'fxmanifest.lua must declare shared_scripts')
 for _, path in ipairs(pathsFrom(sharedBlock)) do
-    -- '@resource/file.lua' entries are other resources (qblib, qbsql); the QB
+    -- '@resource/file.lua' entries are other resources (kora_lib, kora_sql); the QB
     -- surface they provide is mocked below.
     if path:sub(1, 1) ~= '@' then dofile(path) end
 end
 
--- A minimal QB (qblib/qbsql) surface. Only the entry points touched
+-- A minimal QB (kora_lib/qbsql) surface. Only the entry points touched
 -- unconditionally at module-load time need to exist here; everything else in
 -- these files runs inside a function body and is never invoked by merely
 -- loading the module.
@@ -73,7 +73,7 @@ QB = {
 -- these server_scripts. CreateThread/RegisterCommand/AddEventHandler/
 -- RegisterNetEvent are intentionally no-ops: none of these files run
 -- business logic through them at load time, they only register callbacks.
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 GetInvokingResource = function() return nil end
 CreateThread = function() end
 RegisterCommand = function() end
@@ -83,9 +83,9 @@ RegisterNetEvent = function() end
 -- The shared mock `exports` table under test. `exports(name, fn)` is the
 -- registration form every server_scripts file above uses. `exports.res:Fn(...)`
 -- is the rarer in-resource consumption form -- server/shops/ammunation.lua
--- calls `exports.qbinventory:RegisterShop(...)` at load time, which must
+-- calls `exports.kora_inventory:RegisterShop(...)` at load time, which must
 -- resolve to whatever server.lua registered moments earlier through the very
--- same table. An export that was never registered here (e.g. exports.qbcore,
+-- same table. An export that was never registered here (e.g. exports.kora_core,
 -- which this test never loads) resolves to a no-op returning nil rather than
 -- erroring, so an unrelated missing dependency can't hide a real collision.
 local registeredBy = {} -- exportName -> { {file=, fn=}, ... } in registration order
@@ -99,7 +99,7 @@ local exportsProxy = setmetatable({}, {
         return setmetatable({}, {
             __index = function(_, exportName)
                 return function(_, ...)
-                    if _resourceName == 'qbcore' and exportName == 'allShared' then return {} end
+                    if _resourceName == 'kora_core' and exportName == 'allShared' then return {} end
                     local entries = registeredBy[exportName]
                     local fn = entries and entries[#entries].fn
                     if fn then return fn(...) end
@@ -140,7 +140,7 @@ for _ in pairs(registeredBy) do total = total + 1 end
 H.ok(total > 20, 'the combined exports table captured every server_scripts export')
 
 -- Dual-case pairing. Half this surface shipped with a lowercase alias and half
--- without, so a caller had to know which half a name fell in -- qbambulance
+-- without, so a caller had to know which half a name fell in -- kora_ambulance
 -- called `registerStash`, which only existed as `RegisterStash`, and got
 -- "No such export" at boot. These pairs must stay reachable in BOTH cases and
 -- must resolve to the SAME function, so an alias can never drift into a second
@@ -180,20 +180,20 @@ end
 -- client/compat/ox.lua looped `exports(name, fn)` over its whole Ox table,
 -- which includes openInventory/closeInventory. client.lua registers those
 -- first, so the compat wrappers silently replaced them for every resource in
--- the server -- and those wrappers called exports.qbinventory:openInventory,
+-- the server -- and those wrappers called exports.kora_inventory:openInventory,
 -- which then resolved back to themselves. Unbounded recursion on every
--- qbpolice/qbambulance/qbclothing/qblib-playground stash or shop open.
+-- kora_police/kora_ambulance/kora_clothing/qblib-playground stash or shop open.
 --
 -- These client files touch NUI and LocalPlayer at load time, so they are read
 -- statically rather than dofile'd. The invariant enforced is the same one the
 -- server realm gets structurally from server/compat/providers.lua: a compat
 -- module builds a table and its PROVIDER IDENTITY publishes it -- a compat
--- module never registers into qbinventory's own export table.
+-- module never registers into kora_inventory's own export table.
 local clientBlock = assert(manifest:match('client_scripts%s*{(.-)\n}'), 'fxmanifest.lua must declare client_scripts')
 local clientScripts = {}
 for _, path in ipairs(pathsFrom(clientBlock)) do
     -- Imported dependency files execute in this resource's VM, but they do
-    -- not belong to qbinventory's local export surface and cannot be opened
+    -- not belong to kora_inventory's local export surface and cannot be opened
     -- relative to this repository by a plain-Lua test.
     if path:sub(1, 1) ~= '@' then clientScripts[#clientScripts + 1] = path end
 end

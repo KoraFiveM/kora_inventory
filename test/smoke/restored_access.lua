@@ -10,7 +10,7 @@ local players = {
 }
 local positions = { [7] = 2, [8] = 100 }
 local function noop() end
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 GetInvokingResource = function() return nil end
 GetGameTimer = function() return 1000 end
 GetPlayerPed = function(source) return source end
@@ -69,7 +69,7 @@ exports = setmetatable({}, {
     __index = function(_, resource)
         return setmetatable({}, { __index = function(_, name)
             return function(_, ...)
-                if resource == 'qbcore' then
+                if resource == 'kora_core' then
                     local source, field = ...
                     if name == 'getShared' then return definitions[field] end
                     if name == 'allShared' then return {} end

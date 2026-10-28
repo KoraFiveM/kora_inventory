@@ -2,7 +2,9 @@ fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
 
-name 'qbinventory'
+name 'kora_inventory'
+-- Keep the legacy resource name resolvable for exports['qbinventory'] callers.
+provide 'qbinventory'
 author 'qbcore2'
 version '0.1.0'
 description 'Server-authoritative inventory with bundled NUI'
@@ -16,15 +18,15 @@ provide 'ox_inventory'
 -- without a second weapon controller running beside the inventory.
 provide 'qb-weapons'
 
-dependency 'qbtheme'
-dependency 'qblib'
-dependency 'qbsql'
-dependency 'qbcore'
-dependency 'qbtarget'
+dependency 'kora_theme'
+dependency 'kora_lib'
+dependency 'kora_sql'
+dependency 'kora_core'
+dependency 'kora_target'
 
 shared_scripts {
-    '@qblib/init.lua',
-    '@qbsql/init.lua',
+    '@kora_lib/init.lua',
+    '@kora_sql/init.lua',
     'config.lua',
     'config/shops/ammunation.lua',
     'config/shops/vendingmachine.lua',
@@ -51,7 +53,7 @@ server_scripts {
     'server/weaponcarry.lua',
     -- Narrow adapter for the legacy qb-weapons event/callback names.  This
     -- comes after the authoritative weapon modules so it can resolve slots,
-    -- ammunition and durability from qbinventory state rather than trusting
+    -- ammunition and durability from kora_inventory state rather than trusting
     -- the old client item payloads.
     'server/compat/qb_weapons.lua',
     'server/shops/ammunation.lua',
@@ -74,7 +76,7 @@ server_scripts {
 }
 
 client_scripts {
-    '@qbtheme/client/bridge.lua',
+    '@kora_theme/client/bridge.lua',
     'client.lua',
     -- Resolves nearby recipients locally; it never exposes them to the NUI.
     'client/give_target.lua',
@@ -97,7 +99,7 @@ client_scripts {
     -- weapon half of the old client/useables.lua toggle.
     'client/weaponcarry.lua',
     -- Legacy qb-weapons client events, translated into the server-owned
-    -- qbinventory weapon lifecycle above.
+    -- kora_inventory weapon lifecycle above.
     'client/compat/qb_weapons.lua'
 }
 
@@ -107,7 +109,7 @@ files {
     'sql/*.sql',
     'web/build/index.html',
     'web/build/assets/**/*',
-    -- Locally hosted item artwork, served as nui://qbinventory/images/<file>.
+    -- Locally hosted item artwork, served as nui://kora_inventory/images/<file>.
     -- Outside web/ deliberately: web/build is Vite's output directory, and art
     -- a server owner dropped in must not be something `pnpm build` can delete.
     --

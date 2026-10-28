@@ -27,7 +27,7 @@ for name in pairs(expectedAmmo) do H.ok(ammoFound[name], ('Ammu-Nation stocks %s
 
 local captured
 exports = {
-    qbinventory = {
+    kora_inventory = {
         RegisterShop = function(_, id, data)
             captured = { id = id, data = data }
             return 'shop:' .. id

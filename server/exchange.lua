@@ -66,7 +66,7 @@ local function decode(value)
 end
 
 local function tokens()
-    return exports.qbcore:getPlayerColumnOperations()
+    return exports.kora_core:getPlayerColumnOperations()
 end
 
 local function findToken(operation)
@@ -94,7 +94,7 @@ local function reconcile(provider, key, fingerprint)
     local token = findToken(operation)
     if not row then
         if token then
-            local released, err = exports.qbcore:abortPlayerColumnOperation(token)
+            local released, err = exports.kora_core:abortPlayerColumnOperation(token)
             if not released then return nil, 'pending', err end
         end
         return nil, 'not_found'
@@ -106,7 +106,7 @@ local function reconcile(provider, key, fingerprint)
         local items = inventory.persistence.normaliseItems(values.inventory)
         if not items then return nil, 'pending', 'Exchange inventory receipt requires repair.' end
         values.inventory = items
-        local finished, err = exports.qbcore:finishPlayerColumnOperation(token, { [row.citizenid] = values })
+        local finished, err = exports.kora_core:finishPlayerColumnOperation(token, { [row.citizenid] = values })
         if not finished then return nil, 'pending', err end
     end
     return receipt
@@ -114,7 +114,7 @@ end
 
 local function plan(data, terms)
     local draft = { items = inventory.copy(data.items or {}), slots = Config.qbinventory.playerSlots, maxWeight = Config.qbinventory.playerMaxWeight }
-    local physical = exports.qbcore:isPhysicalCash('cash')
+    local physical = exports.kora_core:isPhysicalCash('cash')
     local cash = Config.qbinventory.cash
     if physical and (not cash or not cash.asItem or cash.account ~= 'cash' or not internal.itemDef(cash.item)) then return nil, 'Physical cash policy is unavailable.' end
     for _, entry in ipairs(terms.take) do
@@ -139,7 +139,7 @@ local function plan(data, terms)
     end
     local money = inventory.copy(data.money or {})
     if terms.cash > 0 then
-        if exports.qbcore:getTransactionTax(terms.cash, 'cash', 'add') > 0 then return nil, 'Durable exchanges require transaction tax to be disabled for cash rewards.' end
+        if exports.kora_core:getTransactionTax(terms.cash, 'cash', 'add') > 0 then return nil, 'Durable exchanges require transaction tax to be disabled for cash rewards.' end
         if physical then
             if money.cash ~= 0 then return nil, 'Physical cash migration is incomplete.' end
             local added, err = internal.addSecondary(draft, cash.item, terms.cash, nil, {})
@@ -164,16 +164,16 @@ local function execute(provider, source, key, terms, fingerprint)
     local existing, code, err = reconcile(provider, key, fingerprint)
     if existing or code ~= 'not_found' then return existing, code, err end
     if not inventory.persistence.getStatus().ready then return nil, 'unavailable', 'Inventory storage is not ready.' end
-    local data = exports.qbcore:getPlayerData(source)
+    local data = exports.kora_core:getPlayerData(source)
     if not data or data.citizenid ~= terms.citizenid then return nil, 'rejected', 'The exchange recipient is not this character.' end
     local operation = identity(provider, key)
-    local token, lockCode, lockError = exports.qbcore:beginPlayerColumnOperation(operation, { terms.citizenid }, { 'inventory', 'money', 'metadata' })
+    local token, lockCode, lockError = exports.kora_core:beginPlayerColumnOperation(operation, { terms.citizenid }, { 'inventory', 'money', 'metadata' })
     if not token then return nil, lockCode, lockError end
     local function reject(message)
-        local released, releaseError = exports.qbcore:abortPlayerColumnOperation(token)
+        local released, releaseError = exports.kora_core:abortPlayerColumnOperation(token)
         return nil, released and 'rejected' or 'pending', releaseError or message
     end
-    data = exports.qbcore:getPlayerData(source)
+    data = exports.kora_core:getPlayerData(source)
     if not data or data.citizenid ~= terms.citizenid then return reject('The exchange recipient changed.') end
     local values, planError = plan(data, terms)
     if not values then return reject(planError) end

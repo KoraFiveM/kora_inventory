@@ -1,8 +1,8 @@
 -- qb-weapons compatibility transport.
 --
--- qbinventory provides qb-weapons so a resource which merely depends on the
+-- kora_inventory provides qb-weapons so a resource which merely depends on the
 -- retired resource still starts.  These are intentionally adapters, not a
--- second weapon controller: every live weapon is still qbinventory's item,
+-- second weapon controller: every live weapon is still kora_inventory's item,
 -- draw record and canonical metadata.  In particular, legacy tables received
 -- from a client contribute at most a slot; their weapon name, serial, quality,
 -- attachments and ammo count are never authority.
@@ -55,7 +55,7 @@ local function weaponAmmo(src, legacy)
 end
 
 -- Current qb-weapons asks this callback while reconstructing its client state.
--- qbinventory has no repair-point config of its own, so an empty configuration
+-- kora_inventory has no repair-point config of its own, so an empty configuration
 -- is the compatible, no-hang response for a left-over caller.
 QB.callback.register('qb-weapons:server:GetConfig', function()
     return {}

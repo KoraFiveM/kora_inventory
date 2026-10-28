@@ -30,7 +30,7 @@ end
 local function owner()
     return type(GetInvokingResource) == 'function' and GetInvokingResource()
         or GetCurrentResourceName and GetCurrentResourceName()
-        or 'qbinventory'
+        or 'kora_inventory'
 end
 local function shallowlyMatches(actual, required)
     if type(required) ~= 'table' then
@@ -349,7 +349,7 @@ function weapons.prepareMetadata(name, metadata)
     local info = copy(metadata or {})
     -- qb-weapons called this field `quality`. Keep reading and mirroring it
     -- during the migration so older server scripts and persisted inventories
-    -- see the value they expect while qbinventory uses `durability` internally.
+    -- see the value they expect while kora_inventory uses `durability` internally.
     local durability = tonumber(info.durability)
     if durability == nil then
         durability = tonumber(info.quality)
@@ -511,14 +511,14 @@ function crafting.canCraftItems(src, ingredients, outputs)
         local cash = type(Config.qbinventory.cash) == 'table' and Config.qbinventory.cash or nil
         local cashItem = cash and type(cash.item) == 'string' and cash.item:lower()
         local cashAccount = cash and type(cash.account) == 'string' and cash.account:lower()
-        if cash and cash.asItem == true and cashItem and cashAccount and exports.qbcore:isPhysicalCash(cashAccount) then
+        if cash and cash.asItem == true and cashItem and cashAccount and exports.kora_core:isPhysicalCash(cashAccount) then
             local netOutputs = {}
             for _, output in ipairs(produced) do
                 if output.name == cashItem then
                     -- Cash item grants ignore item metadata and award the net
                     -- amount through addMoney, once per configured output.
                     output.metadata = {}
-                    output.amount = output.amount - exports.qbcore:getTransactionTax(output.amount, cashAccount, 'add')
+                    output.amount = output.amount - exports.kora_core:getTransactionTax(output.amount, cashAccount, 'add')
                 end
                 if output.amount > 0 then netOutputs[#netOutputs + 1] = output end
             end
@@ -605,8 +605,8 @@ local function replaceWeaponState(src, slot, mutate)
     end
     local primary = internal.playerKey(src)
     return internal.lock({ primary }, function()
-        local item = exports.qbcore:getPlayerData(src, { 'items', slot })
-        if not item and not exports.qbcore:getPlayerData(src, { 'citizenid' }) then
+        local item = exports.kora_core:getPlayerData(src, { 'items', slot })
+        if not item and not exports.kora_core:getPlayerData(src, { 'citizenid' }) then
             return false, 'player inventory not found'
         end
         if not item or not weapons.isWeapon(item) then
@@ -686,7 +686,7 @@ function weapons.getState(src, slot)
     if not src or not slot then
         return nil
     end
-    local item = exports.qbcore:getPlayerData(src, { 'items', slot })
+    local item = exports.kora_core:getPlayerData(src, { 'items', slot })
     return item and weapons.isWeapon(item) and copy(item.info or item.metadata or {}) or nil
 end
 

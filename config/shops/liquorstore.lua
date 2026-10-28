@@ -9,7 +9,7 @@
 -- registry-backed item record (label, image, weight, unique and metadata) at
 -- registration time; never copy those presentation/authority fields here.
 --
--- Every stock row must be a real item in qbcore's shared registry. Nothing new
+-- Every stock row must be a real item in kora_core's shared registry. Nothing new
 -- is invented here: a liquor store that stocked ids the registry has never
 -- heard of would present unbuyable slots with no label and no weight.
 

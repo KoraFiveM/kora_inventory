@@ -1,4 +1,4 @@
--- The bundled UI is intentionally presentation-only. qbinventory owns session
+-- The bundled UI is intentionally presentation-only. kora_inventory owns session
 -- creation, all inventory state and every server request; this bridge just
 -- translates its local client events into this resource's NUI wire contract.
 local activeSession
@@ -62,13 +62,13 @@ local function closeSession(reason)
     SetNuiFocus(false, false)
 end
 
--- Payload is produced by qbinventory only. Expected minimum wire shape is
+-- Payload is produced by kora_inventory only. Expected minimum wire shape is
 -- { sessionId, token, player, secondary?, revision, secondaryRevision? }.
 local function normalizeView(view)
     if type(view) ~= 'table' then
         return nil
     end
-    -- qbinventory's public view calls the server-side inventory identifier
+    -- kora_inventory's public view calls the server-side inventory identifier
     -- `key`; the web UI names this transport-only field `id`.
     local out = {}
     for key, value in pairs(view) do
@@ -79,7 +79,7 @@ local function normalizeView(view)
 end
 
 -- These `qbinventory:ui:*` events are explicitly local presentation events.
--- qbinventory's network transport retains `qbinventory:client:*`, preventing
+-- kora_inventory's network transport retains `qbinventory:client:*`, preventing
 -- a UI listener from ever accidentally re-entering a network event handler.
 AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     if type(payload) ~= 'table' or type(payload.token) ~= 'string' then
@@ -110,7 +110,7 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
 end)
 
 -- Patches must carry the session id so delayed traffic cannot change a later
--- session after close/reopen. qbinventory remains authoritative on revisions.
+-- session after close/reopen. kora_inventory remains authoritative on revisions.
 AddEventHandler('qbinventory:ui:sessionPatched', function(payload, legacyPatch)
     local token, patch
     if type(payload) == 'string' then
@@ -128,7 +128,7 @@ AddEventHandler('qbinventory:ui:sessionPatched', function(payload, legacyPatch)
         return
     end
 
-    -- Accept qbinventory's compact `{ key, revision, inventory }` patch and
+    -- Accept kora_inventory's compact `{ key, revision, inventory }` patch and
     -- the normalized `{ player?, secondary? }` form for future UI consumers.
     local wire = {
         sessionId = activeSession,
@@ -186,7 +186,7 @@ RegisterNetEvent('qbinventory:client:itemBox', function(payload)
 end)
 
 -- The target resolver reports presentation state only.  While an in-world
--- target selection is active, relinquish NUI focus so qbtarget can receive
+-- target selection is active, relinquish NUI focus so kora_target can receive
 -- gameplay input; restore it immediately on resolve or cancellation.
 AddEventHandler('qbinventory:ui:giveTargeting', function(payload)
     if not activeSession or type(payload) ~= 'table' then
@@ -204,8 +204,8 @@ AddEventHandler('qbinventory:ui:giveAvailability', function(payload)
     send('qbinventory:nui:giveAvailability', { available = payload.available == true })
 end)
 
--- qblib computes the tokens in Lua, so this bridge does not duplicate the
--- design-system HSL math in TypeScript. qbinventory can trigger this local
+-- kora_lib computes the tokens in Lua, so this bridge does not duplicate the
+-- design-system HSL math in TypeScript. kora_inventory can trigger this local
 -- event after a live theme change without involving inventory authority.
 AddEventHandler('qbinventory:client:theme', QBTheme.refresh)
 
@@ -222,7 +222,7 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
         return
     end
 
-    -- Wait for qbinventory's authoritative callback result. This keeps the
+    -- Wait for kora_inventory's authoritative callback result. This keeps the
     -- browser locked until validation and any yielding useable handler finish,
     -- rather than acknowledging a merely-local hand-off as success.
     local ok, result = QbInventory.clientApi.submitIntent({

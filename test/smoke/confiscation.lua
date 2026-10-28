@@ -1,7 +1,7 @@
--- Run from qbinventory with sibling qbcore: lua5.4 test/smoke/confiscation.lua [server-source]
--- Actual authority, compatibility providers, shared rules and qbcore player
+-- Run from kora_inventory with sibling qbcore: lua5.4 test/smoke/confiscation.lua [server-source]
+-- Actual authority, compatibility providers, shared rules and kora_core player
 -- funnel. Only host transport/registration is mocked; no SQL or live server.
-local core = '../qbcore/'
+local core = '../kora_core/'
 local H = dofile('test/harness.lua')
 dofile(core .. 'test/mocks.lua').install()
 for _, path in ipairs({
@@ -28,7 +28,7 @@ env.QB = {
     compat = { provideExport = function(identity, name, fn) aliases[identity .. ':' .. name] = fn end },
     sql = {},
 }
-env.GetCurrentResourceName = function() return 'qbinventory' end
+env.GetCurrentResourceName = function() return 'kora_inventory' end
 env.GetInvokingResource = function() return nil end
 env.CreateThread, env.RegisterCommand = function() end, function() end
 env.RegisterNetEvent = function(name, fn) net[name] = fn end
@@ -36,11 +36,11 @@ env.AddEventHandler = function(name, fn) handlers[name] = handlers[name] or {}; 
 env.TriggerEvent = function() end
 env.TriggerClientEvent = function(name, src, ...) events[#events + 1] = { name = name, source = src, args = { ... } } end
 env.GetGameTimer = function() return 12345 end
-local resourceExports = { qbcore = {} }
-resourceExports.qbcore.getPlayerData = function(_, ...) return Core.player.getPlayerData(...) end
-resourceExports.qbcore.getShared = function(_, ...) return Core.registry.getShared(...) end
-resourceExports.qbcore.allShared = function(_, ...) return Core.registry.allShared(...) end
-resourceExports.qbcore.setPath = function(_, ...) return Core.player.setPath(...) end
+local resourceExports = { kora_core = {} }
+resourceExports.kora_core.getPlayerData = function(_, ...) return Core.player.getPlayerData(...) end
+resourceExports.kora_core.getShared = function(_, ...) return Core.registry.getShared(...) end
+resourceExports.kora_core.allShared = function(_, ...) return Core.registry.allShared(...) end
+resourceExports.kora_core.setPath = function(_, ...) return Core.player.setPath(...) end
 setmetatable(resourceExports, { __call = function() end })
 env.exports = resourceExports
 local function load(path) assert(loadfile(path, 't', env))() end

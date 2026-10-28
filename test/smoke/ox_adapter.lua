@@ -441,7 +441,7 @@ H.equal(container.id, 'bag-1', 'the container is keyed by metadata.container')
 H.equal(container.slots, 6, 'a missing container is sized from metadata.size[1]')
 H.equal(container.maxWeight, 250, 'a missing container is sized from metadata.size[2]')
 H.equal(created[1].opts.owner, 1, 'the created container inherits an access boundary from its holder')
--- qbinventory's own container domain writes info.containerId; both are accepted.
+-- kora_inventory's own container domain writes info.containerId; both are accepted.
 state['player:1'].items[5] = item('backpack', 1, 5, { containerId = 'bag-2', size = { 2, 20 } })
 H.equal(Ox.GetContainerFromSlot('player:1', 5).id, 'bag-2', 'the native containerId spelling still resolves')
 H.equal(Ox.GetContainerFromSlot('player:1', 3), nil, 'a slot with no container metadata is nil')
@@ -556,7 +556,7 @@ H.equal(I.totalWeight(state['player:1'].items), 55, 'metadata weight changes the
 
 -- --- useItem is published on the SERVER identity too ------------------------
 --
--- Previously only client/compat/ox.lua and qbinventory's own native api
+-- Previously only client/compat/ox.lua and kora_inventory's own native api
 -- carried this name; exports.ox_inventory:useItem(...) on the server
 -- resolved to nothing.
 

@@ -5,7 +5,7 @@
 -- registration API here used to gate on `type(x) == 'function'`, so every
 -- createUseable/registerInspectionAccess/registerHook call made from another
 -- resource failed its own assert at boot ("name and handler are required",
--- "inspection callback is required"). qbpolice, qbambulance and qbdrugs all
+-- "inspection callback is required"). kora_police, kora_ambulance and kora_drugs all
 -- started with their useable items silently unregistered.
 --
 -- These tests call the real registration exports with the funcref SHAPE, which
@@ -24,8 +24,8 @@ QB = {
     callback = { register = function() end },
     sql = {},
 }
-GetCurrentResourceName = function() return 'qbinventory' end
-GetInvokingResource = function() return 'qbpolice' end
+GetCurrentResourceName = function() return 'kora_inventory' end
+GetInvokingResource = function() return 'kora_police' end
 CreateThread = function() end
 RegisterCommand = function() end
 AddEventHandler = function() end
@@ -38,7 +38,7 @@ exports = setmetatable({}, {
         return setmetatable({}, {
             __index = function(_, exportName)
                 return function(_, ...)
-                    if resourceName == 'qbcore' and exportName == 'allShared' then return {} end
+                    if resourceName == 'kora_core' and exportName == 'allShared' then return {} end
                     local fn = registered[exportName]
                     if fn then return fn(...) end
                     return nil
@@ -63,7 +63,7 @@ H.ok(not QbInventory.isCallable({}), 'a bare table is not callable')
 H.ok(not QbInventory.isCallable('handler'), 'a string is not callable')
 H.ok(not QbInventory.isCallable(nil), 'nil is not callable')
 
--- createUseable: the qbpolice/qbambulance/qbdrugs boot failure.
+-- createUseable: the kora_police/kora_ambulance/qbdrugs boot failure.
 local calls = 0
 local handler = funcref(function() calls = calls + 1 end)
 local ok, err = pcall(registered.createUseable, 'handcuffs', handler)
@@ -78,7 +78,7 @@ H.ok(pcall(registered.createUseable, 'radio', function() end), 'createUseable st
 H.ok(not pcall(registered.createUseable, 'nohandler', {}), 'createUseable still rejects a non-callable handler')
 H.ok(not pcall(registered.createUseable, 42, function() end), 'createUseable still rejects a non-string name')
 
--- registerInspectionAccess: the qbpolice/server/seize.lua boot failure.
+-- registerInspectionAccess: the kora_police/server/seize.lua boot failure.
 local id = registered.registerInspectionAccess(funcref(function() return true end))
 H.ok(type(id) == 'number', 'registerInspectionAccess accepts a cross-resource funcref')
 H.ok(not pcall(registered.registerInspectionAccess, {}), 'registerInspectionAccess still rejects a non-callable')
@@ -91,12 +91,12 @@ H.ok(not pcall(registered.registerHook, 42, function() end), 'registerHook still
 
 local useable = registered.getUseable('handcuffs')
 H.ok(useable and useable.func == handler, 'getUseable returns the authoritative cross-resource callback')
-H.ok(useable.resource == 'qbpolice', 'getUseable preserves registration ownership')
+H.ok(useable.resource == 'kora_police', 'getUseable preserves registration ownership')
 H.ok(registered.getUseable('unregistered') == nil, 'getUseable returns nil for an unregistered item')
 useable.func(1, {})
 H.ok(calls == 2, 'the legacy CanUseItem record callback remains callable')
 
-GetInvokingResource = function() return 'qbcore' end
+GetInvokingResource = function() return 'kora_core' end
 registered.createUseable('forwarded', handler, 'legacy_shop')
 H.ok(registered.getUseable('forwarded').resource == 'legacy_shop', 'trusted core gateway preserves the original owner')
 GetInvokingResource = function() return 'other_resource' end

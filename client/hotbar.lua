@@ -1,6 +1,6 @@
--- Slot 1-5 hotbar keybinds. qbinventory has no separate hotbar/quickslot data
+-- Slot 1-5 hotbar keybinds. kora_inventory has no separate hotbar/quickslot data
 -- model of its own -- see client/compat.lua's `qb-inventory:client:hotbar`,
--- which is a deliberate no-op because "the hotbar is part of qbinventory's
+-- which is a deliberate no-op because "the hotbar is part of kora_inventory's
 -- own UI and is driven from its session, not from a caller-supplied item
 -- list". Since no reserved hotbar range exists anywhere in the item/slot data
 -- model (server.lua indexes player items 1..Config.qbinventory.playerSlots
@@ -20,12 +20,12 @@ local function useHotbarSlot(slot)
     -- while nothing already owns keyboard focus -- same guard client/compat.lua
     -- uses for the `inventory` command. This also means the panel is always
     -- closed here in practice, since SetNuiFocus(true, true) (client/ui.lua)
-    -- captures keyboard input the moment a qbinventory session opens.
+    -- captures keyboard input the moment a kora_inventory session opens.
     if IsPauseMenuActive() or IsNuiFocused() then
         return
     end
 
-    local data = exports.qbcore:getPlayerData()
+    local data = exports.kora_core:getPlayerData()
     local item = data and data.items and data.items[slot]
     if type(item) ~= 'table' then
         return

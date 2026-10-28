@@ -31,7 +31,7 @@ QB = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function() end },
 }
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 GetInvokingResource = function() return nil end
 GetGameTimer = function() return 100 end
 CreateThread = function() end
@@ -46,7 +46,7 @@ TriggerClientEvent = function(event, _, payload)
 end
 local player = { name = 'Test', items = {} }
 local definition = { name = 'card', label = 'Card', image = 'card.png', weight = 10, description = 'Base card' }
-exports = setmetatable({ qbcore = {
+exports = setmetatable({ kora_core = {
     allShared = function() return {} end,
     getShared = function(_, registry, name) return registry == 'items' and name == 'card' and definition or nil end,
     getPlayerData = function(_, _, path) return path and player.items or player end,

@@ -15,7 +15,7 @@ local definitions = {
     weapon_pistol = { name = 'weapon_pistol', type = 'weapon', unique = true, weight = 1, ammotype = 'AMMO_PISTOL' },
 }
 local function noop() end
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 GetInvokingResource = function() return invokingResource end
 GetGameTimer = function() return 1000 end
 GetPlayerPed = function(source) return source end
@@ -37,7 +37,7 @@ exports = setmetatable({}, {
     __index = function(_, resource)
         return setmetatable({}, { __index = function(_, name)
             return function(_, ...)
-                if resource == 'qbcore' then
+                if resource == 'kora_core' then
                     local source, field, value = ...
                     if name == 'allShared' then return {} end
                     if name == 'registerPhysicalCash' then return true end
@@ -71,7 +71,7 @@ dofile('server.lua')
 dofile('server/crafting.lua')
 dofile('server/containers.lua')
 dofile('server/compat/qb.lua')
--- This is qbinventory's own compatibility module; no ox_lib code is loaded.
+-- This is kora_inventory's own compatibility module; no ox_lib code is loaded.
 dofile('server/compat/ox.lua')
 
 local inventory, internal = QbInventory, QbInventory.internal
@@ -148,7 +148,7 @@ rejectsCash(extraCash, 'an additional cash stack cannot mint money')
 H.equal(inventory.compat.qb.SetItemData(7, 'cash', 'amount', 101, 1), false, 'QB item-data API cannot mint cash')
 
 local stale = inventory.copy(data[7].items)
-invokingResource = 'qbcore'
+invokingResource = 'kora_core'
 H.ok(registered.physicalCashAdd(7, 'cash', 5, 'test'), 'the existing cash bridge remains authoritative')
 invokingResource = nil
 rejectsCash(stale, 'stale trusted snapshot cannot undo a later cash credit')
@@ -158,7 +158,7 @@ local duringValidation = inventory.copy(data[7].items)
 local writesBeforeCredit = writes
 local revisionBeforeCredit = internal.getRevision('player:7')
 definitionHook = function()
-    invokingResource = 'qbcore'
+    invokingResource = 'kora_core'
     H.ok(registered.physicalCashAdd(7, 'cash', 5, 'validation-test'))
     invokingResource = nil
 end

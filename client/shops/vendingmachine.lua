@@ -1,5 +1,5 @@
--- World presentation only. qbtarget's addModel matches every currently- and
--- future-streamed prop of these models anywhere on the map (unlike qblib's
+-- World presentation only. kora_target's addModel matches every currently- and
+-- future-streamed prop of these models anywhere on the map (unlike kora_lib's
 -- own QB.interact.addTargetModel, a one-shot snapshot of what's streamed in
 -- at call time) -- exactly what a feature with no curated location list
 -- needs. The reported entity's own coordinates travel with the open request
@@ -12,13 +12,13 @@ local shop = assert(
     'qbinventory vending machine configuration is required'
 )
 
-exports.qbtarget:addModel(shop.models, {
+exports.kora_target:addModel(shop.models, {
     {
         label = ('Browse %s'):format(shop.label),
         icon = 'shopping-basket',
         onSelect = function(entity)
             local coords = GetEntityCoords(entity)
-            exports.qbinventory:openInventory('shop', {
+            exports.kora_inventory:openInventory('shop', {
                 id = shop.id,
                 coords = { x = coords.x, y = coords.y, z = coords.z },
             })

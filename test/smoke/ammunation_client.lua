@@ -21,10 +21,10 @@ AddEventHandler = function(name, callback)
 end
 
 exports = {
-    qbinventory = {
+    kora_inventory = {
         openInventory = function() end,
     },
-    qbtarget = {
+    kora_target = {
         addSphereZone = function(_, options)
             nextId = nextId + 1
             activeZones[nextId] = options
@@ -49,17 +49,17 @@ end
 
 H.equal(countActiveZones(), #shop.locations, 'initial load registers one target per Ammu-Nation counter')
 
-for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('qbtarget') end
+for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('kora_target') end
 H.equal(countActiveZones(), #shop.locations, 'a qbtarget start replaces existing Ammu-Nation targets')
 
-for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('qbtarget') end
+for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('kora_target') end
 H.equal(countActiveZones(), #shop.locations, 'repeated qbtarget starts cannot duplicate Ammu-Nation targets')
 
-for _, callback in ipairs(handlers.onClientResourceStop or {}) do callback('qbtarget') end
--- qbtarget's own stop handler removes its zone registrations before the next
+for _, callback in ipairs(handlers.onClientResourceStop or {}) do callback('kora_target') end
+-- kora_target's own stop handler removes its zone registrations before the next
 -- instance starts. Simulate that independent cleanup here.
 activeZones = {}
-for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('qbtarget') end
+for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('kora_target') end
 H.equal(countActiveZones(), #shop.locations, 'a restarted qbtarget instance does not remove targets registered after its stop')
 
 H.finish()

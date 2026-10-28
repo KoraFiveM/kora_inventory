@@ -5,7 +5,7 @@
 -- name present in the file but never placed on the compat table looked fine.
 -- It was also missing from test/run.sh entirely, so it never ran -- which is
 -- how `HasItem` stayed absent from the qb-inventory identity while the pinned
--- contract listed it, and how qbambulance's `registerStash` call reached a
+-- contract listed it, and how kora_ambulance's `registerStash` call reached a
 -- production boot.
 --
 -- Instead, load every realm's scripts the way FXServer does and capture what
@@ -60,7 +60,7 @@ end
 -- inside that shop rather than anything about the provider contract.
 Config = { qbinventory = {} }
 for _, path in ipairs(pathsFrom('shared_scripts')) do
-    -- '@resource/file.lua' entries are other resources (qblib, qbsql); the QB
+    -- '@resource/file.lua' entries are other resources (kora_lib, kora_sql); the QB
     -- surface they provide is mocked below.
     if path:sub(1, 1) ~= '@' then dofile(path) end
 end
@@ -91,7 +91,7 @@ QB.theme = setmetatable({}, { __index = function() return function() end end })
 QB.keybind = { add = function() return { remove = function() return true end } end }
 QBTheme = { refresh = function() end, apply = function() return {} end }
 
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 GetInvokingResource = function() return nil end
 CreateThread = function() end
 RegisterCommand = function() end
@@ -118,9 +118,9 @@ exports = setmetatable({}, {
         return setmetatable({}, {
             __index = function(_, exportName)
                 return function(_, ...)
-                    if resourceName == 'qbcore' and exportName == 'allShared' then return {} end
-                    if resourceName == 'qbcore' and exportName == 'getPlayerData' then return {} end
-                    if resourceName == 'qbcore' and exportName == 'getShared' then
+                    if resourceName == 'kora_core' and exportName == 'allShared' then return {} end
+                    if resourceName == 'kora_core' and exportName == 'getPlayerData' then return {} end
+                    if resourceName == 'kora_core' and exportName == 'getShared' then
                         local registry, name = ...
                         if registry == 'items' and name == 'water_bottle' then
                             return {
@@ -167,7 +167,7 @@ assertContract('client', 'qb-inventory', contract.qbInventory.client, 'qb client
 assertContract('server', 'ox_inventory', contract.oxInventory.server, 'ox server')
 assertContract('client', 'ox_inventory', contract.oxInventory.client, 'ox client')
 
--- qblib-playground initialises its shared locker at resource startup through
+-- kora_lib-playground initialises its shared locker at resource startup through
 -- RegisterStash + SetStashItems. This regression test exercises that public
 -- path end to end: stashSet is declared above setInventoryItems in server.lua,
 -- so it must close over the forward-declared local instead of a nil global.

@@ -2,8 +2,8 @@
 --
 -- This module is deliberately transport-free.  It runs after server.lua and
 -- talks only to QbInventory.internal, so player item writes continue through
--- qbcore's PlayerData mutation funnel and secondary changes keep their
--- qbinventory revision/broadcast guarantees.
+-- kora_core's PlayerData mutation funnel and secondary changes keep their
+-- kora_inventory revision/broadcast guarantees.
 
 local inventory = QbInventory
 local internal =
@@ -284,7 +284,7 @@ end
 -- This module does NOT call exports(). It builds a table which
 -- server/compat/providers.lua publishes under the `qb-inventory` identity
 -- through __cfx_export_qb-inventory_<name> handlers -- a namespace entirely
--- separate from qbinventory's own flat export table. That separation is what
+-- separate from kora_inventory's own flat export table. That separation is what
 -- lets GetInventory and CanAddItem keep their upstream qb-inventory return
 -- shapes here while server.lua's native exports of the same names keep theirs.
 -- (An earlier version of this file did call exports() and silently overwrote
@@ -305,14 +305,14 @@ local api = {
 }
 
 -- Full upstream qb-inventory compatibility uses the same authority methods,
--- but keeps its provider-specific return shapes separate from qbinventory's
+-- but keeps its provider-specific return shapes separate from kora_inventory's
 -- native exports (and from ox_inventory's identically named exports).
 -- inventory.api is installed by server.lua in the live resource. Keeping a blank
 -- fallback permits this transport-free adapter to be unit-tested in isolation.
 local native = inventory.api or {}
 
 ---Upstream: LoadInventory(source, citizenid) -> slot-keyed item table.
----`citizenid` is accepted and ignored: qbcore owns player persistence and has
+---`citizenid` is accepted and ignored: kora_core owns player persistence and has
 ---already loaded PlayerData.items by the time anything can call this.
 api.LoadInventory = function(source, _citizenid)
     return inventory.copy(native.GetInventory(source) or {})
@@ -328,10 +328,10 @@ api.SaveInventory = function(source, offline)
                 or (source.items ~= nil and type(source.items) ~= 'table') then
                 return false, 'invalid offline player inventory'
             end
-            return exports.qbcore:saveOfflinePlayer({ citizenid = source.citizenid,
+            return exports.kora_core:saveOfflinePlayer({ citizenid = source.citizenid,
                 items = inventory.copy(source.items or {}) }, { 'items' })
         end
-        return exports.qbcore:savePlayer(source, 'items')
+        return exports.kora_core:savePlayer(source, 'items')
     end)
     if not called then return false, tostring(saved) end
     if saved ~= true then
@@ -365,7 +365,7 @@ end
 
 ---Upstream: UseItem(itemName, ...) -- the first argument is the ITEM NAME and
 ---the varargs are forwarded to the registered handler, which upstream calls as
----(source, itemData). qbinventory's own earlier compat shape was
+---(source, itemData). kora_inventory's own earlier compat shape was
 ---UseItem(source, item); both are accepted so neither caller breaks.
 api.UseItem = function(first, second, third)
     if type(first) == 'string' then
@@ -415,7 +415,7 @@ api.OpenInventory = function(source, identifier, data)
     return native.OpenInventory(source, identifier, data)
 end
 
----Upstream: CloseInventory(source, identifier). qbinventory sessions are keyed
+---Upstream: CloseInventory(source, identifier). kora_inventory sessions are keyed
 ---by player, so the identifier is advisory -- closing the player's session is
 ---what actually releases the inventory either way. Kept as a WRAPPER rather
 ---than a direct `native.CloseInventory` reference: the value-copy form silently

@@ -9,7 +9,7 @@ local function copy(value)
 end
 QbInventory = { internal = {}, api = {}, copy = copy,
     persistence = { flush = function() error('player saves must not flush unrelated secondary inventories') end } }
-exports = { qbcore = {
+exports = { kora_core = {
     savePlayer = function(_, src, field)
         if throwOnline then error('core unavailable') end
         calls.online = { src = src, field = field }

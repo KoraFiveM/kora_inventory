@@ -2,7 +2,7 @@
 --
 -- This file deliberately translates legacy *intent* events only. It never
 -- renders the legacy payload or accepts legacy item tables as a source of
--- truth: qbinventory asks its server to resolve every target and the active
+-- truth: kora_inventory asks its server to resolve every target and the active
 -- session remains the only source of inventory views and mutations.
 
 local inventoryApi = assert(QbInventory and QbInventory.clientApi, 'qbinventory client transport must load first')
@@ -10,7 +10,7 @@ local selfOpening = false
 
 local function setBusy(value)
     -- Keep the conventional qb-inventory state bag in sync with a real
-    -- qbinventory session. This state is advisory to other client resources;
+    -- kora_inventory session. This state is advisory to other client resources;
     -- the server still validates every action independently.
     LocalPlayer.state:set('inv_busy', value == true, true)
 end
@@ -28,7 +28,7 @@ local function openSelf()
         return false
     end
     selfOpening = true
-    -- qbinventory validates the local player's server ID before granting the
+    -- kora_inventory validates the local player's server ID before granting the
     -- short-lived session. We intentionally do not inspect nearby vehicles,
     -- entities, or any client inventory record here.
     inventoryApi.openInventory('player', QB.cache.serverId())
@@ -38,7 +38,7 @@ end
 local function openLegacyTarget(other)
     -- The first legacy argument is the old player-items table. It is ignored
     -- by design. A second panel's name is only a requested identifier and is
-    -- still resolved, access-checked and snapshotted by qbinventory's server.
+    -- still resolved, access-checked and snapshotted by kora_inventory's server.
     if type(other) ~= 'table' then
         return openSelf()
     end
@@ -77,7 +77,7 @@ end
 
 ---Respond to a legacy "your inventory changed" push.
 ---
----Under qbinventory this is a deliberate no-op, and it must stay one. An open
+---Under kora_inventory this is a deliberate no-op, and it must stay one. An open
 ---session is already kept current by the authoritative
 ---`qbinventory:client:sessionPatched` stream, and with no session open there is
 ---no UI to refresh -- so there is no state a re-open could recover.
@@ -93,7 +93,7 @@ local function refreshActiveSession()
     return inventoryApi.getCurrentSession() ~= nil
 end
 
--- A qbinventory session is the single lifecycle authority for inv_busy. The
+-- A kora_inventory session is the single lifecycle authority for inv_busy. The
 -- UI bridge owns focus; this bridge only mirrors the compatibility state bag.
 AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     if type(payload) ~= 'table' or type(payload.token) ~= 'string' then
@@ -124,7 +124,7 @@ end)
 
 -- Current upstream qb-inventory event names. The item lists passed by legacy
 -- servers are intentionally ignored; all UI state comes back from the
--- qbinventory server session response.
+-- kora_inventory server session response.
 RegisterNetEvent('qb-inventory:client:openInventory', function(_, other)
     openLegacyTarget(other)
 end)
@@ -137,24 +137,24 @@ RegisterNetEvent('qb-inventory:client:updateInventory', function()
     refreshActiveSession()
 end)
 
--- qbinventory owns item receipt configuration and presentation. Upstream
+-- kora_inventory owns item receipt configuration and presentation. Upstream
 -- resources commonly call this immediately after AddItem; accepting it as a
 -- deliberate no-op avoids duplicate receipts and means resources never need
 -- to carry UI data or decide whether boxes are enabled.
 RegisterNetEvent('qb-inventory:client:ItemBox', function() end)
 
--- The rest of upstream's client event surface. qbinventory owns its own UI, so
+-- The rest of upstream's client event surface. kora_inventory owns its own UI, so
 -- most of these are DELIBERATE no-ops rather than missing work: registering the
 -- names means an unmodified qb-inventory dependant fires them harmlessly
--- instead of erroring, while presentation stays under qbinventory's control
+-- instead of erroring, while presentation stays under kora_inventory's control
 -- (same reasoning as the ItemBox handler above).
 
--- Upstream renders a "required items" hint panel. qbinventory's NUI does not
+-- Upstream renders a "required items" hint panel. kora_inventory's NUI does not
 -- take item lists from other resources -- that is the spoofing vector the
 -- ItemBox policy exists to close -- so the payload is intentionally dropped.
 RegisterNetEvent('qb-inventory:client:requiredItems', function() end)
 
--- The hotbar is part of qbinventory's own UI and is driven from its session,
+-- The hotbar is part of kora_inventory's own UI and is driven from its session,
 -- not from a caller-supplied item list.
 RegisterNetEvent('qb-inventory:client:hotbar', function() end)
 
@@ -171,7 +171,7 @@ RegisterNetEvent('qb-inventory:client:giveAnim', function()
     TaskPlayAnim(ped, 'mp_common', 'givetake1_b', 8.0, -8.0, -1, 49, 0, false, false, false)
 end)
 
--- Drop discovery is server-resolved here: qbinventory hands the client a
+-- Drop discovery is server-resolved here: kora_inventory hands the client a
 -- session for a drop it has already access-checked, so there is no client-side
 -- drop entity registry to add or remove targets from. Accepting these keeps
 -- upstream drop scripts from erroring.
@@ -181,7 +181,7 @@ RegisterNetEvent('qb-inventory:client:removeDropTarget', function() end)
 -- Registered CLIENT-side upstream despite the :server: name (qb-policejob
 -- fires it). Opening another player's inventory is gated by the server's
 -- inspection policy, so this cannot be granted from a client event -- the
--- officer's own search flow goes through qbinventory's validated open.
+-- officer's own search flow goes through kora_inventory's validated open.
 RegisterNetEvent('qb-inventory:server:RobPlayer', function() end)
 
 -- Older qb scripts used these names before the resource prefix was
@@ -204,7 +204,7 @@ RegisterCommand('inventory', function()
     if IsPauseMenuActive() or IsNuiFocused() then
         return
     end
-    -- TAB also drives qblib's zone and entity-placement creators;
+    -- TAB also drives kora_lib's zone and entity-placement creators;
     -- all are independent keybinds, so an active creator session
     -- must explicitly veto this one rather than relying on FiveM to pick
     -- only one handler for a shared key.
@@ -233,8 +233,8 @@ QB.keybind.add({
     onPressed = openInventoryCommand,
 })
 
--- RegisterNetEvent, not AddEventHandler: qbcore only ever fires these two over
--- the wire (TriggerClientEvent in qbcore's modules/player/server.lua). FiveM
+-- RegisterNetEvent, not AddEventHandler: kora_core only ever fires these two over
+-- the wire (TriggerClientEvent in kora_core's modules/player/server.lua). FiveM
 -- SKIPS a net-delivered event whose handler was attached with bare
 -- AddEventHandler -- printing "event ... was not safe for net" -- so these
 -- resets silently never ran on login/logout.

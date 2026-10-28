@@ -22,7 +22,7 @@ for name in pairs(expectedItems) do H.ok(found[name], ('vending machine stocks %
 
 local captured
 exports = {
-    qbinventory = {
+    kora_inventory = {
         RegisterShop = function(_, id, data)
             captured = { id = id, data = data }
             return 'shop:' .. id
@@ -50,7 +50,7 @@ local inv = { type = 'shop', id = 'vendingmachine' }
 distanceResult = true
 H.ok(V.access(7, inv, { coords = { x = 1.0, y = 2.0, z = 3.0 } }), 'server permits a real machine within range')
 
--- Session revalidation (qbinventory's validSession) has no fresh coords to
+-- Session revalidation (kora_inventory's validSession) has no fresh coords to
 -- offer -- the short-lived approval from the open above must cover it.
 H.ok(V.access(7, inv, nil), 'revalidation without fresh coords reuses the just-granted approval')
 

@@ -1,6 +1,6 @@
 -- Server-authoritative Ammu-Nation registration.
 --
--- This file has no network event. The generic qbinventory open transport may
+-- This file has no network event. The generic kora_inventory open transport may
 -- receive a client request for `shop:ammunation`, but RegisterShop's access
 -- callback below re-resolves the player's ped, routing bucket and position on
 -- the server before every open and every session revalidation.
@@ -54,7 +54,7 @@ local function access(source, inventory)
     return isAtApprovedLocation(source)
 end
 
-local shopKey = exports.qbinventory:RegisterShop(shop.id, {
+local shopKey = exports.kora_inventory:RegisterShop(shop.id, {
     label = shop.label,
     slots = shop.slots,
     maxWeight = shop.maxWeight,

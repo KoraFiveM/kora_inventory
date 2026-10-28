@@ -1,28 +1,28 @@
-# qbinventory
+# kora_inventory
 
-`qbinventory` is the server-authoritative inventory provider. It provides the
+`kora_inventory` is the server-authoritative inventory provider. It provides the
 `qb-inventory`, `ox_inventory`, and retired `qb-weapons` compatibility
 identities. Same-named qb and ox exports retain their upstream-specific
 signatures through separate identity routing. A real qb-inventory, ox_inventory
-or qb-weapons resource must not run alongside qbinventory.
+or qb-weapons resource must not run alongside kora_inventory.
 
 ## Ownership and startup
 
-Player inventory ownership never moves: qbcore owns the slot-keyed
+Player inventory ownership never moves: kora_core owns the slot-keyed
 `PlayerData.items` object and the `players.inventory` database column.
-qbinventory makes player mutations only through qbcore's `setPath` funnel, so
-replication and persistence remain single-writer. qbinventory owns secondary
+kora_inventory makes player mutations only through kora_core's `setPath` funnel, so
+replication and persistence remain single-writer. kora_inventory owns secondary
 inventory state (stashes, temporary stashes, drops, and shops), sessions,
 revisions, locks, hook registration, and audit events.
 
-Shared item definitions remain in qbcore's runtime `items` registry and are
-looked up when each inventory operation runs; qbinventory never caches the
+Shared item definitions remain in kora_core's runtime `items` registry and are
+looked up when each inventory operation runs; kora_inventory never caches the
 legacy `QBCore.Shared.Items` map. Runtime weapon and ammunition additions are
 observed through registry subscriptions and receive their built-in use handler
 without a resource restart.
 
 `RegisterStash(..., owner = true, ...)` is a private-stash template. It does
-not create a shared stash with a boolean owner flag: on open, qbinventory
+not create a shared stash with a boolean owner flag: on open, kora_inventory
 derives the caller's citizen id server-side and uses a separate durable
 `stash:<template>:<citizenid>` record. A caller cannot choose another owner's
 identifier through the client transport.
@@ -45,7 +45,7 @@ a client recipe, output, item metadata, count or `trustedContext` to this API.
 Register a static recipe from its owning server resource:
 
 ```lua
-exports.qbinventory:RegisterCraftRecipe('repair_board', {
+exports.kora_inventory:RegisterCraftRecipe('repair_board', {
   ingredients = { { name = 'wood', amount = 2, metadata = { grade = 'oak' } } },
   outputs = {
     { name = 'board', amount = 1, metadata = { quality = 100 } },
@@ -71,7 +71,7 @@ locked transaction; the default amount remains one.
 
 Crafting locks the qbcore-owned player inventory, makes a detached plan,
 validates all recipe ingredients/weight/slots, then commits through
-`qbcore:setPath` via qbinventory's authority seam. A failed recipe changes no
+`qbcore:setPath` via kora_inventory's authority seam. A failed recipe changes no
 slots. Hooks can approve/reject a craft but cannot mutate its planned state.
 
 Weapon helpers are also server-only: `PrepareWeaponMetadata`, `GetWeaponState`,
@@ -139,7 +139,7 @@ concealment to price. Set the durations to `0` for the previous instant
 toggle. The bar deliberately cannot be cancelled -- a cancellable draw is a
 free way to skip the surcharge by tapping the item repeatedly.
 
-A weapon is classified by its qbcore `weapontype` through `tiers`
+A weapon is classified by its kora_core `weapontype` through `tiers`
 (`back` / `sling` / `hip`), and each tier lists ordered attachment positions
 in `attachments`. A weapon that finds no free position in its tier is simply
 not rendered rather than stacked on top of one that is. `weapons` holds
@@ -148,7 +148,7 @@ per-item overrides: `tier = false` excludes an item entirely, `bone`/`pos`/
 weapon -- which is also how a non-weapon item can be carried, since only
 registry weapons are classified automatically. `components` maps a weapon
 component *item name* to the GTA component it renders as; it is empty by
-default because qbcore's shared registry carries no component-to-native
+default because kora_core's shared registry carries no component-to-native
 mapping and guessing one would attach the wrong part.
 
 The carried list is built on the server from qbcore-owned `PlayerData` and
@@ -168,8 +168,8 @@ at all and can only ever put a weapon *back* on its own player's body (weapon
 wheel, disarm, death), never take one off. Read-only server exports:
 
 ```lua
-exports.qbinventory:GetCarriedWeapons(src)  -- the rendered list
-exports.qbinventory:GetEquippedWeapon(src)  -- { slot, name } or nil
+exports.kora_inventory:GetCarriedWeapons(src)  -- the rendered list
+exports.kora_inventory:GetEquippedWeapon(src)  -- { slot, name } or nil
 ```
 
 There is deliberately no setter. A resource that wants a different carried
@@ -178,7 +178,7 @@ remove the weapon item from its slot (see `server/useables.lua`).
 
 ### Retired `qb-weapons` compatibility
 
-`qbinventory` provides `qb-weapons`, so a resource that only lists it as a
+`kora_inventory` provides `qb-weapons`, so a resource that only lists it as a
 dependency continues to start without a second weapon controller. It accepts
 the legacy draw, holster, ammo, durability and read-only ammo callback names
 and routes them to the current inventory lifecycle. Legacy client item tables
@@ -188,7 +188,7 @@ durability. `quality` is retained as a mirror of canonical `durability` for
 old weapon metadata and existing database rows.
 
 The legacy client `getConfigWeaponAttachments` export remains available too.
-It is derived only from the explicit qbinventory component allow-lists, so
+It is derived only from the explicit kora_inventory component allow-lists, so
 attachment UIs can read it without gaining a metadata or component mutation
 path.
 
@@ -214,7 +214,7 @@ permissive configuration toggle.
 `server/vehicles.lua` is the isolated trunk/glovebox domain. It derives the
 canonical persistent keys `trunk:<NORMALISED_PLATE>` and
 `glovebox:<NORMALISED_PLATE>` from a live **server-resolved** entity. A client
-open request may contain only a network id; qbinventory never accepts a
+open request may contain only a network id; kora_inventory never accepts a
 client-supplied plate, class, coordinates, capacities, or arbitrary vehicle
 inventory key.
 
@@ -253,7 +253,7 @@ existing container only and still passes the core access/distance checks.
 For a portable item container, trusted code calls
 `QbInventory.containers.bindItem(source, slot, options)`. The module reads the
 actual qbcore-owned slot, derives the caller's citizen ID, generates the
-identifier server-side, and writes `info.containerId` through qbcore's mutation
+identifier server-side, and writes `info.containerId` through kora_core's mutation
 funnel. `openItem(source, slot)` then reads that same current server slot. It
 does not accept a browser/client item table, owner, or container identifier.
 
@@ -299,13 +299,13 @@ target player, or inventory key.
 inventories: stashes, trunks, gloveboxes, containers, evidence, shops and
 optional drops.
 It never reads or writes `PlayerData.items` or `players.inventory`; those remain
-qbcore's canonical player store.
+kora_core's canonical player store.
 
-The qbsql migration creates `qbinventory_inventories` (items, properties and
+The kora_sql migration creates `qbinventory_inventories` (items, properties and
 revision), `qbinventory_shop_stock`, audit, migration-state/row and quarantine
 tables. Legacy rows are copied, never deleted or updated. An already imported
 row with the same checksum is skipped; a changed legacy row is reported rather
-than overwriting a possibly-live qbinventory record. Malformed JSON/item slots
+than overwriting a possibly-live kora_inventory record. Malformed JSON/item slots
 are retained in `qbinventory_quarantine` for operator review.
 
 Run these from the server console (or grant `command.qbinventory`):
@@ -319,12 +319,12 @@ The importer inspects, when present, `inventories`, `stashitems`, `trunkitems`,
 and `gloveboxitems`. It accepts common identifier/slot/weight column spellings
 and preserves original item metadata.
 
-Start it after `qbcore`. The bundled `web/` NUI starts with qbinventory, while
+Start it after `kora_core`. The bundled `web/` NUI starts with kora_inventory, while
 the server API and client session transport remain usable by another renderer.
 
 ## Server API
 
-The lower-camel exports are the qbcore gateway surface:
+The lower-camel exports are the kora_core gateway surface:
 
 - `getWeight`, `canCarry`, `addItem`, `removeItem`, `getItemByName`,
   `getItemsByName`, `getItemBySlot`, `getItemCount`, `hasItem`, `getFreeSlot`,
@@ -357,25 +357,25 @@ resolve to the same function.
 `qb-inventory` and `ox_inventory` are **enabled**. Each compat module builds a
 table which `server/compat/providers.lua` publishes as
 `__cfx_export_<identity>_<name>` handlers -- a namespace separate from
-qbinventory's own flat export table, which is what lets same-named qb and ox
+kora_inventory's own flat export table, which is what lets same-named qb and ox
 exports keep their different upstream return shapes.
 `test/smoke/provider_contract.lua` loads both realms the way FXServer does and
 asserts every name in `test/contracts/upstream.lua` is actually callable on the
 right identity **in the right realm**.
 
-A compat module must never call `exports()`. Doing so writes into qbinventory's
+A compat module must never call `exports()`. Doing so writes into kora_inventory's
 own flat table and silently replaces a native export for every other resource --
 `client/compat/ox.lua` did exactly that to `openInventory`/`closeInventory`, and
 because its wrappers then re-entered the export, every stash and shop open
 recursed until the client hung. `test/smoke/export_collisions.lua` covers both
 realms against that.
 
-### Reading qbcore's shared item registry
+### Reading kora_core's shared item registry
 
-`exports.qbcore:getShared(name, key)` requires **both** arguments -- it returns
+`exports.kora_core:getShared(name, key)` requires **both** arguments -- it returns
 `registries[name].materialised[key]`. Calling it with only a registry name
 returns `nil` unconditionally, silently. The registry is named `items`,
-lower-case (`qbcore/modules/registry/server.lua:12`), and there is no public
+lower-case (`kora_core/modules/registry/server.lua:12`), and there is no public
 accessor for the whole name-keyed map: `allShared('items')` returns a dense
 ARRAY of records, so a map has to be rebuilt from it.
 
@@ -390,9 +390,9 @@ such a lookup reports "no such item" for every item in the game.
 - `client/compat/ox.lua` -- the whole `ox_inventory` client identity, including
   its own `openInventory`/`closeInventory` wrappers (which carry the
   `setStashTarget` substitution). Its UI adapters translate ox notification
-  positions onto qblib's six placements, preserve multi-select input rows, and
-  map progress scenarios and props onto qblib's supported shapes.
-- `client.lua` -- qbinventory's native client exports, and the `qb-inventory`
+  positions onto kora_lib's six placements, preserve multi-select input rows, and
+  map progress scenarios and props onto kora_lib's supported shapes.
+- `client.lua` -- kora_inventory's native client exports, and the `qb-inventory`
   identity only.
 
 **One module owns one identity.** Registering the same name on the same identity
@@ -410,11 +410,11 @@ conflicts with this resource's authority model.
 | `Inventories` / `Drops` / `RegisteredShops` | mutable globals other resources write to | not exposed | a mutable global bypasses the lock/bump/broadcast write funnel |
 | `qb-inventory:server:updateDrop` | writes drop coords from the client | inert no-op | position gates every distance check |
 | `qb-inventory:server:snowball` | grants a weapon on a client event | inert no-op | server code can call `AddItem` directly |
-| `SaveInventory(source, offline)` | writes player items | flushes secondary inventories only | qbcore owns player persistence |
+| `SaveInventory(source, offline)` | writes player items | flushes secondary inventories only | kora_core owns player persistence |
 | ox `GetInventory` / `Inventory` | a live `OxInventory` instance with methods | a detached snapshot | a live object is a mutation path around the write funnel |
-| ox `SetSlotCount` / `SetMaxWeight` | resizes any inventory | refuses player inventories | qbcore owns player dimensions |
+| ox `SetSlotCount` / `SetMaxWeight` | resizes any inventory | refuses player inventories | kora_core owns player dimensions |
 | ox `SetMetadata` | accepts `metadata.weight` | rejects it | a caller-supplied weight invalidates capacity checks |
-| ox `addCash` / `removeCash` / `getBank` / `getCards` / `giveCard` | operate on `money` / `mastercard` items | routed to qbcore accounts | qbcore owns balances |
+| ox `addCash` / `removeCash` / `getBank` / `getCards` / `giveCard` | operate on `money` / `mastercard` items | routed to kora_core accounts | kora_core owns balances |
 
 ## Ammunition
 
@@ -473,8 +473,8 @@ with no HEAD requests and no manifest to keep in sync. Set `preferLocal = true`
 to move the remote URL to the end of that list, or `allowRemote = false` to drop
 it entirely.
 
-Local files live in `qbinventory/images/` (see its README) and are served as
-`nui://qbinventory/images/<file>`. That is outside `web/` on purpose: `web/build`
+Local files live in `kora_inventory/images/` (see its README) and are served as
+`nui://kora_inventory/images/<file>`. That is outside `web/` on purpose: `web/build`
 is Vite's output directory, and artwork a server owner added must not be
 something `pnpm build` can delete.
 
@@ -530,7 +530,7 @@ rejected rather than merged.
 
 ### Using items
 
-An item definition (qbcore's shared `items` registry) may set two qbinventory-
+An item definition (kora_core's shared `items` registry) may set two qbinventory-
 native fields on top of the usual `useable`/`weight`/`unique`/etc, both derived
 and validated by `buildItem` exactly like those:
 
@@ -540,8 +540,8 @@ and validated by `buildItem` exactly like those:
   `shouldClose = false` (kept as pure qb-core compat metadata, see below) is
   honoured as an implicit `preventClose = true` even without the native field.
 - `useTime` (integer ms) -- default `0` (today's immediate-use behaviour).
-  When set, the client runs qblib's progress bar
-  (`QB.progressbar.start`, see `qblib/modules/progressbar`) for `useTime` ms
+  When set, the client runs kora_lib's progress bar
+  (`QB.progressbar.start`, see `kora_lib/modules/progressbar`) for `useTime` ms
   *before* it ever contacts the server. If the bar is cancelled or never
   starts, the client never sends the use request at all -- there is no
   server-side "was it shown" flag to trust, so not asking is what keeps a
@@ -559,7 +559,7 @@ path and the hotbar keybinds below, so there is exactly one place that decides
 whether a use is allowed to proceed.
 
 Pressing `1`-`5` uses whatever item currently occupies inventory slots
-`1..Config.qbinventory.hotbarSlots`, even with the panel closed -- qbinventory
+`1..Config.qbinventory.hotbarSlots`, even with the panel closed -- kora_inventory
 has no separate hotbar/quickslot data model (see the
 `qb-inventory:client:hotbar` no-op just below), so the first N general
 inventory slots double as the hotbar, matching real qb-inventory/ox_inventory.
@@ -585,13 +585,13 @@ safe during migration. It listens for `qb-inventory:client:openInventory`,
 commands, and the default `openInv`/`TAB` mapping through `QB.keybind`.
 
 Legacy item tables, slot counts, labels, weights and metadata are never read.
-An open event contributes only a validated identifier request; qbinventory's
+An open event contributes only a validated identifier request; kora_inventory's
 server then resolves the inventory, checks access/distance/bucket rules and
 returns its own session snapshot. `updateInventory` re-opens the current
 server-issued target to obtain a fresh authoritative snapshot. No vehicle or
 entity discovery happens client-side.
 
-`LocalPlayer.state.inv_busy` is set only while a qbinventory UI session is
+`LocalPlayer.state.inv_busy` is set only while a kora_inventory UI session is
 open, and released on the matching session-close event or resource stop. NUI
 focus remains exclusively owned by `client/ui.lua`.
 
@@ -599,7 +599,7 @@ focus remains exclusively owned by `client/ui.lua`.
 
 There is deliberately no client event, callback, or NUI endpoint that accepts
 a complete inventory table for replacement. Browser and client payloads are
-limited to an action intent plus slots and amounts; qbinventory resolves item
+limited to an action intent plus slots and amounts; kora_inventory resolves item
 records, inventory identifiers, prices, permissions, and revisions again on
 the server.
 
@@ -613,12 +613,12 @@ add after payment is refunded by the server.
 
 `config/shops/ammunation.lua` defines one finite-stock `ammunation` shop and
 the approved world counters. Its stock is intentionally declarative
-`{ name, amount, price }` data: qbinventory must build each canonical item view
-from qbcore's registry, rather than accepting labels, local `image` filenames,
+`{ name, amount, price }` data: kora_inventory must build each canonical item view
+from kora_core's registry, rather than accepting labels, local `image` filenames,
 remote `imageUrl` fields, weights or other
 item fields from configuration or a client.
 
-`client/shops/ammunation.lua` creates qblib interaction zones and map blips as
+`client/shops/ammunation.lua` creates kora_lib interaction zones and map blips as
 presentation only. Selecting a zone sends the fixed shop identifier through
 the normal inventory open request; it does not send a location, price, stock
 row or item data. `server/shops/ammunation.lua` registers the shop with an
@@ -626,14 +626,14 @@ access callback that independently reads the player's server ped coordinates
 and routing bucket, and permits the open only inside a configured counter. A
 forged shop-ID request away from a counter or in another bucket is denied.
 The blip uses the canonical `Weapons` category and the separate storefront
-name `Ammu-Nation`, letting qblib render `Weapons: Ammu-Nation` while grouping
+name `Ammu-Nation`, letting kora_lib render `Weapons: Ammu-Nation` while grouping
 it with other weapon shops.
 
 The bundled liquor shop follows the same contract. Each location declares its
 own storefront name (`Rob's Liquor` or `24/7`) while all of them use the
 canonical `Liquor` category and the same server-validated shop stock.
 
-The initial catalog includes standard qbcore weapons and the registered
+The initial catalog includes standard kora_core weapons and the registered
 `pistol_ammo`, `smg_ammo`, `shotgun_ammo`, `rifle_ammo`, `mg_ammo`, and
 `snp_ammo` packs. Load the three Ammu-Nation files after
 `config.lua`/`server.lua`/`client.lua` respectively in the manifest; the shop
@@ -647,9 +647,9 @@ list -- a vending machine is any `models` prop
 `prop_vend_coffe_01`, matching real qb-inventory's default set) a mapper
 placed anywhere, and FXServer has no way to independently query a static map
 prop's position the way it can a player ped. `client/shops/vendingmachine.lua`
-targets those models globally through `exports.qbtarget:addModel` (a
-persistent, streaming-aware registration -- qbinventory now `dependency`s
-`qbtarget` for this), not qblib's own `QB.interact.addTargetModel`, which is
+targets those models globally through `exports.kora_target:addModel` (a
+persistent, streaming-aware registration -- kora_inventory now `dependency`s
+`kora_target` for this), not kora_lib's own `QB.interact.addTargetModel`, which is
 documented as a one-shot snapshot of whatever is streamed in at call time and
 would miss every machine outside the player's initial render distance.
 Selecting a machine sends its live entity coordinates alongside the fixed
@@ -660,7 +660,7 @@ reported coordinates against the source's own live server position (the same
 trust boundary real qb-inventory's `OpenShop` accepts -- see its
 `server/main.lua`) rather than inventing a stronger guarantee the platform
 can't back up. A verified open is cached per-source for
-`Config.qbinventory.sessionTtl` so qbinventory's own in-session revalidation
+`Config.qbinventory.sessionTtl` so kora_inventory's own in-session revalidation
 (`validSession`, which re-runs `access` on every transfer but has no fresh
 client data to offer) doesn't kick a player out mid-purchase; a bare open
 with no coordinates at all, or coordinates that don't place the source near a
@@ -691,12 +691,12 @@ never treated as authoritative.
 
 ## Durable player exchanges
 
-`ExecutePlayerExchange(source, operationKey, request)` is a native server-only export for trusted gameplay domains listed in `Config.qbinventory.exchangeCallers` (default: `qbdrugs`). The calling resource owns its key namespace. The request requires `citizenid` and accepts `take = {{ name, amount }}`, `give = {{ name, amount, info = {} }}`, nonnegative whole `cash`, signed whole `dealerRep`, and `reason`. Inputs are objects with named fields; omitted lists and amounts default empty/zero. Weapon outputs and direct physical-currency item legs are rejected; use `cash` for physical cash. Reputation updates `metadata.rep.dealer`, with negative results clamped to zero. The gameplay caller must authorize the interaction and choose all terms on the server; no client event exposes this API.
+`ExecutePlayerExchange(source, operationKey, request)` is a native server-only export for trusted gameplay domains listed in `Config.qbinventory.exchangeCallers` (default: `kora_drugs`). The calling resource owns its key namespace. The request requires `citizenid` and accepts `take = {{ name, amount }}`, `give = {{ name, amount, info = {} }}`, nonnegative whole `cash`, signed whole `dealerRep`, and `reason`. Inputs are objects with named fields; omitted lists and amounts default empty/zero. Weapon outputs and direct physical-currency item legs are rejected; use `cash` for physical cash. Reputation updates `metadata.rep.dealer`, with negative results clamped to zero. The gameplay caller must authorize the interaction and choose all terms on the server; no client event exposes this API.
 
-The export plans against the current inventory, validates capacity, and uses qbcore's durable inventory/money/metadata fences. One SQL transaction writes the player values and a permanent, resource-scoped receipt. It returns the receipt on success or `(nil, code, message)` on failure. Reusing a key with identical canonical terms and recipient returns the original receipt; changing terms or recipient returns `conflict`. `GetPlayerExchange(operationKey)` retrieves and reconciles the calling resource's receipt, returning `not_found` only after the previous worker has settled and a locking read confirms no receipt. Unknown outcomes remain fenced; callers must retry the same key, not create a new reward key. Native recovery also reconciles pending operations after provider/core restarts, including offline recipients.
+The export plans against the current inventory, validates capacity, and uses kora_core's durable inventory/money/metadata fences. One SQL transaction writes the player values and a permanent, resource-scoped receipt. It returns the receipt on success or `(nil, code, message)` on failure. Reusing a key with identical canonical terms and recipient returns the original receipt; changing terms or recipient returns `conflict`. `GetPlayerExchange(operationKey)` retrieves and reconciles the calling resource's receipt, returning `not_found` only after the previous worker has settled and a locking read confirms no receipt. Unknown outcomes remain fenced; callers must retry the same key, not create a new reward key. Native recovery also reconciles pending operations after provider/core restarts, including offline recipients.
 
 Cash rewards honor the configured item-backed cash authority and retain a zero ledger mirror. Nonzero cash transaction tax is currently rejected explicitly because the configurable tax collector has no durable collector transaction contract; equivalent dealer profiles require tax disabled for those rewards. Marked-bill output metadata is preserved, but the item must exist in the authoritative item registry. The receipt includes provider, operation key, citizen ID, cash, reputation delta, canonical request fingerprint and completion time.
 
-Validation: `lua test/smoke/player_exchange.lua` exercises the actual qbcore fences and inventory planners with a controlled SQL transport, including repeated/changed requests, cash items, marked bills, capacity, source reuse, unknown commits, delayed workers, offline restart recovery and ordinary writes blocked by all three fences.
+Validation: `lua test/smoke/player_exchange.lua` exercises the actual kora_core fences and inventory planners with a controlled SQL transport, including repeated/changed requests, cash items, marked bills, capacity, source reuse, unknown commits, delayed workers, offline restart recovery and ordinary writes blocked by all three fences.
 
-Run `python3 test/exchange_database.py` for the optional database check. It starts a disposable socket-only MariaDB instance, captures the actual exchange planner SQL, and executes it with qbsql's checked transaction runner. It verifies receipt/player atomicity, duplicate rejection after restart, precondition rollback, missing commit acknowledgements, and recovery reads waiting for older transactions. It does not exercise a connected FiveM player.
+Run `python3 test/exchange_database.py` for the optional database check. It starts a disposable socket-only MariaDB instance, captures the actual exchange planner SQL, and executes it with kora_sql's checked transaction runner. It verifies receipt/player atomicity, duplicate rejection after restart, precondition rollback, missing commit acknowledgements, and recovery reads waiting for older transactions. It does not exercise a connected FiveM player.

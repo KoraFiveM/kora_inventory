@@ -17,7 +17,7 @@ QB = {
     callback = { register = function(name, fn) QBCallbacks[name] = fn end },
     sql = {},
 }
-GetCurrentResourceName = function() return 'qbinventory' end
+GetCurrentResourceName = function() return 'kora_inventory' end
 GetInvokingResource = function() return nil end
 CreateThread = function() end
 RegisterCommand = function() end
@@ -53,7 +53,7 @@ exports = setmetatable({}, {
         return setmetatable({}, {
             __index = function(_, exportName)
                 return function(_, ...)
-                    if resourceName == 'qbcore' then
+                    if resourceName == 'kora_core' then
                         if exportName == 'allShared' then return {} end
                         if exportName == 'getShared' then
                             local registry, itemName = ...

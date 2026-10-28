@@ -1,15 +1,15 @@
 -- Run from qbinventory: lua5.4 test/smoke/persistence_flush.lua [persistence-source]
--- Uses actual persistence/shared code and the qbsql consumer adapter. Driver
+-- Uses actual persistence/shared code and the kora_sql consumer adapter. Driver
 -- callbacks and the FiveM host are controlled; no database or service runs.
 local H = dofile('test/harness.lua')
-dofile('../qbcore/test/mocks.lua').install() -- existing deterministic JSON codec
+dofile('../kora_core/test/mocks.lua').install() -- existing deterministic JSON codec
 
 local function setup()
     local f = { calls = {}, threads = {} }
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
     env.Config, env.QbInventory, env.QB = {}, nil, {}
-    env.GetCurrentResourceName = function() return 'qbinventory' end
+    env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.CreateThread = function(fn) f.threads[#f.threads + 1] = fn end
     env.RegisterCommand, env.AddEventHandler, env.TriggerEvent = function() end, function() end, function() end
     env.print = function() end
@@ -40,7 +40,7 @@ local function setup()
         if type(opts) == 'function' then callback = opts end
         submit({ kind = 'upsert', tableName = tableName, rows = env.QbInventory.copy(rows) }, callback)
     end
-    env.exports = { qbsql = driver }
+    env.exports = { kora_sql = driver }
     env.promise = { new = function()
         return {
             resolve = function(p, value) p.settled, p.value = true, value end,
@@ -54,7 +54,7 @@ local function setup()
         return p.value
     end }
     local function load(path) assert(loadfile(path, 't', env))() end
-    load('config.lua'); load('shared.lua'); load('../qbsql/init.lua')
+    load('config.lua'); load('shared.lua'); load('../kora_sql/init.lua')
     load(arg[1] or 'server/persistence.lua')
     -- Run only real bootstrap, leaving the permanent periodic flusher dormant.
     assert(f.threads[1])()
@@ -213,7 +213,7 @@ do
     H.equal(json.decode(params[8]).bucket, 11, 'bucket is stored in existing properties JSON')
     local row = { inventory_type = 'drop', inventory_id = 'scoped', label = 'Drop',
         slots = 10, max_weight = 100000, revision = 1, items = params[7], properties = params[8] }
-    f.env.exports.qbsql.query = function(_, statement, args, callback) callback({ row }) end
+    f.env.exports.kora_sql.query = function(_, statement, args, callback) callback({ row }) end
     local restored = assert(f.persistence.load('drop', 'scoped'))
     H.equal(restored.bucket, 11, 'bucket survives actual persistence loading')
     row.properties = '{}'
@@ -252,7 +252,7 @@ for _, savedFirst in ipairs({ false, true }) do
     assert(loadfile('server/compat/qb.lua', 't', env))()
     env.exports = providers
     -- Controlled durable-row absence after DELETE's effect, before its response.
-    providers.qbsql.query = function(_, _, _, callback) callback({}) end
+    providers.kora_sql.query = function(_, _, _, callback) callback({}) end
     local internal, api = env.QbInventory.internal, env.QbInventory.compat.qb
     H.equal(api.CreateInventory('recreated', { items = record('stash', 'recreated', 0, 2).items }), nil,
         'legacy creation keeps its no-value return')

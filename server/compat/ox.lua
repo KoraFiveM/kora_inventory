@@ -3,7 +3,7 @@
 -- This file deliberately does not register any exports or provide an
 -- `ox_inventory` identity. server.lua owns the authority and decides when the
 -- compatibility contract is complete enough to expose. Keeping this adapter
--- as a table also makes it safe to load alongside native qbinventory callers.
+-- as a table also makes it safe to load alongside native kora_inventory callers.
 --
 -- Required trusted seam (provided by server.lua):
 --   QbInventory.internal.resolveInventory(reference, preferredType)
@@ -11,7 +11,7 @@
 --   QbInventory.internal.{itemDef,bump,broadcast,totalWeight,config}
 --   QbInventory.internal.{createSecondary,removeSecondary,rekeySecondary,open}
 -- Never call any of these from a client event. In particular, setInventoryItems
--- preserves qbcore as the only writer of player PlayerData.items.
+-- preserves kora_core as the only writer of player PlayerData.items.
 --
 -- Signatures and return shapes are pinned against ox_inventory commit
 -- ce8ad4c624cacebf0b2434a3aa27b363fb4c4b06 (see test/contracts/upstream.lua).
@@ -125,7 +125,7 @@ local function toOxItem(item)
     end
     local out = copy(item)
     out.count = countOf(item)
-    out.amount = out.count -- qbinventory callers retain their native field.
+    out.amount = out.count -- kora_inventory callers retain their native field.
     out.metadata = copy(itemMetadata(item))
     out.info = copy(out.metadata)
     return out
@@ -145,7 +145,7 @@ local function toOxItems(items)
 end
 
 -- ACCEPTED DIVERGENCE: upstream's Inventory()/GetInventory() hand back the LIVE
--- OxInventory object, methods and all. qbinventory returns a detached snapshot
+-- OxInventory object, methods and all. kora_inventory returns a detached snapshot
 -- on purpose: every write in this resource goes through the lock -> mutate ->
 -- bump -> broadcast funnel in server.lua, and a live object is a mutation path
 -- straight around it (no lock, no revision bump, no viewer patch, no
@@ -172,7 +172,7 @@ end
 -- Callers distinguish "no such item" from "none held".
 --
 -- MISSING vs upstream: ox_inventory calls Items.UpdateDurability while walking
--- slots, which deletes an expired consumable in the read path. qbinventory has
+-- slots, which deletes an expired consumable in the read path. kora_inventory has
 -- no durability decay yet, so a fully-degraded item is still reported here.
 -- Implementing it needs authority-side write access from a read export, which
 -- is a server.lua change, not an adapter one.
@@ -203,7 +203,7 @@ local function mutateItems(reference, callback)
     end
     return core.lock({ key }, function()
         -- Resolve inside the lock; player inventory views are rebuilt from
-        -- qbcore and must never be retained across the critical section.
+        -- kora_core and must never be retained across the critical section.
         local currentKey, current = resolve(key)
         if not currentKey or not current then
             return false, 'invalid_inventory'
@@ -237,7 +237,7 @@ local function changeInventoryDimensions(reference, field, value)
         return
     end
     if inv.type == 'player' then
-        -- ACCEPTED DIVERGENCE: player dimensions are qbcore configuration, not a
+        -- ACCEPTED DIVERGENCE: player dimensions are kora_core configuration, not a
         -- mutable secondary record. Pretending to accept this would create a
         -- non-persistent split-brain between PlayerData and the session view.
         return warn('player_inventory_dimensions_are_configured_by_qbcore (%s on %s)', field, key)
@@ -722,7 +722,7 @@ function ox.GetItemSlots(reference, item, metadata, strict)
 end
 
 -- Upstream keys the bound container off `metadata.container` and sizes a
--- missing one from `metadata.size` = { slots, maxWeight }. qbinventory's own
+-- missing one from `metadata.size` = { slots, maxWeight }. kora_inventory's own
 -- container domain writes `info.containerId`, so both spellings are accepted.
 function ox.GetContainerFromSlot(reference, slot)
     local key, inv = resolve(reference)
@@ -898,7 +898,7 @@ function ox.ClearInventory(reference, keep)
     end)
 end
 
--- `instance` is upstream's 8th parameter. qbinventory gates stash access on
+-- `instance` is upstream's 8th parameter. kora_inventory gates stash access on
 -- owner/groups/access plus the LIVE player's routing bucket, not on a value
 -- declared at registration time, so it is recorded on the record for callers
 -- that read it back and is deliberately NOT enforced as an access check.
@@ -997,7 +997,7 @@ function ox.CreateDropFromPlayer(playerId)
 end
 
 -- MISSING vs upstream: ox_inventory tracks an EQUIPPED slot (inv.weapon) and
--- returns that slot only. qbinventory has no equipped-slot concept on the
+-- returns that slot only. kora_inventory has no equipped-slot concept on the
 -- server -- adding one means new authority state in server.lua, driven by the
 -- client's weapon events. Until then this reports the first weapon-type slot
 -- found, which answers "is a weapon carried?" but NOT "which is drawn?".
@@ -1015,7 +1015,7 @@ end
 
 -- Upstream ids are ('trunk%s'):format(PLATE) and ('glove%s'):format(PLATE) --
 -- `glove`, not `glovebox` -- uppercased, with an optional whitespace trim.
--- qbinventory keys the same records as trunk:<PLATE> / glovebox:<PLATE>, so the
+-- kora_inventory keys the same records as trunk:<PLATE> / glovebox:<PLATE>, so the
 -- kind names are mapped here and the plate is normalised the same way.
 local function normalisePlate(value)
     if inventory.vehicles then
@@ -1174,7 +1174,7 @@ end
 
 -- A single lookup goes through the authority's resolver so weapons and
 -- case-insensitive names behave exactly as they do everywhere else here.
--- The registry is named 'items' (qbcore modules/registry/server.lua:12) and
+-- The registry is named 'items' (kora_core modules/registry/server.lua:12) and
 -- `getShared(name, key)` requires BOTH arguments. Calling it with only a
 -- registry name returns nil unconditionally, whichever spelling is used, so the
 -- full-list form has to come from allShared -- which is a dense ARRAY, not the
@@ -1184,7 +1184,7 @@ function ox.Items(name)
         return copy(core.itemDef(name))
     end
     local out = {}
-    for _, def in ipairs(exports.qbcore:allShared('items') or {}) do
+    for _, def in ipairs(exports.kora_core:allShared('items') or {}) do
         if type(def) == 'table' and type(def.name) == 'string' then
             out[def.name] = copy(def)
         end
@@ -1203,10 +1203,10 @@ end
 
 -- Upstream: useItem(source, slot, cb). This is the SERVER identity's copy of
 -- the same export client/compat/ox.lua already publishes -- it was reachable
--- on the client and via qbinventory's own native `useItem`, but never on the
+-- on the client and via kora_inventory's own native `useItem`, but never on the
 -- ox_inventory SERVER identity, so a third-party server script calling
 -- exports.ox_inventory:useItem(...) resolved to nothing. Delegates to the
--- exact same use-item funnel qbinventory's own api.useItem calls: handler
+-- exact same use-item funnel kora_inventory's own api.useItem calls: handler
 -- dispatch, the portable-container bypass and the QBCore:Server:UseItem
 -- legacy fallback all live there and are never reimplemented here.
 function ox.useItem(source, slot, cb)
@@ -1235,21 +1235,21 @@ function ox.removeHooks(id)
 end
 
 -- ACCEPTED DIVERGENCE: upstream registers these in modules/pefcl, against a
--- pefcl bank/cash account. qbinventory has no pefcl dependency, so they stay
--- pointed at qbcore's accounts -- the only source of truth for money here.
+-- pefcl bank/cash account. kora_inventory has no pefcl dependency, so they stay
+-- pointed at kora_core's accounts -- the only source of truth for money here.
 function ox.getCash(source)
-    return exports.qbcore:getMoney(source, 'cash')
+    return exports.kora_core:getMoney(source, 'cash')
 end
 function ox.addCash(source, amount, reason)
-    return exports.qbcore:addMoney(source, 'cash', amount, reason or 'ox_inventory')
+    return exports.kora_core:addMoney(source, 'cash', amount, reason or 'ox_inventory')
 end
 function ox.removeCash(source, amount, reason)
-    return exports.qbcore:removeMoney(source, 'cash', amount, reason or 'ox_inventory')
+    return exports.kora_core:removeMoney(source, 'cash', amount, reason or 'ox_inventory')
 end
 -- Upstream registers this as a literal no-op -- its pefcl module exports a
 -- `function() end` under this name and never fills it in.
 -- Nothing consumes its return, so returning a balance here would be inventing a
--- contract. qbcore's own money export is the way to read a bank balance.
+-- contract. kora_core's own money export is the way to read a bank balance.
 function ox.getBank() end
 function ox.getCards(_)
     return {}

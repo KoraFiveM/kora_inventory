@@ -89,7 +89,7 @@ export interface UiConfig {
     /** Outline the hotbar slots in the accent colour. */
     showHotbar?: boolean
     images?: {
-        /** e.g. `nui://qbinventory/images` */
+        /** e.g. `nui://kora_inventory/images` */
         localPath?: string
         /** Tried in order for `<localPath>/<name>.<ext>`. */
         extensions?: string[]

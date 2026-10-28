@@ -10,7 +10,7 @@ declare global {
 const browser = typeof window.invokeNative !== "function"
 
 function resourceName() {
-    return window.GetParentResourceName?.() ?? "qbinventory"
+    return window.GetParentResourceName?.() ?? "kora_inventory"
 }
 
 /** The sole browser-to-Lua transport. Inventory state never bypasses this UI. */

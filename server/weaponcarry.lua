@@ -130,7 +130,7 @@ local function buildCarryList(src)
     if not enabled() then
         return {}
     end
-    local items = exports.qbcore:getPlayerData(src, { 'items' }) or {}
+    local items = exports.kora_core:getPlayerData(src, { 'items' }) or {}
     local limit = hotbarOnly() and hotbarSlots() or math.huge
     local holding = equipped[src]
 
@@ -339,11 +339,11 @@ RegisterNetEvent('qbinventory:server:weaponUnequipped', function()
     publish(src)
 end)
 
--- GTA owns the immediate shot count on the ped, but qbinventory owns the
+-- GTA owns the immediate shot count on the ped, but kora_inventory owns the
 -- durable item state. A client report can only lower the ammo stored on the
 -- weapon the server has already confirmed as drawn; reloading is the sole
 -- server-side path that raises it. That makes this safe for both native
--- qbinventory draws and the qb-weapons compatibility adapter.
+-- kora_inventory draws and the qb-weapons compatibility adapter.
 RegisterNetEvent('qbinventory:server:weaponAmmoConsumed', function(slot, amount)
     if GetInvokingResource() then
         return
@@ -440,8 +440,8 @@ RegisterNetEvent('qbinventory:server:weaponFired', function()
     TriggerEvent('qbinventory:server:weaponRoundFired', src, round)
 end)
 
--- Every player item write funnels through qbcore's setPath, which fires this
--- for qbinventory's own transfers as well as another resource's AddItem, so
+-- Every player item write funnels through kora_core's setPath, which fires this
+-- for kora_inventory's own transfers as well as another resource's AddItem, so
 -- one handler covers picking a rifle up, dropping it, and moving it in or out
 -- of the hotbar range.
 AddEventHandler('qbcore:server:inventoryChanged', function(src, path, value)
@@ -456,7 +456,7 @@ AddEventHandler('qbcore:server:inventoryChanged', function(src, path, value)
             return
         end
         -- The held weapon may have just been moved, dropped or given away.
-        local owned = exports.qbcore:getPlayerData(src, { 'items', holding.slot })
+        local owned = exports.kora_core:getPlayerData(src, { 'items', holding.slot })
         if not owned or owned.name ~= holding.name then
             equipped[src] = nil
         end

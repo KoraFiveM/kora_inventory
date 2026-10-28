@@ -6,7 +6,7 @@
 --
 -- SECURITY: none of these accept inventory contents from the client. Upstream's
 -- SetInventoryData is a move/split/swap engine that trusts the client's
--- inventory ids; here it is translated onto qbinventory's own validated
+-- inventory ids; here it is translated onto kora_inventory's own validated
 -- transfer funnel, which rechecks the session token, both revisions, access,
 -- routing bucket and distance inside a lock. The translation can only ever name
 -- the two inventories the caller's own server-issued session already
@@ -123,7 +123,7 @@ RegisterNetEvent('qb-inventory:server:openDrop', function(dropId)
     if type(dropId) ~= 'string' and type(dropId) ~= 'number' then
         return
     end
-    -- Upstream addresses drops as 'drop-<id>' while qbinventory's key is
+    -- Upstream addresses drops as 'drop-<id>' while kora_inventory's key is
     -- key('drop', id), so the prefix has to come off first -- forwarding it
     -- verbatim builds 'drop:drop-<id>' and never resolves.
     local id = tostring(dropId):gsub('^drop%-', '')

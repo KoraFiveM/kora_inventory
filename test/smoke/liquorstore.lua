@@ -10,12 +10,12 @@ local shop = Config.qbinventory.shops.liquorstore
 H.equal(shop.id, 'liquorstore', 'the liquor store has a fixed canonical identifier')
 H.ok(#shop.locations >= 1, 'the liquor store has approved locations')
 
--- Every stock row must name an item qbcore's registry actually defines.
+-- Every stock row must name an item kora_core's registry actually defines.
 -- Inventing an id here would present a slot with no label, no weight and no
 -- price authority -- an unbuyable row that looks like a shop bug rather than a
 -- config one.
 QBCoreSeed = nil
-dofile('../qbcore/shared/items.lua')
+dofile('../kora_core/shared/items.lua')
 local known = {}
 for _, def in ipairs(QBCoreSeed.items) do known[def.name] = true end
 
@@ -45,7 +45,7 @@ end
 
 local captured
 exports = {
-    qbinventory = {
+    kora_inventory = {
         RegisterShop = function(_, id, data)
             captured = { id = id, data = data }
             return 'shop:' .. id

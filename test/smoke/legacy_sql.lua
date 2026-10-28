@@ -1,7 +1,7 @@
--- Actual authority, persistence and qbsql Lua adapter with controlled durable
+-- Actual authority, persistence and kora_sql Lua adapter with controlled durable
 -- callbacks. Exercise the fixed SQL command across hydration/save boundaries.
 local H = dofile('test/harness.lua')
-dofile('../qbcore/test/mocks.lua').install()
+dofile('../kora_core/test/mocks.lua').install()
 
 local function record(amount)
     return { inventory_type = 'stash', inventory_id = 'policetrash', label = 'Trash', slots = 10,
@@ -15,8 +15,8 @@ local function setup(initial, boot)
     local env = {}; for k, v in pairs(_G) do env[k] = v end
     env.Config, env.QbInventory = {}, nil
     env.QB = { resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end }, callback = { register = function() end } }
-    env.GetCurrentResourceName = function() return 'qbinventory' end
-    env.GetInvokingResource = function() return f.invoker or 'qbsql' end
+    env.GetCurrentResourceName = function() return 'kora_inventory' end
+    env.GetInvokingResource = function() return f.invoker or 'kora_sql' end
     env.GetGameTimer = function() return f.time end
     env.Wait = function() coroutine.yield('wait') end
     env.CreateThread = function(fn) f.threads[#f.threads + 1] = coroutine.create(fn) end
@@ -100,12 +100,12 @@ local function setup(initial, boot)
             return { success = true, results = { { affectedRows = 1 }, { affectedRows = affected } } }
         end, cb)
     end
-    env.exports = setmetatable({ qbsql = driver, qbcore = {
+    env.exports = setmetatable({ kora_sql = driver, kora_core = {
         getShared = function(_, _, name) return { name = name, label = name, weight = 1 } end,
         allShared = function() return {} end,
     } }, { __call = function(_, name, fn) f.exports[name] = fn end })
     local function load(path) assert(loadfile(path, 't', env))() end
-    load('config.lua'); load('shared.lua'); load('../qbsql/init.lua'); load('server/persistence.lua'); load('server.lua')
+    load('config.lua'); load('shared.lua'); load('../kora_sql/init.lua'); load('server/persistence.lua'); load('server.lua')
     f.env, f.persistence, f.internal = env, env.QbInventory.persistence, env.QbInventory.internal
     function f.resume(thread)
         local ok, value, err = coroutine.resume(thread); assert(ok, value); return value, err

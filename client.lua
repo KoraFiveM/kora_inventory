@@ -1,4 +1,4 @@
--- Client transport for qbinventory's built-in NUI. The NUI bridge lives in
+-- Client transport for kora_inventory's built-in NUI. The NUI bridge lives in
 -- client/ui.lua and subscribes to the local session events below.
 
 local session
@@ -6,7 +6,7 @@ local pendingGive
 local nextGiveRequestId = 0
 
 -- Shared by submitIntent's 'use' branch below and client/hotbar.lua's
--- keybinds: gates a use behind qblib's progress bar when the item defines
+-- keybinds: gates a use behind kora_lib's progress bar when the item defines
 -- `useTime`. There is no server-side "was the bar actually shown/completed"
 -- flag to trust, so the only safe design is not sending the use request at
 -- all until the bar itself reports completion -- a cancelled/never-started
@@ -241,7 +241,7 @@ end
 ---@param amount number|nil
 ---@return boolean hasItems
 local function hasItem(names, amount)
-    local data = exports.qbcore:getPlayerData() or {}
+    local data = exports.kora_core:getPlayerData() or {}
     local items = data.items or {}
     local function count(name)
         local count = 0

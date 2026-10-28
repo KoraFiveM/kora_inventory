@@ -1,6 +1,6 @@
 ---
 layout: default
-title: qbinventory
+title: kora_inventory
 ---
 
 Server-authoritative inventory provider for FiveM, with a bundled NUI. It
@@ -10,36 +10,36 @@ fixtures in `test/contracts/`, so same-named qb and ox exports keep their own
 upstream-specific signatures through separate identity routing. A real
 `qb-inventory` or `ox_inventory` resource must not run alongside it.
 
-Ownership never moves: [qbcore](https://qbcore2.github.io/qbcore/) owns the
+Ownership never moves: [qbcore](https://qbcore2.github.io/kora_core/) owns the
 slot-keyed `PlayerData.items` object and the `players.inventory` database
-column, and qbinventory only mutates player items through qbcore's `setPath`
-funnel. qbinventory owns everything else — stashes, temporary stashes, drops,
+column, and kora_inventory only mutates player items through kora_core's `setPath`
+funnel. kora_inventory owns everything else — stashes, temporary stashes, drops,
 shops, item containers, evidence/confiscation, trunks/gloveboxes, crafting,
 weapon metadata, sessions, revisions, locks, hooks, and audit events — headless
 by default, with its own optional NUI as one renderer among possible others.
 
 ## Requirements
 
-- [qblib](https://qbcore2.github.io/qblib/)
-- [qbsql](https://qbcore2.github.io/qbsql/)
-- [qbcore](https://qbcore2.github.io/qbcore/)
+- [qblib](https://qbcore2.github.io/kora_lib/)
+- [qbsql](https://qbcore2.github.io/kora_sql/)
+- [qbcore](https://qbcore2.github.io/kora_core/)
 
 ## Installation
 
 `server.cfg`, after qbcore:
 ```
 set mysql_connection_string "mysql://user:pass@localhost/qbcore?charset=utf8mb4"
-ensure qbsql
-ensure qblib
-ensure qbcore
-ensure qbinventory
+ensure kora_sql
+ensure kora_lib
+ensure kora_core
+ensure kora_inventory
 ```
-qbinventory creates its own secondary-inventory tables
+kora_inventory creates its own secondary-inventory tables
 (`qbinventory_inventories`, `qbinventory_shop_stock`, migration/audit tables)
-on first boot via qbsql's migration runner — no manual schema import needed.
+on first boot via kora_sql's migration runner — no manual schema import needed.
 
 If you're migrating off a real `qb-inventory`/`ox_inventory`, run one of these
-from the server console (or grant `command.qbinventory`) once qbinventory has
+from the server console (or grant `command.qbinventory`) once kora_inventory has
 booted:
 ```
 qbinventory-migrate dry-run   -- inspect import eligibility without writing
@@ -55,17 +55,17 @@ Legacy rows are copied, never deleted or updated, and malformed rows land in
 ### Give and remove items
 ```lua
 -- server
-exports.qbinventory:addItem(source, 'water_bottle', 2)
-exports.qbinventory:removeItem(source, 'water_bottle', 1)
+exports.kora_inventory:addItem(source, 'water_bottle', 2)
+exports.kora_inventory:removeItem(source, 'water_bottle', 1)
 ```
 
 ### Check weight/capacity before granting a reward
 ```lua
 -- server
-local weight, maxWeight = exports.qbinventory:getWeight(source)
-local canCarry = exports.qbinventory:canCarry(source, 'gold_bar', 1)
+local weight, maxWeight = exports.kora_inventory:getWeight(source)
+local canCarry = exports.kora_inventory:canCarry(source, 'gold_bar', 1)
 if canCarry then
-    exports.qbinventory:addItem(source, 'gold_bar', 1, nil, nil, 'mission-reward')
+    exports.kora_inventory:addItem(source, 'gold_bar', 1, nil, nil, 'mission-reward')
 else
     print(('player %d is too full: %d/%d'):format(source, weight, maxWeight))
 end
@@ -74,10 +74,10 @@ end
 ### Register and open a private (per-citizen) stash
 ```lua
 -- server, e.g. in a house/garage resource
-exports.qbinventory:RegisterStash('house_stash', 'House Storage', 50, 100000, true)
+exports.kora_inventory:RegisterStash('house_stash', 'House Storage', 50, 100000, true)
 
 -- client, when the player interacts with the stash prop
-exports.qbinventory:openInventory('stash', 'house_stash')
+exports.kora_inventory:openInventory('stash', 'house_stash')
 ```
 `owner = true` derives a durable `stash:house_stash:<citizenid>` record from
 the caller's own session server-side — a client can never open another
@@ -108,7 +108,7 @@ emptiness or completing a sale. The block survives restart and policy refresh.
 `ClaimStash(source, id, operationKey)` moves all stash items to that player and
 returns `true, receipt` or `false, error`. This trusted owner-only API commits
 the stash, `players.inventory`, and an operation receipt in one checked SQL
-transaction, coordinated with qbcore's inventory persistence fence. Reuse the
+transaction, coordinated with kora_core's inventory persistence fence. Reuse the
 same key after an uncertain result. A completed key returns its original
 receipt without delivering again or touching later deposits. A clean capacity
 rejection may retry with the same key after making room. Pending operations
@@ -118,7 +118,7 @@ APIs also have lowercase-first aliases.
 ### Register a shop and let players buy from it
 ```lua
 -- server, e.g. a 24/7 store resource
-exports.qbinventory:RegisterShop('liquorstore', {
+exports.kora_inventory:RegisterShop('liquorstore', {
     slots = 5,
     inventory = {
         { slot = 1, name = 'water_bottle', amount = 50, price = 5 },
@@ -127,32 +127,32 @@ exports.qbinventory:RegisterShop('liquorstore', {
 })
 
 -- client, once the player has the shop's inventory open
-exports.qbinventory:openInventory('shop', 'liquorstore')
+exports.kora_inventory:openInventory('shop', 'liquorstore')
 ```
 The buy path itself is client-driven through the panel's `buy` intent; a
 gameplay resource only needs to register the shop and open it. To sell
-programmatically from server code, call `exports.qbinventory:buyItem(source,
+programmatically from server code, call `exports.kora_inventory:buyItem(source,
 'liquorstore', slot, count)` after your own payment logic.
 
 ### Custom useable item with a progress bar
 ```lua
 -- server
-exports.qbinventory:createUseable('bandage', function(src, item)
-    exports.qbinventory:removeItem(src, 'bandage', 1, item.slot)
+exports.kora_inventory:createUseable('bandage', function(src, item)
+    exports.kora_inventory:removeItem(src, 'bandage', 1, item.slot)
     -- heal the player, etc.
 end)
 ```
 ```lua
--- shared item definition (qbcore's `items` registry)
+-- shared item definition (kora_core's `items` registry)
 QB.shared.register('items', 'bandage', {
     label = 'Bandage', weight = 100, useable = true, useTime = 2500,
 })
 ```
-`useTime` runs qblib's client progress bar before the use request is ever
+`useTime` runs kora_lib's client progress bar before the use request is ever
 sent to the server; a cancelled bar never reaches your handler.
 
-Item definitions are resolved through qbcore's getter when an operation runs;
-qbinventory does not capture the shared Items table at startup. Definitions can
+Item definitions are resolved through kora_core's getter when an operation runs;
+kora_inventory does not capture the shared Items table at startup. Definitions can
 therefore be registered, updated, or removed at runtime. Its built-in weapon and
 ammunition handlers also subscribe to those registry changes, so a newly
 registered weapon or magazine is usable immediately without restarting either
@@ -161,7 +161,7 @@ resource.
 ### Ground drops
 ```lua
 -- server: drop items at a location (e.g. on player death)
-local dropId = exports.qbinventory:dropCreate(GetEntityCoords(ped), {
+local dropId = exports.kora_inventory:dropCreate(GetEntityCoords(ped), {
     [1] = { name = 'water_bottle', amount = 1, slot = 1 },
 })
 ```
@@ -171,20 +171,20 @@ RegisterNetEvent('qbinventory:client:dropCreated', function(id, coords) end)
 RegisterNetEvent('qbinventory:client:dropRemoved', function(id) end)
 
 -- client: open a known drop by id (server re-validates distance/existence)
-exports.qbinventory:openInventory('drop', dropId)
+exports.kora_inventory:openInventory('drop', dropId)
 ```
 
 ### Register a crafting recipe (server-only foundation)
 ```lua
 -- server, in the resource that owns the crafting station
-exports.qbinventory:RegisterCraftRecipe('repair_board', {
+exports.kora_inventory:RegisterCraftRecipe('repair_board', {
     ingredients = { { name = 'wood', amount = 2, metadata = { grade = 'oak' } } },
     output = { name = 'board', amount = 1, metadata = { quality = 100 } },
     access = function(source, recipe, context) return true end, -- your own station/job/proximity checks
 })
 
 -- later, after your resource has resolved station/job/proximity server-side
-exports.qbinventory:CraftItem(source, 'repair_board', trustedContext, amount)
+exports.kora_inventory:CraftItem(source, 'repair_board', trustedContext, amount)
 ```
 `server/crafting.lua` registers no NUI callback or network event on its own —
 a gameplay resource supplies the UI and the trusted context.
@@ -195,23 +195,23 @@ All server-side unless noted. Every name below is reachable in **both**
 `camelCase` and `PascalCase` (e.g. `registerStash`/`RegisterStash`) — pick
 whichever reads better.
 
-### Player inventory (routes through qbcore's mutation funnel)
+### Player inventory (routes through kora_core's mutation funnel)
 ```lua
-exports.qbinventory:getWeight(src)                          -- weight, maxWeight
-exports.qbinventory:canCarry(src, name, amount)
-exports.qbinventory:addItem(src, name, amount, slot, info, reason)
-exports.qbinventory:removeItem(src, name, amount, slot, reason)
-exports.qbinventory:getItemByName(src, name)
-exports.qbinventory:getItemsByName(src, name)
-exports.qbinventory:getItemBySlot(src, slot)
-exports.qbinventory:getItemCount(src, names)
-exports.qbinventory:hasItem(src, names, amount)
-exports.qbinventory:getFreeSlot(src)
-exports.qbinventory:moveItem(src, fromSlot, toSlot, amount)
-exports.qbinventory:clearInventory(src, keep)
-exports.qbinventory:setItems(src, newItems)
-exports.qbinventory:createUseable(name, handler)             -- handler(src, item)
-exports.qbinventory:useItem(src, slotOrName)
+exports.kora_inventory:getWeight(src)                          -- weight, maxWeight
+exports.kora_inventory:canCarry(src, name, amount)
+exports.kora_inventory:addItem(src, name, amount, slot, info, reason)
+exports.kora_inventory:removeItem(src, name, amount, slot, reason)
+exports.kora_inventory:getItemByName(src, name)
+exports.kora_inventory:getItemsByName(src, name)
+exports.kora_inventory:getItemBySlot(src, slot)
+exports.kora_inventory:getItemCount(src, names)
+exports.kora_inventory:hasItem(src, names, amount)
+exports.kora_inventory:getFreeSlot(src)
+exports.kora_inventory:moveItem(src, fromSlot, toSlot, amount)
+exports.kora_inventory:clearInventory(src, keep)
+exports.kora_inventory:setItems(src, newItems)
+exports.kora_inventory:createUseable(name, handler)             -- handler(src, item)
+exports.kora_inventory:useItem(src, slotOrName)
 ```
 qb-style aliases are also exported: `AddItem`, `RemoveItem`, `GetItemByName`,
 `GetItemsByName`, `GetItemBySlot`, `GetItemCount`, `HasItem`, `GetFreeSlot`,
@@ -221,13 +221,13 @@ qb-style aliases are also exported: `AddItem`, `RemoveItem`, `GetItemByName`,
 
 ### Stashes, temporary stashes, shops
 ```lua
-exports.qbinventory:stashGet(id)
-exports.qbinventory:stashSet(id, items)
-exports.qbinventory:stashOpen(src, id, opts)
-exports.qbinventory:registerStash(id, label, slots, maxWeight, owner, groups, coords, distance)
-exports.qbinventory:createTemporaryStash(properties)          -- returns an inventory key
-exports.qbinventory:registerShop(id, data)                    -- { slots, inventory/items, prices }
-exports.qbinventory:buyItem(src, shopId, slot, count)
+exports.kora_inventory:stashGet(id)
+exports.kora_inventory:stashSet(id, items)
+exports.kora_inventory:stashOpen(src, id, opts)
+exports.kora_inventory:registerStash(id, label, slots, maxWeight, owner, groups, coords, distance)
+exports.kora_inventory:createTemporaryStash(properties)          -- returns an inventory key
+exports.kora_inventory:registerShop(id, data)                    -- { slots, inventory/items, prices }
+exports.kora_inventory:buyItem(src, shopId, slot, count)
 ```
 `RegisterStash(..., owner = true, ...)` is a **template**, not a single shared
 stash: each caller gets their own `stash:<template>:<citizenid>` record,
@@ -241,16 +241,16 @@ A point in a list may carry its own `distance` override.
 
 ### Drops
 ```lua
-exports.qbinventory:dropCreate(coords, items)                 -- returns dropId
-exports.qbinventory:dropTake(src, dropId, slot, amount)
+exports.kora_inventory:dropCreate(coords, items)                 -- returns dropId
+exports.kora_inventory:dropTake(src, dropId, slot, amount)
 ```
 
 ### Hooks and inspection access
 ```lua
-exports.qbinventory:registerHook(eventName, callback, options)  -- e.g. 'buyItem'
-exports.qbinventory:removeHooks(id)
-exports.qbinventory:registerInspectionAccess(callback)           -- callback(source, target, sourceData, targetData)
-exports.qbinventory:removeInspectionAccess(id)
+exports.kora_inventory:registerHook(eventName, callback, options)  -- e.g. 'buyItem'
+exports.kora_inventory:removeHooks(id)
+exports.kora_inventory:registerInspectionAccess(callback)           -- callback(source, target, sourceData, targetData)
+exports.kora_inventory:removeInspectionAccess(id)
 ```
 Hooks may return `false` to deny an action with the default reason, or a string
 to deny it with a specific user-facing reason. A table return value continues
@@ -261,13 +261,13 @@ for an authorised police/admin/consent flow.
 
 ### Crafting (server-only, headless foundation)
 ```lua
-exports.qbinventory:RegisterCraftRecipe(id, recipe)
-exports.qbinventory:RemoveCraftRecipe(id)
-exports.qbinventory:GetCraftRecipe(id)
-exports.qbinventory:CanCraftRecipe(src, recipeId, amount)
-exports.qbinventory:CraftItem(src, recipeId, trustedContext, amount)
-exports.qbinventory:RegisterCraftHook(callback)
-exports.qbinventory:RemoveCraftHook(id)
+exports.kora_inventory:RegisterCraftRecipe(id, recipe)
+exports.kora_inventory:RemoveCraftRecipe(id)
+exports.kora_inventory:GetCraftRecipe(id)
+exports.kora_inventory:CanCraftRecipe(src, recipeId, amount)
+exports.kora_inventory:CraftItem(src, recipeId, trustedContext, amount)
+exports.kora_inventory:RegisterCraftHook(callback)
+exports.kora_inventory:RemoveCraftHook(id)
 ```
 Ships no station discovery, progress timers, or UI — a gameplay resource
 resolves its own server-side station/job/proximity checks before calling
@@ -277,13 +277,13 @@ ingredient/output transaction.
 
 ### Weapons (server-only)
 ```lua
-exports.qbinventory:PrepareWeaponMetadata(...)
-exports.qbinventory:GetWeaponState(src, slot)
-exports.qbinventory:SetWeaponState(...)
-exports.qbinventory:ConsumeWeaponDurability(...)
-exports.qbinventory:SetWeaponAmmo(...)
-exports.qbinventory:SetWeaponComponents(...)
-exports.qbinventory:FireWeaponRound(src, slot) -- consumes ammo only; returns true, round
+exports.kora_inventory:PrepareWeaponMetadata(...)
+exports.kora_inventory:GetWeaponState(src, slot)
+exports.kora_inventory:SetWeaponState(...)
+exports.kora_inventory:ConsumeWeaponDurability(...)
+exports.kora_inventory:SetWeaponAmmo(...)
+exports.kora_inventory:SetWeaponComponents(...)
+exports.kora_inventory:FireWeaponRound(src, slot) -- consumes ammo only; returns true, round
 ```
 New weapon metadata gets a server-generated serial, bounded durability/ammo,
 and only components listed in `Config.qbinventory.weapons.components`.
@@ -297,8 +297,8 @@ authoritative immediately; `FireWeaponRound` retains its ammo-only contract.
 
 ### Visible weapon carry
 ```lua
-exports.qbinventory:GetCarriedWeapons(src)  -- read-only, server-built
-exports.qbinventory:GetEquippedWeapon(src)  -- { slot, name, components? } or nil; mapped components from server-owned item metadata
+exports.kora_inventory:GetCarriedWeapons(src)  -- read-only, server-built
+exports.kora_inventory:GetEquippedWeapon(src)  -- { slot, name, components? } or nil; mapped components from server-owned item metadata
 ```
 `Config.qbinventory.weaponCarry` renders weapons a player owns but is not
 holding onto their body, and makes equipping one a timed, animated draw.
@@ -335,11 +335,11 @@ their own; a gameplay resource resolves its interaction server-side first.
 
 ### Client and renderer contract
 ```lua
-exports.qbinventory:openInventory(invType, data)   -- client — 'player'|'stash'|'trunk'|'glovebox'|'shop'|'drop'|...
-exports.qbinventory:closeInventory()               -- client
-exports.qbinventory:submitIntent(intent)           -- client — used by the bundled NUI bridge
-exports.qbinventory:getCurrentSession()            -- client
-exports.qbinventory:HasItem(names, amount)         -- client, reads the local session snapshot
+exports.kora_inventory:openInventory(invType, data)   -- client — 'player'|'stash'|'trunk'|'glovebox'|'shop'|'drop'|...
+exports.kora_inventory:closeInventory()               -- client
+exports.kora_inventory:submitIntent(intent)           -- client — used by the bundled NUI bridge
+exports.kora_inventory:getCurrentSession()            -- client
+exports.kora_inventory:HasItem(names, amount)         -- client, reads the local session snapshot
 ```
 Local presentation events fired after the server resolves a request:
 `qbinventory:ui:sessionOpened`, `qbinventory:ui:sessionPatched`,
@@ -347,7 +347,7 @@ Local presentation events fired after the server resolves a request:
 
 ### Provider identities (qb-inventory / ox_inventory compat)
 Both identities are enabled and published under `__cfx_export_<identity>_<name>`
-— a separate namespace from qbinventory's own flat exports, so same-named qb
+— a separate namespace from kora_inventory's own flat exports, so same-named qb
 and ox functions keep different upstream return shapes. Legacy net events like
 `qb-inventory:client:openInventory`, `qb-inventory:server:useItem`, and the
 `inventory`/`openInv`/`closeInv` commands are bridged transparently. A few
@@ -357,9 +357,9 @@ break the authority model (`qb-inventory:server:updateDrop`,
 instead.
 
 The client compatibility helpers also normalize ox-style notifications,
-multi-select input rows, and progress scenarios/props onto qblib. The ox
+multi-select input rows, and progress scenarios/props onto kora_lib. The ox
 `center-left`/`center-right` notification positions retain their horizontal
-side but use qblib's top edge because qblib has no vertically centered toast
+side but use kora_lib's top edge because kora_lib has no vertically centered toast
 stack.
 
 ## Config highlights (`config.lua`)
@@ -378,10 +378,10 @@ Ammu-Nation shop data lives in `config/shops/ammunation.lua`.
 
 Part of the [qbcore2](https://github.com/qbcore2) resource set:
 
-- [qblib](https://qbcore2.github.io/qblib/) — shared helper library
-- [qbsql](https://qbcore2.github.io/qbsql/) — database driver
-- [qbcore](https://qbcore2.github.io/qbcore/) — framework core
-- [qbtarget](https://qbcore2.github.io/qbtarget/) — targeting/interaction
-- [qbclothing](https://qbcore2.github.io/qbclothing/) — clothing/wardrobe
-- [qbdrugs](https://qbcore2.github.io/qbdrugs/) — drug production/economy job
+- [qblib](https://qbcore2.github.io/kora_lib/) — shared helper library
+- [qbsql](https://qbcore2.github.io/kora_sql/) — database driver
+- [qbcore](https://qbcore2.github.io/kora_core/) — framework core
+- [qbtarget](https://qbcore2.github.io/kora_target/) — targeting/interaction
+- [qbclothing](https://qbcore2.github.io/kora_clothing/) — clothing/wardrobe
+- [qbdrugs](https://qbcore2.github.io/kora_drugs/) — drug production/economy job
 - [full resource list ↗](https://github.com/orgs/qbcore2/repositories)

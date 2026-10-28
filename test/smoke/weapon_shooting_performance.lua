@@ -1,6 +1,6 @@
 -- Exercise the real inventory mutation and replication funnels together.
 local H = dofile('test/harness.lua')
-local coreRoot = '../qbcore/'
+local coreRoot = '../kora_core/'
 local mocks = dofile(coreRoot .. 'test/mocks.lua')
 local mock = mocks.install()
 local clock, invoking = 1000, nil
@@ -27,7 +27,7 @@ local function exported(resource, functions)
     return setmetatable({}, { __index = function(_, name)
         return function(_, ...)
             local previous = invoking
-            invoking = resource == 'qbcore' and 'qbinventory' or 'qbcore'
+            invoking = resource == 'kora_core' and 'kora_inventory' or 'kora_core'
             local results = table.pack(assert(functions[name], 'missing export ' .. name)(...))
             invoking = previous
             return table.unpack(results, 1, results.n)
@@ -35,11 +35,11 @@ local function exported(resource, functions)
     end })
 end
 exports = setmetatable({
-    qbcore = exported('qbcore', coreExports),
-    qbinventory = exported('qbinventory', inventoryExports),
+    kora_core = exported('kora_core', coreExports),
+    kora_inventory = exported('kora_inventory', inventoryExports),
 }, { __call = function(_, name, fn) inventoryExports[name] = fn end })
-GetCurrentResourceName = function() return 'qbinventory' end
-mock.resourceStates.qbinventory = 'started'
+GetCurrentResourceName = function() return 'kora_inventory' end
+mock.resourceStates.kora_inventory = 'started'
 local threads = {}
 CreateThread = function(fn) threads[#threads + 1] = fn end
 for _, file in ipairs({ 'config.lua', 'shared.lua', 'server.lua', 'server/crafting.lua', 'server/weaponcarry.lua' }) do

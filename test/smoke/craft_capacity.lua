@@ -4,9 +4,9 @@
 local inventoryRoot = debug.getinfo(1, 'S').source:sub(2):match('^(.-)test/smoke/craft_capacity.lua$')
 local root = inventoryRoot .. '../'
 local H = dofile(inventoryRoot .. 'test/harness.lua')
-local M = dofile(root .. 'qbcore/test/mocks.lua')
+local M = dofile(root .. 'kora_core/test/mocks.lua')
 local mock = M.install()
-local function core(path) return dofile(root .. 'qbcore/' .. path) end
+local function core(path) return dofile(root .. 'kora_core/' .. path) end
 core('config.lua')
 local coreConfig = Config
 coreConfig.money.default.cash = 0
@@ -21,10 +21,10 @@ for _, path in ipairs({
 local invoking, callbacks, threads, taxThreads = nil, {}, {}, {}
 local logs, notifications, xp, government = {}, {}, 0, 0
 local freshReferences = os.getenv('QB_CRAFT_TRANSPORT') ~= 'direct'
-local functions = { qbcore = {}, qbinventory = {} }
+local functions = { kora_core = {}, kora_inventory = {} }
 for _, group in ipairs({ 'inventory', 'registry', 'player', 'money' }) do
     for name, fn in pairs(Core[group]) do
-        if type(fn) == 'function' then functions.qbcore[name] = fn end
+        if type(fn) == 'function' then functions.kora_core[name] = fn end
     end
 end
 GetInvokingResource = function() return invoking end
@@ -65,16 +65,16 @@ local function exportRealm(resource)
         end,
     })
 end
-exports = exportRealm('qbcore')
+exports = exportRealm('kora_core')
 core('modules/inventory/gateway.lua')
-for name, fn in pairs(Core.inventory) do functions.qbcore[name] = fn end
-mock.resourceStates.qbinventory = 'started'
+for name, fn in pairs(Core.inventory) do functions.kora_core[name] = fn end
+mock.resourceStates.kora_inventory = 'started'
 
 local inv = {}
 for name, value in pairs(_G) do inv[name] = value end
 inv.Config, inv.QbInventory = {}, nil
-inv.exports = exportRealm('qbinventory')
-inv.GetCurrentResourceName = function() return 'qbinventory' end
+inv.exports = exportRealm('kora_inventory')
+inv.GetCurrentResourceName = function() return 'kora_inventory' end
 inv.CreateThread = function(fn) threads[#threads + 1] = fn end
 inv.QB = { resources = QB.resources, sql = {}, distance = { player = function() return true end },
     callback = { register = function(name, fn) callbacks[name] = fn end } }
@@ -107,9 +107,9 @@ job.QbJobCreator = {
         module = function() return module end, worksFor = function() return true end },
     logs = { record = function(_, entry) logs[#logs + 1] = entry end },
 }
-job.exports, job.QB = exportRealm('qbjobcreator'), inv.QB
+job.exports, job.QB = exportRealm('kora_jobcreator'), inv.QB
 job.QB.notify = { send = function(_, payload) notifications[#notifications + 1] = payload end }
-assert(loadfile(os.getenv('QB_JOB_CRAFT_SOURCE') or root .. 'qbjobcreator/server/crafting.lua', 't', job))()
+assert(loadfile(os.getenv('QB_JOB_CRAFT_SOURCE') or root .. 'kora_jobcreator/server/crafting.lua', 't', job))()
 local crafting = job.QbJobCreator.crafting
 local function item(name, amount, slot, info) return assert(internal.buildItem(name, amount, slot, info or {})) end
 local function reset(items, slots)
@@ -124,7 +124,7 @@ local function rewards(ingredients, give)
 end
 local function denied(recipe, message)
     local before, revision, pending = snapshot(), internal.getRevision('player:7'), #taxThreads
-    local ok, err = invoke('qbjobcreator', crafting.craft, 7, recipe, business)
+    local ok, err = invoke('kora_jobcreator', crafting.craft, 7, recipe, business)
     H.equal(ok, false, message)
     H.ok(type(err) == 'string' and #err > 0, 'denial has a reason')
     H.equal(snapshot(), before, 'capacity denial leaves exact items and metadata unchanged')
@@ -143,7 +143,7 @@ reset({ [1] = item('blocker', 1, 1), [2] = item('blocker', 1, 2), [3] = item('in
 denied(rewards({ { item = 'ingredient' } }, {
     { item = 'board', info = { batch = 'A' } }, { item = 'board', info = { batch = 'B' } },
 }), 'different output metadata requires two slots')
-H.ok(invoke('qbjobcreator', crafting.craft, 7, rewards({ { item = 'ingredient' } }, {
+H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards({ { item = 'ingredient' } }, {
     { item = 'board' }, { item = 'board' },
 }), business), 'identical outputs fit one stack')
 H.equal(count('board'), 2)
@@ -169,7 +169,7 @@ local custom = rewards({ { item = 'WOOD', count = 1.9, info = { ignored = true }
 })
 custom.completeLabel = 'Custom success'
 job.Config.recipes['custom recipe:/with spaces'] = custom
-local ok, message = invoke('qbjobcreator', callbacks['qbjobcreator:server:craft'], 7, business.id, 1, 'custom recipe:/with spaces')
+local ok, message = invoke('kora_jobcreator', callbacks['qbjobcreator:server:craft'], 7, business.id, 1, 'custom recipe:/with spaces')
 H.equal(ok, true, message)
 H.equal(message, 'Custom success')
 H.equal(count('wood'), 0, 'ingredient metadata remains a name-only check')
@@ -178,10 +178,10 @@ H.equal(api.getItemByName(7, 'board').info.custom, 'output')
 H.equal(xp, 5); H.equal(#logs, 1)
 
 reset()
-H.ok(invoke('qbjobcreator', crafting.craft, 7, rewards(nil, { { item = 'board' } }), business), 'missing ingredients means a legitimate free recipe')
+H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards(nil, { { item = 'board' } }), business), 'missing ingredients means a legitimate free recipe')
 H.equal(count('board'), 1); H.equal(xp, 5); H.equal(#logs, 1)
 reset()
-H.ok(invoke('qbjobcreator', crafting.craft, 7, rewards({}, {
+H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards({}, {
     { item = 'weapon_capacity', info = { weight = 4000, serial = 'CUSTOM', ammo = 3, custom = 'retained' } },
 }), business), 'successful weapon grant keeps the existing addItem metadata behavior')
 local weapon = api.getItemByName(7, 'weapon_capacity')
@@ -197,13 +197,13 @@ local emptyRegistered, emptyReason = registered.register('empty_inputs', {
 })
 H.equal(emptyRegistered, false); H.equal(emptyReason, 'recipe ingredients are required')
 local beforeQuery = snapshot()
-H.ok(invoke('qbjobcreator', functions.qbinventory.CanCraftItems, 7, {}, { { item = 'board' } }),
+H.ok(invoke('kora_jobcreator', functions.kora_inventory.CanCraftItems, 7, {}, { { item = 'board' } }),
     'the new trusted capacity query accepts empty inputs')
 H.equal(snapshot(), beforeQuery, 'the query never applies its detached plan')
 H.ok(registered.register('registered_weapon', { ingredients = { wood = 1 }, output = {
     name = 'weapon_capacity', metadata = { weight = 4000, serial = 'STATIC', ammo = 3, custom = 'unchanged' },
 } }))
-H.ok(invoke('qbjobcreator', registered.craft, 7, 'registered_weapon'))
+H.ok(invoke('kora_jobcreator', registered.craft, 7, 'registered_weapon'))
 local staticWeapon = api.getItemByName(7, 'weapon_capacity')
 H.equal(staticWeapon.info.weight, nil, 'registered weapon metadata retains its existing default treatment')
 H.equal(staticWeapon.info.ammo, 0); H.equal(staticWeapon.info.custom, nil)
@@ -211,18 +211,18 @@ H.ok(staticWeapon.info.serial ~= 'STATIC')
 
 reset()
 inv.Config.qbinventory.cash = false
-H.ok(invoke('qbjobcreator', crafting.craft, 7, rewards({}, { { item = 'cash', amount = 5, info = { custom = true } } }), business), 'invalid/off cash policy does not crash the capacity query')
+H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards({}, { { item = 'cash', amount = 5, info = { custom = true } } }), business), 'invalid/off cash policy does not crash the capacity query')
 H.equal(api.getItemByName(7, 'cash').info.custom, true, 'cash-off remains an ordinary item grant')
 reset()
 inv.Config.qbinventory.cash = { asItem = true, item = 'CASH', account = 'CASH' }
-invoke('qbinventory', threads[1]) -- Only real cash bootstrap; never drain permanent workers.
+invoke('kora_inventory', threads[1]) -- Only real cash bootstrap; never drain permanent workers.
 H.ok(Core.money.isPhysicalCash('cash'))
 H.ok(Core.money.addMoney(7, 'cash', 100, 'seed', true))
 H.ok(Core.inventory.addItem(7, 'wood', 1))
-H.ok(invoke('qbjobcreator', crafting.craft, 7, rewards({ { item = 'wood' } }, { { item = 'board' } }), business),
+H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards({ { item = 'wood' } }, { { item = 'board' } }), business),
     'physical cash mode keeps ordinary non-cash recipes working')
 H.equal(Core.money.getMoney(7, 'cash'), 100)
-H.ok(invoke('qbjobcreator', crafting.craft, 7, rewards({ { item = 'cash', amount = 20, info = { ignored = true } } }, {
+H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards({ { item = 'cash', amount = 20, info = { ignored = true } } }, {
     { item = 'board' }, { item = 'cash', amount = 5, info = { weight = 999999 } },
 }), business), 'physical cash keeps name-only consumption and ignores grant metadata')
 H.equal(Core.money.getMoney(7, 'cash'), 85)
@@ -238,9 +238,9 @@ functions['qb-banking'] = {
 mock.resourceStates['qb-banking'] = 'started'
 coreConfig.money.tax.enabled, coreConfig.money.tax.rate = true, 0.05
 reset()
-H.ok(invoke('qbjobcreator', crafting.craft, 7, rewards({}, { { item = 'cash', amount = 100 } }), business))
+H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards({}, { { item = 'cash', amount = 100 } }), business))
 H.equal(Core.money.getMoney(7, 'cash'), 95, 'gross cash grant is still taxed by Core')
-for _, fn in ipairs(taxThreads) do invoke('qbcore', fn) end
+for _, fn in ipairs(taxThreads) do invoke('kora_core', fn) end
 taxThreads = {}
 H.equal(government, 5)
 H.equal(Player(7).state['qbcore:money:cash'], 95)
@@ -249,9 +249,9 @@ reset()
 H.ok(Core.registry.registerShared('items', 'cash', { name = 'cash', weight = 1 }))
 H.ok(Core.money.addMoney(7, 'cash', 110000, 'seed', true))
 local weightedCash = rewards({}, { { item = 'cash', amount = 5200 }, { item = 'cash', amount = 5200 } })
-H.ok(invoke('qbjobcreator', crafting.craft, 7, weightedCash, business), 'net cash rewards fit where their gross total would not')
+H.ok(invoke('kora_jobcreator', crafting.craft, 7, weightedCash, business), 'net cash rewards fit where their gross total would not')
 H.equal(Core.money.getMoney(7, 'cash'), 119880)
-for _, fn in ipairs(taxThreads) do invoke('qbcore', fn) end
+for _, fn in ipairs(taxThreads) do invoke('kora_core', fn) end
 taxThreads = {}
 reset()
 H.ok(Core.money.addMoney(7, 'cash', 110000, 'seed', true))
@@ -260,14 +260,14 @@ H.equal(Core.money.getTransactionTax(5200, 'cash', 'add'), 0)
 H.equal(Core.money.calculateTax(5200, 'cash', 'add'), 260, 'configured calculator retains its original semantics')
 denied(weightedCash, 'bank outage means full cash rewards exceed combined weight')
 reset()
-H.ok(invoke('qbjobcreator', crafting.craft, 7, rewards({}, { { item = 'cash', amount = 100 } }), business))
+H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards({}, { { item = 'cash', amount = 100 } }), business))
 H.equal(Core.money.getMoney(7, 'cash'), 100, 'provider unavailable remains untaxed')
 mock.resourceStates['qb-banking'] = 'started'
 coreConfig.money.tax.rate = 1
 reset()
-H.ok(invoke('qbjobcreator', crafting.craft, 7, rewards({}, { { item = 'cash', amount = 100 } }), business), 'fully taxed cash has no positive item insertion to plan')
+H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards({}, { { item = 'cash', amount = 100 } }), business), 'fully taxed cash has no positive item insertion to plan')
 H.equal(Core.money.getMoney(7, 'cash'), 0)
-for _, fn in ipairs(taxThreads) do invoke('qbcore', fn) end
+for _, fn in ipairs(taxThreads) do invoke('kora_core', fn) end
 taxThreads = {}
 coreConfig.money.tax.enabled = false
 
@@ -275,8 +275,8 @@ coreConfig.money.tax.enabled = false
 -- consumed useable item using the existing handler, without consuming inputs.
 reset({ [1] = item('ballast', 1, 1), [2] = item('ingredient', 1, 2), [3] = item('voucher', 1, 3) })
 job.Config.recipes.paired = paired
-invoke('qbjobcreator', crafting.registerUseable, business, { item = 'voucher', consume = 1, useType = 'recipe', recipe = 'paired' })
-H.ok(invoke('qbjobcreator', api.useItem, 7, 'voucher'))
+invoke('kora_jobcreator', crafting.registerUseable, business, { item = 'voucher', consume = 1, useType = 'recipe', recipe = 'paired' })
+H.ok(invoke('kora_jobcreator', api.useItem, 7, 'voucher'))
 H.equal(count('voucher'), 1); H.equal(count('ingredient'), 1)
 H.equal(count('output_a'), 0); H.equal(count('output_b'), 0)
 H.equal(xp, 0); H.equal(#logs, 0); H.equal(notifications[#notifications].type, 'error')
@@ -284,30 +284,30 @@ H.equal(xp, 0); H.equal(#logs, 0); H.equal(notifications[#notifications].type, '
 -- A deliberately failed grant checks the success/XP boundary only. The
 -- capacity query is not a rollback transaction for unexpected operation errors.
 reset({ [1] = item('ingredient', 1, 1) })
-local actualAdd = functions.qbcore.addItem
-functions.qbcore.addItem = function(src, name, ...)
+local actualAdd = functions.kora_core.addItem
+functions.kora_core.addItem = function(src, name, ...)
     if name == 'output_b' then return false, 'controlled unexpected failure' end
     return actualAdd(src, name, ...)
 end
-local failed, reason = invoke('qbjobcreator', crafting.craft, 7, paired, business)
+local failed, reason = invoke('kora_jobcreator', crafting.craft, 7, paired, business)
 H.equal(failed, false); H.equal(reason, 'You do not have room for that.')
 H.equal(xp, 0); H.equal(#logs, 0)
 H.equal(count('ingredient'), 0); H.equal(count('output_a'), 1); H.equal(count('output_b'), 0)
-functions.qbcore.addItem = actualAdd
+functions.kora_core.addItem = actualAdd
 
 reset({ [1] = item('wood', 1, 1), [2] = item('ingredient', 1, 2) })
-local actualRemove = functions.qbcore.removeItem
-functions.qbcore.removeItem = function(src, name, ...)
+local actualRemove = functions.kora_core.removeItem
+functions.kora_core.removeItem = function(src, name, ...)
     if name == 'ingredient' then return false, 'controlled removal failure' end
     return actualRemove(src, name, ...)
 end
-local removalFailed, removalReason = invoke('qbjobcreator', crafting.craft, 7,
+local removalFailed, removalReason = invoke('kora_jobcreator', crafting.craft, 7,
     rewards({ { item = 'wood' }, { item = 'ingredient' } }, { { item = 'board' } }), business)
 H.equal(removalFailed, false); H.equal(removalReason, 'You are missing ingredients.')
 H.equal(count('wood'), 1, 'existing refund restores the previous removed ingredient')
 H.equal(count('ingredient'), 1); H.equal(count('board'), 0)
 H.equal(xp, 0); H.equal(#logs, 0)
-functions.qbcore.removeItem = actualRemove
+functions.kora_core.removeItem = actualRemove
 
 io.write(('craft capacity transport: %s\n'):format(freshReferences and 'fresh coroutine per reference' or 'direct references'))
 H.finish()

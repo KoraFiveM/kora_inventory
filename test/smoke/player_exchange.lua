@@ -37,7 +37,7 @@ for _,failure in ipairs({'missing','capacity','rollback','tax'}) do
     if failure=='missing' then terms.take[1].amount=4 end
     if failure=='capacity' then Config.qbinventory.playerMaxWeight=0;terms.give={{name='markedbills',amount=1}} end
     if failure=='rollback' then f.rollback=true end
-    if failure=='tax' then exports.qbcore.getTransactionTax=function() return 5 end end
+    if failure=='tax' then exports.kora_core.getTransactionTax=function() return 5 end end
     local result=f.execute('failure',terms);H.equal(result,nil,failure)
     H.equal(json.encode(f.data()),before,'failed exchange preserves player state: '..failure)
     H.equal(next(f.db.fences),nil);H.equal(next(f.db.receipts),nil)
@@ -46,7 +46,7 @@ end
 -- Existing physical-cash authority remains item-backed with a zero ledger mirror.
 do
     local f=prepare();Config.qbinventory.cash.asItem=true
-    f.caller='qbinventory';assert(Core.money.registerPhysicalCash('cash'));f.caller='qbdrugs'
+    f.caller='kora_inventory';assert(Core.money.registerPhysicalCash('cash'));f.caller='kora_drugs'
     assert(f.execute('cash-item',f.terms({take={{name='water_bottle',amount=1}},cash=50})))
     H.equal(f.count('cash'),50);H.equal(f.data().money.cash,0)
     H.equal(Core.money.getMoney(1,'cash'),50)

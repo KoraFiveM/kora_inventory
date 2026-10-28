@@ -1,8 +1,8 @@
-# qbinventory agent guide
+# kora_inventory agent guide
 
 ## Boundary
 
-`qbinventory` ships its own NUI, but its inventory engine remains headless in
+`kora_inventory` ships its own NUI, but its inventory engine remains headless in
 the architectural sense: `server.lua` is the sole authority and never calls
 NUI APIs. `client.lua` owns the server transport; `client/ui.lua` owns the
 NUI/focus bridge and may only forward restricted intent envelopes back to
@@ -11,10 +11,10 @@ data directly.
 
 ## Player data
 
-Player items remain exclusively in qbcore's `PlayerData.items` and its
-`players.inventory` persistence column. Never create a qbinventory player-item
-table and never mutate a player inventory other than through qbcore exports.
-Resolve item definitions through qbcore's getter at use time; never cache or
+Player items remain exclusively in kora_core's `PlayerData.items` and its
+`players.inventory` persistence column. Never create a kora_inventory player-item
+table and never mutate a player inventory other than through kora_core exports.
+Resolve item definitions through kora_core's getter at use time; never cache or
 index the legacy `QBCore.Shared.Items` map. Registry-driven built-in use
 handlers must subscribe to runtime add/update/remove changes.
 

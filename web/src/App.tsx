@@ -23,7 +23,7 @@ const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo
     centreWhenSolo: true,
     showHotbar: true,
     images: {
-        localPath: "nui://qbinventory/images",
+        localPath: "nui://kora_inventory/images",
         extensions: ["webp", "png", "gif", "jpg"],
         preferLocal: false,
         allowRemote: true,
@@ -105,7 +105,7 @@ function artworkCandidates(item: Pick<InventoryItem, "name" | "label" | "image" 
 
     if (remote && (item.imageOverride || !images.preferLocal)) out.push(remote)
 
-    // qbcore's legacy `image` field is a bare filename ('water_bottle.png'),
+    // kora_core's legacy `image` field is a bare filename ('water_bottle.png'),
     // which is the one case where the extension is already chosen for us.
     const named = typeof item.image === "string" ? item.image.replace(/\.[a-z0-9]+$/i, "") : undefined
     const explicit = typeof item.image === "string" ? /\.([a-z0-9]+)$/i.exec(item.image)?.[1] : undefined
