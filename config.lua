@@ -7,6 +7,12 @@ Config.qbinventory = {
     -- number keys to exactly this range, and weaponCarry's 'hotbar'
     -- visibility mode treats exactly this range as "openly carried", so the
     -- two can never drift apart into two different meanings of "hotbar".
+    --
+    -- This is on by default: keys 1..hotbarSlots are bound as the rebindable
+    -- keybinds `qbinventory:hotbar1`..`qbinventory:hotbarN` (Settings > Key
+    -- Bindings > FiveM). There is no always-on bar on the HUD while the
+    -- inventory is closed; the only visual is the accent outline on those
+    -- slots inside the open panel (ui.showHotbar). 0 disables the key binds.
     hotbarSlots = 5,
     defaultSlots = 50,
     defaultMaxWeight = 100000,
@@ -51,7 +57,8 @@ Config.qbinventory = {
 
         -- Outline the first `hotbarSlots` slots in the accent colour so the
         -- keys 1-5 already bound in client/hotbar.lua are visible rather than
-        -- folklore. Purely a border: the slots behave identically either way.
+        -- folklore. Purely a border: the slots behave identically either way,
+        -- and the number keys keep working with this off (see hotbarSlots).
         showHotbar = true,
 
         -- Item artwork resolution. `localPath` is tried before any remote
