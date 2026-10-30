@@ -48,6 +48,10 @@ H.ok(hotbar:find('QB.keybind.add({', 1, true) and hotbar:find('name = command', 
 H.ok(not hotbar:find('qbinventory:server:useSlot', 1, true),
     'no new bespoke server-side use transport was introduced for the hotbar')
 
+H.ok(hotbar:find("name = 'qbinventory:hotbarshow'", 1, true) and hotbar:find('Config.qbinventory.ui', 1, true),
+    'a rebindable key shows the hotbar overlay for the configured seconds, read at press time')
+H.ok(read('config.lua'):find('hotbarSeconds = 5', 1, true), 'the hotbar display time defaults to 5 seconds')
+
 H.ok(manifest:find("'client/hotbar.lua'", 1, true), 'the hotbar module is loaded by the manifest')
 
 H.finish()

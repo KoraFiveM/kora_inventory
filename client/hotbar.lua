@@ -58,3 +58,35 @@ for slot = 1, HOTBAR_SLOTS do
         end,
     })
 end
+
+-- Players asked for a hotbar they can see without opening the inventory. It is
+-- a short-lived overlay rather than a permanent HUD bar, so it costs nothing
+-- while hidden: the NUI hides it again after the configured seconds.
+QB.keybind.add({
+    name = 'qbinventory:hotbarshow',
+    description = 'Show hotbar',
+    defaultMapper = 'keyboard',
+    defaultKey = 'Z',
+    onPressed = function()
+        local seconds = tonumber((Config.qbinventory.ui or {}).hotbarSeconds) or 0
+        if seconds <= 0 or HOTBAR_SLOTS == 0 or IsPauseMenuActive() or IsNuiFocused() then
+            return
+        end
+
+        local data = exports.kora_core:getPlayerData()
+        local items = data and data.items or {}
+        local slots = {}
+        for slot = 1, HOTBAR_SLOTS do
+            local item = items[slot]
+            slots[slot] = type(item) == 'table' and {
+                slot = slot,
+                name = item.name,
+                label = item.label,
+                amount = item.amount or item.count or 1,
+                image = item.image,
+            } or { slot = slot }
+        end
+
+        TriggerEvent('qbinventory:ui:hotbarShow', { slots = slots, seconds = seconds })
+    end,
+})

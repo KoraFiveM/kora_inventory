@@ -72,6 +72,12 @@ Config.qbinventory = {
         -- and the number keys keep working with this off (see hotbarSlots).
         showHotbar = true,
 
+        -- Seconds the on-screen hotbar stays visible after the player presses
+        -- the `qbinventory:hotbarshow` key (rebindable in Settings > Key
+        -- Bindings, default Z). It lists the first `hotbarSlots` items and
+        -- fades away on its own; 0 disables the key. Read on every press.
+        hotbarSeconds = 5,
+
         -- Size multiplier for the inventory's text, slots and counts, for
         -- players who find the default too small. 1.0 is the original size.
         -- Applied the next time the inventory opens.
@@ -411,6 +417,14 @@ if QB and QB.config and QB.config.adopt then
             label = 'Visible carried-weapon components',
             description = 'Maps an inventory component item name to the exact GTA component model name rendered on a holstered weapon. Only entries in this allow-list are sent to clients, preventing item metadata from requesting arbitrary native components.',
         })
+    Config.qbinventory.ui.hotbarSeconds = QB.config.number(Config.qbinventory.ui.hotbarSeconds, {
+        label = 'Hotbar display time (seconds)',
+        description = 'How long the on-screen hotbar stays visible after a player presses the show-hotbar key before it disappears again. Set to 0 to disable the key.',
+        min = 0,
+        max = 30,
+        step = 1,
+        live = true,
+    })
     Config.qbinventory.ui.scale = QB.config.number(Config.qbinventory.ui.scale, {
         label = 'Inventory UI scale',
         description = 'Scales the inventory text, slot sizes, item counts and weight labels. Leave at 1.0 for the original size; increase it if the inventory is too small on your screen. Changes apply the next time a player opens their inventory.',

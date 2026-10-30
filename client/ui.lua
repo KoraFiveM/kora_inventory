@@ -111,6 +111,17 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     TriggerEvent('qbinventory:client:requestGiveAvailability')
 end)
 
+-- Local presentation relay for client/hotbar.lua's show-hotbar key. Works
+-- without an open session, so theme and config are pushed first.
+AddEventHandler('qbinventory:ui:hotbarShow', function(payload)
+    if type(payload) ~= 'table' or activeSession then
+        return
+    end
+    pushTheme()
+    pushConfig()
+    send('qbinventory:nui:hotbar', payload)
+end)
+
 -- Patches must carry the session id so delayed traffic cannot change a later
 -- session after close/reopen. kora_inventory remains authoritative on revisions.
 AddEventHandler('qbinventory:ui:sessionPatched', function(payload, legacyPatch)

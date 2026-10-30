@@ -338,6 +338,21 @@ function ItemBoxStack({ boxes }: { boxes: ActiveItemBox[] }) {
     </aside>
 }
 
+interface HotbarState { id: number; slots: Array<Partial<InventoryItem> & { slot: number }> }
+
+function HotbarHud({ hotbar }: { hotbar: HotbarState }) {
+    return <aside className="hotbar-hud" aria-label="Hotbar">
+        {hotbar.slots.map((item) => <div className={`hotbar-slot${item.name ? "" : " hotbar-slot-empty"}`} key={item.slot}>
+            <kbd>{item.slot}</kbd>
+            {item.name ? <>
+                <ItemArtwork item={item as InventoryItem} className="hotbar-art" />
+                <strong>{item.label ?? item.name}</strong>
+                {(item.amount ?? 1) > 1 && <b>×{item.amount}</b>}
+            </> : null}
+        </div>)}
+    </aside>
+}
+
 /** Dragging a stack out of the window drops it in the world. The zone is only
  * mounted while a drag is running, so it never captures a click, and it sits
  * behind the shell (z-index) so a slot under the cursor always wins the drop.
@@ -391,6 +406,8 @@ function InventoryApp() {
     const pendingInventories = useRef<Set<string> | undefined>()
     const requestPending = useRef(false)
     const nextItemBoxId = useRef(1)
+    const [hotbar, setHotbar] = useState<HotbarState | null>(null)
+    const hotbarTimeout = useRef<number>()
     const moveTimeout = useRef<number | undefined>()
 
     const clearPendingMove = useCallback(() => {
@@ -424,7 +441,14 @@ function InventoryApp() {
             images: { ...current.images, ...(config.images ?? {}) },
         }))
     })
+    useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number }>("qbinventory:nui:hotbar", ({ slots, seconds }) => {
+        if (!Array.isArray(slots) || !(Number(seconds) > 0)) return
+        window.clearTimeout(hotbarTimeout.current)
+        setHotbar({ id: Date.now(), slots })
+        hotbarTimeout.current = window.setTimeout(() => setHotbar(null), Number(seconds) * 1000)
+    })
     useNuiEvent<SessionSnapshot>("qbinventory:nui:sessionOpened", (snapshot) => {
+        window.clearTimeout(hotbarTimeout.current); setHotbar(null)
         clearPendingMove(); setSession(snapshot); setSelected(undefined); setGiveAvailable(false); setError(undefined)
     })
     useNuiEvent<SessionPatch>("qbinventory:nui:sessionPatched", (patch) => {
@@ -593,7 +617,7 @@ function InventoryApp() {
     // A fresh selection always starts at one, so a large slider value can never
     // carry over onto a different stack or shop stock row.
     useEffect(() => { setSelectedAmount(1) }, [selected?.inventory.id, selected?.item.slot])
-    if (!session) return <UiConfigContext.Provider value={uiConfig}><DragGuard open={false} /><ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
+    if (!session) return <UiConfigContext.Provider value={uiConfig}><DragGuard open={false} />{hotbar && <HotbarHud hotbar={hotbar} />}<ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
 
     // Solo layout starts as the player's inventory alone. Its inspector is a
     // drawer, mounted only after selection, so an idle personal inventory does
