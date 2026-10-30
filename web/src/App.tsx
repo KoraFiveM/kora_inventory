@@ -1,14 +1,18 @@
 import { CircleAlert, PackageOpen, Search, X } from "lucide-react"
 import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { DndProvider, useDrag, useDragLayer, useDrop } from "react-dnd"
+import { DndProvider, useDrag, useDragDropManager, useDragLayer, useDrop } from "react-dnd"
 import { TouchBackend } from "react-dnd-touch-backend"
 import { closeSession, sendIntent } from "@/lib/nui"
 import { openDevHarness } from "@/lib/dev"
+import { watchDragRelease } from "@/lib/dragReset"
 import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, UiConfig } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
+
+// A move that gets no answer would leave the inventory locked for good.
+const MOVE_TIMEOUT_MS = 10000
 
 /**
  * Presentation config from `Config.qbinventory.ui`, pushed on
@@ -358,6 +362,19 @@ function WorldDropZone({ session, busy, onDropOut }: { session: SessionSnapshot;
     </>
 }
 
+/** Ends a drag the backend missed (release outside the window, focus loss,
+ * Escape) and when the inventory closes mid-drag. Renders nothing. */
+function DragGuard({ open }: { open: boolean }) {
+    const manager = useDragDropManager()
+    useEffect(() => {
+        const monitor = manager.getMonitor()
+        const cancel = () => manager.getActions().endDrag()
+        if (!open && monitor.isDragging()) cancel()
+        return watchDragRelease(window, () => monitor.isDragging(), cancel)
+    }, [manager, open])
+    return null
+}
+
 function InventoryApp() {
     const [session, setSession] = useState<SessionSnapshot | null>(null)
     const [selected, setSelected] = useState<Selection | undefined>()
@@ -373,8 +390,10 @@ function InventoryApp() {
     const pendingInventories = useRef<Set<string> | undefined>()
     const requestPending = useRef(false)
     const nextItemBoxId = useRef(1)
+    const moveTimeout = useRef<number | undefined>()
 
     const clearPendingMove = useCallback(() => {
+        window.clearTimeout(moveTimeout.current)
         pendingInventories.current = undefined
         requestPending.current = false
         setMovePending(false)
@@ -431,6 +450,13 @@ function InventoryApp() {
         if (!session || requestPending.current) return false
         requestPending.current = true
         setMovePending(true)
+        // Use can legitimately run long (progress bar), everything else gets a deadline.
+        if (intent !== "use") {
+            moveTimeout.current = window.setTimeout(() => {
+                clearPendingMove()
+                setError("Inventory did not respond")
+            }, MOVE_TIMEOUT_MS)
+        }
         if (awaitInventories?.length) {
             pendingInventories.current = new Set(awaitInventories)
         }
@@ -562,12 +588,12 @@ function InventoryApp() {
     // A fresh selection always starts at one, so a large slider value can never
     // carry over onto a different stack or shop stock row.
     useEffect(() => { setSelectedAmount(1) }, [selected?.inventory.id, selected?.item.slot])
-    if (!session) return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
+    if (!session) return <UiConfigContext.Provider value={uiConfig}><DragGuard open={false} /><ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
 
     // Solo layout starts as the player's inventory alone. Its inspector is a
     // drawer, mounted only after selection, so an idle personal inventory does
     // not reserve a permanently empty actions column.
-    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} /><main className={`inventory-shell${solo ? " inventory-shell-solo" : ""}`}>
+    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><DragGuard open /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} /><main className={`inventory-shell${solo ? " inventory-shell-solo" : ""}`}>
         <DragPreview session={session} />
         <div className="inventory-heading">
             <header className="inventory-topbar">
