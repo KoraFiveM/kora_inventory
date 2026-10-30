@@ -27,7 +27,7 @@ local function registerAmmunationTargets()
     targetIds = {}
 
     for _, location in ipairs(shop.locations or {}) do
-        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone({
+        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(QbInventory.shopZoneSprite({
             coords = { x = location.x, y = location.y, z = location.z },
             radius = shop.interactionDistance,
             options = {
@@ -37,7 +37,7 @@ local function registerAmmunationTargets()
                     onSelect = openAmmunation,
                 },
             },
-        })
+        }, location))
     end
 end
 

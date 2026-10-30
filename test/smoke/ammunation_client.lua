@@ -5,6 +5,7 @@ local H = dofile('test/harness.lua')
 
 Config = { qbinventory = {} }
 dofile('config/shops/ammunation.lua')
+dofile('shared.lua')
 
 local shop = Config.qbinventory.shops.ammunation
 shop.locations = {

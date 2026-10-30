@@ -38,12 +38,14 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/confiscation.lua
 "${LUA:-lua}" test/smoke/drop_buckets.lua
 "${LUA:-lua}" test/smoke/drops_client.lua
+"${LUA:-lua}" test/smoke/drop_ground.lua
 "${LUA:-lua}" test/smoke/crafting.lua
 "${LUA:-lua}" test/smoke/craft_capacity.lua
 "${LUA:-lua}" test/smoke/ammunation.lua
 "${LUA:-lua}" test/smoke/ammunation_client.lua
 "${LUA:-lua}" test/smoke/liquorstore.lua
 "${LUA:-lua}" test/smoke/liquorstore_client.lua
+"${LUA:-lua}" test/smoke/shop_sprites.lua
 "${LUA:-lua}" test/smoke/ammo.lua
 "${LUA:-lua}" test/smoke/vendingmachine.lua
 "${LUA:-lua}" test/smoke/export_collisions.lua

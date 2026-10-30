@@ -36,6 +36,41 @@ local function onGround(coords)
     return { x = coords.x, y = coords.y, z = z }
 end
 
+---A prop is created at its model origin, so on its own it sits part-way into
+---the floor. Needs collision streamed in, or both placement paths hit nothing.
+---@param entity number
+---@param coords table Ground position from onGround().
+local function settleOnGround(entity, coords)
+    if dropConfig.placeOnGround == false then
+        return
+    end
+
+    RequestCollisionAtCoord(coords.x + 0.0, coords.y + 0.0, coords.z + 0.0)
+    local attempts = 0
+    while not HasCollisionLoadedAroundEntity(entity) and attempts < 20 do
+        Wait(50)
+        attempts = attempts + 1
+    end
+    if not DoesEntityExist(entity) then
+        return
+    end
+
+    local offset = tonumber(dropConfig.groundOffset) or 0.0
+    if PlaceObjectOnGroundProperly(entity) then
+        if offset == 0.0 then
+            return
+        end
+        local placed = GetEntityCoords(entity)
+        SetEntityCoordsNoOffset(entity, placed.x, placed.y, QbInventory.groundedZ(placed.z, 0.0, offset), false, false, false)
+        return
+    end
+
+    -- No surface found by the native: lift the model's lowest point onto the
+    -- ground Z that onGround() already resolved.
+    local minDimension = GetModelDimensions(GetEntityModel(entity))
+    SetEntityCoordsNoOffset(entity, coords.x, coords.y, QbInventory.groundedZ(coords.z, minDimension.z, offset), false, false, false)
+end
+
 local function removeDrop(id)
     local record = drops[tostring(id)]
     if not record then
@@ -100,6 +135,9 @@ local function addDrop(id, coords)
             return
         end
         record.entity = entity or nil
+        if entity then
+            settleOnGround(entity, placed)
+        end
     end)
 end
 

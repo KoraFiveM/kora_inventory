@@ -18,6 +18,28 @@ function inventory.copy(value, seen)
     return out
 end
 
+---Adds the world-icon fields to a kora_target zone for a shop counter.
+---`spriteCoords` is where the icon floats (the till/counter; a location can
+---override it). `Config.showTargetHints` is read on every call, so it applies
+---the next time zones are registered: nil follows kora_target's own sprite
+---setting, true/false force the icon on/off for these zones.
+function inventory.shopZoneSprite(zone, location)
+    zone.spriteCoords = location.spriteCoords or { x = location.x, y = location.y, z = location.z }
+    if Config.showTargetHints == true then
+        zone.drawSprite = true
+    elseif Config.showTargetHints == false then
+        zone.drawSprite = false
+    end
+    return zone
+end
+
+---Z for a prop that must rest on the ground: a model's origin is usually its
+---centre, so its lowest point (`minZ`, negative) has to be lifted back to the
+---surface. `offset` is the configured nudge applied after placement.
+function inventory.groundedZ(groundZ, minZ, offset)
+    return groundZ - (minZ or 0.0) + (offset or 0.0)
+end
+
 function inventory.amount(value, fallback)
     local number = math.floor(tonumber(value) or (fallback or 1))
     return number > 0 and number or nil

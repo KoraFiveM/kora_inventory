@@ -1,5 +1,12 @@
 Config = Config or {}
 
+-- Whether shop counters show a floating world icon. nil (default) follows
+-- kora_target's Config.target.sprites.enabled; true forces the icon on and
+-- false forces it off for kora_inventory's shop zones. Needs kora_target's
+-- sprites.allowPerZoneOverride (default true) for `true` to take effect.
+-- Read when the zones are registered (resource or kora_target start).
+Config.showTargetHints = nil
+
 Config.qbinventory = {
     playerSlots = 41,
     playerMaxWeight = 120000,
@@ -39,6 +46,10 @@ Config.qbinventory = {
         -- off the floor. Trace down to the ground so the bag sits on the
         -- surface instead of hovering at waist height.
         placeOnGround = true,
+        -- Metres added to the bag's height after it has been placed on the
+        -- ground. Positive lifts it, negative sinks it; use it if a custom
+        -- `model` still floats or clips. Ignored when placeOnGround is false.
+        groundOffset = 0.0,
         -- Metres. Kept at or below dropDistance so the prompt can never appear
         -- at a range the server will refuse to open the drop from.
         interactionDistance = 1.5,
@@ -406,6 +417,21 @@ if QB and QB.config and QB.config.adopt then
         min = 0.5,
         max = 2.0,
         step = 0.05,
+        live = true,
+    })
+
+    Config.qbinventory.drops.groundOffset = QB.config.number(Config.qbinventory.drops.groundOffset, {
+        label = 'Dropped bag height offset (metres)',
+        description = 'Adds this many metres to the height of a dropped bag after it has been placed on the ground. Use a positive value if the bag sinks into the floor and a negative value if it floats. Only used while placing dropped bags on the ground is enabled.',
+        min = -1.0,
+        max = 1.0,
+        step = 0.01,
+        live = true,
+    })
+
+    Config.showTargetHints = QB.config.optional(Config.showTargetHints, QB.config.boolean(false), {
+        label = 'Show shop counter icons',
+        description = 'Controls the floating world icon over shop counters. Leave it unset to follow the target system’s global icon setting, or choose on or off to force it for kora_inventory shops. Applies the next time the shop targets are registered.',
         live = true,
     })
 
