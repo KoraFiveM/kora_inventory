@@ -74,7 +74,7 @@ Config.qbinventory = {
 
         -- Seconds the on-screen hotbar stays visible after the player presses
         -- the `qbinventory:hotbarshow` key (rebindable in Settings > Key
-        -- Bindings, default Z). It lists the first `hotbarSlots` items and
+        -- Bindings, default U). It lists the first `hotbarSlots` items and
         -- fades away on its own; 0 disables the key. Read on every press.
         hotbarSeconds = 5,
 

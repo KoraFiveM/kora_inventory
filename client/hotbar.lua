@@ -66,7 +66,7 @@ QB.keybind.add({
     name = 'qbinventory:hotbarshow',
     description = 'Show hotbar',
     defaultMapper = 'keyboard',
-    defaultKey = 'Z',
+    defaultKey = 'U',
     onPressed = function()
         local seconds = tonumber((Config.qbinventory.ui or {}).hotbarSeconds) or 0
         if seconds <= 0 or HOTBAR_SLOTS == 0 or IsPauseMenuActive() or IsNuiFocused() then
