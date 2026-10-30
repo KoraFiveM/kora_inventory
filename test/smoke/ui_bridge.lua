@@ -22,6 +22,10 @@ local images = Config.qbinventory.ui.images
 H.equal(images.localPath, 'nui://kora_inventory/images', 'artwork uses kora_inventory NUI paths')
 H.equal(images.preferLocal, true, 'bundled artwork is preferred over remote fallbacks')
 
+H.equal(Config.qbinventory.ui.scale, 1.0, 'UI scale defaults to 1.0 so the layout is unchanged')
+H.ok(source:find('scale = math.max(0.5, math.min(2.0, tonumber(ui.scale) or 1.0))', 1, true),
+    'the scale is read live and clamped on every config push')
+
 local canonicalImage = io.open('images/advancedlockpick.png', 'rb')
 H.ok(canonicalImage ~= nil, 'canonical qb-inventory artwork is bundled')
 if canonicalImage then canonicalImage:close() end

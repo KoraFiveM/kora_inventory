@@ -22,10 +22,11 @@ const MOVE_TIMEOUT_MS = 10000
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar">> & { images: NonNullable<UiConfig["images"]> } = {
+const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale">> & { images: NonNullable<UiConfig["images"]> } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
+    scale: 1,
     images: {
         localPath: "nui://kora_inventory/images",
         extensions: ["webp", "png", "gif", "jpg"],
@@ -419,6 +420,7 @@ function InventoryApp() {
             hotbarSlots: Number.isFinite(config.hotbarSlots) ? Number(config.hotbarSlots) : current.hotbarSlots,
             centreWhenSolo: config.centreWhenSolo ?? current.centreWhenSolo,
             showHotbar: config.showHotbar ?? current.showHotbar,
+            scale: Number.isFinite(config.scale) && Number(config.scale) > 0 ? Number(config.scale) : current.scale,
             images: { ...current.images, ...(config.images ?? {}) },
         }))
     })
@@ -579,6 +581,9 @@ function InventoryApp() {
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
     }, [activateSelected, close, movePending, selected])
+
+    // Read by styles.css for text and slot sizes; 1 leaves every size as authored.
+    useEffect(() => { document.documentElement.style.setProperty("--ui-scale", String(uiConfig.scale)) }, [uiConfig.scale])
 
     const solo = Boolean(session && uiConfig.centreWhenSolo && !session.secondary)
     // Search belongs to the three-column transfer view. It is intentionally

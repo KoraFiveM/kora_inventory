@@ -61,6 +61,11 @@ Config.qbinventory = {
         -- and the number keys keep working with this off (see hotbarSlots).
         showHotbar = true,
 
+        -- Size multiplier for the inventory's text, slots and counts, for
+        -- players who find the default too small. 1.0 is the original size.
+        -- Applied the next time the inventory opens.
+        scale = 1.0,
+
         -- Item artwork resolution. `localPath` is tried before any remote
         -- `imageUrl` when `preferLocal` is set, and always as the fallback when
         -- a remote image 404s.
@@ -395,5 +400,14 @@ if QB and QB.config and QB.config.adopt then
             label = 'Visible carried-weapon components',
             description = 'Maps an inventory component item name to the exact GTA component model name rendered on a holstered weapon. Only entries in this allow-list are sent to clients, preventing item metadata from requesting arbitrary native components.',
         })
+    Config.qbinventory.ui.scale = QB.config.number(Config.qbinventory.ui.scale, {
+        label = 'Inventory UI scale',
+        description = 'Scales the inventory text, slot sizes, item counts and weight labels. Leave at 1.0 for the original size; increase it if the inventory is too small on your screen. Changes apply the next time a player opens their inventory.',
+        min = 0.5,
+        max = 2.0,
+        step = 0.05,
+        live = true,
+    })
+
     Config = QB.config.adopt(Config)
 end

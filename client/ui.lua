@@ -42,6 +42,8 @@ local function pushConfig()
         hotbarSlots = Config.qbinventory.hotbarSlots,
         centreWhenSolo = ui.centreWhenSolo ~= false,
         showHotbar = ui.showHotbar ~= false,
+        -- Read on every push so a live config change applies on the next open.
+        scale = math.max(0.5, math.min(2.0, tonumber(ui.scale) or 1.0)),
         images = ui.images,
     })
 end

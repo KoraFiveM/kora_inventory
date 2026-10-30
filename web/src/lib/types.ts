@@ -88,6 +88,8 @@ export interface UiConfig {
     centreWhenSolo?: boolean
     /** Outline the hotbar slots in the accent colour. */
     showHotbar?: boolean
+    /** Size multiplier for text and slots (Config.qbinventory.ui.scale), 1 = default. */
+    scale?: number
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string
