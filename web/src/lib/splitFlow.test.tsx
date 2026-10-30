@@ -11,6 +11,7 @@ const { sendIntent, closeSession } = vi.hoisted(() => ({
 }))
 vi.mock("@/lib/nui", () => ({ sendIntent, closeSession }))
 
+import { readFileSync } from "node:fs"
 import App from "../App"
 import { parseSplitAmount } from "./split"
 
@@ -94,5 +95,35 @@ describe("right-click split", () => {
         await post("qbinventory:nui:config", { rightClickSplit: false })
         rightClick()
         expect(dialog()).toBeNull()
+    })
+
+    const btn = (text: string) => Array.from(host.querySelectorAll("button")).find((b) => b.textContent === text)!
+    const mouseClick = (el: Element) => act(() => {
+        for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 }))
+    })
+
+    it("a full mouse click on Cancel closes the dialog without sending anything", () => {
+        rightClick(); mouseClick(btn("Cancel"))
+        expect(dialog()).toBeNull()
+        expect(sendIntent).not.toHaveBeenCalled()
+    })
+
+    it("a full mouse click on Split sends the split", async () => {
+        rightClick()
+        await act(async () => { mouseClick(btn("Split")) })
+        expect(dialog()).toBeNull()
+        expect(sendIntent).toHaveBeenCalledTimes(1)
+    })
+
+    it("Enter in the input confirms", async () => {
+        rightClick()
+        await act(async () => { host.querySelector("form")!.requestSubmit() })
+        expect(sendIntent).toHaveBeenCalledTimes(1)
+    })
+
+    it("the backdrop re-enables pointer events (html/body/#root are pointer-events:none in CEF)", () => {
+        const css = readFileSync(`${process.cwd()}/src/styles.css`, "utf8")
+        const rule = css.match(/^\.split-backdrop\s*\{([^}]*)\}/m)?.[1] ?? ""
+        expect(rule).toMatch(/pointer-events:\s*auto/)
     })
 })

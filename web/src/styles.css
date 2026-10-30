@@ -246,7 +246,7 @@ kbd { border: 1px solid hsl(var(--border-strong)); border-radius: 4px; padding: 
 .hotbar-slot strong { max-width: 100%; overflow: hidden; font-size: calc(9px * var(--ui-scale, 1)); text-overflow: ellipsis; white-space: nowrap; }
 .hotbar-slot b { position: absolute; top: 3px; right: 5px; color: hsl(var(--primary)); font-size: calc(10px * var(--ui-scale, 1)); }
 
-.split-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgb(0 0 0 / .5); }
+.split-backdrop { position: fixed; pointer-events: auto; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgb(0 0 0 / .5); }
 .split-dialog { display: grid; gap: 10px; min-width: 260px; padding: 16px; border: 1px solid hsl(var(--border)); border-radius: 10px; color: hsl(var(--foreground)); background: hsl(var(--background)); font-size: calc(12px * var(--ui-scale, 1)); }
 .split-dialog h3 { margin: 0; font-size: calc(12px * var(--ui-scale, 1)); letter-spacing: .08em; text-transform: uppercase; }
 .split-dialog label { display: grid; gap: 6px; }
