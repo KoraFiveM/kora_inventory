@@ -452,6 +452,7 @@ Nothing in it is authority and the inventory engine never reads it.
 | `centreWhenSolo` | With no second inventory open, show only a compact centred player grid; selecting an item slides its inspector and actions out in a drawer. |
 | `showHotbar` | Outline slots `1..hotbarSlots` on the player's own inventory in the accent colour, so the keys `client/hotbar.lua` already binds are visible rather than folklore. |
 | `rightClickSplit` | Right-click on a stack of 2+ opens the split dialog (default `true`); `false` makes right-click do nothing. |
+| `optimisticMoves` | Draw a drag-and-drop move (move, stack, swap, split) immediately and undo it if the server refuses or does not answer within 10 s (default `true`); `false` shows a move only after the server confirms it. The server validates every move either way. |
 | `images` | Item artwork resolution -- see below. |
 
 `hotbarSlots` is sent alongside it because the NUI draws the boundary and cannot

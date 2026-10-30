@@ -9,6 +9,7 @@ import { openDevHarness } from "@/lib/dev"
 import { watchDragRelease } from "@/lib/dragReset"
 import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, UiConfig } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
+import { predictMove, refreshedInventories, restoreInventories, type MoveRequest, type Prediction } from "@/lib/optimistic"
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
 
@@ -23,11 +24,12 @@ const MOVE_TIMEOUT_MS = 10000
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit">> & { images: NonNullable<UiConfig["images"]> } = {
+const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves">> & { images: NonNullable<UiConfig["images"]> } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
     rightClickSplit: true,
+    optimisticMoves: true,
     scale: 1,
     images: {
         localPath: "nui://kora_inventory/images",
@@ -412,13 +414,26 @@ function InventoryApp() {
     const [hotbar, setHotbar] = useState<HotbarState | null>(null)
     const hotbarTimeout = useRef<number>()
     const moveTimeout = useRef<number | undefined>()
+    // Request counter, plus the views to restore if the in-flight optimistic move fails.
+    const requestSeq = useRef(0)
+    const optimistic = useRef<Map<string, InventoryView> | undefined>()
 
     const clearPendingMove = useCallback(() => {
         window.clearTimeout(moveTimeout.current)
         pendingInventories.current = undefined
         requestPending.current = false
+        optimistic.current = undefined
         setMovePending(false)
     }, [])
+    // A move the server refused or never answered: put back exactly what the
+    // prediction replaced, except inventories an authoritative patch has since
+    // refreshed (those were dropped from `optimistic` when the patch landed).
+    const rollbackPendingMove = useCallback((message: string) => {
+        const before = optimistic.current
+        if (before?.size) setSession((current) => current && restoreInventories(current, before))
+        clearPendingMove()
+        setError(message)
+    }, [clearPendingMove])
     const settlePatchedInventories = useCallback((patch: SessionPatch) => {
         const pending = pendingInventories.current
         if (!pending) return
@@ -441,6 +456,7 @@ function InventoryApp() {
             centreWhenSolo: config.centreWhenSolo ?? current.centreWhenSolo,
             showHotbar: config.showHotbar ?? current.showHotbar,
             rightClickSplit: config.rightClickSplit ?? current.rightClickSplit,
+            optimisticMoves: config.optimisticMoves ?? current.optimisticMoves,
             scale: Number.isFinite(config.scale) && Number(config.scale) > 0 ? Number(config.scale) : current.scale,
             images: { ...current.images, ...(config.images ?? {}) },
         }))
@@ -456,6 +472,8 @@ function InventoryApp() {
         clearPendingMove(); setSession(snapshot); setSelected(undefined); setGiveAvailable(false); setError(undefined)
     })
     useNuiEvent<SessionPatch>("qbinventory:nui:sessionPatched", (patch) => {
+        // The server's items win over any prediction for the inventories they cover.
+        if (optimistic.current) for (const id of refreshedInventories(patch)) optimistic.current.delete(id)
         settlePatchedInventories(patch)
         setSession((current) => current && current.sessionId === patch.sessionId ? applyPatch(current, patch) : current)
         setSelected(undefined)
@@ -465,8 +483,7 @@ function InventoryApp() {
         setSession((current) => current?.sessionId === sessionId ? null : current)
     })
     useNuiEvent<{ reason?: string }>("qbinventory:nui:rejected", ({ reason }) => {
-        clearPendingMove()
-        setError(reason ?? "Action rejected by inventory")
+        rollbackPendingMove(reason ?? "Action rejected by inventory")
     })
     useNuiEvent<{ available?: boolean }>("qbinventory:nui:giveAvailability", ({ available }) => setGiveAvailable(available === true))
     useNuiEvent<ItemBoxReceipt>("qbinventory:nui:itemBox", (receipt) => {
@@ -476,25 +493,30 @@ function InventoryApp() {
         window.setTimeout(() => setItemBoxes((current) => current.filter((box) => box.id !== id)), Math.max(750, receipt.duration ?? 2600))
     })
 
-    const submit = useCallback(async (intent: Parameters<typeof sendIntent>[0]["intent"], payload: Record<string, unknown> = {}, awaitInventories?: string[]) => {
+    const submit = useCallback(async (intent: Parameters<typeof sendIntent>[0]["intent"], payload: Record<string, unknown> = {}, awaitInventories?: string[], prediction?: Prediction) => {
         if (!session || requestPending.current) return false
         requestPending.current = true
+        const seq = ++requestSeq.current
+        // After a timeout a late answer to an older request must not touch the newer one.
+        const stale = () => uiConfig.optimisticMoves && requestSeq.current !== seq
         setMovePending(true)
+        if (prediction) {
+            optimistic.current = new Map(prediction.before)
+            setSelected(undefined)
+            setSession(prediction.session)
+        }
         // Use can legitimately run long (progress bar), everything else gets a deadline.
         if (intent !== "use") {
-            moveTimeout.current = window.setTimeout(() => {
-                clearPendingMove()
-                setError("Inventory did not respond")
-            }, MOVE_TIMEOUT_MS)
+            moveTimeout.current = window.setTimeout(() => rollbackPendingMove("Inventory did not respond"), MOVE_TIMEOUT_MS)
         }
         if (awaitInventories?.length) {
             pendingInventories.current = new Set(awaitInventories)
         }
         try {
             const response = await sendIntent({ sessionId: session.sessionId, token: session.token, intent, payload })
+            if (stale()) return response.ok
             if (!response.ok) {
-                clearPendingMove()
-                setError(response.error ?? "Action rejected by inventory")
+                rollbackPendingMove(response.error ?? "Action rejected by inventory")
                 return false
             }
             // The Vite harness has no Lua authority to send a patch back. Keep
@@ -503,11 +525,11 @@ function InventoryApp() {
             if (!awaitInventories?.length) clearPendingMove()
             return true
         } catch {
-            clearPendingMove()
-            setError("Inventory connection interrupted")
+            if (stale()) return false
+            rollbackPendingMove("Inventory connection interrupted")
             return false
         }
-    }, [clearPendingMove, movePending, session])
+    }, [clearPendingMove, movePending, rollbackPendingMove, session, uiConfig.optimisticMoves])
 
     const move = useCallback((from: InventoryView, fromSlot: number, to: InventoryView, toSlot: number, requestedAmount?: number) => {
         const item = findItem(from, fromSlot)
@@ -521,11 +543,14 @@ function InventoryApp() {
             return
         }
         if (to.type === "shop") { setError("Shop inventory is read only"); return }
+        const amount = requestedAmount ?? item.amount
+        const request: MoveRequest = { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount }
+        const prediction = session && uiConfig.optimisticMoves ? predictMove(session, request) : undefined
         void submit("move", {
-            fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount: requestedAmount ?? item.amount,
+            fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount,
             revision: session?.revision, secondaryRevision: session?.secondaryRevision,
-        }, [from.id, to.id])
-    }, [session, submit])
+        }, [from.id, to.id], prediction)
+    }, [session, submit, uiConfig.optimisticMoves])
 
     const canDropSlot = useCallback((source: DragSlot, target: SlotTarget) => {
         if (!source || !session || movePending || (source.inventoryId === target.inventoryId && source.slot === target.slot)) return false

@@ -92,6 +92,8 @@ export interface UiConfig {
     scale?: number
     /** Right-clicking a stack opens the split dialog (Config.qbinventory.ui.rightClickSplit). */
     rightClickSplit?: boolean
+    /** Paint a move before the server answers and roll back if refused (Config.qbinventory.ui.optimisticMoves). */
+    optimisticMoves?: boolean
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string

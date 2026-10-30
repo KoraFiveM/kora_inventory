@@ -89,6 +89,14 @@ Config.qbinventory = {
         -- Applied the next time the inventory opens.
         rightClickSplit = true,
 
+        -- Paint a drag-and-drop move in the browser straight away instead of
+        -- waiting for the server's reply, then reconcile with the server's own
+        -- inventory; a refused or unanswered move is rolled back exactly. The
+        -- server still validates and decides every move -- this only changes
+        -- when the result is drawn. Set to false to show moves only once the
+        -- server has confirmed them. Applied the next time the inventory opens.
+        optimisticMoves = true,
+
         -- Item artwork resolution. `localPath` is tried before any remote
         -- `imageUrl` when `preferLocal` is set, and always as the fallback when
         -- a remote image 404s.
@@ -434,6 +442,11 @@ if QB and QB.config and QB.config.adopt then
     Config.qbinventory.ui.rightClickSplit = QB.config.boolean(Config.qbinventory.ui.rightClickSplit, {
         label = 'Right-click splits stacks',
         description = 'When on, right-clicking a stack of two or more items opens a dialog to choose how many to move into an empty slot. Turn it off to make right-click do nothing. Changes apply the next time a player opens their inventory.',
+        live = true,
+    })
+    Config.qbinventory.ui.optimisticMoves = QB.config.boolean(Config.qbinventory.ui.optimisticMoves, {
+        label = 'Show inventory moves instantly',
+        description = 'When on, moving, stacking, swapping or splitting items appears immediately and is undone if the server refuses the move or does not answer. Turn it off to show a move only after the server has confirmed it, which avoids a brief flash of a move that is then refused. The server checks every move either way. Changes apply the next time a player opens their inventory.',
         live = true,
     })
     Config.qbinventory.ui.scale = QB.config.number(Config.qbinventory.ui.scale, {
