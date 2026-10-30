@@ -182,7 +182,7 @@ end
 -- first, so the compat wrappers silently replaced them for every resource in
 -- the server -- and those wrappers called exports.kora_inventory:openInventory,
 -- which then resolved back to themselves. Unbounded recursion on every
--- kora_police/kora_ambulance/kora_clothing/qblib-playground stash or shop open.
+-- kora_police/kora_ambulance/kora_clothing/kora_lib-playground stash or shop open.
 --
 -- These client files touch NUI and LocalPlayer at load time, so they are read
 -- statically rather than dofile'd. The invariant enforced is the same one the

@@ -299,7 +299,7 @@ H.ok(client:find("QB.state.onChange(STATE_KEY, nil,", 1, true),
 H.ok(client:find('canCancel = false', 1, true),
     'a draw cannot be cancelled -- otherwise the surcharge is free to skip')
 H.ok(client:find('QB.stream.loadWeaponAsset', 1, true) and client:find('QB.stream.loadModel', 1, true),
-    'streaming goes through qblib rather than raw request/poll loops')
+    'streaming goes through kora_lib rather than raw request/poll loops')
 H.ok(client:find('IsWeaponValid(', 1, true),
     'a configured entry that is not a real weapon cannot assert inside the renderer')
 H.ok(useables:find('QbInventory.weaponCarry', 1, true),

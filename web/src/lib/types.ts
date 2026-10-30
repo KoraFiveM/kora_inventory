@@ -23,7 +23,7 @@ export interface InventoryItem {
     stack?: boolean
     container?: boolean
     useable?: boolean
-    /** Ms the client runs qblib's progress bar for before a use resolves. */
+    /** Ms the client runs kora_lib's progress bar for before a use resolves. */
     useTime?: number
     /** When true, using this item leaves the inventory panel open. */
     preventClose?: boolean

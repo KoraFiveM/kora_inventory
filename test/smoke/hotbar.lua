@@ -24,7 +24,7 @@ local manifest = read('fxmanifest.lua')
 H.ok(client:find('function QbInventory.useGate(item)', 1, true),
     'client.lua exposes the shared use-time progress bar gate')
 H.ok(client:find('QB.progressbar.start(', 1, true),
-    'the gate actually runs qblib\'s progress bar')
+    'the gate actually runs kora_lib\'s progress bar')
 H.ok(client:find('if not QbInventory.useGate(item) then', 1, true),
     'submitIntent gates a use behind the progress bar before contacting the server')
 H.ok(client:find("return false, 'cancelled'", 1, true),

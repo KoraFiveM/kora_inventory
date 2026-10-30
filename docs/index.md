@@ -20,7 +20,7 @@ by default, with its own optional NUI as one renderer among possible others.
 
 ## Requirements
 
-- [qblib](https://qbcore2.github.io/kora_lib/)
+- [kora_lib](https://qbcore2.github.io/kora_lib/)
 - [qbsql](https://qbcore2.github.io/kora_sql/)
 - [qbcore](https://qbcore2.github.io/kora_core/)
 
@@ -378,7 +378,7 @@ Ammu-Nation shop data lives in `config/shops/ammunation.lua`.
 
 Part of the [qbcore2](https://github.com/qbcore2) resource set:
 
-- [qblib](https://qbcore2.github.io/kora_lib/) — shared helper library
+- [kora_lib](https://qbcore2.github.io/kora_lib/) — shared helper library
 - [qbsql](https://qbcore2.github.io/kora_sql/) — database driver
 - [qbcore](https://qbcore2.github.io/kora_core/) — framework core
 - [qbtarget](https://qbcore2.github.io/kora_target/) — targeting/interaction

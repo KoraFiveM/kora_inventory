@@ -235,7 +235,7 @@ H.equal(calls.notify[#calls.notify].message, 'From ox_lib.', 'an ox_lib descript
 Ox.notify({ title = 'Hi', text = 'Body', type = 'nonsense' })
 H.equal(calls.notify[#calls.notify].type, nil, 'an unknown type is dropped rather than failing validation')
 Ox.notify({ title = 'Hi', position = 'bottom' })
-H.equal(calls.notify[#calls.notify].position, 'bottom-center', 'the ox bottom position maps to qblib bottom-center')
+H.equal(calls.notify[#calls.notify].position, 'bottom-center', 'the ox bottom position maps to kora_lib bottom-center')
 Ox.notify({ title = 'Hi', position = 'center-right' })
 H.equal(calls.notify[#calls.notify].position, 'top-right', 'unsupported center-right retains its side without failing validation')
 
@@ -269,15 +269,15 @@ Ox.Progress({ label = 'Searching', duration = 1000,
 })
 payload = calls.progress[#calls.progress]
 H.equal(payload.anim, nil, 'an ox scenario is not also sent as an animation')
-H.equal(payload.scenario.name, 'WORLD_HUMAN_WELDING', 'an ox scenario maps onto qblib scenario playback')
+H.equal(payload.scenario.name, 'WORLD_HUMAN_WELDING', 'an ox scenario maps onto kora_lib scenario playback')
 H.equal(#payload.props, 2, 'an ox prop array remains an array')
-H.equal(payload.props[1].offset.x, 1, 'ox prop pos maps to qblib offset')
-H.equal(payload.props[1].rotation.z, 6, 'ox prop rot maps to qblib rotation')
-H.equal(payload.props[1].rotationOrder, 2, 'ox prop rotOrder maps to qblib rotationOrder')
+H.equal(payload.props[1].offset.x, 1, 'ox prop pos maps to kora_lib offset')
+H.equal(payload.props[1].rotation.z, 6, 'ox prop rot maps to kora_lib rotation')
+H.equal(payload.props[1].rotationOrder, 2, 'ox prop rotOrder maps to kora_lib rotationOrder')
 
 Ox.Progress({ label = 'Holding', duration = 1000, prop = { model = 'prop_single' } })
 payload = calls.progress[#calls.progress]
-H.equal(#payload.props, 1, 'a single ox prop is wrapped for qblib')
+H.equal(#payload.props, 1, 'a single ox prop is wrapped for kora_lib')
 H.equal(payload.props[1].model, 'prop_single')
 
 progressResult = false
@@ -287,11 +287,11 @@ H.equal(cancelledArg, true, 'a cancelled bar calls back with cancelled = true')
 H.equal(Ox.Progress({ label = 'Doing', duration = 1000 }), false, 'the callback stays optional')
 
 progressActive = true
-H.equal(Ox.ProgressActive(), true, 'ProgressActive reads qblib progressbar state, not a hardcoded false')
+H.equal(Ox.ProgressActive(), true, 'ProgressActive reads kora_lib progressbar state, not a hardcoded false')
 progressActive = false
 H.equal(Ox.ProgressActive(), false, 'ProgressActive follows the live state back down')
 Ox.CancelProgress()
-H.ok(calls.cancelled, 'CancelProgress delegates to qblib')
+H.ok(calls.cancelled, 'CancelProgress delegates to kora_lib')
 
 -- --- Keyboard ---------------------------------------------------------------
 --
@@ -356,7 +356,7 @@ pedWeapon = 0
 
 -- --- documented no-ops ------------------------------------------------------
 --
--- These four have no backing subsystem in kora_inventory/qblib and each carries a
+-- These four have no backing subsystem in kora_inventory/kora_lib and each carries a
 -- comment in client/compat/ox.lua saying which upstream feature it stands in
 -- for and why nothing can back it. They must stay CALLABLE (an ox dependant
 -- calling one must not error) and must stay COMMENTED, so a future reader

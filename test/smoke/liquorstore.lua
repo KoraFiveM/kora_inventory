@@ -29,7 +29,7 @@ end
 
 -- Every branch shares the service category while retaining its storefront.
 H.equal(shop.blip.category, 'Liquor', 'liquor stores use the canonical category')
-H.equal(shop.blip.label, nil, 'qblib composes the map label from category and name')
+H.equal(shop.blip.label, nil, 'kora_lib composes the map label from category and name')
 local storefronts = {}
 for _, location in ipairs(shop.locations) do storefronts[location.name] = true end
 H.ok(storefronts["Rob's Liquor"], 'Rob\'s Liquor locations retain their storefront name')

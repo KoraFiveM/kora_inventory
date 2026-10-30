@@ -54,6 +54,6 @@ H.equal(activeZoneCount(), #shop.locations, 'repeated target starts leave one li
 H.equal(createdBlips[1].category, 'Liquor', 'Rob\'s and 24/7 share the Liquor category')
 H.equal(createdBlips[1].name, "Rob's Liquor", 'the first blip uses its location storefront')
 H.equal(createdBlips[2].name, '24/7', 'the second blip uses its location storefront')
-H.equal(createdBlips[1].label, nil, 'the caller leaves map-label composition to qblib')
+H.equal(createdBlips[1].label, nil, 'the caller leaves map-label composition to kora_lib')
 
 H.finish()
