@@ -26,6 +26,9 @@ H.equal(Config.qbinventory.ui.scale, 1.0, 'UI scale defaults to 1.0 so the layou
 H.ok(source:find('scale = math.max(0.5, math.min(2.0, tonumber(ui.scale) or 1.0))', 1, true),
     'the scale is read live and clamped on every config push')
 
+H.equal(Config.qbinventory.ui.rightClickSplit, true, 'right-click split defaults on')
+H.ok(source:find('rightClickSplit = ui.rightClickSplit ~= false', 1, true), 'rightClickSplit is pushed to the NUI on every config push')
+
 local canonicalImage = io.open('images/advancedlockpick.png', 'rb')
 H.ok(canonicalImage ~= nil, 'canonical qb-inventory artwork is bundled')
 if canonicalImage then canonicalImage:close() end

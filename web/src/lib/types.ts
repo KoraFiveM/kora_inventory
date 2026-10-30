@@ -90,6 +90,8 @@ export interface UiConfig {
     showHotbar?: boolean
     /** Size multiplier for text and slots (Config.qbinventory.ui.scale), 1 = default. */
     scale?: number
+    /** Right-clicking a stack opens the split dialog (Config.qbinventory.ui.rightClickSplit). */
+    rightClickSplit?: boolean
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string

@@ -83,6 +83,12 @@ Config.qbinventory = {
         -- Applied the next time the inventory opens.
         scale = 1.0,
 
+        -- Right-clicking a stack of 2 or more in your own or a stash inventory
+        -- opens an in-page "split" dialog (amount, Split, Cancel; Escape or a
+        -- click outside cancels). Set to false to make right-click do nothing.
+        -- Applied the next time the inventory opens.
+        rightClickSplit = true,
+
         -- Item artwork resolution. `localPath` is tried before any remote
         -- `imageUrl` when `preferLocal` is set, and always as the fallback when
         -- a remote image 404s.
@@ -423,6 +429,11 @@ if QB and QB.config and QB.config.adopt then
         min = 0,
         max = 30,
         step = 1,
+        live = true,
+    })
+    Config.qbinventory.ui.rightClickSplit = QB.config.boolean(Config.qbinventory.ui.rightClickSplit, {
+        label = 'Right-click splits stacks',
+        description = 'When on, right-clicking a stack of two or more items opens a dialog to choose how many to move into an empty slot. Turn it off to make right-click do nothing. Changes apply the next time a player opens their inventory.',
         live = true,
     })
     Config.qbinventory.ui.scale = QB.config.number(Config.qbinventory.ui.scale, {

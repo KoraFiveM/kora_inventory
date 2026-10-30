@@ -1,3 +1,4 @@
+import { SplitDialog } from "./SplitDialog"
 import { CircleAlert, PackageOpen, Search, X } from "lucide-react"
 import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
@@ -22,10 +23,11 @@ const MOVE_TIMEOUT_MS = 10000
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale">> & { images: NonNullable<UiConfig["images"]> } = {
+const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit">> & { images: NonNullable<UiConfig["images"]> } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
+    rightClickSplit: true,
     scale: 1,
     images: {
         localPath: "nui://kora_inventory/images",
@@ -400,6 +402,7 @@ function InventoryApp() {
     const [movePending, setMovePending] = useState(false)
     const [itemBoxes, setItemBoxes] = useState<ActiveItemBox[]>([])
     const [selectedAmount, setSelectedAmount] = useState(1)
+    const [splitTarget, setSplitTarget] = useState<Selection | undefined>()
     const [uiConfig, setUiConfig] = useState(DEFAULT_UI_CONFIG)
     const selectedMax = Math.max(1, Math.floor(selected?.item.amount ?? 1))
     const selectedCount = Math.min(Math.max(1, selectedAmount), selectedMax)
@@ -437,6 +440,7 @@ function InventoryApp() {
             hotbarSlots: Number.isFinite(config.hotbarSlots) ? Number(config.hotbarSlots) : current.hotbarSlots,
             centreWhenSolo: config.centreWhenSolo ?? current.centreWhenSolo,
             showHotbar: config.showHotbar ?? current.showHotbar,
+            rightClickSplit: config.rightClickSplit ?? current.rightClickSplit,
             scale: Number.isFinite(config.scale) && Number(config.scale) > 0 ? Number(config.scale) : current.scale,
             images: { ...current.images, ...(config.images ?? {}) },
         }))
@@ -567,14 +571,20 @@ function InventoryApp() {
         move(inventory, item.slot, inventory, emptySlot, amount)
     }, [move, selectedCount, session])
     const promptSplit = useCallback((inventory: InventoryView, item: InventoryItem) => {
-        if (inventory.type === "shop" || item.amount < 2) return
-        const answer = window.prompt(`Split ${item.label ?? item.name}: move how many?`, String(Math.floor(item.amount / 2)))
-        if (answer === null) return
-        const amount = Number(answer)
-        setSelected({ inventory, item })
+        if (!uiConfig.rightClickSplit || inventory.type === "shop" || item.amount < 2) return
+        setSplitTarget({ inventory, item })
+    }, [uiConfig.rightClickSplit])
+    const confirmSplit = useCallback((amount: number) => {
+        const target = splitTarget
+        setSplitTarget(undefined)
+        if (!target) return
+        setSelected(target)
         setSelectedAmount(amount)
-        split(inventory, item, amount)
-    }, [split])
+        split(target.inventory, target.item, amount)
+    }, [split, splitTarget])
+    // The dialog never outlives its session, and any server patch dismisses it
+    // so it can never act on a stack that changed underneath it.
+    useEffect(() => { setSplitTarget(undefined) }, [session?.sessionId, session?.revision, session?.secondaryRevision])
 
     const use = useCallback((inventory: InventoryView, item: InventoryItem) => {
         if (inventory.id !== session?.player.id) { setError("Only items in your inventory can be used"); return }
@@ -599,12 +609,13 @@ function InventoryApp() {
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
+            if (event.key === "Escape" && splitTarget) { setSplitTarget(undefined); return }
             if (event.key === "Escape" || event.key === "Tab") close()
             if (event.key === "Enter" && selected && !movePending) activateSelected(selected)
         }
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
-    }, [activateSelected, close, movePending, selected])
+    }, [activateSelected, close, movePending, selected, splitTarget])
 
     // Read by styles.css for text and slot sizes; 1 leaves every size as authored.
     useEffect(() => { document.documentElement.style.setProperty("--ui-scale", String(uiConfig.scale)) }, [uiConfig.scale])
@@ -622,7 +633,7 @@ function InventoryApp() {
     // Solo layout starts as the player's inventory alone. Its inspector is a
     // drawer, mounted only after selection, so an idle personal inventory does
     // not reserve a permanently empty actions column.
-    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><DragGuard open /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} /><main className={`inventory-shell${solo ? " inventory-shell-solo" : ""}`}>
+    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><DragGuard open /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} />{splitTarget && <SplitDialog label={splitTarget.item.label ?? splitTarget.item.name} stack={splitTarget.item.amount} onConfirm={confirmSplit} onCancel={() => setSplitTarget(undefined)} />}<main className={`inventory-shell${solo ? " inventory-shell-solo" : ""}`}>
         <DragPreview session={session} />
         <div className="inventory-heading">
             <header className="inventory-topbar">
