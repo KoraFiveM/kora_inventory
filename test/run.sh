@@ -49,5 +49,6 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/export_collisions.lua
 "${LUA:-lua}" test/smoke/providers.lua
 "${LUA:-lua}" test/smoke/provider_contract.lua
+"${LUA:-lua}" test/smoke/split_stack.lua
 
 "${LUA:-lua}" test/smoke/player_exchange.lua

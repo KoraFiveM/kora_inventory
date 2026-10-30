@@ -636,7 +636,10 @@ local function lock(keys, transaction)
     return table.unpack(result, 2, result.n)
 end
 
-local function addSecondary(inv, name, amount, slot, metadata)
+-- `exactSlot` is for moves between slots: it stops an empty target slot falling
+-- back to "merge into any matching stack", which would put a split stack
+-- straight back onto the stack it was split from.
+local function addSecondary(inv, name, amount, slot, metadata, exactSlot)
     if inv.blocked then return false, 'inventory is locked' end
     if inv.durablePending then return false, 'inventory recovery is being reconciled' end
     local item, err = buildItem(name, amount, slot, metadata)
@@ -666,7 +669,7 @@ local function addSecondary(inv, name, amount, slot, metadata)
         return true, placed[1]
     end
     local stack = slot and inventory.canStack(inv.items[slot], item) and slot
-        or inventory.stackSlot(inv.items, item)
+        or not exactSlot and inventory.stackSlot(inv.items, item)
     if stack then
         inv.items[stack].amount = inv.items[stack].amount + amount
         return true, stack
@@ -718,7 +721,7 @@ local function removeSecondary(inv, slot, amount)
     return true, nil, removed
 end
 
-local function addPlayer(src, name, amount, slot, metadata, reason)
+local function addPlayer(src, name, amount, slot, metadata, reason, exactSlot)
     local items = playerItems(src)
     -- Every weapon added through the public inventory surface receives the
     -- canonical server metadata, not only weapons crafted in crafting.lua.
@@ -783,7 +786,7 @@ local function addPlayer(src, name, amount, slot, metadata, reason)
         end
         return true, nil, items[placed[1]]
     end
-    local stack = slot and inventory.canStack(items[slot], item) and slot or inventory.stackSlot(items, item)
+    local stack = slot and inventory.canStack(items[slot], item) and slot or not exactSlot and inventory.stackSlot(items, item)
     if stack then
         local nextItem = inventory.copy(items[stack])
         nextItem.amount = nextItem.amount + amount
@@ -1029,7 +1032,7 @@ end
 -- (generic transfer, the ox adapter, and anything added later) funnels
 -- through addTo/removeFrom, so the read-only guard lives here once instead
 -- of being re-asserted (and risking drifting error strings) at every caller.
-local function addTo(inventoryKey, name, amount, slot, metadata, reason)
+local function addTo(inventoryKey, name, amount, slot, metadata, reason, exactSlot)
     local inv = getInventory(inventoryKey)
     if not inv then
         return false, 'inventory not found'
@@ -1038,10 +1041,10 @@ local function addTo(inventoryKey, name, amount, slot, metadata, reason)
         return false, 'shop inventory is read only'
     end
     if inv.type == 'player' then
-        local ok, err = addPlayer(inv.source, name, amount, slot, metadata, reason)
+        local ok, err = addPlayer(inv.source, name, amount, slot, metadata, reason, exactSlot)
         return ok, err
     end
-    return addSecondary(inv, name, amount, slot, metadata)
+    return addSecondary(inv, name, amount, slot, metadata, exactSlot)
 end
 
 ---Removes `amount` from `slot` of any inventory.
@@ -1345,7 +1348,7 @@ local function transfer(src, request)
         if not removedOK then
             return false, removedErr
         end
-        local addedOK, addedErr = addTo(toKey, removed.name, amount, toSlot, payload.metadata, 'transfer')
+        local addedOK, addedErr = addTo(toKey, removed.name, amount, toSlot, payload.metadata, 'transfer', toSlot ~= nil)
         if not addedOK then
             addTo(fromKey, removed.name, amount, fromSlot, removed.info, 'transfer-rollback')
             return false, addedErr
@@ -1999,7 +2002,7 @@ local function moveItem(src, fromSlot, toSlot, amount)
         if not removed then
             return false, removeErr
         end
-        local added, addErr = addPlayer(src, moved.name, amount, toSlot, moved.info, 'move')
+        local added, addErr = addPlayer(src, moved.name, amount, toSlot, moved.info, 'move', true)
         if not added then
             addPlayer(src, moved.name, amount, fromSlot, moved.info, 'move-rollback')
             return false, addErr
