@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { watchDragRelease } from "./dragReset"
 
 function setup() {
@@ -53,5 +53,32 @@ describe("watchDragRelease", () => {
         stop()
         window.dispatchEvent(new MouseEvent("mouseup"))
         expect(state.cancels).toBe(0)
+    })
+
+    it("ends a drag the backend never saw released (same slot, overlap) once the pointer comes up", () => {
+        vi.useFakeTimers()
+        const { state, stop } = setup()
+        window.dispatchEvent(new Event("pointerup"))
+        // not before the mouse event the backend drops on has been handled
+        expect(state.cancels).toBe(0)
+        vi.advanceTimersByTime(1)
+        expect(state.cancels).toBe(1)
+        state.dragging = true
+        window.dispatchEvent(new Event("pointercancel"))
+        vi.advanceTimersByTime(1)
+        expect(state.cancels).toBe(2)
+        stop()
+        vi.useRealTimers()
+    })
+
+    it("leaves a drag the backend already dropped alone on pointerup", () => {
+        vi.useFakeTimers()
+        const { state, stop } = setup()
+        window.dispatchEvent(new Event("pointerup"))
+        state.dragging = false
+        vi.advanceTimersByTime(1)
+        expect(state.cancels).toBe(0)
+        stop()
+        vi.useRealTimers()
     })
 })

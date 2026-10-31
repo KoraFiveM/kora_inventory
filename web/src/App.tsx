@@ -9,7 +9,8 @@ import { openDevHarness } from "@/lib/dev"
 import { watchDragRelease } from "@/lib/dragReset"
 import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, UiConfig } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
-import { predictMove, refreshedInventories, restoreInventories, type MoveRequest, type Prediction } from "@/lib/optimistic"
+import { predictMove, refreshedInventories, restoreInventories, type Prediction } from "@/lib/optimistic"
+import { createMoveQueue, type MoveJob, type MoveQueue } from "@/lib/moveQueue"
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
 
@@ -221,6 +222,9 @@ function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHot
         aria-label={item ? `${item.label ?? item.name}, slot ${index}` : `Empty slot ${index}`}
         aria-pressed={selected || undefined}
         aria-disabled={busy || undefined}
+        // A new gesture starts clean: a drag that ended without a click (released
+        // on another slot, or outside the window) must not swallow the next real click.
+        onMouseDown={() => { suppressClick.current = false }}
         onClick={() => {
             if (suppressClick.current) { suppressClick.current = false; return }
             if (!busy) onSelect(item)
@@ -415,53 +419,51 @@ function InventoryApp() {
     const locked = movePending && !unlocked
     const selectedMax = Math.max(1, Math.floor(selected?.item.amount ?? 1))
     const selectedCount = Math.min(Math.max(1, selectedAmount), selectedMax)
-    const pendingInventories = useRef<Set<string> | undefined>()
-    const requestPending = useRef(false)
     const nextItemBoxId = useRef(1)
     const [hotbar, setHotbar] = useState<HotbarState | null>(null)
     const hotbarTimeout = useRef<number>()
-    const moveTimeout = useRef<number | undefined>()
-    // Request counter, plus the views to restore if the in-flight optimistic move fails.
-    const requestSeq = useRef(0)
+    // The views the in-flight optimistic move replaced, restored if it fails.
     const optimistic = useRef<Map<string, InventoryView> | undefined>()
-    // Drags made while a request is in flight, oldest first, plus the latest
-    // session and handlers they must be resolved against when their turn comes.
-    const queue = useRef<Array<() => void>>([])
-    const sessionRef = useRef(session)
-    sessionRef.current = session
-    const queued = useRef<{ move: (request: MoveRequest) => void; dropOut: (source: DragSlot) => void } | undefined>()
-
-    const clearPendingMove = useCallback((keepQueue = false) => {
-        window.clearTimeout(moveTimeout.current)
-        pendingInventories.current = undefined
-        requestPending.current = false
-        optimistic.current = undefined
-        if (keepQueue !== true) queue.current = []
-        setMovePending(false)
+    // Latest session and config for requests that start later, when their turn comes.
+    // Every session change goes through updateSession, which moves the ref in the
+    // same tick: a queued request that starts before React has re-rendered must
+    // still see the rollback or patch that just landed, not the state before it.
+    const sessionRef = useRef<SessionSnapshot | null>(null)
+    const updateSession = useCallback((change: (current: SessionSnapshot | null) => SessionSnapshot | null) => {
+        const next = change(sessionRef.current)
+        sessionRef.current = next
+        setSession(next)
     }, [])
-    // The request was answered: start the next queued drag, if any.
-    const finishPendingMove = useCallback(() => {
-        clearPendingMove(true)
-        if (queue.current.length) window.setTimeout(() => { if (!requestPending.current) queue.current.shift()?.() }, 0)
-    }, [clearPendingMove])
-    // A move the server refused or never answered: put back exactly what the
-    // prediction replaced, except inventories an authoritative patch has since
-    // refreshed (those were dropped from `optimistic` when the patch landed).
-    const rollbackPendingMove = useCallback((message: string) => {
-        const before = optimistic.current
-        if (before?.size) setSession((current) => current && restoreInventories(current, before))
-        clearPendingMove()
-        setError(message)
-    }, [clearPendingMove])
-    const settlePatchedInventories = useCallback((patch: SessionPatch) => {
-        const pending = pendingInventories.current
-        if (!pending) return
-        const changed = patch.snapshot
-            ? [patch.snapshot.player.id, patch.snapshot.secondary?.id]
-            : [patch.player?.id, patch.secondary?.id]
-        for (const id of changed) if (id) pending.delete(id)
-        if (pending.size === 0) finishPendingMove()
-    }, [finishPendingMove])
+    const configRef = useRef(uiConfig)
+    configRef.current = uiConfig
+    const resyncing = useRef(false)
+
+    // Asks the server to re-send the authoritative state. Used after a move that
+    // was refused, errored or never answered, when the browser cannot know what
+    // the server really did. The answer arrives as ordinary patches.
+    const resync = useCallback(() => {
+        const current = sessionRef.current
+        if (!current || resyncing.current) return
+        resyncing.current = true
+        sendIntent({ sessionId: current.sessionId, token: current.token, intent: "sync", payload: {} })
+            .catch(() => undefined)
+            .finally(() => { resyncing.current = false })
+    }, [])
+    // Drags made while a request is in flight wait here and are sent in order;
+    // see lib/moveQueue.ts for the settle-exactly-once guarantee.
+    const queueRef = useRef<MoveQueue>()
+    if (!queueRef.current) {
+        queueRef.current = createMoveQueue({
+            maxQueued: MAX_QUEUED_MOVES,
+            onPending: setMovePending,
+            onFailure: resync,
+        })
+    }
+    const queue = queueRef.current
+    const clearPendingMove = useCallback(() => {
+        queue.reset()
+        optimistic.current = undefined
+    }, [queue])
 
     // Merged onto the defaults rather than replacing them, so a config table
     // that omits a key keeps the shipped behaviour for it instead of dropping to
@@ -490,21 +492,26 @@ function InventoryApp() {
     })
     useNuiEvent<SessionSnapshot>("qbinventory:nui:sessionOpened", (snapshot) => {
         window.clearTimeout(hotbarTimeout.current); setHotbar(null)
-        clearPendingMove(); setSession(snapshot); setSelected(undefined); setGiveAvailable(false); setError(undefined)
+        clearPendingMove(); updateSession(() => snapshot); setSelected(undefined); setGiveAvailable(false); setError(undefined)
     })
     useNuiEvent<SessionPatch>("qbinventory:nui:sessionPatched", (patch) => {
         // The server's items win over any prediction for the inventories they cover.
         if (optimistic.current) for (const id of refreshedInventories(patch)) optimistic.current.delete(id)
-        settlePatchedInventories(patch)
-        setSession((current) => current && current.sessionId === patch.sessionId ? applyPatch(current, patch) : current)
+        queue.patched(patch.snapshot
+            ? [patch.snapshot.player.id, patch.snapshot.secondary?.id ?? ""]
+            : [patch.player?.id ?? "", patch.secondary?.id ?? ""])
+        updateSession((current) => current && current.sessionId === patch.sessionId ? applyPatch(current, patch) : current)
         setSelected(undefined)
     })
     useNuiEvent<{ sessionId: string; reason?: string }>("qbinventory:nui:sessionClosed", ({ sessionId }) => {
         clearPendingMove()
-        setSession((current) => current?.sessionId === sessionId ? null : current)
+        updateSession((current) => current?.sessionId === sessionId ? null : current)
     })
     useNuiEvent<{ reason?: string }>("qbinventory:nui:rejected", ({ reason }) => {
-        rollbackPendingMove(reason ?? "Action rejected by inventory")
+        const message = reason ?? "Action rejected by inventory"
+        // Settles the request in flight (once); with nothing in flight it is only a notice.
+        if (queue.pending) queue.reject(message)
+        else setError(message)
     })
     useNuiEvent<{ available?: boolean }>("qbinventory:nui:giveAvailability", ({ available }) => setGiveAvailable(available === true))
     useNuiEvent<ItemBoxReceipt>("qbinventory:nui:itemBox", (receipt) => {
@@ -514,77 +521,75 @@ function InventoryApp() {
         window.setTimeout(() => setItemBoxes((current) => current.filter((box) => box.id !== id)), Math.max(750, receipt.duration ?? 2600))
     })
 
-    const submit = useCallback(async (intent: Parameters<typeof sendIntent>[0]["intent"], payload: Record<string, unknown> = {}, awaitInventories?: string[], prediction?: Prediction) => {
-        if (!session || requestPending.current) return false
-        requestPending.current = true
-        const seq = ++requestSeq.current
-        // After a timeout a late answer to an older request must not touch the newer one.
-        const stale = () => uiConfig.optimisticMoves && requestSeq.current !== seq
-        setMovePending(true)
-        if (prediction) {
-            optimistic.current = new Map(prediction.before)
-            setSelected(undefined)
-            setSession(prediction.session)
-        }
-        // Use can legitimately run long (progress bar), everything else gets a deadline.
-        if (intent !== "use") {
-            moveTimeout.current = window.setTimeout(() => rollbackPendingMove("Inventory did not respond"), uiConfig.moveTimeoutMs)
-        }
-        // The server sends its patches before it answers, so the answer alone
-        // settles an unlocked inventory; waiting for a patch as well would hold
-        // every later drag behind any inventory the server did not re-send.
-        const awaiting = unlocked ? undefined : awaitInventories
-        if (awaiting?.length) {
-            pendingInventories.current = new Set(awaiting)
-        }
-        try {
-            const response = await sendIntent({ sessionId: session.sessionId, token: session.token, intent, payload })
-            if (stale()) return response.ok
-            if (!response.ok) {
-                rollbackPendingMove(response.error ?? "Action rejected by inventory")
-                return false
+    // `build` runs when the request's turn comes, against the session as it is
+    // then, so a queued drag never sends revisions or slots from before the moves
+    // in front of it. It returns the request, or a message when it cannot run.
+    type Built = { intent: Parameters<typeof sendIntent>[0]["intent"]; payload: Record<string, unknown>; awaiting?: string[]; prediction?: Prediction }
+    const enqueueRequest = useCallback((build: (current: SessionSnapshot) => Built | string | undefined) => {
+        const config = configRef.current
+        const unlockedNow = config.optimisticMoves && config.queueMoves
+        if (queue.pending && !unlockedNow) return
+        const outcome = queue.enqueue((): MoveJob | undefined => {
+            const current = sessionRef.current
+            const built = current && build(current)
+            if (!current || !built) return undefined
+            if (typeof built === "string") { setError(built); return undefined }
+            const { intent, payload, awaiting, prediction } = built
+            const before = prediction ? new Map(prediction.before) : undefined
+            optimistic.current = before
+            if (prediction) {
+                setSelected(undefined)
+                updateSession(() => prediction.session)
             }
-            // The Vite harness has no Lua authority to send a patch back. Keep
-            // it usable without weakening the runtime's authoritative lock.
-            if (import.meta.env.DEV && awaiting?.length) queueMicrotask(() => clearPendingMove())
-            if (!awaiting?.length) finishPendingMove()
-            return true
-        } catch {
-            if (stale()) return false
-            rollbackPendingMove("Inventory connection interrupted")
-            return false
-        }
-    }, [clearPendingMove, finishPendingMove, movePending, rollbackPendingMove, session, unlocked, uiConfig.optimisticMoves, uiConfig.moveTimeoutMs])
-
-    const enqueue = useCallback((run: () => void) => {
-        if (queue.current.length >= MAX_QUEUED_MOVES) { setError("Too many moves waiting for the server"); return }
-        queue.current.push(run)
-    }, [])
-    const move = useCallback((from: InventoryView, fromSlot: number, to: InventoryView, toSlot: number, requestedAmount?: number) => {
-        if (unlocked && requestPending.current) {
-            const request: MoveRequest = { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount: requestedAmount ?? findItem(from, fromSlot)?.amount ?? 1 }
-            enqueue(() => queued.current?.move(request))
-            return
-        }
-        const item = findItem(from, fromSlot)
-        if (!item || !Number.isFinite(item.amount) || item.amount < 1) {
-            setError("That item is no longer available")
-            return
-        }
-        if (from.type === "shop") {
-            if (session?.player.id !== to.id) { setError("Shop items can only be purchased into your inventory"); return }
-            void submit("buy", { inventory: from.id, slot: fromSlot, amount: 1 }, [from.id, to.id])
-            return
-        }
-        if (to.type === "shop") { setError("Shop inventory is read only"); return }
-        const amount = requestedAmount ?? item.amount
-        const request: MoveRequest = { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount }
-        const prediction = session && uiConfig.optimisticMoves ? predictMove(session, request) : undefined
-        void submit("move", {
-            fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount,
-            revision: session?.revision, secondaryRevision: session?.secondaryRevision,
-        }, [from.id, to.id], prediction)
-    }, [enqueue, session, submit, unlocked, uiConfig.optimisticMoves])
+            return {
+                send: async () => {
+                    const response = await sendIntent({ sessionId: current.sessionId, token: current.token, intent, payload })
+                    // The Vite harness has no Lua authority to send a patch back. Keep
+                    // it usable without weakening the runtime's authoritative lock.
+                    if (import.meta.env.DEV && awaiting?.length) queue.patched(awaiting)
+                    return response
+                },
+                // A patch that refreshed an inventory dropped it from `before`, so
+                // only what the server has not corrected since is put back.
+                rollback: (message) => {
+                    if (before?.size) updateSession((latest) => latest && restoreInventories(latest, before))
+                    if (optimistic.current === before) optimistic.current = undefined
+                    setError(message)
+                },
+                // Use can legitimately run long (progress bar), everything else gets a deadline.
+                timeoutMs: intent === "use" ? undefined : config.moveTimeoutMs,
+                // The server sends its patches before it answers, so with queued
+                // moves the answer alone settles; waiting for a patch as well would
+                // hold every later drag behind an inventory the server did not re-send.
+                awaiting: unlockedNow ? undefined : awaiting,
+            }
+        })
+        if (outcome === "full") setError("Too many moves waiting for the server")
+    }, [queue, updateSession])
+    const submit = useCallback((intent: Built["intent"], payload: Record<string, unknown> = {}, awaiting?: string[]) => {
+        enqueueRequest(() => ({ intent, payload, awaiting }))
+    }, [enqueueRequest])
+    const move = useCallback((fromId: string, fromSlot: number, toId: string, toSlot: number, requestedAmount?: number) => {
+        enqueueRequest((current) => {
+            const from = findInventory(current, fromId)
+            const to = findInventory(current, toId)
+            const item = findItem(from, fromSlot)
+            if (!from || !to || !item || !Number.isFinite(item.amount) || item.amount < 1) return "That item is no longer available"
+            if (from.type === "shop") {
+                if (current.player.id !== to.id) return "Shop items can only be purchased into your inventory"
+                return { intent: "buy", payload: { inventory: from.id, slot: fromSlot, amount: 1 }, awaiting: [from.id, to.id] }
+            }
+            if (to.type === "shop") return "Shop inventory is read only"
+            const amount = requestedAmount ?? item.amount
+            const prediction = configRef.current.optimisticMoves ? predictMove(current, { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount }) : undefined
+            return {
+                intent: "move",
+                payload: { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount, revision: current.revision, secondaryRevision: current.secondaryRevision },
+                awaiting: [from.id, to.id],
+                prediction,
+            }
+        })
+    }, [enqueueRequest])
 
     const canDropSlot = useCallback((source: DragSlot, target: SlotTarget) => {
         if (!source || !session || locked || (source.inventoryId === target.inventoryId && source.slot === target.slot)) return false
@@ -599,7 +604,7 @@ function InventoryApp() {
         const sourceInventory = findInventory(session, source.inventoryId)
         const targetInventory = findInventory(session, target.inventoryId)
         const amount = selected?.inventory.id === source.inventoryId && selected.item.slot === source.slot ? selectedCount : undefined
-        if (sourceInventory && targetInventory) move(sourceInventory, source.slot, targetInventory, target.slot, amount)
+        if (sourceInventory && targetInventory) move(sourceInventory.id, source.slot, targetInventory.id, target.slot, amount)
     }, [canDropSlot, move, selected, selectedCount, session])
 
     // A single click inspects, and only inspects. Moving is drag-only (drag onto
@@ -615,30 +620,21 @@ function InventoryApp() {
     }, [locked])
 
     const dropOut = useCallback((source: DragSlot) => {
-        if (!session || source.inventoryId !== session.player.id) return
-        if (unlocked && requestPending.current) { enqueue(() => queued.current?.dropOut(source)); return }
-        const item = findItem(session.player, source.slot)
-        if (!item || !Number.isFinite(item.amount) || item.amount < 1) { setError("That item is no longer available"); return }
-        setSelected(undefined)
-        void submit("drop", { inventory: source.inventoryId, slot: source.slot, amount: item.amount })
-    }, [enqueue, session, submit, unlocked])
-    queued.current = {
-        move: (request) => {
-            const current = sessionRef.current
-            const from = current && findInventory(current, request.fromInventory)
-            const to = current && findInventory(current, request.toInventory)
-            if (current && from && to && findItem(from, request.fromSlot)) move(from, request.fromSlot, to, request.toSlot, request.amount)
-            else finishPendingMove()
-        },
-        dropOut,
-    }
+        if (source.inventoryId !== sessionRef.current?.player.id) return
+        enqueueRequest((current) => {
+            const item = findItem(current.player, source.slot)
+            if (!item || !Number.isFinite(item.amount) || item.amount < 1) return "That item is no longer available"
+            setSelected(undefined)
+            return { intent: "drop", payload: { inventory: source.inventoryId, slot: source.slot, amount: item.amount } }
+        })
+    }, [enqueueRequest])
     const split = useCallback((inventory: InventoryView, item: InventoryItem, requestedAmount?: number) => {
         if (!session || inventory.type === "shop" || item.amount < 2) return
         const amount = Math.floor(requestedAmount ?? selectedCount)
         const emptySlot = Array.from({ length: inventory.slots }, (_, index) => index + 1).find((slot) => !findItem(inventory, slot))
         if (!Number.isFinite(amount) || amount < 1 || amount >= item.amount) { setError(`Choose an amount from 1 to ${item.amount - 1}`); return }
         if (!emptySlot) { setError("No empty slot available to split this stack"); return }
-        move(inventory, item.slot, inventory, emptySlot, amount)
+        move(inventory.id, item.slot, inventory.id, emptySlot, amount)
     }, [move, selectedCount, session])
     const promptSplit = useCallback((inventory: InventoryView, item: InventoryItem) => {
         if (!uiConfig.rightClickSplit || inventory.type === "shop" || item.amount < 2) return

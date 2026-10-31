@@ -15,6 +15,14 @@ export function watchDragRelease(target: Window, isDragging: () => boolean, canc
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") cancelIfDragging() }
     const onVisibility = () => { if (target.document.visibilityState === "hidden") cancelIfDragging() }
 
+    // The pointer events fire before the mouse event the backend drops on, so
+    // they only get a turn once that has been handled: a drop that was delivered
+    // has already ended the drag by then, and one that never reached the backend
+    // (released over a slot that cannot take it, or the same slot) is ended here.
+    const onPointerRelease = () => { setTimeout(cancelIfDragging, 0) }
+
+    target.addEventListener("pointerup", onPointerRelease)
+    target.addEventListener("pointercancel", onPointerRelease)
     target.addEventListener("mouseup", cancelIfDragging)
     target.addEventListener("mousemove", onMouseMove)
     target.addEventListener("dragend", cancelIfDragging)
@@ -23,6 +31,8 @@ export function watchDragRelease(target: Window, isDragging: () => boolean, canc
     target.document.addEventListener("visibilitychange", onVisibility)
 
     return () => {
+        target.removeEventListener("pointerup", onPointerRelease)
+        target.removeEventListener("pointercancel", onPointerRelease)
         target.removeEventListener("mouseup", cancelIfDragging)
         target.removeEventListener("mousemove", onMouseMove)
         target.removeEventListener("dragend", cancelIfDragging)

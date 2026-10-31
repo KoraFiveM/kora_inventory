@@ -60,7 +60,7 @@ export interface SessionPatch {
 export interface IntentPayload {
     sessionId: string
     token: string
-    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action"
+    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync"
     payload: Record<string, unknown>
 }
 

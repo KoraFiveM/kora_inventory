@@ -179,8 +179,9 @@ describe("optimistic moves in the NUI", () => {
     })
 })
 
+const disabledSlots = () => host.querySelectorAll('.slot[aria-disabled="true"]').length
+
 describe("the inventory stays usable while a move waits for the server", () => {
-    const disabledSlots = () => host.querySelectorAll('.slot[aria-disabled="true"]').length
 
     it("never locks the slots or shows a busy state behind a pending move", async () => {
         hold(); await splitOne()
@@ -205,15 +206,77 @@ describe("the inventory stays usable while a move waits for the server", () => {
         expect(sendIntent).toHaveBeenCalledTimes(2)
     })
 
-    it("drops the queue when the move in front of it is refused", async () => {
+    it("a refused move rolls back, the queued move still goes out, and the server is asked to resync", async () => {
         hold(); await splitOne()
         await splitOne()
         await act(async () => { answer({ ok: false, error: "nope" }) })
         await act(async () => { vi.advanceTimersByTime(50) })
-        expect(sendIntent).toHaveBeenCalledTimes(1)
+        const intents = sendIntent.mock.calls.map((call) => (call[0] as { intent: string }).intent)
+        expect(intents.filter((intent) => intent === "move")).toHaveLength(2)
+        expect(intents).toContain("sync")
+        expect(notice()).toContain("nope")
+    })
+
+    it("a move that gets no answer is rolled back, resynced, and the next drag works", async () => {
+        hold(); await splitOne()
+        await splitOne()
+        await act(async () => { vi.advanceTimersByTime(10001) })
+        expect(notice()).toContain("did not respond")
+        const intents = () => sendIntent.mock.calls.map((call) => (call[0] as { intent: string }).intent)
+        expect(intents()).toContain("sync")
+        expect(intents().filter((intent) => intent === "move")).toHaveLength(2)
+        // a late answer to the dead request changes nothing, and the inventory is still usable
+        await act(async () => { answer({ ok: false, error: "ancient" }) })
+        expect(notice()).not.toContain("ancient")
+        await act(async () => { vi.advanceTimersByTime(10001) })
+        await splitOne()
+        expect(intents().filter((intent) => intent === "move").length).toBeGreaterThanOrEqual(3)
+    })
+
+    it("repeated unanswered drags never close the inventory or lock the slots", async () => {
+        for (let i = 0; i < 6; i++) {
+            sendIntent.mockImplementationOnce(() => new Promise(() => undefined))
+            await splitOne()
+            await act(async () => { vi.advanceTimersByTime(10001) })
+        }
+        expect(disabledSlots()).toBe(0)
+        expect(host.querySelector(".inventory-shell")).not.toBeNull()
+        expect(closeSession).not.toHaveBeenCalled()
         expect(slotText(1)).toContain("×3")
     })
 
+    it("refuses drags beyond the queue limit with a message and recovers", async () => {
+        hold(); await splitOne()
+        for (let i = 0; i < 8; i++) await splitOne()
+        expect(notice()).toBeUndefined()
+        await splitOne()
+        expect(notice()).toContain("Too many moves")
+    })
+
+    describe("buying from a shop", () => {
+        const shop = view("shop:1", [{ slot: 1, name: "bread", label: "Bread", amount: 40, price: 9, weight: 1 }, { slot: 2, name: "beer", label: "Beer", amount: 60, price: 12, weight: 1 }], { type: "shop", label: "Liquor", slots: 16 })
+        const buyOnce = async (n: number) => act(async () => { host.querySelector(`.inventory-stage-secondary button[aria-label$="slot ${n}"]`)!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true })) })
+        const buys = () => sendIntent.mock.calls.filter((call) => (call[0] as { intent: string }).intent === "buy").length
+
+        beforeEach(async () => { await post("qbinventory:nui:sessionOpened", { ...snapshot, secondary: shop }) })
+
+        it("settles on the plain true answer of a purchase, with no patch, so the next buy goes out", async () => {
+            for (let i = 1; i <= 5; i++) { await buyOnce(1); expect(buys()).toBe(i) }
+            expect(disabledSlots()).toBe(0)
+        })
+
+        it("a purchase that is refused or unanswered does not block later purchases", async () => {
+            sendIntent.mockImplementationOnce(async () => ({ ok: false, error: "not enough money" }))
+            await buyOnce(1)
+            expect(notice()).toContain("not enough money")
+            sendIntent.mockImplementationOnce(() => new Promise(() => undefined))
+            await buyOnce(2)
+            await act(async () => { vi.advanceTimersByTime(10001) })
+            expect(notice()).toContain("did not respond")
+            await buyOnce(1)
+            expect(buys()).toBe(3)
+        })
+    })
     it("queueMoves off locks the inventory until the server answers, without a wait cursor", async () => {
         await post("qbinventory:nui:config", { queueMoves: false })
         hold(); await splitOne()
