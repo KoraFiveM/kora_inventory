@@ -137,7 +137,7 @@ local function submitIntent(intent)
         TriggerEvent('qbinventory:client:requestGiveTarget', pendingGive.id)
         return true
     end
-    if action == 'use' or action == 'drop' or action == 'buy' then
+    if action == 'use' or action == 'drop' or action == 'buy' or action == 'sync' then
         local slot = action == 'use' and math.floor(tonumber(payload.slot) or 0)
         local item = slot and session.primary.items and session.primary.items[slot]
         local clearedBusy = item and item.preventClose ~= true
@@ -161,7 +161,9 @@ local function submitIntent(intent)
             secondaryRevision = session.secondary and session.secondary.revision,
         })
         if not ok then
-            TriggerEvent('qbinventory:ui:rejected', { reason = result })
+            -- A callback that errored or timed out has no reason; never hand the
+            -- browser a blank one.
+            TriggerEvent('qbinventory:ui:rejected', { reason = result or 'inventory request failed' })
             if clearedBusy then
                 TriggerEvent('qbinventory:client:useRejected')
             end
@@ -193,7 +195,7 @@ local function submitIntent(intent)
         toRevision = toView and toView.revision,
     })
     if not ok then
-        TriggerEvent('qbinventory:ui:rejected', { reason = result })
+        TriggerEvent('qbinventory:ui:rejected', { reason = result or 'inventory request failed' })
     end
     return ok == true, result
 end

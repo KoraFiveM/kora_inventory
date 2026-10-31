@@ -453,7 +453,7 @@ Nothing in it is authority and the inventory engine never reads it.
 | `showHotbar` | Outline slots `1..hotbarSlots` on the player's own inventory in the accent colour, so the keys `client/hotbar.lua` already binds are visible rather than folklore. |
 | `rightClickSplit` | Right-click on a stack of 2+ opens the split dialog (default `true`); `false` makes right-click do nothing. |
 | `optimisticMoves` | Draw a drag-and-drop move (move, stack, swap, split) immediately and undo it if the server refuses or does not answer within `moveTimeout` (default `true`); `false` shows a move only after the server confirms it. The server validates every move either way. |
-| `queueMoves` | With `optimisticMoves`, keep the inventory draggable while a move waits for the server: further drags are queued (up to 8) and sent in order; a refused or unanswered move undoes itself and clears the queue (default `true`). `false` blocks dragging until the server answers. The busy (wait) cursor is never shown either way. |
+| `queueMoves` | With `optimisticMoves`, keep the inventory draggable while a move waits for the server: further drags are queued (up to 8) and sent in order; a refused or unanswered move undoes itself, the server is asked to re-send the real state, and the drags queued behind it still go out (default `true`). `false` blocks dragging until the server answers. The busy (wait) cursor is never shown either way. |
 | `moveTimeout` | Seconds (2-60, default `10`) the UI waits for the server to answer a move before undoing it. |
 | `images` | Item artwork resolution -- see below. |
 

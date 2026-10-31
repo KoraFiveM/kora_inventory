@@ -14,6 +14,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/housing.lua
 "${LUA:-lua}" test/smoke/client_compat.lua
 "${LUA:-lua}" test/smoke/ui_bridge.lua
+"${LUA:-lua}" test/smoke/session_activity.lua
 "${LUA:-lua}" test/smoke/item_boxes.lua
 "${LUA:-lua}" test/smoke/physical_cash.lua
 "${LUA:-lua}" test/smoke/physical_cash_mutations.lua

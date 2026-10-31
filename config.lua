@@ -28,7 +28,14 @@ Config.qbinventory = {
     -- trusted server callback here (or register one at runtime) to opt into
     -- police/admin/consent rules; proximity alone is never authority.
     playerInspection = { access = nil },
+    -- Milliseconds an open inventory may sit unused before the server closes it
+    -- (the lease). With sessionSliding on, every request the player makes renews
+    -- it, so it is an idle timeout. Off, it is a hard limit counted from the
+    -- moment the inventory was opened: a player who keeps dragging or buying is
+    -- force-closed when it runs out. Vending machine approvals follow the same
+    -- rule. Changes apply to the next request.
     sessionTtl = 120000,
+    sessionSliding = true,
     dropDistance = 2.0,
 
     -- A dropped item leaves a real bag on the floor to walk up to, rather than
@@ -100,7 +107,8 @@ Config.qbinventory = {
         -- While a move is waiting for the server, further drags are queued and
         -- sent in order instead of being refused behind a busy cursor. The
         -- inventory stays draggable at all times; a refused or unanswered move
-        -- rolls back and clears the queue. Needs optimisticMoves. Set to false
+        -- rolls back on its own, the server is asked to re-send the real state,
+        -- and the drags queued behind it still go out. Needs optimisticMoves. Set to false
         -- to lock the inventory (without a wait cursor) until the server
         -- answers. Applied the next time the inventory opens.
         queueMoves = true,
@@ -445,6 +453,12 @@ if QB and QB.config and QB.config.adopt then
             label = 'Visible carried-weapon components',
             description = 'Maps an inventory component item name to the exact GTA component model name rendered on a holstered weapon. Only entries in this allow-list are sent to clients, preventing item metadata from requesting arbitrary native components.',
         })
+    Config.qbinventory.sessionSliding = QB.config.boolean(Config.qbinventory.sessionSliding, {
+        label = 'Renew an open inventory while it is used',
+        description = 'When on, every move, purchase or drop a player makes keeps their open inventory (and a vending machine approval) alive, so it only closes after sitting idle for the session time. Turn it off to close every inventory a fixed time after it was opened, even in the middle of use. Applies from the next request.',
+        scope = 'server',
+        live = true,
+    })
     Config.qbinventory.ui.hotbarSeconds = QB.config.number(Config.qbinventory.ui.hotbarSeconds, {
         label = 'Hotbar display time (seconds)',
         description = 'How long the on-screen hotbar stays visible after a player presses the show-hotbar key before it disappears again. Set to 0 to disable the key.',

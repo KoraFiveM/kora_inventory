@@ -13,6 +13,7 @@ local allowedIntents = {
     drop = true,
     give = true,
     buy = true,
+    sync = true,
     split = true,
     action = true,
 }

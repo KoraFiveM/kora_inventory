@@ -57,6 +57,12 @@ local function access(source, inventory, opts)
     if not expiry or GetGameTimer() > expiry then
         return false, 'not at a vending machine'
     end
+    -- Still being asked means the player is still using the machine; slide the
+    -- window with the session lease (Config.qbinventory.sessionSliding) so a long
+    -- purchase is not cut off by an approval that only counted from the open.
+    if Config.qbinventory.sessionSliding ~= false then
+        approvals[source] = GetGameTimer() + (Config.qbinventory.sessionTtl or 120000)
+    end
     return true
 end
 

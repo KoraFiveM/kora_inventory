@@ -1184,6 +1184,12 @@ local function validSession(src, token, fromKey, toKey, expectedFrom, expectedTo
         close(src, 'expired')
         return nil, nil, 'session expired'
     end
+    -- The lease is an idle timeout, not a hard stop: every request that reaches
+    -- validation (even one refused below) shows the player is still using it, so
+    -- an inventory in use never expires under their hands mid-drag or mid-purchase.
+    if config.sessionSliding ~= false then
+        session.expires = now() + config.sessionTtl
+    end
     if
         (fromKey ~= session.primary and fromKey ~= session.secondary)
         or (toKey ~= session.primary and toKey ~= session.secondary)
@@ -1729,6 +1735,32 @@ local function intentBuy(src, request)
     end)
 end
 
+-- Re-sends the session's inventories as authoritative patches to the asking
+-- player only. The browser asks after a move that failed or went unanswered,
+-- when it can no longer tell what the server did. Read-only; it never changes
+-- an inventory, and a repeat inside the throttle window is a no-op success
+-- because the state was just sent.
+local function intentSync(src, request)
+    local session = sessions[src]
+    if not session then
+        return false, 'invalid session'
+    end
+    local _, primary = validSession(src, request.token, session.primary, session.secondary or session.primary)
+    if not primary then
+        return false, 'stale inventory'
+    end
+    local stamp = now()
+    if session.lastSync and stamp - session.lastSync < 200 then
+        return true
+    end
+    session.lastSync = stamp
+    TriggerClientEvent('qbinventory:client:sessionPatched', src, session.token, patchView(session.primary))
+    if session.secondary then
+        TriggerClientEvent('qbinventory:client:sessionPatched', src, session.token, patchView(session.secondary))
+    end
+    return true
+end
+
 local function handleIntent(src, request)
     if type(request) ~= 'table' or type(request.action) ~= 'string' or type(request.token) ~= 'string' then
         return false, 'invalid request'
@@ -1744,6 +1776,9 @@ local function handleIntent(src, request)
     end
     if request.action == 'buy' then
         return intentBuy(src, request)
+    end
+    if request.action == 'sync' then
+        return intentSync(src, request)
     end
     return false, 'unsupported intent'
 end
