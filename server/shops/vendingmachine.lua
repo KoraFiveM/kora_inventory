@@ -34,7 +34,7 @@ local function hasValidCoords(coords)
 end
 
 local function isNearMachine(source, coords)
-    return hasValidCoords(coords) and QB.distance.player(source, coords, shop.interactionDistance)
+    return hasValidCoords(coords) and Kora.distance.player(source, coords, shop.interactionDistance)
 end
 
 local function access(source, inventory, opts)

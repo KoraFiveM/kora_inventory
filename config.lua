@@ -464,47 +464,47 @@ Config.qbinventory = {
 }
 
 -- Registers this resource-owned configuration with kora_lib without changing its public Config table.
-if QB and QB.config and QB.config.adopt then
-    Config.qbinventory.vehicles.classes = QB.config.map(Config.qbinventory.vehicles.classes, nil, {
+if Kora and Kora.config and Kora.config.adopt then
+    Config.qbinventory.vehicles.classes = Kora.config.map(Config.qbinventory.vehicles.classes, nil, {
         keyType = 'mixed',
         requiredKeys = { 'default' },
         scope = 'server',
         label = 'Vehicle storage by GTA class',
         description = 'Defines trusted trunk and glovebox capacities for each GTA vehicle class. Numeric keys are GTA class IDs and “default” is the required fallback. Set trunk or glovebox to false to disable that storage type; slot counts and maximum weights are enforced by the server after qbinventory restarts.',
     })
-    Config.qbinventory.weapons.components = QB.config.map(Config.qbinventory.weapons.components,
-        QB.config.list({}, QB.config.string('', { minLength = 1 })), {
+    Config.qbinventory.weapons.components = Kora.config.map(Config.qbinventory.weapons.components,
+        Kora.config.list({}, Kora.config.string('', { minLength = 1 })), {
             scope = 'server',
             label = 'Allowed weapon components',
             description = 'Maps each exact weapon item name to the component item names that may be stored in that weapon’s server-owned metadata. A weapon absent from this map, and with no “default” row, accepts no components. Changes apply after qbinventory restarts.',
         })
-    Config.qbinventory.weaponCarry.components = QB.config.map(Config.qbinventory.weaponCarry.components,
-        QB.config.string('', { minLength = 1 }), {
+    Config.qbinventory.weaponCarry.components = Kora.config.map(Config.qbinventory.weaponCarry.components,
+        Kora.config.string('', { minLength = 1 }), {
             label = 'Visible carried-weapon components',
             description = 'Maps an inventory component item name to the exact GTA component model name rendered on a holstered weapon. Only entries in this allow-list are sent to clients, preventing item metadata from requesting arbitrary native components.',
         })
-    Config.qbinventory.sessionSliding = QB.config.boolean(Config.qbinventory.sessionSliding, {
+    Config.qbinventory.sessionSliding = Kora.config.boolean(Config.qbinventory.sessionSliding, {
         label = 'Renew an open inventory while it is used',
         description = 'When on, every move, purchase or drop a player makes keeps their open inventory (and a vending machine approval) alive, so it only closes after sitting idle for the session time. Turn it off to close every inventory a fixed time after it was opened, even in the middle of use. Applies from the next request.',
         scope = 'server',
         live = true,
     })
-    Config.qbinventory.vehicles.enabled = QB.config.boolean(Config.qbinventory.vehicles.enabled, {
+    Config.qbinventory.vehicles.enabled = Kora.config.boolean(Config.qbinventory.vehicles.enabled, {
         label = 'Open vehicle storage with the inventory key',
         description = 'When on, pressing the inventory key while seated in a vehicle opens its glovebox, and pressing it at the boot of a vehicle opens its trunk. Turn it off if another resource handles vehicle storage; exports can still open it. Applies on the next key press.',
         live = true,
     })
-    Config.qbinventory.vehicles.gloveboxEnabled = QB.config.boolean(Config.qbinventory.vehicles.gloveboxEnabled, {
+    Config.qbinventory.vehicles.gloveboxEnabled = Kora.config.boolean(Config.qbinventory.vehicles.gloveboxEnabled, {
         label = 'Glovebox from the inventory key',
         description = 'Allows the inventory key to open the glovebox while seated. Which vehicle classes have a glovebox and how big it is comes from the storage-by-class table. Applies on the next key press.',
         live = true,
     })
-    Config.qbinventory.vehicles.trunkEnabled = QB.config.boolean(Config.qbinventory.vehicles.trunkEnabled, {
+    Config.qbinventory.vehicles.trunkEnabled = Kora.config.boolean(Config.qbinventory.vehicles.trunkEnabled, {
         label = 'Trunk from the inventory key',
         description = 'Allows the inventory key to open the trunk when standing at the boot of a vehicle. Which vehicle classes have a trunk and how big it is comes from the storage-by-class table. Applies on the next key press.',
         live = true,
     })
-    Config.qbinventory.vehicles.bootReach = QB.config.number(Config.qbinventory.vehicles.bootReach, {
+    Config.qbinventory.vehicles.bootReach = Kora.config.number(Config.qbinventory.vehicles.bootReach, {
         label = 'Boot reach (metres)',
         description = 'How close a player must stand to the boot (rear, or front for rear-engine cars) to open the trunk with the inventory key. Raise it if players struggle to find the spot; very large values let them open trunks from the side of the car. Applies on the next key press.',
         min = 0.5,
@@ -512,7 +512,7 @@ if QB and QB.config and QB.config.adopt then
         step = 0.1,
         live = true,
     })
-    Config.qbinventory.vehicles.trunkDistance = QB.config.number(Config.qbinventory.vehicles.trunkDistance, {
+    Config.qbinventory.vehicles.trunkDistance = Kora.config.number(Config.qbinventory.vehicles.trunkDistance, {
         label = 'Trunk server distance (metres)',
         description = 'The furthest a player may be from the vehicle origin when the server accepts a trunk open. The boot is at the end of the vehicle, so this must exceed half the vehicle length plus the boot reach; long vans and trucks need a larger value. Applies on the next trunk open.',
         scope = 'server',
@@ -521,25 +521,25 @@ if QB and QB.config and QB.config.adopt then
         step = 0.5,
         live = true,
     })
-    Config.qbinventory.vehicles.respectLocks = QB.config.boolean(Config.qbinventory.vehicles.respectLocks, {
+    Config.qbinventory.vehicles.respectLocks = Kora.config.boolean(Config.qbinventory.vehicles.respectLocks, {
         label = 'Locked vehicles block the trunk',
         description = 'When on, the server refuses to open the trunk of a locked vehicle (kora_vehiclekeys lock state or the native door lock) and the player is told the vehicle is locked. Turn it off to let anyone open any trunk. The glovebox of the vehicle you are sitting in is never blocked. Applies on the next trunk open.',
         scope = 'server',
         live = true,
     })
-    Config.qbinventory.vehicles.frontBootModels = QB.config.list(Config.qbinventory.vehicles.frontBootModels,
-        QB.config.string('', { minLength = 1 }), {
+    Config.qbinventory.vehicles.frontBootModels = Kora.config.list(Config.qbinventory.vehicles.frontBootModels,
+        Kora.config.string('', { minLength = 1 }), {
             label = 'Front-boot vehicle models',
             description = 'Spawn names of rear- or mid-engine cars whose trunk is at the front (for example adder or zentorno). All other cars use the rear boot. Add streamed addon cars here. Applies on the next key press.',
             live = true,
         })
-    Config.qbinventory.vehicles.bootSkipClasses = QB.config.list(Config.qbinventory.vehicles.bootSkipClasses,
-        QB.config.integer(0, { min = 0, max = 30 }), {
+    Config.qbinventory.vehicles.bootSkipClasses = Kora.config.list(Config.qbinventory.vehicles.bootSkipClasses,
+        Kora.config.integer(0, { min = 0, max = 30 }), {
             label = 'Vehicle classes without a boot',
             description = 'GTA vehicle class numbers that the inventory key ignores when standing next to them (default: motorcycles 8, cycles 13, trains 21). Applies on the next key press.',
             live = true,
         })
-    Config.qbinventory.ui.hotbarSeconds = QB.config.number(Config.qbinventory.ui.hotbarSeconds, {
+    Config.qbinventory.ui.hotbarSeconds = Kora.config.number(Config.qbinventory.ui.hotbarSeconds, {
         label = 'Hotbar display time (seconds)',
         description = 'How long the on-screen hotbar stays visible after a player presses the show-hotbar key before it disappears again. Set to 0 to disable the key.',
         min = 0,
@@ -547,22 +547,22 @@ if QB and QB.config and QB.config.adopt then
         step = 1,
         live = true,
     })
-    Config.qbinventory.ui.rightClickSplit = QB.config.boolean(Config.qbinventory.ui.rightClickSplit, {
+    Config.qbinventory.ui.rightClickSplit = Kora.config.boolean(Config.qbinventory.ui.rightClickSplit, {
         label = 'Right-click splits stacks',
         description = 'When on, right-clicking a stack of two or more items opens a dialog to choose how many to move into an empty slot. Turn it off to make right-click do nothing. Changes apply the next time a player opens their inventory.',
         live = true,
     })
-    Config.qbinventory.ui.optimisticMoves = QB.config.boolean(Config.qbinventory.ui.optimisticMoves, {
+    Config.qbinventory.ui.optimisticMoves = Kora.config.boolean(Config.qbinventory.ui.optimisticMoves, {
         label = 'Show inventory moves instantly',
         description = 'When on, moving, stacking, swapping or splitting items appears immediately and is undone if the server refuses the move or does not answer. Turn it off to show a move only after the server has confirmed it, which avoids a brief flash of a move that is then refused. The server checks every move either way. Changes apply the next time a player opens their inventory.',
         live = true,
     })
-    Config.qbinventory.ui.queueMoves = QB.config.boolean(Config.qbinventory.ui.queueMoves, {
+    Config.qbinventory.ui.queueMoves = Kora.config.boolean(Config.qbinventory.ui.queueMoves, {
         label = 'Queue inventory drags while a move is pending',
         description = 'When on (and instant moves are on), you can keep dragging items while an earlier move is still waiting for the server; the extra moves are sent one after another. Turn it off to block dragging until the server has answered. Changes apply the next time a player opens their inventory.',
         live = true,
     })
-    Config.qbinventory.ui.moveTimeout = QB.config.number(Config.qbinventory.ui.moveTimeout, {
+    Config.qbinventory.ui.moveTimeout = Kora.config.number(Config.qbinventory.ui.moveTimeout, {
         label = 'Inventory move timeout (seconds)',
         description = 'How long the inventory waits for the server to answer a move before undoing it and reporting that the server did not respond. Raise it only if your server is slow to answer. Changes apply the next time a player opens their inventory.',
         min = 2,
@@ -570,7 +570,7 @@ if QB and QB.config and QB.config.adopt then
         step = 1,
         live = true,
     })
-    Config.qbinventory.ui.scale = QB.config.number(Config.qbinventory.ui.scale, {
+    Config.qbinventory.ui.scale = Kora.config.number(Config.qbinventory.ui.scale, {
         label = 'Inventory UI scale',
         description = 'Scales the inventory text, slot sizes, item counts and weight labels. Leave at 1.0 for the original size; increase it if the inventory is too small on your screen. Changes apply the next time a player opens their inventory.',
         min = 0.5,
@@ -579,7 +579,7 @@ if QB and QB.config and QB.config.adopt then
         live = true,
     })
 
-    Config.qbinventory.drops.groundOffset = QB.config.number(Config.qbinventory.drops.groundOffset, {
+    Config.qbinventory.drops.groundOffset = Kora.config.number(Config.qbinventory.drops.groundOffset, {
         label = 'Dropped bag height offset (metres)',
         description = 'Adds this many metres to the height of a dropped bag after it has been placed on the ground. Use a positive value if the bag sinks into the floor and a negative value if it floats. Only used while placing dropped bags on the ground is enabled.',
         min = -1.0,
@@ -588,11 +588,11 @@ if QB and QB.config and QB.config.adopt then
         live = true,
     })
 
-    Config.showTargetHints = QB.config.optional(Config.showTargetHints, QB.config.boolean(false), {
+    Config.showTargetHints = Kora.config.optional(Config.showTargetHints, Kora.config.boolean(false), {
         label = 'Show shop counter icons',
         description = 'Controls the floating world icon over shop counters. Leave it unset to follow the target system’s global icon setting, or choose on or off to force it for kora_inventory shops. Applies the next time the shop targets are registered.',
         live = true,
     })
 
-    Config = QB.config.adopt(Config)
+    Config = Kora.config.adopt(Config)
 end

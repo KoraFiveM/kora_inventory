@@ -8,7 +8,7 @@ local function setup()
     local f = { calls = {}, threads = {} }
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
-    env.Config, env.QbInventory, env.QB = {}, nil, {}
+    env.Config, env.QbInventory, env.Kora = {}, nil, {}
     env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.CreateThread = function(fn) f.threads[#f.threads + 1] = fn end
     env.RegisterCommand, env.AddEventHandler, env.TriggerEvent = function() end, function() end, function() end
@@ -241,8 +241,8 @@ end
 for _, savedFirst in ipairs({ false, true }) do
     local f = setup()
     local env, registered = f.env, {}
-    env.QB.resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end }
-    env.QB.callback = { register = function() end }
+    env.Kora.resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end }
+    env.Kora.callback = { register = function() end }
     env.RegisterNetEvent = function() end
     local providers = env.exports
     -- Capture the native export registrar only during module loading; SQL has

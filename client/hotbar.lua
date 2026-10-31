@@ -48,7 +48,7 @@ end
 
 for slot = 1, HOTBAR_SLOTS do
     local command = ('qbinventory:hotbar%d'):format(slot)
-    QB.keybind.add({
+    Kora.keybind.add({
         name = command,
         description = ('Use hotbar item %d'):format(slot),
         defaultMapper = 'keyboard',
@@ -62,7 +62,7 @@ end
 -- Players asked for a hotbar they can see without opening the inventory. It is
 -- a short-lived overlay rather than a permanent HUD bar, so it costs nothing
 -- while hidden: the NUI hides it again after the configured seconds.
-QB.keybind.add({
+Kora.keybind.add({
     name = 'qbinventory:hotbarshow',
     description = 'Show hotbar',
     defaultMapper = 'keyboard',

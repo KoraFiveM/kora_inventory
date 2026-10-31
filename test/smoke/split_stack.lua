@@ -10,7 +10,7 @@ dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
 
 local callbacks = {}
-QB = {
+Kora = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function(name, fn) callbacks[name] = fn end },
     sql = {},

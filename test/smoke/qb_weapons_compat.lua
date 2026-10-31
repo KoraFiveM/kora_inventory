@@ -11,7 +11,7 @@ local inventory = {
 
 RegisterNetEvent = function(name, fn) events[name] = fn end
 GetInvokingResource = function() return invokingResource end
-QB = { callback = { register = function(name, fn) callbacks[name] = fn end } }
+Kora = { callback = { register = function(name, fn) callbacks[name] = fn end } }
 source = 7
 
 QbInventory = {

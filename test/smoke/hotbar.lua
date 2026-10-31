@@ -23,7 +23,7 @@ local manifest = read('fxmanifest.lua')
 
 H.ok(client:find('function QbInventory.useGate(item)', 1, true),
     'client.lua exposes the shared use-time progress bar gate')
-H.ok(client:find('QB.progressbar.start(', 1, true),
+H.ok(client:find('Kora.progressbar.start(', 1, true),
     'the gate actually runs kora_lib\'s progress bar')
 H.ok(client:find('if not QbInventory.useGate(item) then', 1, true),
     'submitIntent gates a use behind the progress bar before contacting the server')
@@ -43,8 +43,8 @@ H.ok(hotbar:find('IsNuiFocused()', 1, true),
 H.ok(hotbar:find('Config.qbinventory.hotbarSlots', 1, true),
     'the hotbar range comes from config, so weaponCarry\'s hotbar visibility cannot disagree with it')
 H.ok(hotbar:find('for slot = 1, HOTBAR_SLOTS do', 1, true), 'slots 1-5 each register a keybind')
-H.ok(hotbar:find('QB.keybind.add({', 1, true) and hotbar:find('name = command', 1, true),
-    'hotbar mappings use QB.keybind lifecycle ownership')
+H.ok(hotbar:find('Kora.keybind.add({', 1, true) and hotbar:find('name = command', 1, true),
+    'hotbar mappings use Kora.keybind lifecycle ownership')
 H.ok(not hotbar:find('qbinventory:server:useSlot', 1, true),
     'no new bespoke server-side use transport was introduced for the hotbar')
 

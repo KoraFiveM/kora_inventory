@@ -121,7 +121,7 @@ local function playerInRange(source, target, distance)
         return false, 'different routing bucket'
     end
     if
-        not QB.distance.player(
+        not Kora.distance.player(
             source,
             GetEntityCoords(targetPed),
             tonumber(distance) or containerConfig.evidence.distance or 3.0

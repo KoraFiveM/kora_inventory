@@ -40,7 +40,7 @@ end
 local function register(identity, surface)
     for name, fn in pairs(surface) do
         if type(fn) == 'function' then
-            QB.compat.provideExport(identity, name, fn)
+            Kora.compat.provideExport(identity, name, fn)
         end
     end
 end

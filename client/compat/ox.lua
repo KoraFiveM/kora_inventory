@@ -178,7 +178,7 @@ local function search(kind, requested, metadata)
 end
 
 -- ox_lib's neutral notify variant is 'inform'; kora_lib's is 'info'. An
--- unrecognised type fails QB.notify.assert, which drops the whole toast
+-- unrecognised type fails Kora.notify.assert, which drops the whole toast
 -- silently, so the vocabulary is translated rather than passed through.
 local NOTIFY_TYPES = { info = true, success = true, warning = true, error = true }
 local NOTIFY_POSITIONS = {
@@ -192,7 +192,7 @@ local NOTIFY_POSITIONS = {
     ['center-right'] = 'top-right',
 }
 
--- ox_lib inputDialog row types mapped onto QB.nui.openInputDialog field types.
+-- ox_lib inputDialog row types mapped onto Kora.nui.openInputDialog field types.
 -- Anything outside this set degrades to a text field rather than erroring,
 -- matching how the qb-input compat shim in kora_lib handles unknown types.
 local KEYBOARD_TYPES = {
@@ -341,7 +341,7 @@ local ox = {
         end
         -- Upstream (src/modules/utils/client.lua:Utils.Notify) moves `text`
         -- onto `description` before notifying; this file passed `data` straight
-        -- to QB.notify.send, whose body field is `message`, so the notification
+        -- to Kora.notify.send, whose body field is `message`, so the notification
         -- rendered title-only and the text was silently lost. Both ox spellings
         -- are folded onto `message`. The caller's table is never mutated
         -- (upstream mutates it, which is its own small bug).
@@ -357,7 +357,7 @@ local ox = {
         if payload.position ~= nil then
             payload.position = NOTIFY_POSITIONS[payload.position]
         end
-        return QB.notify.send(payload)
+        return Kora.notify.send(payload)
     end,
     -- Upstream: `local success = lib.progressBar(options); if completed then
     -- completed(not success) end`. The callback argument is CANCELLED, not
@@ -370,7 +370,7 @@ local ox = {
         local disable = options.disable or {}
         local anim = options.anim
         local scenario = anim and anim.scenario
-        local success = QB.progressbar.start({
+        local success = Kora.progressbar.start({
             label = options.label,
             duration = options.duration,
             canCancel = options.canCancel,
@@ -393,10 +393,10 @@ local ox = {
         return success
     end,
     ProgressActive = function()
-        return QB.progressbar.isActive()
+        return Kora.progressbar.isActive()
     end,
     CancelProgress = function()
-        return QB.progressbar.cancel()
+        return Kora.progressbar.cancel()
     end,
     -- Upstream is `exports('Keyboard', lib.inputDialog)`: (heading, rows) in,
     -- an array of values POSITIONALLY aligned with `rows` out, or nil on
@@ -421,7 +421,7 @@ local ox = {
                 options = spec.options,
             }
         end
-        local result = QB.nui.openInputDialog(fields, heading)
+        local result = Kora.nui.openInputDialog(fields, heading)
         if type(result) ~= 'table' or result.cancelled or type(result.values) ~= 'table' then
             return nil
         end
@@ -455,7 +455,7 @@ local ox = {
 -- it replaces, which made every ox durability/ammo caller a silent no-op.
 -- Defined outside the table literal so it can walk the raw item list.
 function ox.getCurrentWeapon()
-    local selected = QB.cache.weapon()
+    local selected = Kora.cache.weapon()
     if not selected or selected == joaat('weapon_unarmed') then
         return nil
     end
@@ -483,5 +483,5 @@ end
 -- registration won -- and kora_police, kora_ambulance, kora_clothing and
 -- kora_lib-playground all call exports.kora_inventory:openInventory(...).
 for name, fn in pairs(ox) do
-    QB.compat.provideExport('ox_inventory', name, fn)
+    Kora.compat.provideExport('ox_inventory', name, fn)
 end

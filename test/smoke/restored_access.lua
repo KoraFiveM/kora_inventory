@@ -31,7 +31,7 @@ json = {
     end,
     decode = function(token) return QbInventory.copy(encoded[token]) end,
 }
-QB = {
+Kora = {
     resources = { serverRegistry = function() return { track = noop, untrack = noop } end },
     callback = { register = function(name, callback) callbacks[name] = callback end },
     distance = { player = function(source, point, distance) return math.abs(point.x - positions[source]) <= distance end },

@@ -25,10 +25,10 @@ RegisterNetEvent('qbinventory:client:consumeEffect', function(_, effects)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
-    local ped = QB.cache.ped()
+    local ped = Kora.cache.ped()
     local anim = (effects.thirst or effects.drunk) and DRINK_ANIM or EAT_ANIM
 
-    if QB.stream.loadAnimDict(anim.dict, nil, { timeout = 2000 }) then
+    if Kora.stream.loadAnimDict(anim.dict, nil, { timeout = 2000 }) then
         TaskPlayAnim(ped, anim.dict, anim.anim, 8.0, -8.0, 2000, anim.flag, 0, false, false, false)
     end
 

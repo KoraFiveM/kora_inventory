@@ -187,7 +187,7 @@ end)
 
 AddEventHandler('qbinventory:ui:rejected', function(payload)
     local reason = type(payload) == 'table' and payload.reason or payload
-    QB.notify.send({
+    Kora.notify.send({
         title = 'Inventory',
         message = tostring(reason or 'Action rejected'),
         type = 'error',

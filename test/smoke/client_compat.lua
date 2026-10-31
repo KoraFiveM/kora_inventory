@@ -15,11 +15,11 @@ H.ok(source:find("'qb-inventory:client:ItemBox'", 1, true), 'legacy item boxes a
 H.ok(source:find("RegisterCommand('inventory'", 1, true), 'inventory command')
 H.ok(source:find('inventoryApi.getCurrentSession()', 1, true) and source:find('inventoryApi.closeInventory()', 1, true),
     'inventory command toggles an active qbinventory session closed')
-H.ok(source:find('QB.zones.isCreatorActive()', 1, true), 'TAB defers to an in-progress zone creator session instead of opening alongside it')
-H.ok(source:find('QB.placement.isActive()', 1, true), 'TAB defers to an in-progress entity placement session through kora_lib export proxy')
+H.ok(source:find('Kora.zones.isCreatorActive()', 1, true), 'TAB defers to an in-progress zone creator session instead of opening alongside it')
+H.ok(source:find('Kora.placement.isActive()', 1, true), 'TAB defers to an in-progress entity placement session through kora_lib export proxy')
 H.ok(source:find("RegisterCommand('closeInv'", 1, true), 'close command')
-H.ok(source:find('QB.keybind.add({', 1, true) and source:find("name = 'openInv'", 1, true),
-    'legacy TAB mapping uses QB.keybind')
+H.ok(source:find('Kora.keybind.add({', 1, true) and source:find("name = 'openInv'", 1, true),
+    'legacy TAB mapping uses Kora.keybind')
 H.ok(source:find("inventoryApi.openInventory(typeName, id)", 1, true), 'legacy targets route through validated open API')
 H.ok(source:find('refreshActiveSession()', 1, true), 'updates request an authoritative refresh')
 -- The server emits the legacy qb-inventory:client:updateInventory after every

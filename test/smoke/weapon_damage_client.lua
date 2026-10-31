@@ -6,7 +6,7 @@ local events, cacheHandlers, damageCalls, criticalCalls, sent = {}, {}, {}, {}, 
 local currentWeapon = 0
 
 Config = { qbinventory = { weaponCarry = { enabled = false } } }
-QB = {
+Kora = {
     cache = {
         ped = function() return 42 end,
         weapon = function() return currentWeapon end,

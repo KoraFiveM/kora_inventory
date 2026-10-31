@@ -12,7 +12,7 @@ Config = {
         } },
     },
 }
-QB = { cache = { ped = function() return 44 end } }
+Kora = { cache = { ped = function() return 44 end } }
 exports = function(name, fn) registered[name] = fn end
 RegisterNetEvent = function(name, fn) events[name] = fn end
 TriggerServerEvent = function(name, ...) sent[#sent + 1] = { name = name, args = { ... } } end

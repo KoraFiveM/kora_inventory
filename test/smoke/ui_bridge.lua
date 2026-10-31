@@ -13,7 +13,7 @@ H.ok(source:find("'qbinventory:client:itemBox'", 1, true),
     'relays inventory-owned item receipt payloads to the bundled UI')
 H.ok(source:find("send('qbinventory:nui:itemBox', payload)", 1, true),
     'item receipts can render without an inventory session')
-H.ok(source:find("QB.notify.send({", 1, true),
+H.ok(source:find("Kora.notify.send({", 1, true),
     'rejected inventory actions are presented as notifications')
 
 Config = {}
@@ -52,7 +52,7 @@ SetNuiFocus, TriggerEvent = function() end, function() end
 SendNUIMessage = function(message) messages[#messages + 1] = message end
 GetCurrentResourceName = function() return 'kora_inventory' end
 QBTheme = { refresh = function() end }
-QB = { notify = { send = function() end } }
+Kora = { notify = { send = function() end } }
 dofile(arg[1] or 'client/ui.lua')
 local function view(id, revision)
     return { key = id, revision = revision, items = {}, slots = 4 }

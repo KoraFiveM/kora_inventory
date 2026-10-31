@@ -26,7 +26,7 @@ Wait, RegisterCommand, TriggerClientEvent = noop, noop, noop
 AddEventHandler = function(name, callback) events[name] = callback end
 RegisterNetEvent = AddEventHandler
 TriggerEvent = function(name, ...) if events[name] then events[name](...) end end
-QB = {
+Kora = {
     resources = { serverRegistry = function() return { track = noop, untrack = noop } end },
     callback = { register = noop },
     distance = { player = function() return true end },
@@ -111,9 +111,9 @@ local bound, containerId = inventory.containers.bindItem(7, 4, {
 H.ok(bound, 'real container binding can commit without an outer lock')
 H.equal(data[7].items[4].info.containerId, containerId)
 H.ok(internal.getInventory('container:' .. containerId), 'bound container remains registered')
-H.ok(inventory.compat.qb.SetItemData(7, 'wood', 'info', { batch = 'QB' }, 2), 'QB metadata mutation commits')
+H.ok(inventory.compat.qb.SetItemData(7, 'wood', 'info', { batch = 'QB' }, 2), 'Kora metadata mutation commits')
 inventory.compat.ox.SetMetadata(7, 2, { batch = 'adapter' })
-H.equal(data[7].items[2].info.batch, 'adapter', 'native QB adapter metadata path uses the same real funnel')
+H.equal(data[7].items[2].info.batch, 'adapter', 'native Kora adapter metadata path uses the same real funnel')
 
 for _, replace in ipairs({ inventory.api.setItems, inventory.api.SetInventory, inventory.compat.qb.SetInventory }) do
     local ok, reason = replace(7, inventory.copy(data[7].items), true)
@@ -145,7 +145,7 @@ rejectsCash(missingCash, 'internal replacement cannot remove the cash stack')
 local extraCash = inventory.copy(data[7].items)
 extraCash[6] = internal.buildItem('cash', 1, 6, {})
 rejectsCash(extraCash, 'an additional cash stack cannot mint money')
-H.equal(inventory.compat.qb.SetItemData(7, 'cash', 'amount', 101, 1), false, 'QB item-data API cannot mint cash')
+H.equal(inventory.compat.qb.SetItemData(7, 'cash', 'amount', 101, 1), false, 'Kora item-data API cannot mint cash')
 
 local stale = inventory.copy(data[7].items)
 invokingResource = 'kora_core'

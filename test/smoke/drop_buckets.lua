@@ -10,7 +10,7 @@ local callbacks, handlers, registered, clientEvents, threads = {}, {}, {}, {}, {
 local buckets = { [7] = 11, [8] = 22, [10] = 55 }
 local positions = { [7] = { x = 0, y = 0, z = 0 }, [8] = { x = 0, y = 0, z = 0 }, [10] = { x = 0, y = 0, z = 0 } }
 local function noop() end
-env.QB = {
+env.Kora = {
     util = {}, compat = { isCallable = function(value) return type(value) == 'function' end },
     resources = { serverRegistry = function() return { track = noop, untrack = noop } end },
     callback = { register = function(name, callback) callbacks[name] = callback end },

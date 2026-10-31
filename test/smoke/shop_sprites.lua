@@ -36,7 +36,7 @@ exports = {
         removeZone = function() end,
     },
 }
-QB = { blips = { create = function() return 1 end, setInfo = function() end } }
+Kora = { blips = { create = function() return 1 end, setInfo = function() end } }
 
 for _, file in ipairs({ 'client/shops/liquorstore.lua', 'client/shops/ammunation.lua' }) do
     for _, hint in ipairs({ 'unset', true, false }) do

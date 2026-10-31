@@ -13,7 +13,7 @@ local H = dofile('test/harness.lua')
 local handlers = {}
 local rejected, removed, added, dropped, purchases, prints = {}, {}, {}, {}, {}, {}
 
-QB = {
+Kora = {
     callback = { register = function(name, fn) handlers[name] = fn end },
     distance = { player = function(_, coords, max) return (coords.d or 0) <= max end },
 }

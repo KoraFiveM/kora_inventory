@@ -4,7 +4,7 @@ local handlers = {}
 _G.QbInventory = { compat = { qb = { GetInventory = function() end }, ox = { GetInventory = function() end } } }
 _G.AddEventHandler = function(name, handler) handlers[name] = handler end
 _G.GetCurrentResourceName = function() return 'kora_inventory' end
-_G.QB = { compat = { provideExport = function(identity, name, fn)
+_G.Kora = { compat = { provideExport = function(identity, name, fn)
     AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCallback) setCallback(fn) end)
 end } }
 

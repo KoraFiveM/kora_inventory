@@ -77,12 +77,12 @@ end
 -- here because replica lag must never look like a rolled-back operation.
 local function reconcile(provider, key, fingerprint)
     local operation = identity(provider, key)
-    local settled, waitError = QB.sql.awaitCheckedOperation('qbinventory:' .. operation, fingerprint)
+    local settled, waitError = Kora.sql.awaitCheckedOperation('qbinventory:' .. operation, fingerprint)
     if not settled then return nil, 'pending', waitError end
     if settled.active and settled.result and settled.result.code == 'indeterminate' then
         return nil, 'pending', 'An earlier exchange worker must settle before receipt reconciliation.'
     end
-    local result, readError = QB.sql.transactionChecked({ {
+    local result, readError = Kora.sql.transactionChecked({ {
         query = 'SELECT * FROM `qbinventory_player_exchanges` WHERE `provider`=? AND `operation_key`=? FOR UPDATE',
         values = { provider, key },
     } })
@@ -179,7 +179,7 @@ local function execute(provider, source, key, terms, fingerprint)
     if not values then return reject(planError) end
     local receipt = { provider = provider, operationKey = key, citizenid = terms.citizenid,
         cash = terms.cash, dealerRep = terms.dealerRep, request = fingerprint, completedAt = os.time() }
-    local result, commitError = QB.sql.transactionChecked({
+    local result, commitError = Kora.sql.transactionChecked({
         { query = [[INSERT INTO `qbinventory_player_exchanges`
             (`provider`,`operation_key`,`citizenid`,`request`,`player_values`,`receipt`) VALUES (?,?,?,?,?,?)]],
             values = { provider, key, terms.citizenid, fingerprint, json.encode(values), json.encode(receipt) }, expectedRows = 1 },

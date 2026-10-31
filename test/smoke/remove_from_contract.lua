@@ -22,7 +22,7 @@ dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
 
-QB = {
+Kora = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function() end },
     sql = {},

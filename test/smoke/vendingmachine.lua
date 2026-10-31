@@ -34,7 +34,7 @@ local eventHandlers = {}
 AddEventHandler = function(name, fn) eventHandlers[name] = fn end
 
 local distanceResult = true
-QB = { distance = { player = function() return distanceResult end } }
+Kora = { distance = { player = function() return distanceResult end } }
 
 local timer = 1000
 GetGameTimer = function() return timer end

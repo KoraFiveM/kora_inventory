@@ -9,7 +9,7 @@ Config = { qbinventory = {
     weaponCarry = { enabled = false },
     weapons = { ballistics = { enabled = true } },
 } }
-QB = {
+Kora = {
     cache = {
         ped = function() pedExports = pedExports + 1; return ped end,
         weapon = function() return currentWeapon end,

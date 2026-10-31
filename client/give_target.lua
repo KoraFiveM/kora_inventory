@@ -36,12 +36,12 @@ local function giveDistance()
 end
 
 local function serverIdForPed(ped)
-    if not ped or ped == 0 or ped == QB.cache.ped() then
+    if not ped or ped == 0 or ped == Kora.cache.ped() then
         return nil
     end
 
     for _, playerId in ipairs(GetActivePlayers()) do
-        if playerId ~= QB.cache.playerId() and GetPlayerPed(playerId) == ped then
+        if playerId ~= Kora.cache.playerId() and GetPlayerPed(playerId) == ped then
             local serverId = GetPlayerServerId(playerId)
             if type(serverId) == 'number' and serverId > 0 then
                 return serverId
@@ -50,19 +50,19 @@ local function serverIdForPed(ped)
     end
 end
 
--- Query closest first.  `QB.closest.player` is kora_lib's established mapping
+-- Query closest first.  `Kora.closest.player` is kora_lib's established mapping
 -- from a nearby player ped to a FiveM player id; the full world query is only
 -- used after that to distinguish a single unambiguous recipient from several
 -- targetable peds.  Neither result crosses the Lua/NUI boundary.
 local function nearbyPlayers()
-    local coords = QB.cache.coords()
+    local coords = Kora.cache.coords()
     local radius = giveDistance()
-    local closest = QB.closest.player(coords, radius)
+    local closest = Kora.closest.player(coords, radius)
     if not closest or not closest.id then
         return {}
     end
 
-    local matches = QB.world.getNearbyEntities('player', coords, radius)
+    local matches = Kora.world.getNearbyEntities('player', coords, radius)
     local recipients, seen = {}, {}
     for _, match in ipairs(matches) do
         local serverId = serverIdForPed(match.entity)

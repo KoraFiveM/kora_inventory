@@ -31,7 +31,7 @@ local function openSelf()
     -- kora_inventory validates the local player's server ID before granting the
     -- short-lived session. We intentionally do not inspect nearby vehicles,
     -- entities, or any client inventory record here.
-    inventoryApi.openInventory('player', QB.cache.serverId())
+    inventoryApi.openInventory('player', Kora.cache.serverId())
     return true
 end
 
@@ -161,11 +161,11 @@ RegisterNetEvent('qb-inventory:client:hotbar', function() end)
 -- Purely cosmetic, and safe to honour: play the same give animation upstream
 -- does. Skipped in a vehicle, exactly as upstream does.
 RegisterNetEvent('qb-inventory:client:giveAnim', function()
-    local ped = QB.cache.ped()
-    if QB.cache.vehicle() then
+    local ped = Kora.cache.ped()
+    if Kora.cache.vehicle() then
         return
     end
-    if not QB.stream.loadAnimDict('mp_common', nil, { timeout = 1000 }) then
+    if not Kora.stream.loadAnimDict('mp_common', nil, { timeout = 1000 }) then
         return
     end
     TaskPlayAnim(ped, 'mp_common', 'givetake1_b', 8.0, -8.0, -1, 49, 0, false, false, false)
@@ -208,7 +208,7 @@ RegisterCommand('inventory', function()
     -- all are independent keybinds, so an active creator session
     -- must explicitly veto this one rather than relying on FiveM to pick
     -- only one handler for a shared key.
-    if QB.zones.isCreatorActive() or QB.placement.isActive() then
+    if Kora.zones.isCreatorActive() or Kora.placement.isActive() then
         return
     end
     -- Seated -> glovebox, at a vehicle's boot -> trunk (client/vehicles.lua).
@@ -229,7 +229,7 @@ RegisterCommand('closeInv', function()
     inventoryApi.closeInventory()
 end, false)
 
-QB.keybind.add({
+Kora.keybind.add({
     name = 'openInv',
     description = 'Open inventory (qbinventory)',
     defaultMapper = 'keyboard',

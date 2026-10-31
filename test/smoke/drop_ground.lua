@@ -34,7 +34,7 @@ local function run(drops, natives)
     env.PlaceObjectOnGroundProperly = function() calls.place = true; return natives.placeOk end
     env.SetEntityCoordsNoOffset = function(_, x, y, z) calls.z = z end
     env.exports = { kora_target = { addSphereZone = function() return 1 end, removeZone = function() end } }
-    env.QB = { entities = { create = function() return 7 end, remove = function() end },
+    env.Kora = { entities = { create = function() return 7 end, remove = function() end },
         callback = { trigger = function() return {} end } }
     assert(loadfile('client/drops.lua', 't', env))()
     handlers['qbinventory:client:dropCreated']('a', { x = 1, y = 2, z = 5.0 })

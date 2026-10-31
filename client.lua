@@ -18,7 +18,7 @@ function QbInventory.useGate(item)
     if useTime <= 0 then
         return true
     end
-    local completed = QB.progressbar.start({ label = item.label or item.name, duration = useTime, canCancel = true })
+    local completed = Kora.progressbar.start({ label = item.label or item.name, duration = useTime, canCancel = true })
     return completed == true
 end
 
@@ -153,7 +153,7 @@ local function submitIntent(intent)
                 TriggerEvent('qbinventory:client:useStarted')
             end
         end
-        local ok, result = QB.callback.trigger('qbinventory:server:intent', {
+        local ok, result = Kora.callback.trigger('qbinventory:server:intent', {
             token = session.token,
             action = action,
             payload = payload,
@@ -184,7 +184,7 @@ local function submitIntent(intent)
     local to = payload.toInventory or (payload.toSecondary and secondaryKey or session.primary.key)
     local fromView = from == session.primary.key and session.primary or session.secondary
     local toView = to == session.primary.key and session.primary or session.secondary
-    local ok, result = QB.callback.trigger('qbinventory:server:transfer', {
+    local ok, result = Kora.callback.trigger('qbinventory:server:transfer', {
         token = session.token,
         fromInventory = from,
         toInventory = to,
@@ -288,7 +288,7 @@ exports('HasItem', hasItem)
 -- not. HasItem is a qb-inventory export only; ox has no client HasItem.
 for _, exportName in ipairs({ 'HasItem', 'openInventory', 'closeInventory' }) do
     local fn = exportName == 'HasItem' and hasItem or exportName == 'openInventory' and openInventory or closeInventory
-    QB.compat.provideExport('qb-inventory', exportName, fn)
+    Kora.compat.provideExport('qb-inventory', exportName, fn)
 end
 
 AddEventHandler('onClientResourceStop', function(name)

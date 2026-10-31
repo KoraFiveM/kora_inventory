@@ -20,7 +20,7 @@ exports = { kora_core = {
         return table.unpack(offlineResult)
     end,
 } }
-QB = { sql = { flush = function(tableName)
+Kora = { sql = { flush = function(tableName)
     calls.flush = (calls.flush or 0) + 1
     H.equal(tableName, 'players', 'only the authoritative player queue is flushed')
     if throwFlush then error('queue threw') end

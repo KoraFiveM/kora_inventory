@@ -14,7 +14,7 @@ local function setup(initial, boot)
     if initial then f.rows['stash:policetrash'] = record(initial) end
     local env = {}; for k, v in pairs(_G) do env[k] = v end
     env.Config, env.QbInventory = {}, nil
-    env.QB = { resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end }, callback = { register = function() end } }
+    env.Kora = { resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end }, callback = { register = function() end } }
     env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.GetInvokingResource = function() return f.invoker or 'kora_sql' end
     env.GetGameTimer = function() return f.time end

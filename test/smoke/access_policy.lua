@@ -25,7 +25,7 @@ H.ok(compactServer:find("if result == false then return false, reason or 'player
 H.ok(server:find('inventory.copy(playerData(src) or {})', 1, true), 'inspection policies receive detached source data')
 H.ok(server:find('inventory.copy(playerData(target) or {})', 1, true), 'inspection policies receive detached target data')
 H.ok(server:find('if not sameBucket(src, inv.source)', 1, true), 'inspection validates routing bucket before policy')
-H.ok(server:find('QB.distance.player(src, GetEntityCoords(GetPlayerPed(inv.source)), config.interactionDistance)', 1, true), 'inspection validates live target distance before policy')
+H.ok(server:find('Kora.distance.player(src, GetEntityCoords(GetPlayerPed(inv.source)), config.interactionDistance)', 1, true), 'inspection validates live target distance before policy')
 H.ok(server:find('return mayInspectPlayer(src, inv.source)', 1, true), 'player access funnels through inspection policy')
 
 -- owner=true is a server registration template. The concrete stash namespace

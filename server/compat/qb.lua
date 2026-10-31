@@ -340,7 +340,7 @@ api.SaveInventory = function(source, offline)
     end
     if not offline then
         local flushed
-        called, flushed, err = pcall(QB.sql.flush, 'players')
+        called, flushed, err = pcall(Kora.sql.flush, 'players')
         if not called then return false, tostring(flushed) end
         if flushed ~= true then return false, err or 'player inventory flush failed' end
     end

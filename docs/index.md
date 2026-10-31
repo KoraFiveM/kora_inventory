@@ -144,7 +144,7 @@ end)
 ```
 ```lua
 -- shared item definition (kora_core's `items` registry)
-QB.shared.register('items', 'bandage', {
+Kora.shared.register('items', 'bandage', {
     label = 'Bandage', weight = 100, useable = true, useTime = 2500,
 })
 ```

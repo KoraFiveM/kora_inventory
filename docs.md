@@ -564,7 +564,7 @@ and validated by `buildItem` exactly like those:
   honoured as an implicit `preventClose = true` even without the native field.
 - `useTime` (integer ms) -- default `0` (today's immediate-use behaviour).
   When set, the client runs kora_lib's progress bar
-  (`QB.progressbar.start`, see `kora_lib/modules/progressbar`) for `useTime` ms
+  (`Kora.progressbar.start`, see `kora_lib/modules/progressbar`) for `useTime` ms
   *before* it ever contacts the server. If the bar is cancelled or never
   starts, the client never sends the use request at all -- there is no
   server-side "was it shown" flag to trust, so not asking is what keeps a
@@ -588,7 +588,7 @@ has no separate hotbar/quickslot data model (see the
 inventory slots double as the hotbar, matching real qb-inventory/ox_inventory.
 That same range is what `weaponCarry`'s `'hotbar'` visibility treats as openly
 carried, which is why it is one config value rather than a constant in each. `client/hotbar.lua` registers these through
-`QB.keybind`, does nothing while `IsNuiFocused()`/`IsPauseMenuActive()` (so it
+`Kora.keybind`, does nothing while `IsNuiFocused()`/`IsPauseMenuActive()` (so it
 never fights the panel's own Use action), and reuses the existing legacy
 `QBCore:Server:UseItem` transport -- which already re-resolves the slot from
 qbcore-owned `PlayerData` and never trusts the transmitted item record --
@@ -605,7 +605,7 @@ what "activate this item" means.
 safe during migration. It listens for `qb-inventory:client:openInventory`,
 `closeInv`, and `updateInventory` (plus the narrowly equivalent old
 `inventory:client:*` aliases), the `inventory`, `openInv`, and `closeInv`
-commands, and the default `openInv`/`TAB` mapping through `QB.keybind`.
+commands, and the default `openInv`/`TAB` mapping through `Kora.keybind`.
 
 Legacy item tables, slot counts, labels, weights and metadata are never read.
 An open event contributes only a validated identifier request; kora_inventory's
@@ -672,7 +672,7 @@ placed anywhere, and FXServer has no way to independently query a static map
 prop's position the way it can a player ped. `client/shops/vendingmachine.lua`
 targets those models globally through `exports.kora_target:addModel` (a
 persistent, streaming-aware registration -- kora_inventory now `dependency`s
-`kora_target` for this), not kora_lib's own `QB.interact.addTargetModel`, which is
+`kora_target` for this), not kora_lib's own `Kora.interact.addTargetModel`, which is
 documented as a one-shot snapshot of whatever is streamed in at call time and
 would miss every machine outside the player's initial render distance.
 Selecting a machine sends its live entity coordinates alongside the fixed

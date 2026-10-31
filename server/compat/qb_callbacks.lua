@@ -7,7 +7,7 @@
 --
 -- REGISTRATION. kora_core's compat exposes
 -- `QBCore.Functions.CreateCallback(name, fn)` as a one-line wrapper over
--- `QB.callback.register(name, fn)` which forwards the handler's RETURN VALUES.
+-- `Kora.callback.register(name, fn)` which forwards the handler's RETURN VALUES.
 -- It deliberately does NOT hand the handler upstream's `cb` continuation, so
 -- writing upstream's literal `function(source, cb, item)` shape here would bind
 -- `cb` to the first real argument and the client's callback would never
@@ -116,7 +116,7 @@ local bridgeDrops = {}
 -- does not exist, which is still the intended outcome here: a legacy client
 -- rendering its own duplicate bag on top of ours is worse than it rendering
 -- none, and either way the drop opens by id.
-QB.callback.register('qb-inventory:server:GetCurrentDrops', function(src)
+Kora.callback.register('qb-inventory:server:GetCurrentDrops', function(src)
     local drops = {}
     for id, createdTime in pairs(bridgeDrops) do
         local _, inventory = internal.resolveInventory(internal.key('drop', id), 'drop')
@@ -142,7 +142,7 @@ end)
 -- crafted payload mints an item. Here the payload contributes a slot and an
 -- amount; the item record dropped is a copy of whatever the authority says is
 -- really in that slot, and the drop's position is read from the player's ped.
-QB.callback.register('qb-inventory:server:createDrop', function(src, item)
+Kora.callback.register('qb-inventory:server:createDrop', function(src, item)
     if type(item) ~= 'table' then
         return false
     end
@@ -208,7 +208,7 @@ end)
 -- inventory's own configured `distance`, enforced by canAccess inside BuyItem
 -- along with its group/owner policy -- the same gate kora_inventory's own shop UI
 -- passes through.
-QB.callback.register('qb-inventory:server:attemptPurchase', function(src, data)
+Kora.callback.register('qb-inventory:server:attemptPurchase', function(src, data)
     if type(data) ~= 'table' or type(data.item) ~= 'table' then
         return false
     end
@@ -258,7 +258,7 @@ end)
 -- Config.qbinventory.interactionDistance (3.0 by default), which is what
 -- kora_inventory's own give intent enforces; the routing bucket is checked too,
 -- which upstream does not do at all.
-QB.callback.register('qb-inventory:server:giveItem', function(src, target, item, amount, slot, _info)
+Kora.callback.register('qb-inventory:server:giveItem', function(src, target, item, amount, slot, _info)
     local session = internal.sessionOf(src)
     if not session then
         return reject(src, 'no open inventory session')
@@ -279,7 +279,7 @@ QB.callback.register('qb-inventory:server:giveItem', function(src, target, item,
     if
         not targetPed
         or targetPed == 0
-        or not QB.distance.player(src, GetEntityCoords(targetPed), config.interactionDistance)
+        or not Kora.distance.player(src, GetEntityCoords(targetPed), config.interactionDistance)
     then
         return reject(src, 'recipient is too far away')
     end

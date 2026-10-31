@@ -39,7 +39,7 @@ exports = {
     },
 }
 
-QB = { blips = {} }
+Kora = { blips = {} }
 dofile('client/shops/ammunation.lua')
 
 local function countActiveZones()

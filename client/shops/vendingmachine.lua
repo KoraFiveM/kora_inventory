@@ -1,6 +1,6 @@
 -- World presentation only. kora_target's addModel matches every currently- and
 -- future-streamed prop of these models anywhere on the map (unlike kora_lib's
--- own QB.interact.addTargetModel, a one-shot snapshot of what's streamed in
+-- own Kora.interact.addTargetModel, a one-shot snapshot of what's streamed in
 -- at call time) -- exactly what a feature with no curated location list
 -- needs. The reported entity's own coordinates travel with the open request
 -- so the server can bounds-check them (see server/shops/vendingmachine.lua);

@@ -15,7 +15,7 @@ dofile('shared.lua')
 
 local netEvents, localEvents, clientEvents, bags = {}, {}, {}, {}
 
-QB = {
+Kora = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function() end },
     sql = {},
@@ -294,11 +294,11 @@ H.ok(not client:find('LocalPlayer.state:set', 1, true),
     'the client never writes its own carried list -- the bag is server-owned')
 H.ok(server:find("player.state:set(STATE_KEY", 1, true),
     'the server is what publishes the carried list')
-H.ok(client:find("QB.state.onChange(STATE_KEY, nil,", 1, true),
+H.ok(client:find("Kora.state.onChange(STATE_KEY, nil,", 1, true),
     'the client subscribes with no bag filter, so it is not bound to player:-1 at load')
 H.ok(client:find('canCancel = false', 1, true),
     'a draw cannot be cancelled -- otherwise the surcharge is free to skip')
-H.ok(client:find('QB.stream.loadWeaponAsset', 1, true) and client:find('QB.stream.loadModel', 1, true),
+H.ok(client:find('Kora.stream.loadWeaponAsset', 1, true) and client:find('Kora.stream.loadModel', 1, true),
     'streaming goes through kora_lib rather than raw request/poll loops')
 H.ok(client:find('IsWeaponValid(', 1, true),
     'a configured entry that is not a real weapon cannot assert inside the renderer')

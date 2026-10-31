@@ -4,8 +4,8 @@ Config = { qbinventory = {} }
 dofile('config.lua')
 dofile('shared.lua')
 
-QB = { vehicle = {}, world = {}, lookup = {} }
-function QB.vehicle.normalizePlate(value, options)
+Kora = { vehicle = {}, world = {}, lookup = {} }
+function Kora.vehicle.normalizePlate(value, options)
     if type(value) ~= 'string' then return nil, 'invalid_type' end
     local plate = value:match('^%s*(.-)%s*$'):upper():gsub('%s+', ' ')
     if plate == '' then return nil, 'empty' end
@@ -13,7 +13,7 @@ function QB.vehicle.normalizePlate(value, options)
     if not plate:match('^[A-Z0-9 ]+$') then return nil, 'invalid_characters' end
     return plate
 end
-function QB.world.resolveNetworkEntity(src, networkId, options)
+function Kora.world.resolveNetworkEntity(src, networkId, options)
     if type(networkId) ~= 'number' or networkId < 1 then return nil, 'invalid_network_id' end
     local entity = NetworkGetEntityFromNetworkId(networkId)
     if entity == 0 or not DoesEntityExist(entity) then return nil, 'entity_unavailable' end
@@ -47,7 +47,7 @@ end
 GetVehicleNumberPlateText = function(entity) return entities[entity].plate end
 GetVehicleClass = nil
 GetEntityModel = function(entity) return entity end
-QB.lookup.vehicle = function(model) return { metadata = { class = entities[model].class } } end
+Kora.lookup.vehicle = function(model) return { metadata = { class = entities[model].class } } end
 
 local V = dofile('server/vehicles.lua')
 H.equal(V.normalisePlate('  ab   12  '), 'AB 12', 'plate whitespace is canonical')

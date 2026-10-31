@@ -3,7 +3,7 @@ local inventory, core = QbInventory, QbInventory.internal
 local persistence = inventory.persistence
 
 local function receipt(provider, operationKey)
-    local result, err = QB.sql.transactionChecked({ {
+    local result, err = Kora.sql.transactionChecked({ {
         query = 'SELECT * FROM `qbinventory_recovery_operations` WHERE `provider`=? AND `operation_key`=? FOR UPDATE',
         values = { provider, operationKey },
     } })
@@ -60,7 +60,7 @@ local function claim(source, id, operationKey)
                 inv.durablePending = true
                 -- A provider reload can precede its old SQL worker acquiring
                 -- the receipt lock. Join that worker before inspecting intent.
-                local joined, joinErr = QB.sql.awaitCheckedOperation(context.key, context.fingerprint)
+                local joined, joinErr = Kora.sql.awaitCheckedOperation(context.key, context.fingerprint)
                 if not joined or joined.result and joined.result.code == 'indeterminate' then return false, joinErr or 'Recovery outcome is pending. Retry the same claim.' end
             end
             local row, lookupErr = receipt(provider, operationKey)
@@ -99,14 +99,14 @@ local function claim(source, id, operationKey)
             local saved, saveErr = persistence.save(inv)
             if not saved then return reject(saveErr) end
             if not row then
-                local created, createErr = QB.sql.execute('INSERT IGNORE INTO `qbinventory_recovery_operations` (`provider`,`operation_key`,`stash_id`,`citizenid`) VALUES (?,?,?,?)', { provider, operationKey, id, cid })
+                local created, createErr = Kora.sql.execute('INSERT IGNORE INTO `qbinventory_recovery_operations` (`provider`,`operation_key`,`stash_id`,`citizenid`) VALUES (?,?,?,?)', { provider, operationKey, id, cid })
                 if not created then return reject(createErr or 'Recovery intent could not be saved.') end
             end
             local revision = inv.revision + 1
             local outcome = { operationKey = operationKey, stashId = id, citizenid = cid, amount = count, completedAt = os.time() }
             local encodedItems, encodedReceipt = json.encode(destination.items), json.encode(outcome)
             inv.durablePending = true
-            local result, transactionErr = QB.sql.transactionChecked({
+            local result, transactionErr = Kora.sql.transactionChecked({
                 { query = 'SELECT `operation_key` FROM `qbinventory_recovery_operations` WHERE `provider`=? AND `operation_key`=? AND `stash_id`=? AND `citizenid`=? AND `status`=\'pending\' FOR UPDATE',
                     values = { provider, operationKey, id, cid }, expectedRows = 1, failureCode = 'conflict' },
                 { query = 'UPDATE `qbinventory_inventories` SET `items`=?,`revision`=? WHERE `inventory_type`=\'stash\' AND `inventory_id`=? AND `revision`=?',

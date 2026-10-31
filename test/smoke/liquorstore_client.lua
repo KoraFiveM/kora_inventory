@@ -33,7 +33,7 @@ exports = {
     },
 }
 local createdBlips = {}
-QB = { blips = {
+Kora = { blips = {
     create = function(_, options)
         createdBlips[#createdBlips + 1] = options
         return #createdBlips

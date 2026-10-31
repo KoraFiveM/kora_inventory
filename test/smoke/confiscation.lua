@@ -22,7 +22,7 @@ local env = {}
 for name, value in pairs(_G) do env[name] = value end
 env.Config, env.QbInventory = {}, nil
 local net, callbacks, aliases, events, handlers = {}, {}, {}, {}, {}
-env.QB = {
+env.Kora = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function(name, fn) callbacks[name] = fn end },
     compat = { provideExport = function(identity, name, fn) aliases[identity .. ':' .. name] = fn end },
@@ -136,7 +136,7 @@ env.GetGameTimer = function() return clock end
 env.GetPlayerPed = function(src) return src end
 env.GetEntityCoords = function() return { x = 0, y = 0, z = 0 } end
 env.GetPlayerRoutingBucket = function() return 0 end
-env.QB.distance = { player = function() return true end }
+env.Kora.distance = { player = function() return true end }
 local stash = I.internal.createSecondary('stash', 'session-rejection', {
     items = { [1] = assert(I.internal.buildItem('water_bottle', 2, 1, {})) },
 })

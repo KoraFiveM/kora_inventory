@@ -55,7 +55,7 @@ local function stopTraining(src)
     return true
 end
 
-local trainingOwnership = QB.resources.serverRegistry(function(src)
+local trainingOwnership = Kora.resources.serverRegistry(function(src)
     stopTraining(src)
 end)
 

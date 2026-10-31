@@ -44,7 +44,7 @@ local function clearDamageSettings()
         modifiedWeapon = nil
     end
     if criticalHitsDisabled then
-        SetPedSuffersCriticalHits(QB.cache.ped(), true)
+        SetPedSuffersCriticalHits(Kora.cache.ped(), true)
         criticalHitsDisabled = false
     end
 end
@@ -60,7 +60,7 @@ local function applyDamageSettings(weapon, settings)
         modifiedWeapon = weapon
     end
     if type(settings) == 'table' and settings.disableCriticalHits == true then
-        SetPedSuffersCriticalHits(QB.cache.ped(), false)
+        SetPedSuffersCriticalHits(Kora.cache.ped(), false)
         criticalHitsDisabled = true
     end
 end
@@ -114,7 +114,7 @@ local function playToggle(action, duration, label, tier)
         return true
     end
     local anim = toggleAnim(action, tier)
-    return QB.progressbar.start({
+    return Kora.progressbar.start({
         label = label,
         duration = duration,
         -- A draw is committed once started: cancelling it would be a free way
@@ -142,13 +142,13 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
         return
     end
 
-    local ped = QB.cache.ped()
+    local ped = Kora.cache.ped()
     local hash = joaat(request.name)
     -- 'toggle' is the fallback shape server/useables.lua emits when
     -- weaponcarry.lua is not loaded; resolve it the way that code used to.
     local action = request.action
     if action ~= 'draw' and action ~= 'holster' then
-        action = QB.cache.weapon() == hash and 'holster' or 'draw'
+        action = Kora.cache.weapon() == hash and 'holster' or 'draw'
     end
 
     toggling = true
@@ -165,7 +165,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
 
     -- Re-read the ped: a respawn during a long concealed draw would have
     -- replaced the handle the bar started with.
-    ped = QB.cache.ped()
+    ped = Kora.cache.ped()
     resetShotCadence()
     if action == 'holster' then
         SetCurrentPedWeapon(ped, joaat('weapon_unarmed'), true)
@@ -221,7 +221,7 @@ RegisterNetEvent('qbinventory:client:addAmmo', function(request)
         return
     end
 
-    local ped = QB.cache.ped()
+    local ped = Kora.cache.ped()
     local hash = joaat(request.weapon)
 
     if not HasPedGotWeapon(ped, hash, false) then
@@ -257,7 +257,7 @@ RegisterNetEvent('qbinventory:client:startTrainingWeapon', function(name, rounds
     if type(name) ~= 'string' then
         return
     end
-    local ped = QB.cache.ped()
+    local ped = Kora.cache.ped()
     resetShotCadence()
     trainingWeapon = joaat(name)
     GiveWeaponToPed(ped, trainingWeapon, math.max(0, math.floor(tonumber(rounds) or 0)), false, true)
@@ -273,7 +273,7 @@ RegisterNetEvent('qbinventory:client:stopTrainingWeapon', function()
         return
     end
     clearDamageSettings()
-    RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
+    RemoveWeaponFromPed(Kora.cache.ped(), trainingWeapon)
     trainingWeapon = nil
     resetShotCadence()
 end)
@@ -281,18 +281,18 @@ end)
 -- A drawn weapon can leave the player's hands without a holster: the weapon
 -- wheel, a disarm, death, a respawn. Tell the server so the prop goes back on
 -- their body instead of vanishing for everyone until their next use.
-QB.cache.onChange('weapon', function(weapon)
+Kora.cache.onChange('weapon', function(weapon)
     if drawn and weapon ~= drawn then
         reportUnequipped()
     end
 end)
-QB.cache.onChange('isDead', function(isDead)
+Kora.cache.onChange('isDead', function(isDead)
     if isDead then
         reportUnequipped()
         resetShotCadence()
         if trainingWeapon then
             clearDamageSettings()
-            RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
+            RemoveWeaponFromPed(Kora.cache.ped(), trainingWeapon)
             trainingWeapon = nil
         end
     end
@@ -339,7 +339,7 @@ AddEventHandler('onClientResourceStop', function(name)
     end
     clearDamageSettings()
     if trainingWeapon then
-        RemoveWeaponFromPed(QB.cache.ped(), trainingWeapon)
+        RemoveWeaponFromPed(Kora.cache.ped(), trainingWeapon)
         trainingWeapon = nil
     end
 end)
@@ -385,7 +385,7 @@ local function pedFor(serverId)
         return ped
     end
     local resolved = 0
-    QB.loops.controlled(function()
+    Kora.loops.controlled(function()
         local id = GetPlayerFromServerId(serverId)
         local candidate = id ~= -1 and GetPlayerPed(id) or 0
         if candidate and candidate > 0 then
@@ -421,7 +421,7 @@ end
 ---@return integer entity
 local function createCarried(carried)
     if carried.model then
-        local model = QB.stream.loadModel(carried.model)
+        local model = Kora.stream.loadModel(carried.model)
         if not model then
             return 0
         end
@@ -431,14 +431,14 @@ local function createCarried(carried)
     end
 
     -- A configured override can name something that is not a real weapon.
-    -- QB.stream.loadWeaponAsset asserts on that, so check first: an entry
+    -- Kora.stream.loadWeaponAsset asserts on that, so check first: an entry
     -- with neither a valid weapon nor a `model` simply renders nothing.
     if not IsWeaponValid(joaat(carried.name)) then
         return 0
     end
 
     local entity = 0
-    QB.stream.loadWeaponAsset(carried.name, function(hash)
+    Kora.stream.loadWeaponAsset(carried.name, function(hash)
         entity = CreateWeaponObject(hash, 0, 0.0, 0.0, 0.0, true, 1.0, 0, false, true) or 0
         if entity == 0 then
             return
@@ -535,7 +535,7 @@ end
 -- so it is registered at load without waiting for a session. (A handler bound
 -- to a literal `player:<id>` would have to wait -- GetPlayerServerId is -1
 -- during the loading screen and AddStateBagChangeHandler binds the name once.)
-QB.state.onChange(STATE_KEY, nil, function(context)
+Kora.state.onChange(STATE_KEY, nil, function(context)
     local serverId = serverIdFromBag(context.bagName)
     if not serverId or serverId < 0 then
         return
@@ -571,8 +571,8 @@ end)
 
 -- A new ped (respawn, model change, clothing) drops every attachment, so the
 -- local player's props have to be rebuilt onto the new handle.
-QB.cache.onChange('ped', function()
-    local serverId = QB.cache.serverId()
+Kora.cache.onChange('ped', function()
+    local serverId = Kora.cache.serverId()
     if not serverId or serverId <= 0 then
         return
     end

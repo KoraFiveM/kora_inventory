@@ -58,9 +58,9 @@ end)
 
 for _, location in ipairs(shop.locations or {}) do
     if shop.blip and shop.blip.enabled then
-        local blip = QB.blips.create({ x = location.x, y = location.y, z = location.z }, shop.blip)
+        local blip = Kora.blips.create({ x = location.x, y = location.y, z = location.z }, shop.blip)
         if blip and not shop.blip.info then
-            QB.blips.setInfo(blip, {
+            Kora.blips.setInfo(blip, {
                 title = shop.label,
                 rows = {
                     { kind = 'wrappedText', value = "Browse this store's available weapons and equipment." },

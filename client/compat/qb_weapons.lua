@@ -66,6 +66,6 @@ RegisterNetEvent('qb-weapons:client:EquipTint', function(weapon, tint)
     end
     local index = math.floor(tonumber(tint) or -1)
     if index >= 0 and index <= 32 then
-        SetPedWeaponTintIndex(QB.cache.ped(), type(weapon) == 'string' and joaat(weapon) or weapon, index)
+        SetPedWeaponTintIndex(Kora.cache.ped(), type(weapon) == 'string' and joaat(weapon) or weapon, index)
     end
 end)

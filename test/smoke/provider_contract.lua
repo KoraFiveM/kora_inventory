@@ -60,12 +60,12 @@ end
 -- inside that shop rather than anything about the provider contract.
 Config = { qbinventory = {} }
 for _, path in ipairs(pathsFrom('shared_scripts')) do
-    -- '@resource/file.lua' entries are other resources (kora_lib, kora_sql); the QB
+    -- '@resource/file.lua' entries are other resources (kora_lib, kora_sql); the Kora
     -- surface they provide is mocked below.
     if path:sub(1, 1) ~= '@' then dofile(path) end
 end
 
-QB = {
+Kora = {
     compat = { provideExport = function(identity, name, fn)
         AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCallback) setCallback(fn) end)
     end },
@@ -77,18 +77,18 @@ QB = {
 }
 -- Client files register zones/targets/keybinds at load time. None of that is
 -- under test here; it only has to not error while the export surface is built.
-QB.interact = setmetatable({}, { __index = function() return function() return { remove = function() end } end end })
-QB.zones = setmetatable({}, { __index = function() return function() return { remove = function() end } end end })
-QB.target = setmetatable({}, { __index = function() return function() end end })
-QB.nui = setmetatable({}, { __index = function() return function() end end })
-QB.cache = setmetatable({}, { __index = function() return function() end end })
-QB.loops = setmetatable({}, { __index = function() return function() end end })
-QB.state = setmetatable({}, { __index = function() return function() end end })
-QB.entities = setmetatable({}, { __index = function() return function() end end })
-QB.anim = setmetatable({}, { __index = function() return function() end end })
-QB.blips = setmetatable({}, { __index = function() return function() end end })
-QB.theme = setmetatable({}, { __index = function() return function() end end })
-QB.keybind = { add = function() return { remove = function() return true end } end }
+Kora.interact = setmetatable({}, { __index = function() return function() return { remove = function() end } end end })
+Kora.zones = setmetatable({}, { __index = function() return function() return { remove = function() end } end end })
+Kora.target = setmetatable({}, { __index = function() return function() end end })
+Kora.nui = setmetatable({}, { __index = function() return function() end end })
+Kora.cache = setmetatable({}, { __index = function() return function() end end })
+Kora.loops = setmetatable({}, { __index = function() return function() end end })
+Kora.state = setmetatable({}, { __index = function() return function() end end })
+Kora.entities = setmetatable({}, { __index = function() return function() end end })
+Kora.anim = setmetatable({}, { __index = function() return function() end end })
+Kora.blips = setmetatable({}, { __index = function() return function() end end })
+Kora.theme = setmetatable({}, { __index = function() return function() end end })
+Kora.keybind = { add = function() return { remove = function() return true end } end }
 QBTheme = { refresh = function() end, apply = function() return {} end }
 
 GetCurrentResourceName = function() return 'kora_inventory' end

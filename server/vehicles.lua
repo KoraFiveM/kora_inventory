@@ -87,7 +87,7 @@ end
 ---@return string|nil, string|nil
 function vehicles.normalisePlate(value)
     local maximum = math.max(1, math.floor(tonumber(vehicleConfig.plateMaxLength) or 8))
-    local plate = QB.vehicle.normalizePlate(value, { maxLength = maximum })
+    local plate = Kora.vehicle.normalizePlate(value, { maxLength = maximum })
     if not plate then return nil, 'invalid vehicle plate' end
     return plate
 end
@@ -210,7 +210,7 @@ function vehicles.validate(src, kind, networkId, expectedPlate)
         return nil, 'invalid vehicle storage type'
     end
     networkId = asInteger(networkId)
-    local entity, reason = QB.world.resolveNetworkEntity(src, networkId, {
+    local entity, reason = Kora.world.resolveNetworkEntity(src, networkId, {
         entityType = 'vehicle',
         maxDistance = accessDistance(kind),
         sameBucket = vehicleConfig.requireSameBucket ~= false,
@@ -239,7 +239,7 @@ function vehicles.validate(src, kind, networkId, expectedPlate)
     if expectedPlate and plate ~= expectedPlate then
         return nil, 'vehicle changed'
     end
-    local record = QB.lookup.vehicle(GetEntityModel(entity))
+    local record = Kora.lookup.vehicle(GetEntityModel(entity))
     local metadataClass = record and record.metadata and record.metadata.class
     local class = asInteger(metadataClass)
         or (type(metadataClass) == 'string' and vehicleClasses[metadataClass:upper()] or nil)

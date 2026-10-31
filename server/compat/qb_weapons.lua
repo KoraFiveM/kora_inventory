@@ -57,10 +57,10 @@ end
 -- Current qb-weapons asks this callback while reconstructing its client state.
 -- kora_inventory has no repair-point config of its own, so an empty configuration
 -- is the compatible, no-hang response for a left-over caller.
-QB.callback.register('qb-weapons:server:GetConfig', function()
+Kora.callback.register('qb-weapons:server:GetConfig', function()
     return {}
 end)
-QB.callback.register('weapon:server:GetWeaponAmmo', function(src, legacy)
+Kora.callback.register('weapon:server:GetWeaponAmmo', function(src, legacy)
     local item, slot = itemAt(src, legacy)
     if not item then
         return 0, nil
@@ -74,10 +74,10 @@ end)
 -- can authorise one; gameplay resources should perform their server-side
 -- check and call SetWeaponState. Registering the old names prevents a stale
 -- client from waiting forever and returns a safe refusal.
-QB.callback.register('qb-weapons:server:RepairWeapon', function()
+Kora.callback.register('qb-weapons:server:RepairWeapon', function()
     return false
 end)
-QB.callback.register('qb-weapons:server:RemoveAttachment', function()
+Kora.callback.register('qb-weapons:server:RemoveAttachment', function()
     return false
 end)
 

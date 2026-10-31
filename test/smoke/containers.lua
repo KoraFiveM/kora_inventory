@@ -31,7 +31,7 @@ GetGameTimer = function() return 12345 end
 GetPlayerPed = function(source) return source == 10 and 110 or source == 20 and 120 or 0 end
 GetPlayerRoutingBucket = function(source) return (source == 10 or source == 20) and 1 or 2 end
 GetEntityCoords = function() return { x = 0, y = 0, z = 0 } end
-QB = { distance = { player = function() return true end } }
+Kora = { distance = { player = function() return true end } }
 
 QbInventory = { copy = QbInventory.copy, internal = {} }
 local I = QbInventory.internal

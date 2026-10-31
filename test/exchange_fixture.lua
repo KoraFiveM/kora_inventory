@@ -28,7 +28,7 @@ return function(database)
         local old=f.caller;f.caller='kora_core';local values=table.pack(pcall(f.provided[name],...));f.caller=old
         if not values[1] then error(values[2]) end;return table.unpack(values,2,values.n)
     end end})
-    local sql=QB.sql
+    local sql=Kora.sql
     sql.ready,sql.migrateFiles=function() return true end,function() return true end
     sql.query=function(query,params)
         if query:find('qbcore_player_column_operations',1,true) then

@@ -80,7 +80,7 @@ local function removeDrop(id)
     drops[tostring(id)] = nil
     exports.kora_target:removeZone(record.target)
     if record.entity then
-        QB.entities.remove(record.entity)
+        Kora.entities.remove(record.entity)
     end
 end
 
@@ -117,7 +117,7 @@ local function addDrop(id, coords)
 
     local placed = onGround(coords)
 
-    -- Registered BEFORE the model finishes streaming. QB.entities.create waits
+    -- Registered BEFORE the model finishes streaming. Kora.entities.create waits
     -- on the model, and a drop emptied during that wait would otherwise land its
     -- removal before this record existed and leave the prop orphaned.
     local record = { coords = placed }
@@ -126,11 +126,11 @@ local function addDrop(id, coords)
 
     -- Keep snapshot reconciliation synchronous while the model streams.
     CreateThread(function()
-        local entity = QB.entities.create(dropConfig.model or 'prop_med_bag_01b', placed, { freeze = true })
+        local entity = Kora.entities.create(dropConfig.model or 'prop_med_bag_01b', placed, { freeze = true })
         if drops[stringId] ~= record then
             -- Removed or replaced while the model was streaming.
             if entity then
-                QB.entities.remove(entity)
+                Kora.entities.remove(entity)
             end
             return
         end
@@ -201,7 +201,7 @@ local function hydrate()
     end
 
     local generation = dropGeneration
-    local list = QB.callback.trigger('qbinventory:server:drops')
+    local list = Kora.callback.trigger('qbinventory:server:drops')
     if type(list) ~= 'table' or generation ~= dropGeneration then
         return
     end
@@ -227,7 +227,7 @@ AddEventHandler('onClientResourceStop', function(resource)
         return
     end
 
-    -- QB.entities and QB.interact both clean up their own resource's handles on
+    -- Kora.entities and Kora.interact both clean up their own resource's handles on
     -- stop, so this only has to drop the bookkeeping.
     drops = {}
 end)

@@ -76,7 +76,7 @@ inv.Config, inv.QbInventory = {}, nil
 inv.exports = exportRealm('kora_inventory')
 inv.GetCurrentResourceName = function() return 'kora_inventory' end
 inv.CreateThread = function(fn) threads[#threads + 1] = fn end
-inv.QB = { resources = QB.resources, sql = {}, distance = { player = function() return true end },
+inv.Kora = { resources = Kora.resources, sql = {}, distance = { player = function() return true end },
     callback = { register = function(name, fn) callbacks[name] = fn end } }
 local function inventory(path) return assert(loadfile(inventoryRoot .. path, 't', inv))() end
 inventory('config.lua'); inventory('shared.lua'); inventory('server.lua')
@@ -107,8 +107,8 @@ job.QbJobCreator = {
         module = function() return module end, worksFor = function() return true end },
     logs = { record = function(_, entry) logs[#logs + 1] = entry end },
 }
-job.exports, job.QB = exportRealm('kora_jobcreator'), inv.QB
-job.QB.notify = { send = function(_, payload) notifications[#notifications + 1] = payload end }
+job.exports, job.Kora = exportRealm('kora_jobcreator'), inv.Kora
+job.Kora.notify = { send = function(_, payload) notifications[#notifications + 1] = payload end }
 assert(loadfile(os.getenv('QB_JOB_CRAFT_SOURCE') or root .. 'kora_jobcreator/server/crafting.lua', 't', job))()
 local crafting = job.QbJobCreator.crafting
 local function item(name, amount, slot, info) return assert(internal.buildItem(name, amount, slot, info or {})) end

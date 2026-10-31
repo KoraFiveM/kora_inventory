@@ -12,8 +12,8 @@ function emittedStatements() {
     const capture = spawnSync('lua', ['-'], { cwd: root, encoding: 'utf8', input: `
         local f=dofile('test/exchange_fixture.lua')(); assert(f.login(1,'CID1'))
         assert(Core.inventory.addItem(1,'water_bottle',3)); f.rollback=true
-        local read; local run=QB.sql.transactionChecked
-        QB.sql.transactionChecked=function(statements,context)
+        local read; local run=Kora.sql.transactionChecked
+        Kora.sql.transactionChecked=function(statements,context)
             if statements[1].query:find('SELECT * FROM \`qbinventory_player_exchanges\`',1,true) then read=statements[1] end
             return run(statements,context)
         end

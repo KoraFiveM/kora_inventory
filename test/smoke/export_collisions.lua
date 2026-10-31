@@ -53,16 +53,16 @@ Config = { qbinventory = {} }
 
 local sharedBlock = assert(manifest:match('shared_scripts%s*{(.-)\n}'), 'fxmanifest.lua must declare shared_scripts')
 for _, path in ipairs(pathsFrom(sharedBlock)) do
-    -- '@resource/file.lua' entries are other resources (kora_lib, kora_sql); the QB
+    -- '@resource/file.lua' entries are other resources (kora_lib, kora_sql); the Kora
     -- surface they provide is mocked below.
     if path:sub(1, 1) ~= '@' then dofile(path) end
 end
 
--- A minimal QB (kora_lib/qbsql) surface. Only the entry points touched
+-- A minimal Kora (kora_lib/qbsql) surface. Only the entry points touched
 -- unconditionally at module-load time need to exist here; everything else in
 -- these files runs inside a function body and is never invoked by merely
 -- loading the module.
-QB = {
+Kora = {
     compat = { provideExport = function() end },
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function() end },

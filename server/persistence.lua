@@ -163,25 +163,25 @@ local function db(sql, params)
     if not state.ready then
         return nil, state.lastError or 'persistence is not ready'
     end
-    return QB.sql.execute(sql, params or {})
+    return Kora.sql.execute(sql, params or {})
 end
 
 local function dbQuery(sql, params)
     if not state.ready then
         return nil, state.lastError or 'persistence is not ready'
     end
-    return QB.sql.query(sql, params or {})
+    return Kora.sql.query(sql, params or {})
 end
 
 local function dbUpsert(tableName, conflictKey, rows, opts)
     if not state.ready then
         return nil, state.lastError or 'persistence is not ready'
     end
-    return QB.sql.upsert(tableName, conflictKey, rows, opts)
+    return Kora.sql.upsert(tableName, conflictKey, rows, opts)
 end
 
 -- One multi-row upsert per shop save instead of one query per stock slot.
--- QB.sql.upsert (kora_sql's batched-upsert builder, the same one behind
+-- Kora.sql.upsert (kora_sql's batched-upsert builder, the same one behind
 -- enqueueMany/the hot player-save path) takes the composite `(shop_id, slot)`
 -- primary key as `pk` per row and flushes a single
 -- `INSERT ... VALUES (...),(...) ON DUPLICATE KEY UPDATE ...` statement.
@@ -332,11 +332,11 @@ end
 function persistence.deleteLegacyPoliceTrash()
     -- Every deletion needs its own receipt: an older permanent tombstone does
     -- not establish whether this attempt committed after a connection failure.
-    local token, tokenError = QB.sql.scalar("SELECT REPLACE(UUID(),'-','')")
+    local token, tokenError = Kora.sql.scalar("SELECT REPLACE(UUID(),'-','')")
     if type(token) ~= 'string' or #token ~= 32 or token:find('[^%x]') then
         return false, tokenError or 'inventory deletion receipt could not be created'
     end
-    local called, result, err = pcall(QB.sql.transactionChecked, {
+    local called, result, err = pcall(Kora.sql.transactionChecked, {
         { query = [[INSERT INTO `qbinventory_migration_rows`
             (`source_name`,`source_key`,`source_checksum`,`inventory_type`,`inventory_id`,`status`)
             VALUES ('inventories','stash:policetrash',?,'stash','policetrash','deleted'),
@@ -360,7 +360,7 @@ function persistence.deleteLegacyPoliceTrash()
     -- until this attempt's commit/rollback is known; another UUID is not ours.
     log('3', 'policetrash deletion is awaiting durable reconciliation')
     while true do
-        local readOK, snapshot = pcall(QB.sql.transactionChecked, {
+        local readOK, snapshot = pcall(Kora.sql.transactionChecked, {
             { query = [[SELECT `source_checksum` FROM `qbinventory_migration_rows`
                 WHERE `source_name`='inventories' AND `source_key`='stash:policetrash' FOR UPDATE]] },
         })
@@ -577,7 +577,7 @@ local function writeMigrationRow(source, sourceKey, sourceChecksum, status, kind
         `status`=VALUES(`status`), `error`=VALUES(`error`), `imported_at`=CURRENT_TIMESTAMP]],
         -- `err` is nil on the success path; bind it as a real NULL so the
         -- array keeps its seven elements.
-        { source, sourceKey, sourceChecksum, kind, id, status, err or QB.sql.NULL }
+        { source, sourceKey, sourceChecksum, kind, id, status, err or Kora.sql.NULL }
     )
 end
 
@@ -606,7 +606,7 @@ local function finishMigrationState(source, status, report, err)
         [[UPDATE `qbinventory_migration_state` SET `status`=?, `last_finished_at`=CURRENT_TIMESTAMP,
         `imported_count`=?, `skipped_count`=?, `quarantined_count`=?, `last_error`=? WHERE `source_name`=?]],
         -- `err` sits mid-array and is nil on success, which would leave a hole.
-        { status, report.imported, report.skipped, report.quarantined, err or QB.sql.NULL, source }
+        { status, report.imported, report.skipped, report.quarantined, err or Kora.sql.NULL, source }
     )
 end
 
@@ -790,13 +790,13 @@ local function bootstrap()
         log('3', 'secondary persistence disabled by configuration')
         return
     end
-    local sqlReady, readyErr = QB.sql.ready(60000)
+    local sqlReady, readyErr = Kora.sql.ready(60000)
     if not sqlReady then
         state.lastError = readyErr or 'qbsql did not become ready'
         log('1', state.lastError)
         return
     end
-    local applied, migrationErr = QB.sql.migrateFiles(resource, MIGRATIONS, checksum)
+    local applied, migrationErr = Kora.sql.migrateFiles(resource, MIGRATIONS, checksum)
     if migrationErr then
         state.lastError = migrationErr
         log('1', ('schema migration failed: %s'):format(migrationErr))

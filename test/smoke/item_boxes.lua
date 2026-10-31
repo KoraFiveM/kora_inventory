@@ -27,7 +27,7 @@ H.ok(server:find('local def = itemDef(name)', server:find('local function showIt
 Config = { qbinventory = {} }
 dofile('config.lua')
 dofile('shared.lua')
-QB = {
+Kora = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function() end },
 }

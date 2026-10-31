@@ -26,7 +26,7 @@ local function setup()
         },
         kora_inventory = { openInventory = function(_, kind, id) f.opened[#f.opened + 1] = { kind = kind, id = id } end },
     }
-    env.QB = {
+    env.Kora = {
         entities = {
             create = function(model, coords, options)
                 H.equal(model, 'prop_med_bag_01b'); H.equal(options.freeze, true)
