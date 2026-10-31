@@ -188,6 +188,36 @@ Config.qbinventory = {
         distance = 3.0,
         requireSameBucket = true,
         plateMaxLength = 8,
+        -- Inventory-key access to vehicle storage (client/vehicles.lua). While
+        -- seated the key opens the glovebox; on foot at a vehicle's boot it opens
+        -- the trunk. Set `enabled = false` to leave vehicle storage to other
+        -- resources (exports.kora_inventory:openInventory('trunk', netId) keeps
+        -- working either way).
+        enabled = true,
+        gloveboxEnabled = true,
+        trunkEnabled = true,
+        -- How close (metres) a player must stand to the boot position to open
+        -- the trunk. The boot position is derived from the model dimensions.
+        bootReach = 1.8,
+        -- Server-side limit (metres) from the player to the vehicle origin when
+        -- opening a trunk. Larger than `distance` because the boot sits at the
+        -- far end of the vehicle, well away from its centre.
+        trunkDistance = 7.0,
+        -- Refuse trunk access while the vehicle is locked (kora_vehiclekeys
+        -- state bag or the native door lock status).
+        respectLocks = true,
+        -- Models whose boot is at the FRONT (rear/mid-engine cars). Everything
+        -- else uses the rear boot. Spawn names, case-insensitive.
+        frontBootModels = {
+            'adder', 'autarch', 'cyclone', 'deveste', 'emerus', 'entity2', 'entityxf',
+            'furia', 'gp1', 'ignus', 'italigtb', 'italigtb2', 'krieger', 'le7b',
+            'nero', 'nero2', 'osiris', 'penetrator', 'pfister811', 'prototipo', 'reaper',
+            's80', 'sc1', 'sheava', 'taipan', 'tempesta', 'tezeract', 'thrax', 'tigon',
+            'turismor', 'tyrant', 'vacca', 'vagner', 'visione', 'voltic', 'xa21', 'zentorno',
+        },
+        -- GTA vehicle classes that have no boot to stand at (8 motorcycles,
+        -- 13 cycles, 21 trains). The inventory key ignores them on foot.
+        bootSkipClasses = { 8, 13, 21 },
         -- Optional trusted server callbacks. Return false (or false, reason)
         -- to deny access to the server-resolved vehicle descriptor.
         ownerCheck = nil,
@@ -459,6 +489,56 @@ if QB and QB.config and QB.config.adopt then
         scope = 'server',
         live = true,
     })
+    Config.qbinventory.vehicles.enabled = QB.config.boolean(Config.qbinventory.vehicles.enabled, {
+        label = 'Open vehicle storage with the inventory key',
+        description = 'When on, pressing the inventory key while seated in a vehicle opens its glovebox, and pressing it at the boot of a vehicle opens its trunk. Turn it off if another resource handles vehicle storage; exports can still open it. Applies on the next key press.',
+        live = true,
+    })
+    Config.qbinventory.vehicles.gloveboxEnabled = QB.config.boolean(Config.qbinventory.vehicles.gloveboxEnabled, {
+        label = 'Glovebox from the inventory key',
+        description = 'Allows the inventory key to open the glovebox while seated. Which vehicle classes have a glovebox and how big it is comes from the storage-by-class table. Applies on the next key press.',
+        live = true,
+    })
+    Config.qbinventory.vehicles.trunkEnabled = QB.config.boolean(Config.qbinventory.vehicles.trunkEnabled, {
+        label = 'Trunk from the inventory key',
+        description = 'Allows the inventory key to open the trunk when standing at the boot of a vehicle. Which vehicle classes have a trunk and how big it is comes from the storage-by-class table. Applies on the next key press.',
+        live = true,
+    })
+    Config.qbinventory.vehicles.bootReach = QB.config.number(Config.qbinventory.vehicles.bootReach, {
+        label = 'Boot reach (metres)',
+        description = 'How close a player must stand to the boot (rear, or front for rear-engine cars) to open the trunk with the inventory key. Raise it if players struggle to find the spot; very large values let them open trunks from the side of the car. Applies on the next key press.',
+        min = 0.5,
+        max = 5.0,
+        step = 0.1,
+        live = true,
+    })
+    Config.qbinventory.vehicles.trunkDistance = QB.config.number(Config.qbinventory.vehicles.trunkDistance, {
+        label = 'Trunk server distance (metres)',
+        description = 'The furthest a player may be from the vehicle origin when the server accepts a trunk open. The boot is at the end of the vehicle, so this must exceed half the vehicle length plus the boot reach; long vans and trucks need a larger value. Applies on the next trunk open.',
+        scope = 'server',
+        min = 2.0,
+        max = 20.0,
+        step = 0.5,
+        live = true,
+    })
+    Config.qbinventory.vehicles.respectLocks = QB.config.boolean(Config.qbinventory.vehicles.respectLocks, {
+        label = 'Locked vehicles block the trunk',
+        description = 'When on, the server refuses to open the trunk of a locked vehicle (kora_vehiclekeys lock state or the native door lock) and the player is told the vehicle is locked. Turn it off to let anyone open any trunk. The glovebox of the vehicle you are sitting in is never blocked. Applies on the next trunk open.',
+        scope = 'server',
+        live = true,
+    })
+    Config.qbinventory.vehicles.frontBootModels = QB.config.list(Config.qbinventory.vehicles.frontBootModels,
+        QB.config.string('', { minLength = 1 }), {
+            label = 'Front-boot vehicle models',
+            description = 'Spawn names of rear- or mid-engine cars whose trunk is at the front (for example adder or zentorno). All other cars use the rear boot. Add streamed addon cars here. Applies on the next key press.',
+            live = true,
+        })
+    Config.qbinventory.vehicles.bootSkipClasses = QB.config.list(Config.qbinventory.vehicles.bootSkipClasses,
+        QB.config.integer(0, { min = 0, max = 30 }), {
+            label = 'Vehicle classes without a boot',
+            description = 'GTA vehicle class numbers that the inventory key ignores when standing next to them (default: motorcycles 8, cycles 13, trains 21). Applies on the next key press.',
+            live = true,
+        })
     Config.qbinventory.ui.hotbarSeconds = QB.config.number(Config.qbinventory.ui.hotbarSeconds, {
         label = 'Hotbar display time (seconds)',
         description = 'How long the on-screen hotbar stays visible after a player presses the show-hotbar key before it disappears again. Set to 0 to disable the key.',

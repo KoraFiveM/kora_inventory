@@ -30,7 +30,11 @@ local function storageKind(kind)
     return kind == 'trunk' or kind == 'glovebox'
 end
 
-local function accessDistance()
+local function accessDistance(kind)
+    if kind == 'trunk' and tonumber(vehicleConfig.trunkDistance) then
+        -- The boot is at the far end of the vehicle, not at its origin.
+        return tonumber(vehicleConfig.trunkDistance)
+    end
     return tonumber(vehicleConfig.distance)
         or tonumber(Config.qbinventory and Config.qbinventory.interactionDistance)
         or 3.0
@@ -97,6 +101,21 @@ function vehicles.inventoryKey(kind, plate)
         return nil, err
     end
     return ('%s:%s'):format(kind, normalised)
+end
+
+---Lock state: kora_vehiclekeys publishes a boolean state bag; vehicles it does
+---not manage (parked traffic) fall back to the native door lock status.
+local function isLocked(entity)
+    if type(Entity) == 'function' then
+        local ok, state = pcall(function() return Entity(entity).state['qbvehiclekeys:locked'] end)
+        if ok and type(state) == 'boolean' then
+            return state
+        end
+    end
+    if type(GetVehicleDoorLockStatus) == 'function' then
+        return (tonumber(GetVehicleDoorLockStatus(entity)) or 0) >= 2
+    end
+    return false
 end
 
 ---Find the capacity policy for a server-resolved GTA vehicle class.
@@ -193,7 +212,7 @@ function vehicles.validate(src, kind, networkId, expectedPlate)
     networkId = asInteger(networkId)
     local entity, reason = QB.world.resolveNetworkEntity(src, networkId, {
         entityType = 'vehicle',
-        maxDistance = accessDistance(),
+        maxDistance = accessDistance(kind),
         sameBucket = vehicleConfig.requireSameBucket ~= false,
     })
     if not entity then
@@ -228,6 +247,9 @@ function vehicles.validate(src, kind, networkId, expectedPlate)
     if not capacity then
         return nil, capacityErr
     end
+    if kind == 'trunk' and vehicleConfig.respectLocks ~= false and isLocked(entity) then
+        return nil, 'vehicle is locked'
+    end
     local vehicle = {
         entity = entity,
         netId = networkId,
@@ -257,7 +279,7 @@ function vehicles.resolve(src, kind, networkId)
         slots = vehicle.slots,
         maxWeight = vehicle.maxWeight,
         coords = vehicle.coords,
-        distance = accessDistance(),
+        distance = accessDistance(kind),
     }
     -- Do not retain trust in a one-time open: every access during a session
     -- revalidates the same native entity and original server-resolved plate.

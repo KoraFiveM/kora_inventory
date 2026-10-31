@@ -85,6 +85,8 @@ client_scripts {
     'client/hotbar.lua',
     -- Ground-drop props. Presentation only; see the file header.
     'client/drops.lua',
+    -- Inventory-key access to glovebox/trunk; intent only, the server resolves the vehicle.
+    'client/vehicles.lua',
     'client/shops/ammunation.lua',
     'client/shops/vendingmachine.lua',
     'client/shops/liquorstore.lua',

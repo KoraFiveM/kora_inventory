@@ -211,6 +211,10 @@ RegisterCommand('inventory', function()
     if QB.zones.isCreatorActive() or QB.placement.isActive() then
         return
     end
+    -- Seated -> glovebox, at a vehicle's boot -> trunk (client/vehicles.lua).
+    if QbInventory.vehicleStorage and QbInventory.vehicleStorage.tryOpen() then
+        return
+    end
     openSelf()
 end, false)
 

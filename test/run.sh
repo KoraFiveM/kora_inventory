@@ -22,6 +22,8 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/security.lua
 "${LUA:-lua}" test/smoke/access_policy.lua
 "${LUA:-lua}" test/smoke/vehicles.lua
+"${LUA:-lua}" test/smoke/vehicles_access.lua
+"${LUA:-lua}" test/smoke/vehicles_client.lua
 "${LUA:-lua}" test/smoke/containers.lua
 "${LUA:-lua}" test/smoke/qb_compat.lua
 "${LUA:-lua}" test/smoke/qb_events.lua

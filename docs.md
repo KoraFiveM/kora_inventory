@@ -236,6 +236,25 @@ descriptor and can be cleaned with `cleanupResource(resourceName)`.
 routes trunk/glovebox requests through it. Integrations must pass the network
 id only—never a `plate`, `key`, coordinates, or capacity object.
 
+### Opening vehicle storage with the inventory key
+
+`client/vehicles.lua` turns the inventory key (TAB) into the network-id intent
+above; `client/compat.lua` tries it before the player's own inventory.
+
+- Seated in a vehicle: opens the glovebox next to the player inventory.
+- On foot within `bootReach` of a vehicle's boot: opens the trunk. The boot is
+  the rear bumper, or the front for the rear/mid-engine models in
+  `vehicles.frontBootModels` (adder, zentorno, ...). Classes in
+  `vehicles.bootSkipClasses` (motorcycles, cycles, trains) are ignored.
+- A locked vehicle (kora_vehiclekeys `qbvehiclekeys:locked` state, else the
+  native door lock) refuses the trunk with a "locked" notice; the server
+  enforces this too unless `vehicles.respectLocks = false`.
+
+Options (all under `Config.qbinventory.vehicles`): `enabled`, `gloveboxEnabled`,
+`trunkEnabled`, `bootReach`, `trunkDistance`, `respectLocks`, `frontBootModels`,
+`bootSkipClasses`. Set `enabled = false` if another resource drives vehicle
+storage; `exports.kora_inventory:openInventory('trunk', netId)` still works.
+
 ## Item containers, evidence, and confiscation
 
 `server/containers.lua` is a server-only domain module. It registers no NUI
