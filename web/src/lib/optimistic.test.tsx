@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
+import { readFileSync } from "node:fs"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -175,5 +176,69 @@ describe("optimistic moves in the NUI", () => {
         await act(async () => { answer({ ok: false, error: "nope" }) })
         expect(slotText(1)).toContain("×3")
         expect(notice()).toContain("nope")
+    })
+})
+
+describe("the inventory stays usable while a move waits for the server", () => {
+    const disabledSlots = () => host.querySelectorAll('.slot[aria-disabled="true"]').length
+
+    it("never locks the slots or shows a busy state behind a pending move", async () => {
+        hold(); await splitOne()
+        expect(disabledSlots()).toBe(0)
+        expect(host.querySelector('[aria-busy="true"]')).toBeNull()
+    })
+
+    it("queues a second drag and sends it in order once the first is answered", async () => {
+        hold(); await splitOne()
+        await splitOne()
+        expect(sendIntent).toHaveBeenCalledTimes(1)
+        await act(async () => { answer({ ok: true }) })
+        await act(async () => { vi.advanceTimersByTime(1) })
+        expect(sendIntent).toHaveBeenCalledTimes(2)
+        expect(sendIntent.mock.calls[1][0]).toMatchObject({ intent: "move" })
+    })
+
+    it("settles on the answer alone, without waiting for a patch of every inventory", async () => {
+        hold(); await splitOne()
+        await act(async () => { answer({ ok: true }) })
+        await splitOne()
+        expect(sendIntent).toHaveBeenCalledTimes(2)
+    })
+
+    it("drops the queue when the move in front of it is refused", async () => {
+        hold(); await splitOne()
+        await splitOne()
+        await act(async () => { answer({ ok: false, error: "nope" }) })
+        await act(async () => { vi.advanceTimersByTime(50) })
+        expect(sendIntent).toHaveBeenCalledTimes(1)
+        expect(slotText(1)).toContain("×3")
+    })
+
+    it("queueMoves off locks the inventory until the server answers, without a wait cursor", async () => {
+        await post("qbinventory:nui:config", { queueMoves: false })
+        hold(); await splitOne()
+        expect(disabledSlots()).toBeGreaterThan(0)
+        act(() => { host.querySelector('button[aria-label^="Coca Leaf"]')!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })) })
+        expect(host.querySelector("form")).toBeNull()
+        expect(sendIntent).toHaveBeenCalledTimes(1)
+        await act(async () => { answer({ ok: true }) })
+        await post("qbinventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [leaf(1, 2), leaf(2, 1)]) })
+        expect(disabledSlots()).toBe(0)
+    })
+
+    it("honours the configured move timeout", async () => {
+        await post("qbinventory:nui:config", { moveTimeoutMs: 3000 })
+        hold(); await splitOne()
+        await act(async () => { vi.advanceTimersByTime(2999) })
+        expect(filled(2)).toBe(true)
+        await act(async () => { vi.advanceTimersByTime(2) })
+        expect(filled(2)).toBe(false)
+        expect(notice()).toContain("did not respond")
+    })
+
+    it("opening a session starts unlocked and the stylesheet has no busy cursor", () => {
+        expect(disabledSlots()).toBe(0)
+        const css = readFileSync("src/styles.css", "utf8")
+        expect(css).not.toMatch(/cursor:\s*(wait|progress)/)
     })
 })

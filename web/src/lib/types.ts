@@ -94,6 +94,10 @@ export interface UiConfig {
     rightClickSplit?: boolean
     /** Paint a move before the server answers and roll back if refused (Config.qbinventory.ui.optimisticMoves). */
     optimisticMoves?: boolean
+    /** Queue drags made while a move is pending instead of refusing them (Config.qbinventory.ui.queueMoves). */
+    queueMoves?: boolean
+    /** Milliseconds before an unanswered move is rolled back (Config.qbinventory.ui.moveTimeout, in seconds). */
+    moveTimeoutMs?: number
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string

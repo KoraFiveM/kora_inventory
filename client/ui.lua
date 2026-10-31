@@ -44,6 +44,11 @@ local function pushConfig()
         showHotbar = ui.showHotbar ~= false,
         rightClickSplit = ui.rightClickSplit ~= false,
         optimisticMoves = ui.optimisticMoves ~= false,
+        -- Drags made while a move is awaiting the server are queued rather than
+        -- refused (only meaningful with optimisticMoves).
+        queueMoves = ui.queueMoves ~= false,
+        -- How long the UI waits for the server before rolling a move back.
+        moveTimeoutMs = math.floor(math.max(2, math.min(60, tonumber(ui.moveTimeout) or 10)) * 1000),
         -- Read on every push so a live config change applies on the next open.
         scale = math.max(0.5, math.min(2.0, tonumber(ui.scale) or 1.0)),
         images = ui.images,
@@ -237,15 +242,21 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
         return
     end
 
-    -- Wait for kora_inventory's authoritative callback result. This keeps the
-    -- browser locked until validation and any yielding useable handler finish,
-    -- rather than acknowledging a merely-local hand-off as success.
-    local ok, result = QbInventory.clientApi.submitIntent({
+    -- Wait for kora_inventory's authoritative callback result, rather than
+    -- acknowledging a merely-local hand-off as success. pcall'd so that an error
+    -- in the transport still answers the browser: an unanswered NUI request
+    -- stays pending in CEF and the move would only be rolled back by its timeout.
+    local called, ok, result = pcall(QbInventory.clientApi.submitIntent, {
         sessionId = data.sessionId,
         token = data.token,
         intent = data.intent,
         payload = data.payload,
     })
+    if not called then
+        print(('^3[qbinventory]^7 intent failed: %s'):format(tostring(ok)))
+        cb({ ok = false, error = 'inventory request failed' })
+        return
+    end
     cb({ ok = ok == true, error = ok and nil or result })
 end)
 

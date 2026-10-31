@@ -32,6 +32,12 @@ H.ok(source:find('rightClickSplit = ui.rightClickSplit ~= false', 1, true), 'rig
 H.equal(Config.qbinventory.ui.optimisticMoves, true, 'optimistic moves default on')
 H.ok(source:find('optimisticMoves = ui.optimisticMoves ~= false', 1, true), 'optimisticMoves is pushed to the NUI on every config push')
 
+H.equal(Config.qbinventory.ui.queueMoves, true, 'drags queue behind a pending move by default instead of being refused')
+H.ok(source:find('queueMoves = ui.queueMoves ~= false', 1, true), 'queueMoves is pushed to the NUI on every config push')
+H.equal(Config.qbinventory.ui.moveTimeout, 10, 'move timeout defaults to 10 seconds')
+H.ok(source:find('moveTimeoutMs = math.floor(math.max(2, math.min(60, tonumber(ui.moveTimeout) or 10)) * 1000)', 1, true),
+    'the move timeout is read live, clamped to 2-60 s and pushed in milliseconds')
+
 local canonicalImage = io.open('images/advancedlockpick.png', 'rb')
 H.ok(canonicalImage ~= nil, 'canonical qb-inventory artwork is bundled')
 if canonicalImage then canonicalImage:close() end
@@ -40,7 +46,8 @@ if canonicalImage then canonicalImage:close() end
 local handlers, messages = {}, {}
 AddEventHandler = function(name, callback) handlers[name] = callback end
 RegisterNetEvent = AddEventHandler
-RegisterNUICallback = function() end
+local nui = {}
+RegisterNUICallback = function(name, fn) nui[name] = fn end
 SetNuiFocus, TriggerEvent = function() end, function() end
 SendNUIMessage = function(message) messages[#messages + 1] = message end
 GetCurrentResourceName = function() return 'kora_inventory' end
@@ -118,4 +125,52 @@ H.equal(patch.secondary.id, 'stash:locker', 'storage compact update still reache
 H.equal(patch.player, nil, 'storage update leaves player untouched')
 H.equal(patch.revision, nil, 'storage counter leaves primary revision untouched')
 H.equal(patch.secondaryRevision, 21, 'storage counter reaches secondary revision')
+
+-- Every NUI callback must answer on every path. A callback that never calls cb
+-- leaves the browser's fetch pending: the move then sits locked until the UI's
+-- own timeout fires, which is exactly the "busy cursor, cannot drag" report.
+local function answers(name, data, label)
+    local calls = {}
+    nui[name](data, function(result) calls[#calls + 1] = result end)
+    H.equal(#calls, 1, name .. ' answers exactly once: ' .. label)
+    return calls[1]
+end
+handlers['qbinventory:ui:sessionOpened']({ token = 'D', primary = view('player:1', 1) })
+local envelope = function(intent, payload)
+    return { sessionId = 'D', token = 'D', intent = intent, payload = payload }
+end
+local submit
+QbInventory = { clientApi = { submitIntent = function(...) return submit(...) end } }
+submit = function() return true end
+H.equal(answers('qbinventory:nui:intent', envelope('move', {}), 'accepted').ok, true, 'an accepted intent reports ok')
+submit = function() return false, 'over weight' end
+H.equal(answers('qbinventory:nui:intent', envelope('move', {}), 'rejected').error, 'over weight', 'a rejection carries the reason')
+submit = function() error('transport exploded') end
+local failed = answers('qbinventory:nui:intent', envelope('move', {}), 'transport raises')
+H.equal(failed.ok, false, 'an error inside the transport still answers the browser')
+submit = function() return true end
+for label, data in pairs({
+    ['nil data'] = false, ['empty table'] = {}, ['stale session'] = { sessionId = 'old', token = 'D', intent = 'move', payload = {} },
+    ['bad token'] = { sessionId = 'D', token = 1, intent = 'move', payload = {} },
+    ['unknown intent'] = envelope('teleport', {}), ['bad payload'] = envelope('move', 'x'),
+}) do
+    local result = answers('qbinventory:nui:intent', data or nil, label)
+    H.equal(result.ok, false, 'invalid intent is refused: ' .. label)
+end
+answers('qbinventory:nui:close', nil, 'nil data')
+answers('qbinventory:nui:close', {}, 'empty table')
+answers('qbinventory:nui:close', { sessionId = 'D', token = 'D' }, 'valid close')
+
+-- No other resource file may register a NUI callback this test does not cover.
+local scan = io.popen("grep -rl RegisterNUICallback client client.lua server.lua shared.lua 2>/dev/null")
+for file in scan:lines() do
+    H.equal(file, 'client/ui.lua', 'NUI callbacks are registered only in client/ui.lua (' .. file .. ')')
+end
+scan:close()
+local registered = 0
+for name in pairs(nui) do
+    registered = registered + 1
+    H.ok(name == 'qbinventory:nui:intent' or name == 'qbinventory:nui:close', 'unexpected NUI callback ' .. name .. ' needs an answers() test')
+end
+H.equal(registered, 2, 'both NUI callbacks are exercised')
 H.finish()

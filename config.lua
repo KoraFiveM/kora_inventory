@@ -97,6 +97,20 @@ Config.qbinventory = {
         -- server has confirmed them. Applied the next time the inventory opens.
         optimisticMoves = true,
 
+        -- While a move is waiting for the server, further drags are queued and
+        -- sent in order instead of being refused behind a busy cursor. The
+        -- inventory stays draggable at all times; a refused or unanswered move
+        -- rolls back and clears the queue. Needs optimisticMoves. Set to false
+        -- to lock the inventory (without a wait cursor) until the server
+        -- answers. Applied the next time the inventory opens.
+        queueMoves = true,
+
+        -- Seconds the UI waits for the server to answer a move before rolling
+        -- it back as unanswered (2-60). Raise it on a heavily loaded server so
+        -- slow answers are not shown as failures. Applied the next time the
+        -- inventory opens.
+        moveTimeout = 10,
+
         -- Item artwork resolution. `localPath` is tried before any remote
         -- `imageUrl` when `preferLocal` is set, and always as the fallback when
         -- a remote image 404s.
@@ -447,6 +461,19 @@ if QB and QB.config and QB.config.adopt then
     Config.qbinventory.ui.optimisticMoves = QB.config.boolean(Config.qbinventory.ui.optimisticMoves, {
         label = 'Show inventory moves instantly',
         description = 'When on, moving, stacking, swapping or splitting items appears immediately and is undone if the server refuses the move or does not answer. Turn it off to show a move only after the server has confirmed it, which avoids a brief flash of a move that is then refused. The server checks every move either way. Changes apply the next time a player opens their inventory.',
+        live = true,
+    })
+    Config.qbinventory.ui.queueMoves = QB.config.boolean(Config.qbinventory.ui.queueMoves, {
+        label = 'Queue inventory drags while a move is pending',
+        description = 'When on (and instant moves are on), you can keep dragging items while an earlier move is still waiting for the server; the extra moves are sent one after another. Turn it off to block dragging until the server has answered. Changes apply the next time a player opens their inventory.',
+        live = true,
+    })
+    Config.qbinventory.ui.moveTimeout = QB.config.number(Config.qbinventory.ui.moveTimeout, {
+        label = 'Inventory move timeout (seconds)',
+        description = 'How long the inventory waits for the server to answer a move before undoing it and reporting that the server did not respond. Raise it only if your server is slow to answer. Changes apply the next time a player opens their inventory.',
+        min = 2,
+        max = 60,
+        step = 1,
         live = true,
     })
     Config.qbinventory.ui.scale = QB.config.number(Config.qbinventory.ui.scale, {

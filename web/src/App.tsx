@@ -13,8 +13,8 @@ import { predictMove, refreshedInventories, restoreInventories, type MoveRequest
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
 
-// A move that gets no answer would leave the inventory locked for good.
-const MOVE_TIMEOUT_MS = 10000
+// Drags that may wait behind an unanswered request before further ones are refused.
+const MAX_QUEUED_MOVES = 8
 
 /**
  * Presentation config from `Config.qbinventory.ui`, pushed on
@@ -24,12 +24,15 @@ const MOVE_TIMEOUT_MS = 10000
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves">> & { images: NonNullable<UiConfig["images"]> } = {
+const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "moveTimeoutMs">> & { images: NonNullable<UiConfig["images"]> } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
     rightClickSplit: true,
     optimisticMoves: true,
+    queueMoves: true,
+    // A move that gets no answer would otherwise stay pending for good.
+    moveTimeoutMs: 10000,
     scale: 1,
     images: {
         localPath: "nui://kora_inventory/images",
@@ -406,6 +409,10 @@ function InventoryApp() {
     const [selectedAmount, setSelectedAmount] = useState(1)
     const [splitTarget, setSplitTarget] = useState<Selection | undefined>()
     const [uiConfig, setUiConfig] = useState(DEFAULT_UI_CONFIG)
+    // With instant moves the inventory never locks behind the server: a drag made
+    // while a move is in flight is queued and sent when that move settles.
+    const unlocked = uiConfig.optimisticMoves && uiConfig.queueMoves
+    const locked = movePending && !unlocked
     const selectedMax = Math.max(1, Math.floor(selected?.item.amount ?? 1))
     const selectedCount = Math.min(Math.max(1, selectedAmount), selectedMax)
     const pendingInventories = useRef<Set<string> | undefined>()
@@ -417,14 +424,26 @@ function InventoryApp() {
     // Request counter, plus the views to restore if the in-flight optimistic move fails.
     const requestSeq = useRef(0)
     const optimistic = useRef<Map<string, InventoryView> | undefined>()
+    // Drags made while a request is in flight, oldest first, plus the latest
+    // session and handlers they must be resolved against when their turn comes.
+    const queue = useRef<Array<() => void>>([])
+    const sessionRef = useRef(session)
+    sessionRef.current = session
+    const queued = useRef<{ move: (request: MoveRequest) => void; dropOut: (source: DragSlot) => void } | undefined>()
 
-    const clearPendingMove = useCallback(() => {
+    const clearPendingMove = useCallback((keepQueue = false) => {
         window.clearTimeout(moveTimeout.current)
         pendingInventories.current = undefined
         requestPending.current = false
         optimistic.current = undefined
+        if (keepQueue !== true) queue.current = []
         setMovePending(false)
     }, [])
+    // The request was answered: start the next queued drag, if any.
+    const finishPendingMove = useCallback(() => {
+        clearPendingMove(true)
+        if (queue.current.length) window.setTimeout(() => { if (!requestPending.current) queue.current.shift()?.() }, 0)
+    }, [clearPendingMove])
     // A move the server refused or never answered: put back exactly what the
     // prediction replaced, except inventories an authoritative patch has since
     // refreshed (those were dropped from `optimistic` when the patch landed).
@@ -441,8 +460,8 @@ function InventoryApp() {
             ? [patch.snapshot.player.id, patch.snapshot.secondary?.id]
             : [patch.player?.id, patch.secondary?.id]
         for (const id of changed) if (id) pending.delete(id)
-        if (pending.size === 0) clearPendingMove()
-    }, [clearPendingMove])
+        if (pending.size === 0) finishPendingMove()
+    }, [finishPendingMove])
 
     // Merged onto the defaults rather than replacing them, so a config table
     // that omits a key keeps the shipped behaviour for it instead of dropping to
@@ -457,6 +476,8 @@ function InventoryApp() {
             showHotbar: config.showHotbar ?? current.showHotbar,
             rightClickSplit: config.rightClickSplit ?? current.rightClickSplit,
             optimisticMoves: config.optimisticMoves ?? current.optimisticMoves,
+            queueMoves: config.queueMoves ?? current.queueMoves,
+            moveTimeoutMs: Number.isFinite(config.moveTimeoutMs) && Number(config.moveTimeoutMs) > 0 ? Number(config.moveTimeoutMs) : current.moveTimeoutMs,
             scale: Number.isFinite(config.scale) && Number(config.scale) > 0 ? Number(config.scale) : current.scale,
             images: { ...current.images, ...(config.images ?? {}) },
         }))
@@ -507,10 +528,14 @@ function InventoryApp() {
         }
         // Use can legitimately run long (progress bar), everything else gets a deadline.
         if (intent !== "use") {
-            moveTimeout.current = window.setTimeout(() => rollbackPendingMove("Inventory did not respond"), MOVE_TIMEOUT_MS)
+            moveTimeout.current = window.setTimeout(() => rollbackPendingMove("Inventory did not respond"), uiConfig.moveTimeoutMs)
         }
-        if (awaitInventories?.length) {
-            pendingInventories.current = new Set(awaitInventories)
+        // The server sends its patches before it answers, so the answer alone
+        // settles an unlocked inventory; waiting for a patch as well would hold
+        // every later drag behind any inventory the server did not re-send.
+        const awaiting = unlocked ? undefined : awaitInventories
+        if (awaiting?.length) {
+            pendingInventories.current = new Set(awaiting)
         }
         try {
             const response = await sendIntent({ sessionId: session.sessionId, token: session.token, intent, payload })
@@ -521,17 +546,26 @@ function InventoryApp() {
             }
             // The Vite harness has no Lua authority to send a patch back. Keep
             // it usable without weakening the runtime's authoritative lock.
-            if (import.meta.env.DEV && awaitInventories?.length) queueMicrotask(clearPendingMove)
-            if (!awaitInventories?.length) clearPendingMove()
+            if (import.meta.env.DEV && awaiting?.length) queueMicrotask(() => clearPendingMove())
+            if (!awaiting?.length) finishPendingMove()
             return true
         } catch {
             if (stale()) return false
             rollbackPendingMove("Inventory connection interrupted")
             return false
         }
-    }, [clearPendingMove, movePending, rollbackPendingMove, session, uiConfig.optimisticMoves])
+    }, [clearPendingMove, finishPendingMove, movePending, rollbackPendingMove, session, unlocked, uiConfig.optimisticMoves, uiConfig.moveTimeoutMs])
 
+    const enqueue = useCallback((run: () => void) => {
+        if (queue.current.length >= MAX_QUEUED_MOVES) { setError("Too many moves waiting for the server"); return }
+        queue.current.push(run)
+    }, [])
     const move = useCallback((from: InventoryView, fromSlot: number, to: InventoryView, toSlot: number, requestedAmount?: number) => {
+        if (unlocked && requestPending.current) {
+            const request: MoveRequest = { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount: requestedAmount ?? findItem(from, fromSlot)?.amount ?? 1 }
+            enqueue(() => queued.current?.move(request))
+            return
+        }
         const item = findItem(from, fromSlot)
         if (!item || !Number.isFinite(item.amount) || item.amount < 1) {
             setError("That item is no longer available")
@@ -550,16 +584,16 @@ function InventoryApp() {
             fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount,
             revision: session?.revision, secondaryRevision: session?.secondaryRevision,
         }, [from.id, to.id], prediction)
-    }, [session, submit, uiConfig.optimisticMoves])
+    }, [enqueue, session, submit, unlocked, uiConfig.optimisticMoves])
 
     const canDropSlot = useCallback((source: DragSlot, target: SlotTarget) => {
-        if (!source || !session || movePending || (source.inventoryId === target.inventoryId && source.slot === target.slot)) return false
+        if (!source || !session || locked || (source.inventoryId === target.inventoryId && source.slot === target.slot)) return false
         const sourceInventory = findInventory(session, source.inventoryId)
         const targetInventory = findInventory(session, target.inventoryId)
         if (!findItem(sourceInventory, source.slot) || !targetInventory) return false
         if (sourceInventory?.type === "shop") return targetInventory.id === session.player.id
         return targetInventory.type !== "shop"
-    }, [movePending, session])
+    }, [locked, session])
     const dropSlot = useCallback((source: DragSlot, target: SlotTarget) => {
         if (!source || !session || !canDropSlot(source, target)) return
         const sourceInventory = findInventory(session, source.inventoryId)
@@ -572,21 +606,32 @@ function InventoryApp() {
     // a slot to move/stack, drag outside the window to drop), so a click on an
     // empty slot can no longer fling the previous selection into it.
     const selectSlot = useCallback((inventory: InventoryView, item: InventoryItem | undefined, slot: number) => {
-        if (movePending) return
+        if (locked) return
         setSelected((current) => {
             if (!item) return undefined
             if (current && current.inventory.id === inventory.id && current.item.slot === slot) return undefined
             return { inventory, item }
         })
-    }, [movePending])
+    }, [locked])
 
     const dropOut = useCallback((source: DragSlot) => {
         if (!session || source.inventoryId !== session.player.id) return
+        if (unlocked && requestPending.current) { enqueue(() => queued.current?.dropOut(source)); return }
         const item = findItem(session.player, source.slot)
         if (!item || !Number.isFinite(item.amount) || item.amount < 1) { setError("That item is no longer available"); return }
         setSelected(undefined)
         void submit("drop", { inventory: source.inventoryId, slot: source.slot, amount: item.amount })
-    }, [session, submit])
+    }, [enqueue, session, submit, unlocked])
+    queued.current = {
+        move: (request) => {
+            const current = sessionRef.current
+            const from = current && findInventory(current, request.fromInventory)
+            const to = current && findInventory(current, request.toInventory)
+            if (current && from && to && findItem(from, request.fromSlot)) move(from, request.fromSlot, to, request.toSlot, request.amount)
+            else finishPendingMove()
+        },
+        dropOut,
+    }
     const split = useCallback((inventory: InventoryView, item: InventoryItem, requestedAmount?: number) => {
         if (!session || inventory.type === "shop" || item.amount < 2) return
         const amount = Math.floor(requestedAmount ?? selectedCount)
@@ -636,11 +681,11 @@ function InventoryApp() {
         const onKey = (event: KeyboardEvent) => {
             if (event.key === "Escape" && splitTarget) { setSplitTarget(undefined); return }
             if (event.key === "Escape" || event.key === "Tab") close()
-            if (event.key === "Enter" && selected && !movePending) activateSelected(selected)
+            if (event.key === "Enter" && selected && !locked && !movePending) activateSelected(selected)
         }
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
-    }, [activateSelected, close, movePending, selected, splitTarget])
+    }, [activateSelected, close, locked, movePending, selected, splitTarget])
 
     // Read by styles.css for text and slot sizes; 1 leaves every size as authored.
     useEffect(() => { document.documentElement.style.setProperty("--ui-scale", String(uiConfig.scale)) }, [uiConfig.scale])
@@ -658,7 +703,7 @@ function InventoryApp() {
     // Solo layout starts as the player's inventory alone. Its inspector is a
     // drawer, mounted only after selection, so an idle personal inventory does
     // not reserve a permanently empty actions column.
-    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><DragGuard open /><WorldDropZone session={session} busy={movePending} onDropOut={dropOut} />{splitTarget && <SplitDialog label={splitTarget.item.label ?? splitTarget.item.name} stack={splitTarget.item.amount} onConfirm={confirmSplit} onCancel={() => setSplitTarget(undefined)} />}<main className={`inventory-shell${solo ? " inventory-shell-solo" : ""}`}>
+    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><DragGuard open /><WorldDropZone session={session} busy={locked} onDropOut={dropOut} />{splitTarget && <SplitDialog label={splitTarget.item.label ?? splitTarget.item.name} stack={splitTarget.item.amount} onConfirm={confirmSplit} onCancel={() => setSplitTarget(undefined)} />}<main className={`inventory-shell${solo ? " inventory-shell-solo" : ""}`}>
         <DragPreview session={session} />
         <div className="inventory-heading">
             <header className="inventory-topbar">
@@ -670,7 +715,7 @@ function InventoryApp() {
         </div>
         <div className={`inventory-layout${solo ? " inventory-layout-solo" : ""}`}>
             <section className="inventory-stage inventory-stage-player">
-                <InventoryPanel inventory={session.player} isPlayer selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} onSplit={promptSplit} />
+                <InventoryPanel inventory={session.player} isPlayer selected={selected} busy={locked} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} onSplit={promptSplit} />
             </section>
             {(!solo || selected) && <aside className={`item-detail${solo ? " item-detail-drawer" : ""}${filteredSelected ? "" : " item-detail-empty"}`} aria-label="Selected item actions">
                 <header className="detail-header"><span>Item inspector</span><span className="detail-header-actions"><em>{filteredSelected ? "Selected" : "Select an item"}</em>{solo && <button className="detail-close" onClick={() => setSelected(undefined)} aria-label="Close item drawer"><X size={14} /></button>}</span></header>
@@ -696,7 +741,7 @@ function InventoryApp() {
                 </>}
             </> : <div className="empty-detail"><span className="empty-detail-icon"><PackageOpen size={30} /></span><h1>Inspect an item</h1><p>{selected ? `${(selected.item.label ?? selected.item.name)} is hidden by the current search.` : "Select an item to see its details. Drag it between slots to move or stack it, or drag it outside the window to drop it."}</p></div>}</aside>}
             {session.secondary
-                ? <section className="inventory-stage inventory-stage-secondary"><InventoryPanel inventory={session.secondary} selected={selected} busy={movePending} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} onSplit={promptSplit} /></section>
+                ? <section className="inventory-stage inventory-stage-secondary"><InventoryPanel inventory={session.secondary} selected={selected} busy={locked} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={() => undefined} onSelect={selectSlot} onActivate={activateItem} onSplit={promptSplit} /></section>
                 : solo ? null : <section className="inventory-stage inventory-stage-secondary"><section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>No secondary inventory</h2><p>Open a stash, shop, container, or another player to use this panel.</p></section></section>}
         </div>
         <footer className="shortcut-bar"><span><kbd>Esc</kbd> Close</span><span><kbd>↵</kbd> Use selected</span><span><kbd>Drag</kbd> Move or stack</span><span><kbd>Drag out</kbd> Drop</span><span>{movePending ? "Updating inventory…" : `Revision ${session.revision ?? 0}`}</span></footer>

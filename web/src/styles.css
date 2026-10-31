@@ -131,7 +131,8 @@ h2 { margin-bottom: 0; font-size: calc(15px * var(--ui-scale, 1)); letter-spacin
    slots either side of it. */
 .slot-hotbar.slot-selected, .slot-hotbar.slot-move-target, .slot-hotbar.slot-drop-invalid { box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
 .slot-drop-invalid { border-color: hsl(var(--danger) / .75); box-shadow: inset 0 0 0 1px hsl(var(--danger) / .4); }
-.slot[aria-disabled="true"] { cursor: wait; }
+/* Never the busy cursor: a pending move must not look like a frozen window. */
+.slot[aria-disabled="true"] { cursor: default; }
 .slot-filled { color: hsl(var(--foreground)); }
 .slot-number { position: absolute; z-index: 1; top: 4px; left: 5px; color: hsl(var(--muted-foreground)); font-size: calc(8px * var(--ui-scale, 1)); font-weight: 700; }
 .item-art, .detail-art { display: grid; place-items: center; overflow: hidden; color: hsl(var(--primary)); font-weight: 800; background: hsl(var(--brand-soft)); }
@@ -190,12 +191,12 @@ dd { margin: 0; color: hsl(var(--foreground)); font-weight: 650; }
 .amount-action { display: grid; gap: 6px; }
 .amount-picker { display: grid; grid-template-columns: 1fr 52px; align-items: center; gap: 8px; }
 .amount-slider { width: 100%; height: 16px; margin: 0; padding: 0; accent-color: hsl(var(--primary)); background: transparent; cursor: pointer; }
-.amount-slider:disabled { cursor: wait; opacity: .55; }
+.amount-slider:disabled { cursor: default; opacity: .55; }
 .amount-input { width: 100%; box-sizing: border-box; border: 1px solid hsl(var(--border)); border-radius: 6px; padding: 4px 5px; color: hsl(var(--foreground)); background: hsl(var(--background)); font: inherit; text-align: center; }
 .primary-action, .quiet-action { min-height: 32px; padding: 6px 9px; font-size: calc(11px * var(--ui-scale, 1)); font-weight: 750; cursor: pointer; transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease; }
 .primary-action { border: 1px solid hsl(var(--primary)); border-radius: 7px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); box-shadow: 0 6px 15px hsl(var(--primary) / .18); }
 .primary-action:hover { background: hsl(var(--brand-hover)); transform: translateY(-1px); }
-.primary-action:disabled, .quiet-action:disabled { cursor: wait; opacity: .55; }
+.primary-action:disabled, .quiet-action:disabled { cursor: default; opacity: .55; }
 .empty-detail { max-width: 230px; margin: auto; color: hsl(var(--muted-foreground)); text-align: center; display: grid; justify-items: center; gap: 9px; }
 .empty-detail-icon { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid hsl(var(--brand-border)); border-radius: 15px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .06); }
 .empty-detail-icon svg { width: 28px; height: 28px; }
