@@ -52,6 +52,35 @@ end
 local function playerData(src)
     return exports.kora_core:getPlayerData(src)
 end
+---True when kora_ambulance has the player downed (last stand) or dead. Reads
+---the kora_core metadata the server owns, so a client cannot spoof it.
+---@param src integer
+---@return boolean
+local function isDowned(src)
+    if config.blockWhenDowned == false then
+        return false
+    end
+    local metadata = exports.kora_core:getPlayerData(src, { 'metadata' })
+    return type(metadata) == 'table' and (metadata.isdead == true or metadata.inlaststand == true)
+end
+local lastDownedNotify = {}
+local function notifyDownedBlocked(src)
+    local now = GetGameTimer()
+    local cooldown = tonumber(config.downedNotifyCooldown) or 3000
+    if lastDownedNotify[src] and now - lastDownedNotify[src] < cooldown then
+        return
+    end
+    lastDownedNotify[src] = now
+    Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_downed'), type = 'error' })
+end
+local function downedItemAllowed(name)
+    for _, allowed in ipairs(config.downedAllowedItems or {}) do
+        if type(allowed) == 'string' and type(name) == 'string' and allowed:lower() == name:lower() then
+            return true
+        end
+    end
+    return false
+end
 local function playerItems(src)
     return exports.kora_core:getPlayerData(src, { 'items' }) or {}
 end
@@ -2265,6 +2294,10 @@ useItem = function(src, slotOrName)
     if not item then
         return false, 'item not found'
     end
+    if isDowned(src) and not downedItemAllowed(item.name) then
+        notifyDownedBlocked(src)
+        return false, 'you cannot use items while downed'
+    end
     local allowed, err = runHooks('usingItem', src, {
         itemName = item.name,
         item = inventory.copy(item),
@@ -2694,6 +2727,10 @@ end
 ---@return boolean opened
 ---@return table|string result
 local function openInventory(src, invType, data)
+    if isDowned(src) then
+        notifyDownedBlocked(src)
+        return false, 'you cannot open inventories while downed'
+    end
     local inventoryKey
     if invType == 'player' then
         local target = tonumber(data) or src

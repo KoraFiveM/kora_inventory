@@ -6,6 +6,7 @@
 -- replacement must not let a caller forge either field onto a stored item.
 local H = dofile('test/harness.lua')
 
+NOTIFIED = {}
 Config = { qbinventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
@@ -16,6 +17,8 @@ Kora = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function(name, fn) QBCallbacks[name] = fn end },
     sql = {},
+    notify = { send = function(_, payload) NOTIFIED[#NOTIFIED + 1] = payload end },
+    lang = function(key) return key end,
 }
 GetCurrentResourceName = function() return 'kora_inventory' end
 GetInvokingResource = function() return nil end
@@ -25,7 +28,8 @@ AddEventHandler = function() end
 RegisterNetEvent = function() end
 TriggerClientEvent = function() end
 TriggerEvent = function() end
-GetGameTimer = function() return 12345 end
+NOW = 12345
+GetGameTimer = function() return NOW end
 
 local ITEMS = {
     bandage = { name = 'bandage', label = 'Bandage', weight = 100, useable = true },
@@ -45,6 +49,7 @@ local playersData = { [7] = { citizenid = 'CID-7' } }
 -- a hand-authored raw item table would skip the preventClose/useTime
 -- derivation entirely and defeat the point of this test.
 local playersItems = { [7] = {} }
+playersMetadata = { [7] = {} }
 
 local registered = {}
 exports = setmetatable({}, {
@@ -63,6 +68,7 @@ exports = setmetatable({}, {
                         if exportName == 'getPlayerData' then
                             local src, fields = ...
                             if fields and fields[1] == 'items' then return playersItems[src] end
+                            if fields and fields[1] == 'metadata' then return playersMetadata[src] end
                             return playersData[src]
                         end
                         if exportName == 'setPath' then
@@ -165,5 +171,41 @@ local setOK = QbInventory.api.setItems(7, {
 H.ok(setOK, 'setItems accepts a validated replacement')
 H.equal(playersItems[7][4].preventClose, false, 'a caller cannot forge preventClose through setItems')
 H.equal(playersItems[7][4].useTime, 2500, 'a caller cannot forge useTime through setItems -- the real item useTime wins')
+
+-- downed / dead players cannot open or use items (server-enforced) ----------
+
+local function useSlot2() return QbInventory.api.useItem(7, 4) end
+
+playersMetadata[7] = { inlaststand = true }
+local downedUse, downedErr = useSlot2()
+H.equal(downedUse, false, 'a player in last stand cannot use items')
+H.ok(downedErr:find('downed', 1, true), 'the refusal says why')
+H.equal(#NOTIFIED, 1, 'the blocked attempt notifies once')
+useSlot2()
+H.equal(#NOTIFIED, 1, 'repeated attempts inside the cooldown do not spam')
+NOW = NOW + 5000
+useSlot2()
+H.equal(#NOTIFIED, 2, 'the notify fires again after the cooldown')
+H.equal(QbInventory.internal.openSelf ~= nil and select(1, QBCallbacks['qbinventory:server:open'](7, 'player', 7)), false,
+    'a downed player cannot open an inventory')
+local downedIntent = intent(7, {
+    token = payload.token, action = 'use',
+    payload = { slot = 2 }, primaryRevision = revision,
+})
+H.equal(downedIntent, false, 'the NUI use intent is refused while downed')
+
+playersMetadata[7] = { isdead = true }
+H.equal((useSlot2()), false, 'a dead player cannot use items')
+
+Config.qbinventory.downedAllowedItems = { "POTION" }
+H.ok((useSlot2()), 'an allow-listed item stays usable while downed')
+Config.qbinventory.downedAllowedItems = {}
+
+Config.qbinventory.blockWhenDowned = false
+H.ok((useSlot2()), 'blockWhenDowned = false restores the old behaviour')
+Config.qbinventory.blockWhenDowned = true
+
+playersMetadata[7] = { isdead = false, inlaststand = false }
+H.ok((useSlot2()), 'a standing player can use items again')
 
 H.finish()

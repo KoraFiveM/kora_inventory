@@ -109,6 +109,7 @@ ui_page 'web/build/index.html'
 
 files {
     'sql/*.sql',
+    'locales/*.json',
     'web/build/index.html',
     'web/build/assets/**/*',
     -- Locally hosted item artwork, served as nui://kora_inventory/images/<file>.

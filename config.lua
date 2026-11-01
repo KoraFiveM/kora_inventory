@@ -21,6 +21,16 @@ Config.qbinventory = {
     -- inventory is closed; the only visual is the accent outline on those
     -- slots inside the open panel (ui.showHotbar). 0 disables the key binds.
     hotbarSlots = 5,
+    -- Downed / last stand / dead players (kora_ambulance sets the
+    -- `isdead` / `inlaststand` player metadata, replicated by kora_core) cannot
+    -- open the inventory, use hotbar keys or use items. Enforced on the
+    -- server as well as the client. Set false to restore the old behaviour.
+    blockWhenDowned = true,
+    -- Item names that may still be used while downed (e.g. { "bandage" }).
+    -- Only affects item use; opening the inventory stays blocked. Default none.
+    downedAllowedItems = {},
+    -- Minimum milliseconds between "you cannot do that while downed" notifies.
+    downedNotifyCooldown = 3000,
     defaultSlots = 50,
     defaultMaxWeight = 100000,
     interactionDistance = 3.0,
