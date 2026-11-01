@@ -201,11 +201,18 @@ Config.qbinventory = {
         -- answers. Applied the next time the inventory opens.
         queueMoves = true,
 
-        -- Seconds the UI waits for the server to answer a move before rolling
-        -- it back as unanswered (2-60). Raise it on a heavily loaded server so
-        -- slow answers are not shown as failures. Applied the next time the
-        -- inventory opens.
-        moveTimeout = 10,
+        -- Milliseconds the UI waits for the server to answer a move before
+        -- rolling it back as unanswered and re-syncing (500-60000). While a
+        -- request is outstanding the browser shows a busy cursor, so keep this
+        -- short; raise it only if your server is slow to answer, otherwise slow
+        -- answers are shown as failures. The same deadline bounds how long a
+        -- confirmed move waits for its confirming patch. Applied the next time
+        -- the inventory opens.
+        moveTimeoutMs = 1500,
+
+        -- Legacy form of moveTimeoutMs, in seconds (0.5-60). Not set by
+        -- default; only read when moveTimeoutMs is absent from your config.
+        -- moveTimeout = 10,
 
         -- Item artwork resolution. `localPath` is tried before any remote
         -- `imageUrl` when `preferLocal` is set, and always as the fallback when
@@ -660,12 +667,12 @@ if Kora and Kora.config and Kora.config.adopt then
         description = 'When on (and instant moves are on), you can keep dragging items while an earlier move is still waiting for the server; the extra moves are sent one after another. Turn it off to block dragging until the server has answered. Changes apply the next time a player opens their inventory.',
         live = true,
     })
-    Config.qbinventory.ui.moveTimeout = Kora.config.number(Config.qbinventory.ui.moveTimeout, {
-        label = 'Inventory move timeout (seconds)',
-        description = 'How long the inventory waits for the server to answer a move before undoing it and reporting that the server did not respond. Raise it only if your server is slow to answer. Changes apply the next time a player opens their inventory.',
-        min = 2,
-        max = 60,
-        step = 1,
+    Config.qbinventory.ui.moveTimeoutMs = Kora.config.number(Config.qbinventory.ui.moveTimeoutMs, {
+        label = 'Inventory move timeout (milliseconds)',
+        description = 'How long the inventory waits for the server to answer a move before undoing it, re-syncing and reporting that the server did not respond. The cursor shows as busy while a request is outstanding, so keep it short; raise it only if your server is slow to answer. Changes apply the next time a player opens their inventory.',
+        min = 500,
+        max = 60000,
+        step = 100,
         live = true,
     })
     Config.qbinventory.ui.scale = Kora.config.number(Config.qbinventory.ui.scale, {

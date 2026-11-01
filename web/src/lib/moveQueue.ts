@@ -21,6 +21,17 @@ export interface MoveJob {
     timeoutMs?: number
     /** Inventory ids whose patch must also arrive before the job counts as done. */
     awaiting?: string[]
+    /**
+     * Once the server has answered ok, the longest the job may keep the line waiting for
+     * its `awaiting` patches (defaults to timeoutMs). Past it the job settles as a success
+     * and onUnconfirmed asks for a resync; a confirmed move is never rolled back for a patch.
+     */
+    confirmMs?: number
+}
+
+/** True when a drag lands on the slot it started from: nothing to send, nothing to predict. */
+export function isNoopMove(from: { id: string; slot: number }, to: { id: string; slot: number }): boolean {
+    return from.id === to.id && from.slot === to.slot
 }
 
 /** Builds the job when its turn comes, against whatever the UI looks like by then; undefined skips it. */
@@ -31,6 +42,8 @@ export interface MoveQueueOptions {
     maxQueued: number
     /** Called whenever a job starts or settles (true while one is in flight). */
     onPending?: (pending: boolean) => void
+    /** Called when a confirmed job stopped waiting for its patches (ask the server to re-send the state). */
+    onUnconfirmed?: () => void
     /** Called after a job failed and has been rolled back. */
     onFailure?: (message: string, reason: FailureReason) => void
     /** Runs the next job after a settle; defaults to a macrotask so React can commit first. */
@@ -98,7 +111,22 @@ export function createMoveQueue(options: MoveQueueOptions): MoveQueue {
         sent.then((answer) => {
             if (run.settled) return
             if (!answer || answer.ok !== true) settle(run, { message: answer?.error ?? "Action rejected by inventory", reason: "rejected" })
-            else { run.answered = true; complete(run) }
+            else {
+                run.answered = true
+                if (run.awaiting.size > 0) {
+                    // The answer is final; only the confirming patches are missing. Bound the wait.
+                    clearTimeout(run.timer)
+                    const wait = job.confirmMs ?? job.timeoutMs
+                    if (wait && wait > 0) {
+                        run.timer = setTimeout(() => {
+                            if (run.settled) return
+                            settle(run)
+                            options.onUnconfirmed?.()
+                        }, wait)
+                    }
+                }
+                complete(run)
+            }
         }, () => settle(run, { message: "Inventory connection interrupted", reason: "error" }))
     }
 

@@ -494,7 +494,8 @@ Nothing in it is authority and the inventory engine never reads it.
 | `rightClickSplit` | Right-click on a stack of 2+ opens the split dialog (default `true`); `false` makes right-click do nothing. |
 | `optimisticMoves` | Draw a drag-and-drop move (move, stack, swap, split) immediately and undo it if the server refuses or does not answer within `moveTimeout` (default `true`); `false` shows a move only after the server confirms it. The server validates every move either way. |
 | `queueMoves` | With `optimisticMoves`, keep the inventory draggable while a move waits for the server: further drags are queued (up to 8) and sent in order; a refused or unanswered move undoes itself, the server is asked to re-send the real state, and the drags queued behind it still go out (default `true`). `false` blocks dragging until the server answers. The busy (wait) cursor is never shown either way. |
-| `moveTimeout` | Seconds (2-60, default `10`) the UI waits for the server to answer a move before undoing it. |
+| `moveTimeoutMs` | Milliseconds (500-60000, default `1500`) the UI waits for the server to answer a move before undoing it and re-syncing. The bundled bridge answers the browser at this deadline even if the server never replies, so the busy cursor can never outlast it, and a move the server confirmed no longer waits for its confirming patch longer than this. |
+| `moveTimeout` | Legacy form of `moveTimeoutMs`, in seconds. Not set by default; only read when `moveTimeoutMs` is absent from your config. |
 | `images` | Item artwork resolution -- see below. |
 
 `hotbarSlots` is sent alongside it because the NUI draws the boundary and cannot

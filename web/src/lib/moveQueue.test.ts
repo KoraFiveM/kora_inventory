@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createMoveQueue, type MoveAnswer, type MoveJob } from "./moveQueue"
+import { createMoveQueue, isNoopMove, type MoveAnswer, type MoveJob } from "./moveQueue"
 
 type Deferred = { resolve: (answer: MoveAnswer) => void; reject: (error: unknown) => void }
 
@@ -186,5 +186,49 @@ describe("moveQueue", () => {
         h.deferreds.a.resolve({ ok: false }); await tick()
         expect(h.log).toEqual(["send:a", "send:b"])
         spy.mockRestore()
+    })
+
+    it("an ok answer with a never-arriving awaited patch settles within the short deadline and asks for a resync", async () => {
+        const log: string[] = []
+        const queue = createMoveQueue({ maxQueued: 8, onUnconfirmed: () => log.push("resync") })
+        let answer!: (a: MoveAnswer) => void
+        queue.enqueue(() => ({
+            send: () => new Promise<MoveAnswer>((resolve) => { answer = resolve }),
+            rollback: () => { log.push("rollback") },
+            timeoutMs: 1500,
+            awaiting: ["player", "player"],
+        }))
+        queue.enqueue(() => ({ send: async () => { log.push("send:next"); return { ok: true } }, rollback: () => undefined, timeoutMs: 1500 }))
+        answer({ ok: true }); await tick()
+        expect(queue.pending).toBe(true)
+        await tick(1400)
+        expect(queue.pending).toBe(true)
+        await tick(200); await tick()
+        expect(log).toEqual(["resync", "send:next"]) // settled as success: no rollback
+    })
+
+    it("a patch that arrives inside the deadline settles quietly, without a resync", async () => {
+        const log: string[] = []
+        const queue = createMoveQueue({ maxQueued: 8, onUnconfirmed: () => log.push("resync") })
+        let answer!: (a: MoveAnswer) => void
+        queue.enqueue(() => ({ send: () => new Promise<MoveAnswer>((resolve) => { answer = resolve }), rollback: () => log.push("rollback"), timeoutMs: 1500, awaiting: ["p"] }))
+        answer({ ok: true }); await tick()
+        queue.patched(["p"]); await tick(5000)
+        expect(log).toEqual([])
+        expect(queue.pending).toBe(false)
+    })
+
+    it("a move onto its own slot is a no-op that sends nothing", async () => {
+        const h = harness()
+        const sent = vi.fn()
+        const from = { id: "player", slot: 3 }
+        expect(isNoopMove(from, { id: "player", slot: 3 })).toBe(true)
+        expect(isNoopMove(from, { id: "player", slot: 4 })).toBe(false)
+        expect(isNoopMove(from, { id: "stash", slot: 3 })).toBe(false)
+        // The UI builds no job for a no-op, so the queue skips it without sending or locking.
+        const build = () => isNoopMove(from, { id: "player", slot: 3 }) ? undefined : { send: async () => { sent(); return { ok: true } }, rollback: () => undefined }
+        expect(h.queue.enqueue(build)).toBe("skipped")
+        expect(sent).not.toHaveBeenCalled()
+        expect(h.queue.pending).toBe(false)
     })
 })

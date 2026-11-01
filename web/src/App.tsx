@@ -11,7 +11,7 @@ import { clampGiveAmount } from "@/lib/giveAmount"
 import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, UiConfig } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 import { predictMove, refreshedInventories, restoreInventories, type Prediction } from "@/lib/optimistic"
-import { createMoveQueue, type MoveJob, type MoveQueue } from "@/lib/moveQueue"
+import { createMoveQueue, isNoopMove, type MoveJob, type MoveQueue } from "@/lib/moveQueue"
 import { formatMetaValue } from "@/lib/format"
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
@@ -34,8 +34,9 @@ const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo
     rightClickSplit: true,
     optimisticMoves: true,
     queueMoves: true,
-    // A move that gets no answer would otherwise stay pending for good.
-    moveTimeoutMs: 10000,
+    // A move that gets no answer would otherwise stay pending for good. Short on
+    // purpose: a locked drag is felt immediately (config.lua: ui.moveTimeoutMs).
+    moveTimeoutMs: 1500,
     inspectorDecimals: 1,
     scale: 1,
     images: {
@@ -462,8 +463,14 @@ function InventoryApp() {
     if (!queueRef.current) {
         queueRef.current = createMoveQueue({
             maxQueued: MAX_QUEUED_MOVES,
-            onPending: setMovePending,
+            onPending: (pending) => {
+                setMovePending(pending)
+                // Nothing in flight any more: drop the prediction bookkeeping so a settled
+                // move cannot leave a stale snapshot (or a drag lock) behind.
+                if (!pending) optimistic.current = undefined
+            },
             onFailure: resync,
+            onUnconfirmed: resync,
         })
     }
     const queue = queueRef.current
@@ -566,6 +573,7 @@ function InventoryApp() {
                 rollback: (message) => {
                     if (before?.size) updateSession((latest) => latest && restoreInventories(latest, before))
                     if (optimistic.current === before) optimistic.current = undefined
+                    setSelected(undefined)
                     setError(message)
                 },
                 // Use can legitimately run long (progress bar), everything else gets a deadline.
@@ -587,6 +595,8 @@ function InventoryApp() {
             const to = findInventory(current, toId)
             const item = findItem(from, fromSlot)
             if (!from || !to || !item || !Number.isFinite(item.amount) || item.amount < 1) return "That item is no longer available"
+            // Dropped back on its own slot: nothing to ask the server, nothing to lock.
+            if (isNoopMove({ id: from.id, slot: fromSlot }, { id: to.id, slot: toSlot })) return undefined
             if (from.type === "shop") {
                 if (current.player.id !== to.id) return "Shop items can only be purchased into your inventory"
                 return { intent: "buy", payload: { inventory: from.id, slot: fromSlot, amount: 1 }, awaiting: [from.id, to.id] }
@@ -604,7 +614,7 @@ function InventoryApp() {
     }, [enqueueRequest])
 
     const canDropSlot = useCallback((source: DragSlot, target: SlotTarget) => {
-        if (!source || !session || locked || (source.inventoryId === target.inventoryId && source.slot === target.slot)) return false
+        if (!source || !session || locked || isNoopMove({ id: source.inventoryId, slot: source.slot }, { id: target.inventoryId, slot: target.slot })) return false
         const sourceInventory = findInventory(session, source.inventoryId)
         const targetInventory = findInventory(session, target.inventoryId)
         if (!findItem(sourceInventory, source.slot) || !targetInventory) return false

@@ -1610,6 +1610,11 @@ local function transfer(src, request)
             return false, 'invalid target slot'
         end
     end
+    -- Dropped back on its own slot: nothing to move. Answer ok at once, before
+    -- hooks and locks, so a no-op can never hold the client's request open.
+    if fromKey == toKey and toSlot == fromSlot then
+        return true, { fromRevision = revision(fromKey), toRevision = revision(toKey) }
+    end
     local ownKey = playerKey(src)
     if (fromKey == ownKey and isSlotBusy(src, fromSlot)) or (toKey == ownKey and isSlotBusy(src, toSlot)) then
         notifyBusyBlocked(src)
@@ -4070,11 +4075,25 @@ RegisterNetEvent('qbinventory:server:close', function(token)
         close(source, 'requested')
     end
 end)
+-- Every path answers: transfer never raises into the callback layer and always
+-- returns (ok, result), so the client's request can never be left pending.
+local function replyingTransfer(src, request)
+    local called, ok, result, extra = pcall(transfer, src, request)
+    if not called then
+        print(('^1[qbinventory]^7 transfer failed: %s'):format(tostring(ok)))
+        return false, 'transfer failed'
+    end
+    if ok == nil then
+        return false, 'transfer failed'
+    end
+    return ok, result, extra
+end
+inventory.replyingTransfer = replyingTransfer
 RegisterNetEvent('qbinventory:server:transfer', function(request)
     if GetInvokingResource() then
         return
     end
-    local ok, result = transfer(source, request)
+    local ok, result = replyingTransfer(source, request)
     if not ok then
         TriggerClientEvent('qbinventory:client:rejected', source, result)
     end
@@ -4092,7 +4111,7 @@ Kora.callback.register('qbinventory:server:open', function(src, invType, data)
     return openInventory(src, invType, data)
 end)
 Kora.callback.register('qbinventory:server:transfer', function(src, request)
-    return transfer(src, request)
+    return replyingTransfer(src, request)
 end)
 Kora.callback.register('qbinventory:server:intent', function(src, request)
     return handleIntent(src, request)

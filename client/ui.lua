@@ -36,6 +36,20 @@ end
 -- know where it is otherwise; it stays a read of the same single source
 -- client/hotbar.lua binds its keys from, so the outline and the keys cannot
 -- disagree.
+-- How long the UI, and this bridge, wait for the server to answer a request
+-- before giving up on it (ms). Config.qbinventory.ui.moveTimeoutMs, or the
+-- older moveTimeout in seconds when only that is configured. Short on purpose:
+-- the browser's fetch to the intent callback stays pending (busy cursor) until
+-- it is answered.
+local function moveTimeoutMs()
+    local ui = (Config.qbinventory or {}).ui or {}
+    local ms = tonumber(ui.moveTimeoutMs)
+    if not ms and tonumber(ui.moveTimeout) then
+        ms = tonumber(ui.moveTimeout) * 1000
+    end
+    return math.floor(math.max(500, math.min(60000, ms or 1500)))
+end
+
 local function pushConfig()
     local ui = Config.qbinventory.ui or {}
 
@@ -49,7 +63,7 @@ local function pushConfig()
         -- refused (only meaningful with optimisticMoves).
         queueMoves = ui.queueMoves ~= false,
         -- How long the UI waits for the server before rolling a move back.
-        moveTimeoutMs = math.floor(math.max(2, math.min(60, tonumber(ui.moveTimeout) or 10)) * 1000),
+        moveTimeoutMs = moveTimeoutMs(),
         -- Read on every push so a live config change applies on the next open.
         scale = math.max(0.5, math.min(2.0, tonumber(ui.scale) or 1.0)),
         images = ui.images,
@@ -260,10 +274,29 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
         return
     end
 
+    -- The browser's fetch stays pending (busy cursor, no dragging) until cb runs,
+    -- so cb runs exactly once and never later than the move deadline: if the
+    -- server round trip is still outstanding then, the browser is answered
+    -- { ok = false, error = 'timeout' } and the late result is dropped (the UI
+    -- rolls back and asks for a resync). `use` is exempt: it may wait on a
+    -- progress bar.
+    local answered = false
+    local function reply(result)
+        if answered then
+            return
+        end
+        answered = true
+        cb(result)
+    end
+    if data.intent ~= 'use' then
+        SetTimeout(moveTimeoutMs(), function()
+            reply({ ok = false, error = 'timeout' })
+        end)
+    end
+
     -- Wait for kora_inventory's authoritative callback result, rather than
     -- acknowledging a merely-local hand-off as success. pcall'd so that an error
-    -- in the transport still answers the browser: an unanswered NUI request
-    -- stays pending in CEF and the move would only be rolled back by its timeout.
+    -- in the transport still answers the browser.
     local called, ok, result = pcall(QbInventory.clientApi.submitIntent, {
         sessionId = data.sessionId,
         token = data.token,
@@ -272,10 +305,10 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
     })
     if not called then
         print(('^3[qbinventory]^7 intent failed: %s'):format(tostring(ok)))
-        cb({ ok = false, error = 'inventory request failed' })
+        reply({ ok = false, error = 'inventory request failed' })
         return
     end
-    cb({ ok = ok == true, error = ok and nil or result })
+    reply({ ok = ok == true, error = ok and nil or result })
 end)
 
 RegisterNUICallback('qbinventory:nui:close', function(data, cb)

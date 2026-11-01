@@ -34,9 +34,10 @@ H.ok(source:find('optimisticMoves = ui.optimisticMoves ~= false', 1, true), 'opt
 
 H.equal(Config.qbinventory.ui.queueMoves, true, 'drags queue behind a pending move by default instead of being refused')
 H.ok(source:find('queueMoves = ui.queueMoves ~= false', 1, true), 'queueMoves is pushed to the NUI on every config push')
-H.equal(Config.qbinventory.ui.moveTimeout, 10, 'move timeout defaults to 10 seconds')
-H.ok(source:find('moveTimeoutMs = math.floor(math.max(2, math.min(60, tonumber(ui.moveTimeout) or 10)) * 1000)', 1, true),
-    'the move timeout is read live, clamped to 2-60 s and pushed in milliseconds')
+H.equal(Config.qbinventory.ui.moveTimeoutMs, 1500, 'move timeout defaults to a short 1500 ms')
+H.equal(Config.qbinventory.ui.moveTimeout, nil, 'the legacy seconds option is not set by default')
+H.ok(source:find('moveTimeoutMs = moveTimeoutMs(),', 1, true),
+    'the move timeout is read live and pushed in milliseconds')
 
 local canonicalImage = io.open('images/advancedlockpick.png', 'rb')
 H.ok(canonicalImage ~= nil, 'canonical qb-inventory artwork is bundled')
@@ -49,6 +50,8 @@ RegisterNetEvent = AddEventHandler
 local nui = {}
 RegisterNUICallback = function(name, fn) nui[name] = fn end
 SetNuiFocus, TriggerEvent = function() end, function() end
+local timers = {}
+SetTimeout = function(ms, fn) timers[#timers + 1] = { ms = ms, fn = fn } end
 SendNUIMessage = function(message) messages[#messages + 1] = message end
 GetCurrentResourceName = function() return 'kora_inventory' end
 QBTheme = { refresh = function() end }
@@ -173,6 +176,41 @@ for label, data in pairs({
 }) do
     local result = answers('qbinventory:nui:intent', data or nil, label)
     H.equal(result.ok, false, 'invalid intent is refused: ' .. label)
+end
+-- A server that never replies: the transport blocks (here: parks the thread) and
+-- the deadline answers the browser instead, once, with the late result dropped.
+do
+    local calls = {}
+    timers = {}
+    submit = function() return true end
+    nui['qbinventory:nui:intent'](envelope('move', {}), function(result) calls[#calls + 1] = result end)
+    H.equal(#calls, 1, 'a prompt reply answers once')
+    H.equal(#timers, 1, 'a deadline is armed for a move')
+    H.equal(timers[1].ms, 1500, 'the deadline is the configured move timeout')
+    timers[1].fn()
+    H.equal(#calls, 1, 'the deadline firing after the answer does not answer twice')
+
+    -- Deadline first: the transport never returns before the timer.
+    calls, timers = {}, {}
+    local routine = coroutine.wrap(function()
+        submit = function() coroutine.yield() return true end
+        nui['qbinventory:nui:intent'](envelope('move', {}), function(result) calls[#calls + 1] = result end)
+    end)
+    routine()
+    H.equal(#calls, 0, 'nothing is answered while the server round trip is outstanding')
+    timers[1].fn()
+    H.equal(#calls, 1, 'the deadline answers the browser')
+    H.equal(calls[1].ok, false, 'the deadline answer is a failure')
+    H.equal(calls[1].error, 'timeout', 'and says why')
+    routine()
+    H.equal(#calls, 1, 'the late server result is ignored')
+
+    -- use may wait on a progress bar: no deadline.
+    timers = {}
+    submit = function() return true end
+    nui['qbinventory:nui:intent'](envelope('use', {}), function() end)
+    H.equal(#timers, 0, 'use arms no deadline')
+    submit = function() return true end
 end
 answers('qbinventory:nui:close', nil, 'nil data')
 answers('qbinventory:nui:close', {}, 'empty table')
