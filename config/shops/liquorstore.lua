@@ -32,6 +32,8 @@ Config.qbinventory.shops.liquorstore = {
         shortRange = true,
         -- The category groups all liquor shops; the name identifies this
         -- storefront without forcing every liquor shop to share its brand.
+        -- Must be a Kora.blips category; an unknown value logs a warning and
+        -- the blip is created without a category.
         category = 'Liquor',
     },
 

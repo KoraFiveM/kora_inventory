@@ -24,6 +24,8 @@ Config.qbinventory.shops.ammunation = {
         color = 1,
         scale = 0.72,
         shortRange = true,
+        -- Must be a Kora.blips category; an unknown value logs a warning and
+        -- the blip is created without a category.
         category = 'Weapons',
         name = 'Ammu-Nation',
     },

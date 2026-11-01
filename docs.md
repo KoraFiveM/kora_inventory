@@ -659,7 +659,10 @@ canonical `Liquor` category and the same server-validated shop stock.
 The bundled convenience store (`Config.qbinventory.shops.convenience`, all 24/7
 counters) is a separate shop with the same contract. Its "Open shop" target sits
 on the counter, next to kora_robberies registers. Set `enabled = false` to drop
-the shop, its targets and blips (default `true`).
+the shop, its targets and blips (default `true`). `blip.category` (default
+`Convenience`) must be a `Kora.blips` category (`Kora.blips.getCategories()`);
+the same applies to the Ammu-Nation and liquor `blip.category`. An unknown value
+logs one warning naming the option and the blip is created without a category.
 
 The initial catalog includes standard kora_core weapons and the registered
 `pistol_ammo`, `smg_ammo`, `shotgun_ammo`, `rifle_ammo`, `mg_ammo`, and

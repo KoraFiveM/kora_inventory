@@ -31,7 +31,10 @@ Config.qbinventory.shops.convenience = {
         color = 2,
         scale = 0.7,
         shortRange = true,
-        category = "Convenience Store",
+        -- Must be a Kora.blips category (see Kora.blips.getCategories()), e.g.
+        -- "Convenience". An unknown value logs a warning and the blip is
+        -- created without a category instead of raising a script error.
+        category = "Convenience",
     },
 
     inventory = {

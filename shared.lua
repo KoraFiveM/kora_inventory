@@ -33,6 +33,25 @@ function inventory.shopZoneSprite(zone, location)
     return zone
 end
 
+---Creates a shop map blip without letting a bad configured value abort the
+---caller. `optionName` names the config option for the warning (for example
+---`Config.qbinventory.shops.convenience.blip.category`). `blip.category` must be
+---a Kora.blips category (see Kora.blips.getCategories()). If kora_lib rejects
+---the blip, one warning is printed and the blip is retried without a category.
+function inventory.createShopBlip(optionName, coords, options)
+    local ok, blip = pcall(Kora.blips.create, coords, options)
+    if ok then return blip end
+    print(("^3[kora_inventory] %s = %s was rejected by Kora.blips.create (%s); creating the blip without a category.^7")
+        :format(optionName, tostring(options.category), tostring(blip)))
+    local fallback = {}
+    for key, value in pairs(options) do fallback[key] = value end
+    fallback.category = nil
+    ok, blip = pcall(Kora.blips.create, coords, fallback)
+    if ok then return blip end
+    print(("^3[kora_inventory] %s: could not create the blip at all (%s).^7"):format(optionName, tostring(blip)))
+    return nil
+end
+
 ---Z for a prop that must rest on the ground: a model's origin is usually its
 ---centre, so its lowest point (`minZ`, negative) has to be lifted back to the
 ---surface. `offset` is the configured nudge applied after placement.

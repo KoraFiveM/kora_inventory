@@ -51,7 +51,7 @@ end
 for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('kora_target') end
 for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('kora_target') end
 H.equal(activeZoneCount(), #shop.locations, 'repeated target starts leave one shop option at each counter')
-H.equal(createdBlips[1].category, 'Convenience Store', '24/7 blips use the convenience category')
+H.equal(createdBlips[1].category, 'Convenience', '24/7 blips use the convenience category')
 H.equal(createdBlips[1].name, "24/7", 'the first blip uses its location storefront')
 H.equal(createdBlips[2].name, '24/7', 'the second blip uses its location storefront')
 H.equal(createdBlips[1].label, nil, 'the caller leaves map-label composition to kora_lib')

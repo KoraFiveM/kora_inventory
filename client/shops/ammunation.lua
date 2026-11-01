@@ -58,7 +58,7 @@ end)
 
 for _, location in ipairs(shop.locations or {}) do
     if shop.blip and shop.blip.enabled then
-        local blip = Kora.blips.create({ x = location.x, y = location.y, z = location.z }, shop.blip)
+        local blip = QbInventory.createShopBlip(Config.qbinventory.shops.ammunation.blip.category, { x = location.x, y = location.y, z = location.z }, shop.blip)
         if blip and not shop.blip.info then
             Kora.blips.setInfo(blip, {
                 title = shop.label,

@@ -28,7 +28,7 @@ for _, row in ipairs(shop.inventory) do
 end
 
 -- Every branch shares the service category while retaining its storefront.
-H.equal(shop.blip.category, 'Convenience Store', 'convenience stores use the convenience category')
+H.equal(shop.blip.category, 'Convenience', 'convenience stores use the convenience category')
 H.equal(shop.blip.label, nil, 'kora_lib composes the map label from category and name')
 local storefronts = {}
 for _, location in ipairs(shop.locations) do storefronts[location.name] = true end
