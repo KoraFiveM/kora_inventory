@@ -52,7 +52,7 @@ local function capture(eventName, handler)
     handler(function(fn) byIdentity[identity][name] = fn end)
 end
 
--- --- shared prerequisites (fxmanifest shared_scripts) ---
+-- shared prerequisites (fxmanifest shared_scripts)
 --
 -- Discovered from the manifest rather than listed here: each shop's server
 -- file `assert`s its own config block at load time, so a newly added shop this

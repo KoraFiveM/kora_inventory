@@ -5,8 +5,6 @@ local config = Config.qbinventory
 local inventory = QbInventory
 local resourceName = GetCurrentResourceName()
 
--- Runtime state -------------------------------------------------------------
-
 local inventories = {}
 local secondaryGenerations = {}
 local sessions = {}
@@ -34,8 +32,6 @@ local useItem
 local dropCreate
 -- `owner = true` registrations are templates, not one globally shared stash.
 -- The actual secondary record is created lazily per citizen when they open it.
-
--- Framework adapters --------------------------------------------------------
 
 local function now()
     return GetGameTimer()
@@ -85,7 +81,6 @@ end
 local function playerItems(src)
     return exports.kora_core:getPlayerData(src, { 'items' }) or {}
 end
--- Physical cash policy ------------------------------------------------------
 
 -- This policy is intentionally server-only. Cash item operations are never
 -- exposed to a browser or trusted from a resource-provided item payload.
@@ -131,8 +126,6 @@ local function recordAudit(action, src, details)
     end
     TriggerEvent('qbinventory:server:audit', action, src, details)
 end
-
--- Canonical item records ----------------------------------------------------
 
 local canonicalItemFields = {
     amount = true,
@@ -238,8 +231,6 @@ local function showItemBox(src, name, amount, action, item)
     -- from the native event above.
     TriggerClientEvent('qb-inventory:client:ItemBox', src, payload, action, amount)
 end
-
--- Inventory registry and access --------------------------------------------
 
 local secondaryOptionFields = { 'label', 'coords', 'distance', 'bucket', 'groups', 'owner', 'prices', 'currency', 'policyOwner' }
 
@@ -632,8 +623,6 @@ local function broadcast(inventoryKey)
     end
 end
 
--- Mutation primitives -------------------------------------------------------
-
 local function lock(keys, transaction)
     table.sort(keys)
     local owner = coroutine.running() or 'main'
@@ -853,8 +842,6 @@ local function removePlayer(src, slot, amount)
     local ok, err = playerSetPath(src, { 'items', slot }, nextItem)
     return ok, err, removed
 end
-
--- Physical cash operations -------------------------------------------------
 
 -- These functions are called only by kora_core's money module. They bypass the
 -- public AddItem/RemoveItem compatibility layer deliberately: that layer
@@ -1102,7 +1089,6 @@ local function removeFrom(inventoryKey, slot, amount)
     return removeSecondary(inv, slot, amount)
 end
 
--- ox hook engine ------------------------------------------------------------
 -- Mirrors ox_inventory/modules/hooks/server.lua. Hooks are kept in registration
 -- order per event; every payload carries `source` and uses ox shapes (slot
 -- tables, ox inventory ids). Kora's own keys travel as extra fields
@@ -1420,8 +1406,6 @@ local function buyItemHook(src, shop, slot, item, count, price, metadata)
         toKey = playerKey(src),
     })
 end
-
--- Sessions and transfers ----------------------------------------------------
 
 local function close(src, reason)
     local session = sessions[src]
@@ -1747,7 +1731,6 @@ local function transfer(src, request)
     return committed, committedResult, committedExtra
 end
 
--- Validated client intents --------------------------------------------------
 -- UI actions are intentionally narrower than arbitrary exports. Each one
 -- starts from the current server-issued session, derives every inventory key
 -- from it, and checks the revision supplied by the client mirror.
@@ -2193,8 +2176,6 @@ local function handleIntent(src, request)
     return false, 'unsupported intent'
 end
 
--- Player inventory API ------------------------------------------------------
-
 ---@param src integer
 ---@return number currentWeight
 ---@return number maxWeight
@@ -2598,8 +2579,6 @@ local useables, builtInUseables = {}, {}
 local useableResources = {}
 local builtInUseableKinds = {}
 
--- Useable item API ----------------------------------------------------------
-
 -- Declared on its own line first: a `local x = ... function() x end` would
 -- close over the *global* x, since the local is not in scope until after its
 -- own statement -- and the cleanup only runs on resource stop, so the nil
@@ -2747,8 +2726,6 @@ local function ownedStash(src, identifier, opts)
     -- Namespace durable private storage; never trust a client-chosen owner.
     return secondary('stash', ('%s:%s'):format(tostring(identifier), data.citizenid), opts)
 end
-
--- Secondary inventories ----------------------------------------------------
 
 ---@param identifier string|number
 ---@return table items
@@ -2915,7 +2892,6 @@ local function dropTake(src, id, slot, amount)
     return result, err
 end
 
--- Registration and shops ---------------------------------------------------
 -- Ox-style inventory constructors and shops.
 local function refreshRegistration(inv, opts, skipDirty)
     inv.label = opts.label or inv.label
@@ -3355,8 +3331,6 @@ end
 local function removeInspectionAccess(id)
     inspectionHooks[id] = nil
 end
-
--- Internal module API -------------------------------------------------------
 
 -- Trusted server-side extension seam. Compatibility/domain modules load after
 -- this authority and may use these helpers, but no client event ever receives
@@ -3900,8 +3874,6 @@ local function phoneItemTransaction(src, request)
     end)
 end
 
--- Public exports ------------------------------------------------------------
-
 -- Compatibility aliases. The matching __cfx handlers below make these callable
 -- through the qb-inventory and ox_inventory provided identities as well.
 local api = {
@@ -4016,8 +3988,6 @@ exports('getPersistenceStatus', getPersistenceStatus)
 exports('deleteLegacyPoliceTrash', deleteLegacyPoliceTrash)
 inventory.api = api
 
--- Network transport ---------------------------------------------------------
-
 RegisterNetEvent('qbinventory:server:open', function(invType, data)
     if GetInvokingResource() then
         return
@@ -4074,8 +4044,6 @@ RegisterNetEvent('QBCore:Server:UseItem', function(item)
         useItem(source, slot)
     end
 end)
-
--- Lifecycle and persistence ------------------------------------------------
 
 -- Persistence is deliberately a secondary-store concern. Hydrating happens
 -- only after its kora_sql migration succeeds; malformed rows remain quarantined

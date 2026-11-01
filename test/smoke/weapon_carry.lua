@@ -122,7 +122,7 @@ local function give(slot, name)
     playersItems[7][slot] = buildItem(name, 1, slot, {})
 end
 
--- classification ------------------------------------------------------------
+-- classification
 
 H.equal(carry.carryRule('weapon_carbinerifle').tier, 'back', 'a rifle is carried on the back')
 H.equal(carry.carryRule('weapon_pistol').tier, 'back', 'a pistol is carried on the back')
@@ -131,7 +131,7 @@ H.equal(carry.carryRule('weapon_grenade'), nil, 'a throwable has no configured t
 H.equal(carry.carryRule('weapon_petrolcan'), nil, 'an explicit tier = false override excludes a weapon')
 H.equal(carry.carryRule('water_bottle'), nil, 'a non-weapon item is not carried without an explicit entry')
 
--- visibility ----------------------------------------------------------------
+-- visibility
 
 give(1, 'weapon_carbinerifle')
 give(3, 'weapon_pistol')
@@ -154,7 +154,7 @@ cfg.enabled = false
 H.equal(#carry.buildCarryList(7), 0, 'a disabled carry system carries nothing at all')
 cfg.enabled = true
 
--- draw pacing ---------------------------------------------------------------
+-- draw pacing
 
 cfg.visibility = 'hotbar'
 H.equal(carry.drawDuration(1), cfg.drawTime, 'drawing an openly carried weapon costs the base draw time')
@@ -169,7 +169,7 @@ H.equal(carry.drawDuration(9), cfg.drawTime, 'a disabled carry system never char
 cfg.enabled = true
 cfg.visibility = 'hotbar'
 
--- toggle round trip ---------------------------------------------------------
+-- toggle round trip
 
 local function lastClientEvent()
     return clientEvents[#clientEvents]
@@ -261,7 +261,7 @@ playersItems[7][9] = nil
 localEvents['qbcore:server:inventoryChanged'](7)
 H.equal(carry.equippedWeapon(7), nil, 'losing the held item clears the equipped record')
 
--- state bag -----------------------------------------------------------------
+-- state bag
 
 local stateKey = carry.stateKey
 carry.refresh(7)
@@ -273,7 +273,7 @@ carry.refresh(7)
 H.equal(bags[7][stateKey].value, false,
     'an empty carried list clears the bag with an explicit false, never a nil deletion')
 
--- source patterns -----------------------------------------------------------
+-- source patterns
 
 local function read(path)
     local file = assert(io.open(path, 'r'))

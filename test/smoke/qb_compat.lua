@@ -159,7 +159,7 @@ H.equal(registered.CanAddItem('locker', 'WATER', 2), true, 'can add delegates to
 H.equal(registered.RemoveInventory('evidence'), true, 'remove inventory delegates to authority')
 H.ok(removed['stash:evidence'], 'secondary inventory is removed')
 
--- --- upstream signature fidelity ---
+-- upstream signature fidelity
 --
 -- These are the shapes a real qb-inventory dependant calls with. Each one
 -- diverged from upstream before this pass, so a stock third-party script would

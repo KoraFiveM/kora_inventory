@@ -203,7 +203,6 @@ function inventory.stackSlot(items, item)
     return best
 end
 
--- ox_inventory item-definition translation ---------------------------------
 -- kora_core's registry stays authoritative and is never modified here. These
 -- two pure functions translate between kora records and the `data/items.lua`
 -- shape ox_inventory scripts expect from Items().

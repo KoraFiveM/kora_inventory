@@ -120,7 +120,7 @@ end
 H.equal(handlers['qb-inventory:server:createDrop'](7, 'not-a-table'), false,
     'handlers take (src, ...) and return a value rather than upstream cb(...)')
 
--- --- createDrop ---
+-- createDrop
 local createDrop = handlers['qb-inventory:server:createDrop']
 
 -- A payload naming an inventory the session does not authorise is refused
@@ -165,7 +165,7 @@ H.equal(createDrop(7, { fromSlot = 3, amount = 1 }), false, 'no open session mea
 H.equal(#removed, 0, 'the sessionless drop removed nothing')
 QbInventory.internal.sessionOf = realSessionOf
 
--- --- GetCurrentDrops ---
+-- GetCurrentDrops
 local drops = handlers['qb-inventory:server:GetCurrentDrops'](7)
 H.equal(drops['1'].name, 'drop-1', 'the drop carries its upstream name')
 H.ok(drops['1'].items == nil, 'drop contents are never handed to a client that has no session for them')
@@ -181,7 +181,7 @@ inventories['drop:1'] = nil
 drops = handlers['qb-inventory:server:GetCurrentDrops'](7)
 H.equal(next(drops), nil, 'a drop that no longer exists is pruned rather than reported')
 
--- --- attemptPurchase ---
+-- attemptPurchase
 local attemptPurchase = handlers['qb-inventory:server:attemptPurchase']
 
 H.equal(attemptPurchase(7, { shop = 'shop-ammunation', amount = 2,
@@ -213,7 +213,7 @@ H.equal(attemptPurchase(7, { shop = 'shop-ammunation', amount = 1, item = { slot
 H.equal(#purchases, 0, 'the capacity check runs before the money is taken')
 canAdd = true
 
--- --- giveItem ---
+-- giveItem
 local giveItem = handlers['qb-inventory:server:giveItem']
 inventories['player:7'].items[3] = { name = 'water', amount = 5, slot = 3, weight = 100, info = { serial = 'AAA' } }
 removed, added, rejected = {}, {}, {}

@@ -99,7 +99,6 @@ exports = setmetatable({}, {
     end,
 })
 
-
 dofile('server/persistence.lua')
 dofile('server.lua')
 dofile('server/compat/ox.lua')
@@ -107,7 +106,7 @@ dofile('server/compat/ox.lua')
 local Q = QbInventory
 local ox = Q.compat.ox
 
--- Items(): ox shape, kora registry untouched ---------------------------------
+-- Items(): ox shape, kora registry untouched
 local before = Q.copy(ITEMS.bandage)
 local def = ox.Items('Bandage')
 H.equal(def.name, 'bandage', 'Items(name) is case-insensitive')
@@ -133,7 +132,7 @@ H.equal(uniq.stack, false, 'unique item does not stack')
 H.equal(uniq.client.image, 'p.png', 'kora image becomes client.image')
 H.equal(Q.toOxItemDef({ name = 'w', type = 'weapon' }).weapon, true, 'weapon flag')
 
--- createItem hook -------------------------------------------------------------
+-- createItem hook
 playersItems[7] = {}
 local seen
 local id = Q.api.registerHook('createItem', function(payload, src)
@@ -182,7 +181,7 @@ Q.internal.addTo('player:7', 'map', 1, nil, {}, 'transfer')
 H.equal(moved, nil, 'internal addTo (moves/rollbacks) does not fire createItem')
 Q.api.removeHooks(moveId)
 
--- ImportOxItems ---------------------------------------------------------------
+-- ImportOxItems
 local count, errors = Q.api.ImportOxItems({
     burger = { label = 'Burger', weight = 220, client = { image = 'burger.png', status = { hunger = 200000 } } },
     pistolclip = { label = 'Clip', weight = 5, stack = false, close = false, description = 'x' },

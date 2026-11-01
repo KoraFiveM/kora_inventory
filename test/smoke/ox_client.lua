@@ -15,7 +15,7 @@
 -- these bugs survived this long.
 local H = dofile('test/harness.lua')
 
--- --- environment -----------------------------------------------------------
+-- environment
 
 Config = { qbinventory = {} }
 dofile('config.lua')
@@ -127,7 +127,7 @@ dofile('client/compat/ox.lua')
 
 H.ok(Ox.Search ~= nil, 'the ox_inventory client surface was published')
 
--- --- Search ----------------------------------------------------------------
+-- Search
 --
 -- Upstream normalises 'slots'->1 / 'count'->2 then branches on the NUMBER, so
 -- the numeric form is documented contract. This file branched on the string
@@ -164,7 +164,7 @@ H.equal(Ox.Search(1, nil), false, 'a nil item list is false')
 H.equal(Ox.Search('count', 'bread', 'toast'), 1, 'a string metadata means { type = ... }')
 H.equal(Ox.Search('count', 'bread', 'rye'), 0, 'a non-matching string metadata matches nothing')
 
--- --- strict / metadata matching --------------------------------------------
+-- strict / metadata matching
 --
 -- Upstream defaults to table.contains (partial) and only uses table.matches
 -- (exact) when strict is passed. This file had no strict parameter at all and
@@ -186,7 +186,7 @@ H.equal(Ox.GetSlotIdWithItem('water', { brand = 'ecola' }), 4,
     'GetSlotIdWithItem takes strict and defaults to partial')
 H.equal(Ox.GetItemCount('water'), 5, 'no metadata counts every slot')
 
--- --- unknown item name ------------------------------------------------------
+-- unknown item name
 --
 -- Upstream gates these on Items(itemName) and distinguishes "no such item"
 -- from "known item, none held". Returning {} for both made the documented
@@ -201,7 +201,7 @@ H.equal(Ox.GetSlotIdWithItem('nonexistent'), nil, 'GetSlotIdWithItem is nil for 
 H.equal(Ox.GetItemCount('nonexistent'), 0, 'GetItemCount is 0 for an unknown item')
 H.equal(Ox.GetSlotIdWithItem('WATER'), 1, 'item names are matched case-insensitively')
 
--- --- weight -----------------------------------------------------------------
+-- weight
 
 H.equal(Ox.GetPlayerWeight(), 70, 'weight delegates to the shared totalWeight primitive')
 -- The hardcoded 120000 was a guess that happened to match config; read the
@@ -212,7 +212,7 @@ session = { primary = { maxWeight = 42000 } }
 H.equal(Ox.GetPlayerMaxWeight(), 42000, 'an open session supplies the authoritative capacity')
 session = nil
 
--- --- notify -----------------------------------------------------------------
+-- notify
 --
 -- Upstream moves data.text onto data.description before notifying. kora_lib's
 -- toast body field is `message`, so passing the ox payload through untouched
@@ -239,7 +239,7 @@ H.equal(calls.notify[#calls.notify].position, 'bottom-center', 'the ox bottom po
 Ox.notify({ title = 'Hi', position = 'center-right' })
 H.equal(calls.notify[#calls.notify].position, 'top-right', 'unsupported center-right retains its side without failing validation')
 
--- --- Progress ---------------------------------------------------------------
+-- Progress
 --
 -- Upstream: `local success = lib.progressBar(options); if completed then
 -- completed(not success) end`. The callback argument is CANCELLED, not
@@ -293,7 +293,7 @@ H.equal(Ox.ProgressActive(), false, 'ProgressActive follows the live state back 
 Ox.CancelProgress()
 H.ok(calls.cancelled, 'CancelProgress delegates to kora_lib')
 
--- --- Keyboard ---------------------------------------------------------------
+-- Keyboard
 --
 -- Upstream is exports('Keyboard', lib.inputDialog): rows in, an array of
 -- values positionally aligned with those rows out, nil on cancel.
@@ -317,7 +317,7 @@ answers = Ox.Keyboard('Roles', { { type = 'multi-select', label = 'Roles', optio
 H.equal(calls.dialog.fields[1].type, 'multiselect', 'ox multi-select remains multi-select')
 H.equal(#answers[1], 2, 'the positional result preserves every selected value')
 
--- --- setStashTarget ---------------------------------------------------------
+-- setStashTarget
 --
 -- The old implementation wrote LocalPlayer.state 'ox:stashTarget', which
 -- nothing in this resource ever read. `LocalPlayer` is deliberately NOT mocked
@@ -340,7 +340,7 @@ H.equal(calls.open[#calls.open].invType, 'shop', 'other inventory types are pass
 Ox.closeInventory()
 H.ok(calls.closed, 'closeInventory calls the client.lua global')
 
--- --- getCurrentWeapon -------------------------------------------------------
+-- getCurrentWeapon
 
 pedWeapon = GetHashKey('weapon_unarmed')
 H.equal(Ox.getCurrentWeapon(), nil, 'an unarmed ped has no current weapon')
@@ -354,7 +354,7 @@ H.equal(weapon.info.durability, 80, 'the reported weapon carries its slot metada
 playerItems[6] = nil
 pedWeapon = 0
 
--- --- documented no-ops ------------------------------------------------------
+-- documented no-ops
 --
 -- These four have no backing subsystem in kora_inventory/kora_lib and each carries a
 -- comment in client/compat/ox.lua saying which upstream feature it stands in

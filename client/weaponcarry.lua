@@ -17,8 +17,6 @@ local function vec(point, fallbackZero)
     return vector3(tonumber(point.x) or 0.0, tonumber(point.y) or 0.0, tonumber(point.z) or 0.0)
 end
 
--- --- draw / holster ---------------------------------------------------------
-
 -- The weapon this client believes it is holding because of a kora_inventory
 -- draw. Used only to notice the weapon leaving their hands by some other
 -- route (weapon wheel, disarm, death) so the server can put the prop back.

@@ -262,8 +262,6 @@ local function changeInventoryDimensions(reference, field, value)
     end)
 end
 
--- Inventory/getter exports --------------------------------------------------
-
 function ox.Inventory(reference, owner)
     return ox.GetInventory(reference, owner)
 end
@@ -454,8 +452,6 @@ function ox.Search(reference, search, items, metadata)
     end
     return result
 end
-
--- Capacity exports ----------------------------------------------------------
 
 -- Upstream returns nil (not false) when the item or inventory cannot be
 -- resolved, so `== false` and `== nil` mean different things to a caller.
