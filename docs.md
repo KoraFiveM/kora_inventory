@@ -82,6 +82,18 @@ metadata receives a server serial, bounded durability and ammo, and only configu
 must invoke durability/ammo changes from validated server actions; do not add a
 generic client event for these exports.
 
+New weapon serials are `<prefix>-<WEAPON>-<time>-<n>` from one generator
+(`weapons.generateSerial`). The prefix is `Config.SerialPrefix` (default `KORA`,
+A-Z0-9, max 12; the legacy `Config.qbinventory.weapons.serialPrefix` is still
+honoured when set to something other than `QB`). Existing serials are never
+rewritten. Stored durability is rounded to 2 decimals, and the item inspector
+rounds fractional values to `Config.Inspector.decimals` (default 1).
+
+`Config.ShopHints` draws a small marker and a `[ALT] Shop` hint (locale key
+`shop_hints.text`) at every fixed shop point within `drawDistance`, coloured
+from kora_theme's primary colour. Set `hint = false` on a shop to opt it out;
+vending machines (model targets) have no fixed point and get none.
+
 When `Config.qbinventory.weapons.ballistics.enabled` is set (the default), a
 weapon's `info.loadedBullets` contains one generated record for every loaded
 round; a 12-round magazine therefore contributes exactly 12 entries. The

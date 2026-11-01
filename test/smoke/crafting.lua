@@ -7,6 +7,7 @@ GetInvokingResource = function() return 'crafting-test' end
 TriggerEvent = function() end
 
 Config = {
+    SerialPrefix = 'KORA',
     qbinventory = {
         crafting = {},
         weapons = {
@@ -156,7 +157,23 @@ H.equal(denied, true, 'server recipe policy registers')
 H.equal(crafting.craft(7, 'denied'), false, 'server recipe access policy blocks craft')
 
 local prepared = assert(weapons.prepareMetadata('weapon_pistol', {}))
-H.ok(prepared.serial:match('^QB%-WEAPONPISTOL%-') ~= nil, 'new weapon metadata receives a server serial')
+H.ok(prepared.serial:match('^KORA%-WEAPONPISTOL%-') ~= nil, 'new weapon serial uses Config.SerialPrefix, not the legacy QB alias default')
+
+Config.SerialPrefix = 'ab-c!defghijklmnop'
+H.equal(weapons.serialPrefix(), 'ABCDEFGHIJKL', 'serial prefix is sanitised to A-Z0-9 and 12 characters')
+Config.SerialPrefix = ''
+H.equal(weapons.serialPrefix(), 'KORA', 'empty serial prefix falls back to KORA')
+Config.SerialPrefix = 'KORA'
+Config.qbinventory.weapons.serialPrefix = 'old-alias'
+H.equal(weapons.serialPrefix(), 'OLDALIAS', 'legacy weapons.serialPrefix still applies while Config.SerialPrefix is the default')
+Config.SerialPrefix = 'MINE'
+H.equal(weapons.serialPrefix(), 'MINE', 'Config.SerialPrefix wins over the legacy alias')
+Config.SerialPrefix, Config.qbinventory.weapons.serialPrefix = 'KORA', 'QB'
+H.equal(weapons.serialPrefix(), 'KORA', 'the old shipped QB value is not honoured')
+local kept = assert(weapons.prepareMetadata('weapon_pistol', { serial = 'QB-OLD-1-000001' }))
+H.equal(kept.serial, 'QB-OLD-1-000001', 'existing serials are never rewritten')
+local worn = assert(weapons.prepareMetadata('weapon_pistol', { durability = 92.70000000000044 }))
+H.equal(worn.durability, 92.7, 'stored durability is rounded to 2 decimals')
 H.equal(prepared.durability, 100, 'weapon gets configured default durability')
 H.equal(prepared.quality, 100, 'legacy weapon quality mirrors canonical durability')
 H.equal(prepared.ammo, 0, 'weapon ammo starts at zero')

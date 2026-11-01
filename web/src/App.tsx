@@ -12,6 +12,7 @@ import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, Sessio
 import { useNuiEvent } from "@/lib/useNuiEvent"
 import { predictMove, refreshedInventories, restoreInventories, type Prediction } from "@/lib/optimistic"
 import { createMoveQueue, type MoveJob, type MoveQueue } from "@/lib/moveQueue"
+import { formatMetaValue } from "@/lib/format"
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
 
@@ -26,7 +27,7 @@ const MAX_QUEUED_MOVES = 8
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "moveTimeoutMs">> & { images: NonNullable<UiConfig["images"]> } = {
+const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "moveTimeoutMs" | "inspectorDecimals">> & { images: NonNullable<UiConfig["images"]> } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
@@ -35,6 +36,7 @@ const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo
     queueMoves: true,
     // A move that gets no answer would otherwise stay pending for good.
     moveTimeoutMs: 10000,
+    inspectorDecimals: 1,
     scale: 1,
     images: {
         localPath: "nui://kora_inventory/images",
@@ -485,6 +487,7 @@ function InventoryApp() {
             optimisticMoves: config.optimisticMoves ?? current.optimisticMoves,
             queueMoves: config.queueMoves ?? current.queueMoves,
             moveTimeoutMs: Number.isFinite(config.moveTimeoutMs) && Number(config.moveTimeoutMs) > 0 ? Number(config.moveTimeoutMs) : current.moveTimeoutMs,
+            inspectorDecimals: Number.isFinite(config.inspectorDecimals) ? Number(config.inspectorDecimals) : current.inspectorDecimals,
             scale: Number.isFinite(config.scale) && Number(config.scale) > 0 ? Number(config.scale) : current.scale,
             images: { ...current.images, ...(config.images ?? {}) },
         }))
@@ -725,7 +728,7 @@ function InventoryApp() {
                 <p className="eyebrow">{filteredSelected.inventory.type === "shop" ? "shop item" : `slot ${filteredSelected.item.slot}`}</p>
                 <h1>{filteredSelected.item.label ?? filteredSelected.item.name}</h1>
                 <p>{filteredSelected.item.description ?? "No item description available."}</p>
-                <dl><dt>Amount</dt><dd>×{filteredSelected.item.amount}</dd><dt>Weight</dt><dd>{filteredSelected.item.weight ?? 0} g</dd>{filteredSelected.item.displayMeta?.map((meta, index) => <Fragment key={index}><dt>{meta.label}</dt><dd>{typeof meta.value === "object" ? JSON.stringify(meta.value) : String(meta.value)}</dd></Fragment>)}{filteredSelected.inventory.type === "shop" && <><dt>Price</dt><dd>${(filteredSelected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
+                <dl><dt>Amount</dt><dd>×{filteredSelected.item.amount}</dd><dt>Weight</dt><dd>{filteredSelected.item.weight ?? 0} g</dd>{filteredSelected.item.displayMeta?.map((meta, index) => <Fragment key={index}><dt>{meta.label}</dt><dd>{formatMetaValue(meta.value, uiConfig.inspectorDecimals)}</dd></Fragment>)}{filteredSelected.inventory.type === "shop" && <><dt>Price</dt><dd>${(filteredSelected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
                 {filteredSelected.inventory.type === "shop" ? <div className="amount-action">
                     {selectedMax > 1 && <input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Quantity to buy, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} />}
                     <button className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item, selectedCount)}>Buy {selectedCount} · ${((filteredSelected.item.price ?? 0) * selectedCount).toLocaleString()}</button>

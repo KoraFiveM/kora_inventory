@@ -7,6 +7,37 @@ Config = Config or {}
 -- Read when the zones are registered (resource or kora_target start).
 Config.showTargetHints = nil
 
+-- Prefix of newly generated weapon serials (`KORA-WEAPONPISTOL50-<time>-<n>`).
+-- Upper-cased and reduced to A-Z0-9, max 12 characters; empty falls back to
+-- KORA. Existing items keep the serial they already have.
+Config.SerialPrefix = 'KORA'
+
+-- Item inspector number formatting. Decimals shown for fractional metadata
+-- values such as Durability/Quality (0-3); trailing zeros are dropped, so 1
+-- shows 92.7 and 100.
+Config.Inspector = {
+    decimals = 1,
+}
+
+-- Draws a small marker (and optional "[ALT] Shop" text) at every fixed shop
+-- interaction point (convenience, liquor, Ammu-Nation, ...). Colour follows
+-- kora_theme's primary colour. Set `hint = false` on a shop's config to opt that
+-- shop out. Vending machines are model targets without fixed points and get no
+-- marker. Plain {x,y,z} tables rather than vec3, like the other offsets here.
+Config.ShopHints = {
+    enabled = true,
+    drawDistance = 10.0, -- metres; nothing is drawn or checked per frame beyond this
+    alpha = 160, -- 0-255 marker opacity
+    marker = {
+        type = 20, -- chevron; 2 is an inverted cone, 1 a cylinder
+        scale = { x = 0.3, y = 0.3, z = 0.3 },
+        zOffset = 0.0, -- added to the point's z
+        bob = true,
+        rotate = true,
+    },
+    showText = true, -- locale key shop_hints.text, drawn above the marker
+}
+
 Config.qbinventory = {
     playerSlots = 41,
     playerMaxWeight = 120000,
@@ -356,7 +387,8 @@ Config.qbinventory = {
     weapons = {
         defaultDurability = 100,
         maxAmmo = 10000,
-        serialPrefix = 'QB',
+        -- Deprecated alias of Config.SerialPrefix; only read when that is left at
+        -- its default and this is set to something other than 'QB'.
         -- Ammunition is not merely an integer.  Every loaded round is a
         -- discrete record on its weapon (`info.loadedBullets`), so loading a
         -- 12-round magazine creates exactly 12 traceable rounds.  The

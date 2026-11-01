@@ -93,6 +93,8 @@ client_scripts {
     'client/shops/vendingmachine.lua',
     'client/shops/liquorstore.lua',
     'client/shops/convenience.lua',
+    -- Optional marker/text at fixed shop points (Config.ShopHints).
+    'client/shop_hints.lua',
     -- Legacy qb-inventory event/command adapter. It has no NUI authority and
     -- only routes requested targets through client.lua's validated transport.
     'client/compat.lua',

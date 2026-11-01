@@ -283,14 +283,45 @@ local function normaliseComponents(name, raw)
     return out
 end
 
-local function serial(name)
-    local prefix = tostring(weaponConfig.serialPrefix or 'QB'):upper():gsub('[^A-Z0-9]', ''):sub(1, 12)
+local DEFAULT_SERIAL_PREFIX = 'KORA'
+
+local function cleanSerialPrefix(value)
+    local cleaned = tostring(value or ''):upper():gsub('[^A-Z0-9]', '')
+    return cleaned:sub(1, 12)
+end
+
+---Prefix for newly generated weapon serials: Config.SerialPrefix, or the
+---legacy Config.qbinventory.weapons.serialPrefix when that is set to something
+---other than its old shipped default ('QB') and Config.SerialPrefix is left at
+---the default. Sanitised to A-Z0-9, at most 12 characters. Existing serials are
+---never rewritten.
+function weapons.serialPrefix()
+    local prefix = cleanSerialPrefix(Config.SerialPrefix)
+    if prefix == '' or prefix == DEFAULT_SERIAL_PREFIX then
+        local legacy = cleanSerialPrefix(weaponConfig.serialPrefix)
+        if legacy ~= '' and legacy ~= 'QB' then
+            prefix = legacy
+        end
+    end
+    return prefix ~= '' and prefix or DEFAULT_SERIAL_PREFIX
+end
+
+---The one place a weapon serial is generated; every path (crafting, shop
+---purchases, grants, compat adapters) reaches it through prepareMetadata.
+function weapons.generateSerial(name)
+    local body = tostring(name):upper():gsub('[^A-Z0-9]', '')
     return ('%s-%s-%d-%06d'):format(
-        prefix ~= '' and prefix or 'QB',
-        name:upper():gsub('[^A-Z0-9]', ''):sub(1, 16),
+        weapons.serialPrefix(),
+        body:sub(1, 16),
         os.time(),
         math.random(0, 999999)
     )
+end
+
+---Stored durability is rounded to 2 decimals so repeated float subtraction
+---cannot leave values like 92.70000000000044 in item metadata.
+local function roundDurability(value)
+    return math.floor(value * 100 + 0.5) / 100
 end
 
 -- A cartridge identifier is deliberately unrelated to a firearm serial.  A
@@ -357,7 +388,7 @@ function weapons.prepareMetadata(name, metadata)
     if durability == nil then
         durability = tonumber(weaponConfig.defaultDurability) or 100
     end
-    info.durability = math.max(0, math.min(100, durability))
+    info.durability = roundDurability(math.max(0, math.min(100, durability)))
     info.quality = info.durability
     local ammo = math.floor(tonumber(info.ammo) or 0)
     ammo = math.max(0, math.min(math.floor(tonumber(weaponConfig.maxAmmo) or 10000), ammo))
@@ -381,7 +412,7 @@ function weapons.prepareMetadata(name, metadata)
     end
     info.components = components
     if type(info.serial) ~= 'string' or info.serial == '' or #info.serial > 96 then
-        info.serial = serial(name)
+        info.serial = weapons.generateSerial(name)
     end
     return info
 end
@@ -721,8 +752,9 @@ function weapons.consumeDurability(src, slot, amount)
         return false, 'invalid durability amount'
     end
     return replaceWeaponState(src, slot, function(info)
-        info.durability =
+        info.durability = roundDurability(
             math.max(0, (tonumber(info.durability) or tonumber(weaponConfig.defaultDurability) or 100) - amount)
+        )
         return true
     end)
 end
@@ -790,7 +822,7 @@ local function fireWeaponRound(src, slot, wear)
         if wear and wear > 0 then
             local durability = tonumber(info.durability) or tonumber(info.quality)
                 or tonumber(weaponConfig.defaultDurability) or 100
-            info.durability = math.max(0, math.min(100, durability) - wear)
+            info.durability = roundDurability(math.max(0, math.min(100, durability) - wear))
         end
         return true
     end)

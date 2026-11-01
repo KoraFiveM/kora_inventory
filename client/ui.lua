@@ -53,6 +53,7 @@ local function pushConfig()
         -- Read on every push so a live config change applies on the next open.
         scale = math.max(0.5, math.min(2.0, tonumber(ui.scale) or 1.0)),
         images = ui.images,
+        inspectorDecimals = math.max(0, math.min(3, math.floor(tonumber((Config.Inspector or {}).decimals) or 1))),
     })
 end
 

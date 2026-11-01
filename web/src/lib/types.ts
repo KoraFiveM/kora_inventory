@@ -96,6 +96,8 @@ export interface UiConfig {
     optimisticMoves?: boolean
     /** Queue drags made while a move is pending instead of refusing them (Config.qbinventory.ui.queueMoves). */
     queueMoves?: boolean
+    /** Decimals shown for fractional inspector values (Config.Inspector.decimals). */
+    inspectorDecimals?: number
     /** Milliseconds before an unanswered move is rolled back (Config.qbinventory.ui.moveTimeout, in seconds). */
     moveTimeoutMs?: number
     images?: {
