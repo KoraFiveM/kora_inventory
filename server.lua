@@ -12,6 +12,7 @@ local secondaryGenerations = {}
 local sessions = {}
 local dropViewers = {}
 local hooks = {}
+local runHooks
 local audit = {}
 local locks = {}
 local ownPlayerWrites = {}
@@ -1101,11 +1102,11 @@ local function removeFrom(inventoryKey, slot, amount)
     return removeSecondary(inv, slot, amount)
 end
 
-local function runHooks(name, src, payload)
+function runHooks(name, src, payload)
     for _, hook in pairs(hooks[name] or {}) do
         local filter = hook.options or {}
         local match = (not filter.itemFilter or filter.itemFilter[payload.itemName])
-            and (not filter.inventoryFilter or filter.inventoryFilter[payload.fromInventory] or filter.inventoryFilter[payload.toInventory])
+            and (not filter.inventoryFilter or filter.inventoryFilter[payload.fromInventory] or filter.inventoryFilter[payload.toInventory] or filter.inventoryFilter[payload.inventoryId])
             and (not filter.typeFilter or filter.typeFilter[payload.fromType] or filter.typeFilter[payload.toType])
         if match then
             -- `src` is appended as a SECOND argument (not prepended) so an
@@ -1124,6 +1125,31 @@ local function runHooks(name, src, payload)
         end
     end
     return true
+end
+
+---ox `createItem` hook. Fires when an item is newly created in an inventory
+---(public AddItem paths and shop purchases; never for moves, swaps, gives or
+---rollbacks). Payload follows ox: { inventoryId, item (ox item definition),
+---metadata, count }; a returned table replaces the metadata, `false` cancels.
+---@return boolean ok
+---@return table|string|nil metadataOrErr
+local function createItemHook(src, inventoryKey, name, amount, metadata)
+    if not hooks.createItem or next(hooks.createItem) == nil then
+        return true, metadata
+    end
+    local def = itemDef(name)
+    local payload = {
+        inventoryId = inventoryKey,
+        itemName = type(name) == 'string' and name:lower() or name,
+        item = def and inventory.toOxItemDef(def, name) or { name = name },
+        metadata = inventory.copy(metadata or {}),
+        count = amount,
+    }
+    local ok, err = runHooks('createItem', src, payload)
+    if not ok then
+        return false, err
+    end
+    return true, payload.metadata
 end
 
 -- Sessions and transfers ----------------------------------------------------
@@ -1722,7 +1748,19 @@ local function intentBuy(src, request)
             end
             purchaseInfo = prepared
         end
-        local added, addErr, addedItem = addPlayer(src, currentItem.name, count, nil, purchaseInfo, 'purchase')
+        local hookOK, hookInfo = createItemHook(src, playerKey(src), currentItem.name, count, purchaseInfo)
+        if not hookOK then
+            if price > 0 then
+                exports.kora_core:addMoney(
+                    src,
+                    currentShop.currency == 'money' and 'cash' or currentShop.currency,
+                    price * count,
+                    'qbinventory-refund'
+                )
+            end
+            return false, hookInfo
+        end
+        local added, addErr, addedItem = addPlayer(src, currentItem.name, count, nil, hookInfo, 'purchase')
         if not added then
             if price > 0 then
                 exports.kora_core:addMoney(
@@ -1877,7 +1915,11 @@ local function addItem(src, name, amount, slot, info, reason)
         if not ok then
             return false, err
         end
-        local done, why, added = addPlayer(src, name, amount, slot, info, reason)
+        local hookOK, hookInfo = createItemHook(src, playerKey(src), name, amount, info)
+        if not hookOK then
+            return false, hookInfo
+        end
+        local done, why, added = addPlayer(src, name, amount, slot, hookInfo, reason)
         if done then
             bump(playerKey(src))
             broadcast(playerKey(src))
@@ -2834,7 +2876,19 @@ local function buyItem(src, shopId, slot, count)
             end
             purchaseInfo = prepared
         end
-        local added, addErr = addPlayer(src, item.name, count, nil, purchaseInfo)
+        local hookOK, hookInfo = createItemHook(src, playerKey(src), item.name, count, purchaseInfo)
+        if not hookOK then
+            if price > 0 then
+                exports.kora_core:addMoney(
+                    src,
+                    shop.currency == 'money' and 'cash' or shop.currency,
+                    price * count,
+                    'qbinventory-refund'
+                )
+            end
+            return false, hookInfo
+        end
+        local added, addErr = addPlayer(src, item.name, count, nil, hookInfo)
         if not added then
             if price > 0 then
                 exports.kora_core:addMoney(
@@ -2870,6 +2924,40 @@ local function buyItem(src, shopId, slot, count)
         })
         return true
     end)
+end
+
+---kora-specific (not an ox API): register ox-format item definitions
+---(`data/items.lua` entries, a name-keyed map or an array carrying `name`) into
+---kora_core's item registry. Existing items -- including weapons -- are never
+---replaced unless `opts.overwrite == true`. Invoked server-side only; the
+---registry owner becomes the calling resource (kora_core's own ownership rule).
+---@param definitions table
+---@param opts table|nil { overwrite = boolean }
+---@return integer registered
+---@return table errors name -> reason
+local function importOxItems(definitions, opts)
+    local registered, errors = 0, {}
+    if type(definitions) ~= 'table' then
+        return 0, { ['*'] = 'invalid_definitions' }
+    end
+    local overwrite = type(opts) == 'table' and opts.overwrite == true
+    for key, def in pairs(definitions) do
+        local name = type(key) == 'string' and key or type(def) == 'table' and def.name or nil
+        local record, err = inventory.fromOxItemDef(name, def)
+        if not record then
+            errors[tostring(name or key)] = err
+        elseif not overwrite and itemDef(record.name) then
+            errors[record.name] = 'already_registered'
+        else
+            local ok, regErr = exports.kora_core:registerShared('items', record.name, record)
+            if ok then
+                registered = registered + 1
+            else
+                errors[record.name] = regErr or 'register_failed'
+            end
+        end
+    end
+    return registered, errors
 end
 
 ---@param eventName string
@@ -3126,6 +3214,8 @@ inventory.internal = {
     removeFrom = removeFrom,
     buildItem = buildItem,
     itemDef = itemDef,
+    createItemHook = createItemHook,
+    runHooks = runHooks,
     view = view,
     bump = bump,
     broadcast = broadcast,
@@ -3514,6 +3604,7 @@ local api = {
     registerShop = registerShop,
     BuyItem = buyItem,
     RegisterHook = registerHook,
+    ImportOxItems = importOxItems,
     RemoveHooks = removeHooks,
     registerHook = registerHook,
     removeHooks = removeHooks,
@@ -3539,6 +3630,7 @@ api.getShopItems = api.GetShopItems
 api.setShopItems = api.SetShopItems
 api.createTemporaryStash = api.CreateTemporaryStash
 api.buyItem = api.BuyItem
+api.importOxItems = api.ImportOxItems
 api.getInventory = api.GetInventory
 api.getFreeWeight = api.GetFreeWeight
 api.removeInspectionAccess = api.RemoveInspectionAccess

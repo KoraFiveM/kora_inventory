@@ -30,7 +30,7 @@ local function sharedItems()
     local out = {}
     for _, def in ipairs(exports.kora_core:allShared('items') or {}) do
         if type(def) == 'table' and type(def.name) == 'string' then
-            out[def.name] = def
+            out[def.name] = QbInventory.toOxItemDef(def)
         end
     end
     return out
@@ -307,11 +307,21 @@ local ox = {
     -- Lower-cased like every other lookup in this file: kora_core's shared items
     -- table is keyed lower-case, so `Items('WEAPON_PISTOL')` would otherwise
     -- miss while GetItemCount('WEAPON_PISTOL') resolves it fine.
+    -- Returns ox-format definitions (QbInventory.toOxItemDef); kora's registry
+    -- record is only read, never modified.
     Items = function(name)
-        return name and itemDef(name) or sharedItems()
+        if name then
+            local def = itemDef(name)
+            return def and QbInventory.toOxItemDef(def, itemName(name)) or nil
+        end
+        return sharedItems()
     end,
     ItemList = function(name)
-        return name and itemDef(name) or sharedItems()
+        if name then
+            local def = itemDef(name)
+            return def and QbInventory.toOxItemDef(def, itemName(name)) or nil
+        end
+        return sharedItems()
     end,
     setStashTarget = function(id, owner)
         -- Upstream stores this in a local and its SECONDARY-inventory keybind

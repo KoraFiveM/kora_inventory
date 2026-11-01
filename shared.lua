@@ -183,3 +183,79 @@ function inventory.stackSlot(items, item)
     end
     return best
 end
+
+-- ox_inventory item-definition translation ---------------------------------
+-- kora_core's registry stays authoritative and is never modified here. These
+-- two pure functions translate between kora records and the `data/items.lua`
+-- shape ox_inventory scripts expect from Items().
+
+---Kora record -> ox item definition. Kora's own fields are kept as extra keys;
+---the ox keys are derived and win on collision.
+---@param def table kora_core item/weapon record
+---@param name string|nil
+---@return table
+function inventory.toOxItemDef(def, name)
+    local out = inventory.copy(def)
+    name = def.name or name
+    out.name = name
+    out.label = def.label or name
+    out.weight = def.weight or 0
+    local isWeapon = def.type == 'weapon' or def.weapon == true
+    if def.stack ~= nil then
+        out.stack = def.stack ~= false
+    else
+        out.stack = not def.unique and not isWeapon
+    end
+    out.close = def.close
+    if out.close == nil then
+        out.close = def.shouldClose
+    end
+    if out.close == nil then
+        out.close = true
+    end
+    out.description = def.description
+    out.consume = def.consume
+    if out.consume == nil then
+        out.consume = 1
+    end
+    if isWeapon then
+        out.weapon = true
+    end
+    local client = type(def.client) == 'table' and inventory.copy(def.client) or {}
+    if client.image == nil then
+        client.image = def.image or def.imageUrl or (tostring(name) .. '.png')
+    end
+    out.client = client
+    out.server = type(def.server) == 'table' and inventory.copy(def.server) or {}
+    return out
+end
+
+---ox item table (data/items.lua entry) -> kora_core registry record. Unknown ox
+---fields (client, server, degrade, decay, consume, stack, ammoname, ...) are
+---preserved on the record so toOxItemDef round-trips them.
+---@param name string
+---@param ox table
+---@return table|nil record, string|nil err
+function inventory.fromOxItemDef(name, ox)
+    if type(name) ~= 'string' or name == '' then
+        return nil, 'invalid_item_name'
+    end
+    if type(ox) ~= 'table' then
+        return nil, 'invalid_item_definition'
+    end
+    local record = inventory.copy(ox)
+    record.name = name:lower()
+    record.label = type(ox.label) == 'string' and ox.label or name
+    record.weight = tonumber(ox.weight) or 0
+    record.type = ox.weapon and 'weapon' or ox.type or 'item'
+    record.unique = ox.stack == false
+    local client = type(ox.client) == 'table' and ox.client or {}
+    local server = type(ox.server) == 'table' and ox.server or {}
+    record.image = client.image or ox.image
+    record.shouldClose = ox.close ~= false
+    record.useable = ox.useable == true
+        or client.export ~= nil or client.event ~= nil or server.export ~= nil
+        or client.status ~= nil or client.anim ~= nil or client.prop ~= nil
+        or ox.consume ~= nil
+    return record
+end
