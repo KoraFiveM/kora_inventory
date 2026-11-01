@@ -758,14 +758,21 @@ Run `python3 test/exchange_database.py` for the optional database check. It star
 ## Parachute
 
 `server/useables.lua` registers a built-in use handler for the `parachute`
-item. Using it plays a short pack-up animation, gives the player
-`GADGET_PARACHUTE` and consumes one item. The server only consumes the item
-after the client confirms the parachute was equipped, and a player who already
-has one equipped is told so and keeps the item.
+item. Using it shows a cancellable kora_lib progress bar with a pack-up
+animation, gives the player `GADGET_PARACHUTE`, puts the parachute pack on
+their back and consumes one item. The server waits for the client (so the slot
+stays locked for the whole bar) and only consumes the item once the parachute
+was actually equipped; a cancelled bar, or a player who already has one
+equipped, keeps the item.
 
 `Config.qbinventory.builtinUsables`:
 
 - `parachute` (default `true`) - set `false` to leave the item to another
   resource.
-- `parachuteTime` (default `1500`) - animation length in ms; `0` skips it.
+- `parachuteTime` (default `2500`) - progress bar length in ms; `0` skips it.
 - `parachuteTint` (default `nil`) - optional `SetPedParachuteTintIndex` value.
+- `parachuteBag` - `{ enabled = true, male = { drawable = 8, texture = 0 },
+  female = { drawable = 8, texture = 0 } }`. Sets the bag component (5) so the
+  pack is visible; freemode peds only. The previous bag is restored when the
+  parachute is deployed or gone, unless the player changed their bag meanwhile.
+  `enabled = false` leaves clothing alone.

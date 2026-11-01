@@ -224,48 +224,43 @@ exports.kora_core:onSharedChange('items', function(_, name, def)
     refreshAmmoUseable(name, def)
 end)
 
--- Parachute. Using the item hands the player GADGET_PARACHUTE and consumes one.
--- The ped's weapons live on the client, so the server only asks: it remembers
--- the slot it asked about and consumes the item when the client confirms the
--- parachute was actually equipped (see the client half). A client that is
--- already wearing one, or dies mid-pack, never confirms and keeps the item.
+-- Parachute. Using the item shows a progress bar on the client, hands the
+-- player GADGET_PARACHUTE (and the visible pack, see client/useables.lua) and
+-- consumes one. The ped's weapons live on the client, so the handler asks the
+-- client and WAITS for its answer: the slot stays locked against drop/give/move
+-- for the whole bar (see the mid-use lock in server.lua) and the item is only
+-- consumed when the client reports the parachute was actually equipped. A
+-- cancelled bar, a dead player or one already wearing a parachute keeps the item.
 local PARACHUTE_ITEM = 'parachute'
-local parachutePending = {}
+-- A real bar cannot come back sooner than its duration; allow some slack.
+local PARACHUTE_FINISH_TOLERANCE = 500
 
 local function builtinConfig()
     return Config.qbinventory.builtinUsables or {}
 end
 
 local function parachuteUseable(src, item)
-    parachutePending[src] = { slot = item.slot, expires = GetGameTimer() + 15000 }
-    TriggerClientEvent('qbinventory:client:useParachute', src, {
-        time = math.floor(tonumber(builtinConfig().parachuteTime) or 1500),
+    local duration = math.max(0, math.floor(tonumber(builtinConfig().parachuteTime) or 2500))
+    local startedAt = GetGameTimer()
+    local ok, equipped = pcall(Kora.callback.trigger, src, 'qbinventory:client:useParachute', {
+        time = duration,
         tint = tonumber(builtinConfig().parachuteTint),
     })
+    if not ok or equipped ~= true then
+        return false
+    end
+    -- The client reports its own result, so a modified client could answer at once.
+    if GetGameTimer() - startedAt < duration - PARACHUTE_FINISH_TOLERANCE then
+        return false
+    end
+    local owned = api.getItemBySlot(src, item.slot)
+    if not owned or owned.name ~= PARACHUTE_ITEM then
+        return false
+    end
+    api.removeItem(src, PARACHUTE_ITEM, 1, item.slot, 'used parachute')
     return true
 end
 
 if builtinConfig().parachute ~= false then
     internal.setBuiltInUseable(PARACHUTE_ITEM, parachuteUseable)
 end
-
-RegisterNetEvent('qbinventory:server:parachuteEquipped', function()
-    if GetInvokingResource() then
-        return
-    end
-    local src = source
-    local request = parachutePending[src]
-    parachutePending[src] = nil
-    if not request or GetGameTimer() > request.expires then
-        return
-    end
-    local owned = api.getItemBySlot(src, request.slot)
-    if not owned or owned.name ~= PARACHUTE_ITEM then
-        return
-    end
-    api.removeItem(src, PARACHUTE_ITEM, 1, request.slot, 'used parachute')
-end)
-
-AddEventHandler('playerDropped', function()
-    parachutePending[source] = nil
-end)

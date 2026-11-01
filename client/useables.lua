@@ -39,15 +39,58 @@ RegisterNetEvent('qbinventory:client:consumeEffect', function(_, effects)
     end
 end)
 
-local PARACHUTE_ANIM = { dict = 'clothingshirt', anim = 'try_shirt_positive_d', flag = 49 }
+local PARACHUTE_ANIM = { dict = 'clothingshirt', clip = 'try_shirt_positive_d', flag = 49 }
+local BAG_COMPONENT = 5
+local FREEMODE_MODELS = { [joaat('mp_m_freemode_01')] = 'male', [joaat('mp_f_freemode_01')] = 'female' }
 
--- Gives the parachute after a short pack-up animation, then tells the server
--- so it can consume the item. Nothing is sent (and nothing consumed) when one
--- is already equipped or the player is interrupted.
-RegisterNetEvent('qbinventory:client:useParachute', function(request)
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
-        return
+-- Puts the parachute pack on the ped's back (bag component) and returns what
+-- was there so it can be restored. Freemode peds only: other models have no
+-- matching bag drawable. Disabled with builtinUsables.parachuteBag.enabled = false.
+local function wearParachutePack(ped)
+    local bag = (Config.qbinventory.builtinUsables or {}).parachuteBag
+    if type(bag) ~= 'table' or bag.enabled == false then
+        return nil
     end
+    local sex = FREEMODE_MODELS[GetEntityModel(ped)]
+    local look = sex and bag[sex]
+    if type(look) ~= 'table' or tonumber(look.drawable) == nil then
+        return nil
+    end
+    local previous = {
+        drawable = GetPedDrawableVariation(ped, BAG_COMPONENT),
+        texture = GetPedTextureVariation(ped, BAG_COMPONENT),
+        palette = GetPedPaletteVariation(ped, BAG_COMPONENT),
+    }
+    local worn = { drawable = math.floor(look.drawable), texture = math.floor(tonumber(look.texture) or 0) }
+    SetPedComponentVariation(ped, BAG_COMPONENT, worn.drawable, worn.texture, 0)
+    return previous, worn
+end
+
+-- Restores the previous bag once the parachute is deployed or gone. Nothing is
+-- touched if the player changed their bag meanwhile (e.g. via the clothing menu).
+local function restoreBagWhenDone(ped, chute, previous, worn)
+    CreateThread(function()
+        Wait(1000)
+        while Kora.cache.ped() == ped and not IsPedDeadOrDying(ped, true) do
+            local state = GetPedParachuteState(ped)
+            if not HasPedGotWeapon(ped, chute, false) or state >= 1 then
+                break
+            end
+            Wait(500)
+        end
+        if DoesEntityExist(ped)
+            and GetPedDrawableVariation(ped, BAG_COMPONENT) == worn.drawable
+            and GetPedTextureVariation(ped, BAG_COMPONENT) == worn.texture
+        then
+            SetPedComponentVariation(ped, BAG_COMPONENT, previous.drawable, previous.texture, previous.palette)
+        end
+    end)
+end
+
+-- Server callback: runs the equip progress bar and gives the parachute. The
+-- server waits on the answer (true = equipped), which keeps the item locked
+-- mid-use and lets it consume the item only on success.
+Kora.callback.register('qbinventory:client:useParachute', function(request)
     local chute = joaat('gadget_parachute')
     local ped = Kora.cache.ped()
     if HasPedGotWeapon(ped, chute, false) then
@@ -56,19 +99,23 @@ RegisterNetEvent('qbinventory:client:useParachute', function(request)
             message = Kora.lang('inventory.parachute_equipped'),
             type = 'error',
         })
-        return
+        return false
     end
 
     local duration = math.floor(tonumber(request and request.time) or 0)
     if duration > 0 then
-        if Kora.stream.loadAnimDict(PARACHUTE_ANIM.dict, nil, { timeout = 2000 }) then
-            TaskPlayAnim(ped, PARACHUTE_ANIM.dict, PARACHUTE_ANIM.anim, 8.0, -8.0, duration, PARACHUTE_ANIM.flag, 0, false, false, false)
+        local started, completed = pcall(Kora.progressbar.start, {
+            label = Kora.lang('inventory.parachute_equipping'),
+            duration = duration,
+            canCancel = true,
+            anim = { dict = PARACHUTE_ANIM.dict, clip = PARACHUTE_ANIM.clip, flag = PARACHUTE_ANIM.flag },
+        })
+        if not started or completed ~= true then
+            return false
         end
-        Wait(duration)
-        ClearPedTasks(ped)
-        if Kora.cache.ped() ~= ped or IsPedDeadOrDying(ped, true) then
-            return
-        end
+    end
+    if Kora.cache.ped() ~= ped or IsPedDeadOrDying(ped, true) then
+        return false
     end
 
     GiveWeaponToPed(ped, chute, 1, false, true)
@@ -76,5 +123,9 @@ RegisterNetEvent('qbinventory:client:useParachute', function(request)
     if tint then
         SetPedParachuteTintIndex(ped, math.floor(tint))
     end
-    TriggerServerEvent('qbinventory:server:parachuteEquipped')
+    local previous, worn = wearParachutePack(ped)
+    if previous then
+        restoreBagWhenDone(ped, chute, previous, worn)
+    end
+    return true
 end)

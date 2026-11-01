@@ -29,10 +29,22 @@ Config.qbinventory = {
         -- consumes one item. Refused (item kept) while a parachute is already
         -- equipped.
         parachute = true,
-        -- Milliseconds of the pack-up animation before the parachute is given.
-        parachuteTime = 1500,
+        -- Milliseconds of the kora_lib progress bar (cancellable, with a
+        -- pack-up animation) before the parachute is given. 0 skips the bar.
+        parachuteTime = 2500,
         -- Optional SetPedParachuteTintIndex value (0-7). nil leaves the default.
         parachuteTint = nil,
+        -- Shows the parachute pack on the ped's back while it is worn, by setting
+        -- the bag component (5). Freemode peds only; other models are skipped.
+        -- The previous bag is restored once the parachute is deployed or gone
+        -- (unless the player changed their bag in between). Set enabled = false
+        -- to leave clothing alone. Drawables are the stock freemode parachute
+        -- pack; adjust per server clothing pack.
+        parachuteBag = {
+            enabled = true,
+            male = { drawable = 8, texture = 0 },
+            female = { drawable = 8, texture = 0 },
+        },
     },
     -- Downed / last stand / dead players (kora_ambulance sets the
     -- `isdead` / `inlaststand` player metadata, replicated by kora_core) cannot

@@ -3,6 +3,7 @@
     "title": "Inventory",
     "blocked_downed": "You can't do that while downed.",
     "blocked_busy": "You can't do that while using an item.",
-    "parachute_equipped": "You already have a parachute equipped."
+    "parachute_equipped": "You already have a parachute equipped.",
+    "parachute_equipping": "Putting on parachute..."
   }
 }

@@ -1,14 +1,15 @@
 -- Parachute use: kora_inventory registers a built-in handler so the item no
--- longer falls through to "no useable registered". The server only asks the
--- client to equip it and consumes the item once the client confirms.
+-- longer falls through to "no useable registered". The handler waits for the
+-- client's progress bar (keeping the mid-use lock) and only consumes the item
+-- when the client reports the parachute was equipped.
 local H = dofile('test/harness.lua')
 
 Config = { qbinventory = {} }
 dofile('config.lua')
 
-local useables, removals, pushed, netEvents = {}, {}, {}, {}
+local useables, removals, calls = {}, {}, {}
 local owned = { name = 'parachute', slot = 5 }
-local invoking = nil
+local answer = true
 local NOW = 1000
 
 QbInventory = {
@@ -22,51 +23,55 @@ QbInventory = {
         end,
     },
 }
-function TriggerClientEvent(event, src, payload) pushed[#pushed + 1] = { event = event, src = src, payload = payload } end
-RegisterNetEvent = function(name, fn) netEvents[name] = fn end
-AddEventHandler = function() end
-GetInvokingResource = function() return invoking end
+Kora = {
+    callback = {
+        trigger = function(src, name, payload)
+            calls[#calls + 1] = { src = src, name = name, payload = payload }
+            NOW = NOW + (Config.qbinventory.builtinUsables.parachuteTime or 0)
+            if answer == 'error' then error('timeout') end
+            return answer
+        end,
+    },
+}
 GetGameTimer = function() return NOW end
 exports = setmetatable({}, { __index = function() return setmetatable({}, { __index = function() return function() return {} end end }) end })
 
 local function load()
-    useables, removals, pushed = {}, {}, {}
+    useables, removals, calls = {}, {}, {}
     dofile('server/useables.lua')
 end
 
 load()
 H.ok(useables.parachute, 'the parachute item has a built-in use handler')
+H.equal(Config.qbinventory.builtinUsables.parachuteTime, 2500, 'the progress bar defaults to 2500 ms')
+H.equal(Config.qbinventory.builtinUsables.parachuteBag.enabled, true, 'the visible pack is on by default')
+H.equal(Config.qbinventory.builtinUsables.parachuteBag.male.drawable, 8, 'with the stock freemode parachute bag')
 
 local ok = useables.parachute(7, { name = 'parachute', slot = 5 })
-H.equal(ok, true, 'using it succeeds')
-H.equal(#removals, 0, 'the item is not consumed before the client equips it')
-H.equal(pushed[1].event, 'qbinventory:client:useParachute', 'the client is asked to equip it')
-H.equal(pushed[1].payload.time, 1500, 'with the configured pack-up time')
-
-source = 8
-netEvents['qbinventory:server:parachuteEquipped']()
-H.equal(#removals, 0, 'a confirmation nobody asked for consumes nothing')
-
-source = 7
-invoking = 'other_resource'
-netEvents['qbinventory:server:parachuteEquipped']()
-H.equal(#removals, 0, 'another resource cannot confirm for a player')
-invoking = nil
-netEvents['qbinventory:server:parachuteEquipped']()
-H.equal(#removals, 1, 'the confirmation consumes exactly one parachute')
+H.equal(ok, true, 'using it succeeds when the client equips it')
+H.equal(calls[1].name, 'qbinventory:client:useParachute', 'the client is asked to run the bar and equip it')
+H.equal(calls[1].payload.time, 2500, 'with the configured duration')
+H.equal(#removals, 1, 'exactly one parachute is consumed after the client confirms')
 H.equal(removals[1].slot, 5, 'from the slot that was used')
-netEvents['qbinventory:server:parachuteEquipped']()
-H.equal(#removals, 1, 'a confirmation cannot be replayed')
 
-useables.parachute(7, { name = 'parachute', slot = 5 })
-NOW = NOW + 20000
-netEvents['qbinventory:server:parachuteEquipped']()
-H.equal(#removals, 1, 'a stale request is ignored')
+answer = false
+H.equal(useables.parachute(7, { name = 'parachute', slot = 5 }), false, 'a cancelled bar / existing parachute is rejected')
+H.equal(#removals, 1, 'and consumes nothing')
 
-useables.parachute(7, { name = 'parachute', slot = 5 })
+answer = 'error'
+H.equal(useables.parachute(7, { name = 'parachute', slot = 5 }), false, 'a client that never answers is rejected')
+H.equal(#removals, 1, 'and consumes nothing')
+
+answer = true
+local realTrigger = Kora.callback.trigger
+Kora.callback.trigger = function() return true end
+H.equal(useables.parachute(7, { name = 'parachute', slot = 5 }), false, 'an instant answer (faster than the bar) is ignored')
+H.equal(#removals, 1, 'and consumes nothing')
+Kora.callback.trigger = realTrigger
+
 owned = { name = 'water_bottle', slot = 5 }
-netEvents['qbinventory:server:parachuteEquipped']()
-H.equal(#removals, 1, 'the slot must still hold a parachute')
+H.equal(useables.parachute(7, { name = 'parachute', slot = 5 }), false, 'the slot must still hold a parachute')
+H.equal(#removals, 1, 'and consumes nothing')
 
 Config.qbinventory.builtinUsables.parachute = false
 load()
