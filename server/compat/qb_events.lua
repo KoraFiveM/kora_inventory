@@ -157,5 +157,75 @@ RegisterNetEvent('qb-inventory:server:snowball', function()
     end
 end)
 
+-- Older qb-inventory (1.x) use event, `(inventoryName, item)`; also accepts the
+-- bare `(item)` form. Same posture as useItem above: only a slot is read, from
+-- the caller's own inventory, and the item is re-resolved from player data.
+local function legacyUse(first, second)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
+    local item = second ~= nil and second or first
+    local slot = tonumber(type(item) == 'table' and item.slot or item)
+    if not slot then
+        return
+    end
+    api.useItem(source, slot)
+end
+RegisterNetEvent('qb-inventory:server:UseItem', legacyUse)
+RegisterNetEvent('inventory:server:UseItem', legacyUse)
+
+-- Older qb-inventory (1.x) open event: `(type, id, other)`. `other` carried a
+-- client-chosen capacity or shop stock and is never read. The open is the same
+-- validated path as `qbinventory:server:open`: only an inventory that already
+-- exists server-side can be opened, and its access policy, owner, groups,
+-- coordinates and routing bucket are enforced. A stash the server has not
+-- registered is refused, never created on a client's say-so; server scripts
+-- create stashes with the OpenInventory export. Trunks and gloveboxes are
+-- refused too, because the legacy id is a plate and a plate is not a network id.
+local legacyOpenTypes = { stash = true, shop = true, drop = true, player = true, otherplayer = true }
+
+local function legacyOpen(invType, id)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
+    local src = source
+    if type(invType) ~= 'string' or not legacyOpenTypes[invType:lower()] then
+        return reject(src, 'inventory type not supported')
+    end
+    invType = invType:lower()
+    if type(id) ~= 'string' and type(id) ~= 'number' then
+        return reject(src, 'invalid inventory identifier')
+    end
+    id = tostring(id)
+    if #id < 1 or #id > 96 or not id:match('^[%w_%-:]+$') then
+        return reject(src, 'invalid inventory identifier')
+    end
+    local ok, result
+    if invType == 'player' or invType == 'otherplayer' then
+        local target = tonumber((id:gsub('^otherplayer%-', '')))
+        if not target then
+            return reject(src, 'invalid inventory identifier')
+        end
+        ok, result = internal.openInventory(src, 'player', target)
+    else
+        local prefix = invType .. '-'
+        if id:sub(1, #prefix) == prefix then
+            id = id:sub(#prefix + 1)
+        end
+        ok, result = internal.openInventory(src, invType, { id = id })
+    end
+    if not ok then
+        reject(src, result)
+    end
+end
+RegisterNetEvent('qb-inventory:server:OpenInventory', legacyOpen)
+RegisterNetEvent('inventory:server:OpenInventory', legacyOpen)
+
+-- Older qb-inventory marked a stash open or closed from the client. Open state
+-- is the server session here and a client must never be able to flip it, so
+-- these are accepted as no-ops.
+RegisterNetEvent('qb-inventory:server:SetIsOpenState', function() end)
+RegisterNetEvent('inventory:server:SetIsOpenState', function() end)
+
 inventory.compat = inventory.compat or {}
 inventory.compat.qbEvents = { sessionKeyFor = sessionKeyFor }

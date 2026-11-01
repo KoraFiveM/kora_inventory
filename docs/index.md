@@ -386,6 +386,34 @@ break the authority model (`qb-inventory:server:updateDrop`,
 `qb-inventory:server:snowball`) — call the real exports from server code
 instead.
 
+#### qb-inventory server surface
+
+- `AddItem`/`RemoveItem(identifier, item, amount, slot, info|reason, ...)` take a
+  player source or a stash, `trunk-<plate>`, `glovebox-<plate>`, `drop-<id>` or
+  temporary identifier and return a boolean. Unknown inventories are refused (stock
+  does not create them either); shops, evidence, confiscation and portable
+  containers are not reachable. `RemoveItem` without a slot drains matching slots.
+- `AddHook`/`RemoveHook`/`AddListener`/`RemoveListener` exist upstream and are
+  implemented for `ItemMoved`, `ItemDropped`, `ItemUsed`, `ItemBought`,
+  `ItemAdded`, `ItemRemoved`, `InventoryOpened`, `ShopOpened`. Callbacks receive
+  `(type, data)` as upstream. Opening the player's own inventory raises no
+  `InventoryOpened`.
+- `OpenInventory(src)` with no identifier opens the player's own inventory.
+  `CreateInventory` on an existing stash refreshes label, slots and maxweight.
+- `HasItem` follows stock for string, array and `{ [name] = count }` forms (also on
+  the client); counts are summed across slots.
+- Legacy `inventory:server:OpenInventory` / `qb-inventory:server:OpenInventory`
+  (`type, id`) open only inventories the server already has (stash, shop, drop,
+  player), through the normal access/distance checks; the client's capacity or stock
+  argument is ignored and trunk/glovebox are refused. `UseItem` aliases read a slot
+  from the caller's own inventory. `SetIsOpenState` is a no-op.
+- Client `qb-inventory:client:ItemBox` / `inventory:client:ItemBox` draw a receipt
+  (label and art from the registry, `itemBoxes` policy applies, de-duplicated against
+  the server's own receipt). `requiredItems` shows a text-UI hint from item names.
+- Kept deliberately different: give distance is `interactionDistance` (3.0, stock
+  5.0); `GetCurrentDrops`/`createDrop` return ids without contents or a networked bag;
+  `updateInventory` is a no-op (the session stream keeps the UI current).
+
 The client compatibility helpers also normalize ox-style notifications,
 multi-select input rows, and progress scenarios/props onto kora_lib. The ox
 `center-left`/`center-right` notification positions retain their horizontal

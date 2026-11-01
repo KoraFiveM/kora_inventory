@@ -306,30 +306,37 @@ local function getCurrentSession()
     return session and QbInventory.copy(session) or nil
 end
 
----@param names string|string[]
+---qb-inventory's client HasItem(items, amount). A string needs `amount`
+---(default 1) of it. An array needs every name present, or `amount` of each
+---when given. A `{ [name] = count }` map needs each count, unless `amount` is
+---given, which then applies to every entry. An empty table is false. Counts are
+---summed across slots.
+---@param names string|string[]|table<string, number>
 ---@param amount number|nil
 ---@return boolean hasItems
 local function hasItem(names, amount)
     local data = exports.kora_core:getPlayerData() or {}
-    local items = data.items or {}
-    local function count(name)
-        local count = 0
-        for _, item in pairs(items) do
-            if item.name == name then
-                count = count + (item.amount or 0)
-            end
+    local held = {}
+    for _, item in pairs(data.items or {}) do
+        if type(item) == 'table' and type(item.name) == 'string' then
+            local name = item.name:lower()
+            held[name] = (held[name] or 0) + (tonumber(item.amount) or 0)
         end
-        return count
     end
-    if type(names) == 'table' then
-        for _, name in ipairs(names) do
-            if count(name) < (amount or 1) then
-                return false
-            end
+    if type(names) ~= 'table' then
+        return type(names) == 'string' and (held[names:lower()] or 0) >= (tonumber(amount) or 1)
+    end
+    local isArray = #names > 0
+    local checked = false
+    for key, value in pairs(names) do
+        checked = true
+        local name = isArray and value or key
+        local required = tonumber(amount) or (not isArray and tonumber(value)) or 1
+        if type(name) ~= 'string' or (held[name:lower()] or 0) < required then
+            return false
         end
-        return true
     end
-    return count(names) >= (amount or 1)
+    return checked
 end
 
 QbInventory.clientApi = {

@@ -141,11 +141,20 @@ RegisterNetEvent('qb-inventory:client:updateInventory', function()
     refreshActiveSession()
 end)
 
--- kora_inventory owns item receipt configuration and presentation. Upstream
--- resources commonly call this immediately after AddItem; accepting it as a
--- deliberate no-op avoids duplicate receipts and means resources never need
--- to carry UI data or decide whether boxes are enabled.
-RegisterNetEvent('qb-inventory:client:ItemBox', function() end)
+-- Item receipts are owned by kora_inventory: its server already sends one for
+-- every AddItem/RemoveItem. Stock scripts also trigger this event themselves,
+-- from the client (TriggerEvent) or the server (TriggerClientEvent), so it is
+-- forwarded to the UI bridge, which draws a legacy notice only when the
+-- server's own receipt did not already cover that change. The copy the
+-- inventory itself emits is marked and ignored here.
+local function legacyItemBox(itemData, action, amount)
+    if type(itemData) == 'table' and itemData.koraReceipt then
+        return
+    end
+    TriggerEvent('qbinventory:ui:legacyItemBox', itemData, action, amount)
+end
+
+RegisterNetEvent('qb-inventory:client:ItemBox', legacyItemBox)
 
 -- The rest of upstream's client event surface. kora_inventory owns its own UI, so
 -- most of these are DELIBERATE no-ops rather than missing work: registering the
@@ -153,10 +162,44 @@ RegisterNetEvent('qb-inventory:client:ItemBox', function() end)
 -- instead of erroring, while presentation stays under kora_inventory's control
 -- (same reasoning as the ItemBox handler above).
 
--- Upstream renders a "required items" hint panel. kora_inventory's NUI does not
--- take item lists from other resources -- that is the spoofing vector the
--- ItemBox policy exists to close -- so the payload is intentionally dropped.
-RegisterNetEvent('qb-inventory:client:requiredItems', function() end)
+-- Upstream renders a "required items" hint panel. Only the item NAMES are read
+-- from the payload: labels come from kora_core's registry and the hint is shown
+-- through kora_lib's text UI, so a caller cannot put its own text or artwork on
+-- screen. `show` false (or any new call) clears the previous hint.
+local requiredHint
+
+local function hideRequiredHint()
+    if requiredHint then
+        Kora.textui.hide(requiredHint)
+        requiredHint = nil
+    end
+end
+
+local function showRequiredItems(items, show)
+    hideRequiredHint()
+    if not show or type(items) ~= 'table' then
+        return
+    end
+    local labels = {}
+    for key, entry in pairs(items) do
+        local name = type(entry) == 'table' and entry.name or (type(entry) == 'string' and entry) or key
+        if type(name) == 'string' and #labels < 12 then
+            local def = exports.kora_core:getShared('items', name:lower())
+                or exports.kora_core:getShared('weapons', name:lower())
+            if type(def) == 'table' then
+                labels[#labels + 1] = tostring(def.label or name)
+            end
+        end
+    end
+    if #labels == 0 then
+        return
+    end
+    table.sort(labels)
+    requiredHint = Kora.textui.show('Required: ' .. table.concat(labels, ', '), { position = 'left-center' }, GetCurrentResourceName())
+end
+
+RegisterNetEvent('qb-inventory:client:requiredItems', showRequiredItems)
+RegisterNetEvent('inventory:client:requiredItems', showRequiredItems)
 
 -- The hotbar is part of kora_inventory's own UI and is driven from its session,
 -- not from a caller-supplied item list.
@@ -202,7 +245,7 @@ RegisterNetEvent('inventory:client:updateInventory', function()
     refreshActiveSession()
 end)
 
-RegisterNetEvent('inventory:client:ItemBox', function() end)
+RegisterNetEvent('inventory:client:ItemBox', legacyItemBox)
 
 RegisterCommand('inventory', function()
     if IsPauseMenuActive() or IsNuiFocused() then
@@ -267,6 +310,7 @@ end)
 
 AddEventHandler('onClientResourceStop', function(resource)
     if resource == GetCurrentResourceName() then
+        hideRequiredHint()
         selfOpening = false
         setBusy(false)
     end

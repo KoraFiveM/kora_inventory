@@ -225,6 +225,32 @@ AddEventHandler('qbinventory:ui:rejected', function(payload)
     })
 end)
 
+-- A stock script reports its own item change with the legacy event, and the
+-- server's receipt for the same change arrives too (the inventory owns receipts
+-- for AddItem/RemoveItem). Whichever is seen second inside the window is the
+-- duplicate and is dropped, so each change draws one box.
+local RECEIPT_WINDOW = 5000
+local seenReceipts = { native = {}, legacy = {} }
+
+local function receiptKey(name, action)
+    return ('%s:%s'):format(name, action)
+end
+
+local function takeSeen(pool, key)
+    local list = pool[key]
+    while list and #list > 0 do
+        if GetGameTimer() - table.remove(list, 1) <= RECEIPT_WINDOW then
+            return true
+        end
+    end
+    return false
+end
+
+local function remember(pool, key)
+    pool[key] = pool[key] or {}
+    pool[key][#pool[key] + 1] = GetGameTimer()
+end
+
 -- This is a local presentation relay for the server-authoritative receipt
 -- payload. It intentionally works without an open inventory session.
 RegisterNetEvent('qbinventory:client:itemBox', function(payload)
@@ -234,7 +260,48 @@ RegisterNetEvent('qbinventory:client:itemBox', function(payload)
     if type(payload) ~= 'table' or type(payload.name) ~= 'string' then
         return
     end
+    local key = receiptKey(payload.name, payload.action)
+    if takeSeen(seenReceipts.legacy, key) then
+        return
+    end
+    remember(seenReceipts.native, key)
     send('qbinventory:nui:itemBox', payload)
+end)
+
+local legacyActions = { add = 'showAdditions', remove = 'showRemovals', use = 'showUses' }
+
+-- Cosmetic only. A stock script triggers qb-inventory:client:ItemBox with an
+-- item record; nothing in it is believed beyond the item NAME, and label and
+-- artwork come from kora_core's registry. The server's itemBoxes policy applies.
+AddEventHandler('qbinventory:ui:legacyItemBox', function(itemData, action, amount)
+    local policy = Config.qbinventory.itemBoxes
+    local policyField = legacyActions[action]
+    if type(policy) ~= 'table' or policy.enabled ~= true or not policyField or policy[policyField] ~= true then
+        return
+    end
+    local name = type(itemData) == 'table' and itemData.name or itemData
+    if type(name) ~= 'string' then
+        return
+    end
+    name = name:lower()
+    local def = exports.kora_core:getShared('items', name) or exports.kora_core:getShared('weapons', name)
+    if type(def) ~= 'table' then
+        return
+    end
+    local key = receiptKey(name, action)
+    if takeSeen(seenReceipts.native, key) then
+        return
+    end
+    remember(seenReceipts.legacy, key)
+    send('qbinventory:nui:itemBox', {
+        name = def.name or name,
+        label = def.label or name,
+        image = def.image,
+        imageUrl = def.imageUrl,
+        amount = math.max(1, math.floor(tonumber(amount) or 1)),
+        action = action,
+        duration = math.max(750, math.floor(tonumber(policy.duration) or 2600)),
+    })
 end)
 
 -- The target resolver reports presentation state only.  While an in-world
