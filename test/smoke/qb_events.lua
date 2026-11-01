@@ -46,7 +46,7 @@ for _, name in ipairs({
     H.ok(type(handlers[name]) == 'function', 'registers upstream event ' .. name)
 end
 
--- --- SetInventoryData ---
+-- SetInventoryData
 local setData = handlers['qb-inventory:server:SetInventoryData']
 
 source = 7
@@ -92,7 +92,7 @@ setData('player', 'locker', 1, 2, 1)
 H.equal(#transfers, 0, 'no open session means no transfer')
 QbInventory.internal.sessionOf = realSessionOf
 
--- --- the rest ---
+-- the rest
 handlers['qb-inventory:server:closeInventory']()
 H.equal(closed[1].src, 7, 'closeInventory closes the calling session')
 

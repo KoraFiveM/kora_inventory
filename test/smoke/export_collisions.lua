@@ -174,7 +174,7 @@ for _, pair in ipairs({
     end
 end
 
--- --- client realm ---
+-- client realm
 --
 -- The same flat-namespace hazard applies to client_scripts, and it BIT:
 -- client/compat/ox.lua looped `exports(name, fn)` over its whole Ox table,

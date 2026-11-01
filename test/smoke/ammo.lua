@@ -10,7 +10,7 @@ local H = dofile('test/harness.lua')
 Config = { qbinventory = {} }
 dofile('config.lua')
 
--- --- stubs ------------------------------------------------------------------
+-- stubs
 
 local ITEMS = {
     pistol_ammo = { name = 'pistol_ammo', label = 'Pistol Magazine', ammoType = 'AMMO_PISTOL', rounds = 12 },
@@ -88,7 +88,7 @@ exports = setmetatable({}, {
 
 dofile('server/useables.lua')
 
--- --- registration -----------------------------------------------------------
+-- registration
 
 H.ok(useables.pistol_ammo, 'a magazine with an ammoType and rounds is useable')
 H.ok(useables.rifle_ammo, 'every such magazine is registered, not a hard-coded list')
@@ -107,7 +107,7 @@ H.ok(useables.weapon_runtime, 'a weapon definition added at runtime becomes usea
 sharedChangeHandlers.weapons('remove', 'weapon_runtime', nil)
 H.equal(useables.weapon_runtime, nil, 'removing a runtime weapon definition removes its built-in handler')
 
--- --- refusals ---------------------------------------------------------------
+-- refusals
 
 local function reset()
     removals, pushed, removeResult = {}, {}, true
@@ -140,7 +140,7 @@ ok, err = useables.pistol_ammo(7, { name = 'pistol_ammo', slot = 4 })
 H.equal(ok, false, 'with weaponcarry absent there is no equipped record to trust, so it refuses')
 H.equal(#removals, 0, 'rather than consuming a magazine for no effect')
 
--- --- the happy path ---------------------------------------------------------
+-- the happy path
 
 reset()
 QbInventory.weaponCarry = { equippedWeapon = function() return { slot = 1, name = 'weapon_pistol' } end }

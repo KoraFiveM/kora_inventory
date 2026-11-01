@@ -13,14 +13,14 @@
 -- assert what comes back.
 local H = dofile('test/harness.lua')
 
--- --- structural assertions (retained from the original grep) ----------------
+-- structural assertions (retained from the original grep)
 local file = assert(io.open('server/compat/ox.lua', 'r'))
 local source = file:read('*a')
 file:close()
 H.ok(source:find('inventory.compat.ox = ox', 1, true), 'adapter is namespaced and does not replace authority')
 H.ok(not source:find("exports('", 1, true), 'adapter registers no Cfx exports; providers.lua owns the identity')
 
--- --- the world the adapter runs in -----------------------------------------
+-- the world the adapter runs in
 
 local warnings = {}
 local realPrint = print
@@ -282,7 +282,7 @@ H.ok(type(Ox) == 'table' and type(Ox.SwapSlots) == 'function', 'the adapter tabl
 local function argc(...) return select('#', ...) end
 local function count(t) local n = 0; for _ in pairs(t or {}) do n = n + 1 end; return n end
 
--- --- Tier 1: SwapSlots is a FOUR-argument, TWO-inventory cross swap ---------
+-- Tier 1: SwapSlots is a FOUR-argument, TWO-inventory cross swap
 
 reset()
 local fromSlot, toSlot = Ox.SwapSlots('player:1', 'stash:box', 1, 2)
@@ -320,7 +320,7 @@ H.equal(state['player:1'].items[1].name, 'water', 'a refused swap leaves the sou
 reset()
 H.equal((Ox.SwapSlots('player:1', 1, 2)), nil, 'the legacy three-argument call no longer resolves')
 
--- --- Tier 1: CreateDropFromPlayer must EMPTY the player ---------------------
+-- Tier 1: CreateDropFromPlayer must EMPTY the player
 
 reset()
 local dropId = Ox.CreateDropFromPlayer(1)
@@ -336,7 +336,7 @@ H.equal(writes[#writes].slots, 0, 'the clearing write commits an empty item tabl
 H.equal(writes[#writes].locked, true, 'the clear happens INSIDE the same lock as the copy')
 H.equal(Ox.CreateDropFromPlayer(1), nil, 'an empty player produces no drop, as upstream')
 
--- --- Tier 1: CanSwapItem does real weight arithmetic ------------------------
+-- Tier 1: CanSwapItem does real weight arithmetic
 
 reset()
 -- stash:box holds one phone (5) and caps at 100. Trading the phone for six
@@ -347,7 +347,7 @@ H.equal(Ox.CanSwapItem('stash:box', 'phone', 5, 'bread', 1), nil, 'CanSwapItem i
 H.equal(Ox.CanSwapItem('stash:box', 'nonexistent', 1, 'bread', 1), nil, 'CanSwapItem is nil for an unknown item')
 H.equal(Ox.CanSwapItem('nope', 'phone', 1, 'bread', 1), nil, 'CanSwapItem is nil for an unresolvable inventory')
 
--- --- Tier 1: UpdateVehicle re-keys the registry -----------------------------
+-- Tier 1: UpdateVehicle re-keys the registry
 
 reset()
 H.equal(argc(Ox.UpdateVehicle(' abc 123 ', 'xyz789')), 0, 'UpdateVehicle returns nothing, as upstream')
@@ -357,7 +357,7 @@ H.equal(state['trunk:XYZ789'].key, 'trunk:XYZ789', 'the record key matches the r
 H.equal(state['trunk:XYZ789'].id, 'XYZ789', 'the record id is the new plate')
 H.equal(state['trunk:XYZ789'].items[1].name, 'bread', 'the contents survive the rekey')
 
--- --- Tier 1: InspectInventory takes the VIEWER first ------------------------
+-- Tier 1: InspectInventory takes the VIEWER first
 
 reset()
 H.equal(argc(Ox.InspectInventory(1, 'stash:box')), 0, 'InspectInventory returns nothing, as upstream')
@@ -366,7 +366,7 @@ H.equal(opened[1].key, 'stash:box', 'the inspected inventory is the second argum
 Ox.InspectInventory(1, 1)
 H.equal(#opened, 1, 'inspecting yourself is a no-op')
 
--- --- Tier 2: strict defaults to PARTIAL on five exports ---------------------
+-- Tier 2: strict defaults to PARTIAL on five exports
 
 reset()
 -- Slot 1 is water with { quality = 100, serial = 'A' }; slot 2 is water with
@@ -385,7 +385,7 @@ H.equal(Ox.GetSlotIdsWithItem('player:1', 'water', partial)[2], 2, 'GetSlotIdsWi
 H.equal(select(2, Ox.GetItemSlots('player:1', 'water', partial)), 3, 'GetItemSlots still defaults to STRICT, as upstream')
 H.equal(select(2, Ox.GetItemSlots('player:1', 'water', partial, false)), 5, 'GetItemSlots honours an explicit strict=false')
 
--- --- Tier 2: GetItemSlots returns three values ------------------------------
+-- Tier 2: GetItemSlots returns three values
 
 reset()
 local slots, totalCount, emptySlots = Ox.GetItemSlots('player:1', 'water')
@@ -397,7 +397,7 @@ H.equal(totalCount, 5, 'the second return is the total count across those slots'
 H.equal(emptySlots, 2, 'the third return is the inventory-wide empty slot count')
 H.equal(Ox.GetItemSlots('player:1', 'nonexistent'), nil, 'GetItemSlots is nil for an unknown item')
 
--- --- Tier 2: Search treats a one-element ARRAY as single --------------------
+-- Tier 2: Search treats a one-element ARRAY as single
 
 reset()
 H.equal(Ox.Search('player:1', 'count', { 'water' }), 5, 'a one-element array returns a bare value, not a table')
@@ -417,7 +417,7 @@ H.equal(Ox.Search('player:1', 'count', { 'WEAPON_PISTOL' }), 1, 'a weapon_ prefi
 H.equal(Ox.Search('player:1', 'count', {}), false, 'an empty request is false')
 H.equal(Ox.Search('nope', 'count', { 'water' }), false, 'an unresolvable inventory is false')
 
--- --- Tier 2: the GetSlot* family is nil for an unknown item -----------------
+-- Tier 2: the GetSlot* family is nil for an unknown item
 
 reset()
 H.equal(Ox.GetSlotWithItem('player:1', 'nonexistent'), nil, 'GetSlotWithItem is nil for an unknown item')
@@ -431,7 +431,7 @@ H.equal(Ox.GetItemCount('nope', 'water'), 0, 'GetItemCount is 0 for an unresolva
 -- A known item held in no slot is an empty list, not nil.
 H.equal(#Ox.GetSlotsWithItem('player:1', 'feather'), 0, 'a known but unheld item is an empty list')
 
--- --- Tier 2: GetContainerFromSlot reads metadata.container ------------------
+-- Tier 2: GetContainerFromSlot reads metadata.container
 
 reset()
 state['player:1'].items[4] = item('backpack', 1, 4, { container = 'bag-1', size = { 6, 250 } })
@@ -446,7 +446,7 @@ state['player:1'].items[5] = item('backpack', 1, 5, { containerId = 'bag-2', siz
 H.equal(Ox.GetContainerFromSlot('player:1', 5).id, 'bag-2', 'the native containerId spelling still resolves')
 H.equal(Ox.GetContainerFromSlot('player:1', 3), nil, 'a slot with no container metadata is nil')
 
--- --- Tier 3/4: transient ids never collide ---------------------------------
+-- Tier 3/4: transient ids never collide
 
 reset()
 local dropA = Ox.CustomDrop('loot', {}, nil, 5, 100)
@@ -459,7 +459,7 @@ Ox.CreateTemporaryStash({ label = 'A' })
 Ox.CreateTemporaryStash({ label = 'B' })
 H.ok(api.temporaryIds[1] ~= api.temporaryIds[2], 'two CreateTemporaryStash calls produce different ids')
 
--- --- Tier 3/4: RemoveItem error vocabulary ---------------------------------
+-- Tier 3/4: RemoveItem error vocabulary
 
 reset()
 H.equal(select(2, Ox.RemoveItem('player:1', 'water', 'abc')), 'invalid_count', 'a non-numeric count is invalid_count')
@@ -472,7 +472,7 @@ H.equal(select(2, Ox.RemoveItem('player:1', 'nonexistent', 1)), 'invalid_item', 
 H.equal(Ox.RemoveItem('player:1', 'water', 2, nil, 1), true, 'a valid removal succeeds')
 H.equal(state['player:1'].items[1], nil, 'the emptied slot is cleared')
 
--- --- Tier 3/4: capacity return shapes --------------------------------------
+-- Tier 3/4: capacity return shapes
 
 reset()
 H.equal(Ox.CanCarryItem('nope', 'water', 1), nil, 'CanCarryItem is nil, not false, for an unresolvable inventory')
@@ -486,7 +486,7 @@ state['stash:box'].maxWeight = 1
 H.equal(Ox.CanCarryAmount('stash:box', 'water'), -1, 'an overweight inventory reports a negative amount, as upstream')
 H.equal(Ox.CanCarryAmount('nope', 'water'), nil, 'CanCarryAmount is nil for an unresolvable inventory')
 
--- --- Tier 3/4: exports that return nothing ---------------------------------
+-- Tier 3/4: exports that return nothing
 
 reset()
 H.equal(argc(Ox.SetMetadata('player:1', 3, { quality = 50 })), 0, 'SetMetadata returns nothing')
@@ -522,14 +522,14 @@ H.equal(argc(Ox.ReturnInventory(1)), 0, 'ReturnInventory returns nothing')
 H.equal(count(state['player:1'].items), 3, 'ReturnInventory restores the items')
 H.equal(state['confiscation:1'], nil, 'ReturnInventory removes the confiscation record')
 
--- --- Tier 3/4: RegisterStash accepts upstream's 8th parameter ---------------
+-- Tier 3/4: RegisterStash accepts upstream's 8th parameter
 
 reset()
 H.equal(argc(Ox.RegisterStash('vault', 'Vault', 10, 900, 'CID1', nil, nil, 'instance-3')), 0, 'RegisterStash returns nothing')
 H.equal(api.stash.slots, 10, 'RegisterStash forwards the first seven arguments')
 H.equal(state['stash:vault'].instance, 'instance-3', 'RegisterStash records upstream\'s instance parameter')
 
--- --- accepted divergences, asserted so they stay deliberate -----------------
+-- accepted divergences, asserted so they stay deliberate
 
 reset()
 local snapshot = Ox.GetInventory('player:1')
@@ -554,7 +554,7 @@ Ox.SetMetadata('player:1', 3, { weight = 5 })
 H.equal(state['player:1'].items[3].metadata.weight, 5, 'metadata weight is retained')
 H.equal(I.totalWeight(state['player:1'].items), 55, 'metadata weight changes the authoritative total')
 
--- --- useItem is published on the SERVER identity too ------------------------
+-- useItem is published on the SERVER identity too
 --
 -- Previously only client/compat/ox.lua and kora_inventory's own native api
 -- carried this name; exports.ox_inventory:useItem(...) on the server
@@ -573,7 +573,7 @@ Ox.useItem(1, 3, function(ok, err) cbResult, cbErr = ok, err end)
 H.equal(cbResult, true, 'useItem invokes an optional callback with the result')
 H.equal(Ox.useItem('not-a-number', 1), false, 'useItem refuses a non-numeric source')
 
--- --- ConvertInventory converts a whole inventory record ---------------------
+-- ConvertInventory converts a whole inventory record
 
 reset()
 local live = Ox.ConvertInventory('player:1')

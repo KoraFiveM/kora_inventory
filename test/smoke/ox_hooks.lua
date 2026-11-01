@@ -95,7 +95,7 @@ local function lease(src, kind, id)
     return l
 end
 
--- registerHook surface -------------------------------------------------------
+-- registerHook surface
 invoker = 'ox_script'
 local calls = {}
 local function record(tag, verdict)
@@ -122,7 +122,7 @@ _, _, h = internal.runHooks('swapItems', 7, { fromInventory = 7 })
 check(#h.ids == 0, 'removeHooks() with no id removes every hook of the caller')
 check(h.payload.source == 7, 'runHooks stamps payload.source')
 
--- transfers: move / stack / swap ------------------------------------------------
+-- transfers: move / stack / swap
 check(api.AddItem(7, 'water_bottle', 10, 1, { q = 1 }), 'seed')
 check(api.registerStash('box', 'Box', 10, 100000), 'stash registered')
 invoker = 'ox_script'
@@ -180,7 +180,7 @@ flush()
 check(seen and seen.success == true and seen.hookId == nil, 'TriggerEvent(hookId, true, payload) after the action')
 api.removeHooks()
 
--- filters -----------------------------------------------------------------------
+-- filters
 calls = {}
 api.registerHook('swapItems', record('pat'), { inventoryFilter = { '^bo' } })
 api.registerHook('swapItems', record('nomatch'), { inventoryFilter = { '^zzz' } })
@@ -199,7 +199,7 @@ check(not tags.type, 'typeFilter checks fromType only (stash source)')
 check(tags.typeStash, 'typeFilter matches fromType')
 api.removeHooks()
 
--- first-party kora_* hooks keep kora keys in the id fields -----------------------
+-- first-party kora_* hooks keep kora keys in the id fields
 invoker = 'kora_jobcreator'
 calls = {}
 api.registerHook('swapItems', record('legacy'), { typeFilter = { stash = true } })
@@ -212,7 +212,7 @@ invoker = 'kora_jobcreator'
 api.removeHooks()
 invoker = 'ox_script'
 
--- ground drop: move to newdrop with the drop id --------------------------------
+-- ground drop: move to newdrop with the drop id
 calls = {}
 api.registerHook('swapItems', record('drop'))
 local sl = lease(7, 'player', 7)
@@ -233,7 +233,7 @@ local denied = callbacks['qbinventory:server:intent'](7, { action = 'drop', toke
 check(not denied and #api.GetInventory(7) == count and api.GetItemCount(7, 'water_bottle') == waterBefore, 'a cancelled drop removes nothing')
 api.removeHooks()
 
--- give ----------------------------------------------------------------------------
+-- give
 calls = {}
 api.registerHook('swapItems', record('give'))
 positions[8] = positions[7]
@@ -253,7 +253,7 @@ gave = callbacks['qbinventory:server:intent'](7, { action = 'give', token = sl.t
 check(not gave and api.GetItemCount(8, 'water_bottle') == had, 'a hook can cancel a give')
 api.removeHooks()
 
--- openInventory / openShop ---------------------------------------------------------
+-- openInventory / openShop
 calls = {}
 api.registerHook('openInventory', record('open'))
 lease(7, 'stash', 'box')
@@ -274,7 +274,7 @@ check(p.source == 7 and p.shopId == 'gunshop' and p.shopType == 'gunshop' and p.
 check(p.items[1].name == 'water_bottle' and p.items[1].price == 10, 'openShop items are ox slots')
 api.removeHooks()
 
--- buyItem: after payment succeeds, rolled back on cancel --------------------------------
+-- buyItem: after payment succeeds, rolled back on cancel
 local function buy(amount)
     local sh = lease(7, 'shop', 'gunshop')
     return callbacks['qbinventory:server:intent'](7, { action = 'buy', token = sh.token,
@@ -318,7 +318,7 @@ check(not buy(1) and #calls == 0, 'unaffordable purchase never reaches the hook'
 api.removeHooks()
 money = 100
 
--- usingItem --------------------------------------------------------------------------
+-- usingItem
 calls = {}
 api.registerHook('usingItem', record('use'))
 api.CreateUsableItem('water_bottle', function() end)
@@ -329,7 +329,7 @@ check(p.source == 7 and p.inventoryId == 7 and p.item.name == 'water_bottle', 'u
 check(p.consume == 1 and p.inventoryType == 'player', 'usingItem has consume and type')
 api.removeHooks()
 
--- createItem: false does not cancel, resource field -----------------------------------
+-- createItem: false does not cancel, resource field
 calls = {}
 api.registerHook('createItem', function(payload) calls[#calls + 1] = payload return false end)
 check(api.AddItem(7, 'water_bottle', 1), 'false does not cancel createItem')

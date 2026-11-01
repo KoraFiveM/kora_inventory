@@ -10,8 +10,6 @@
 local api = assert(QbInventory and QbInventory.api, 'qbinventory server authority must load before useables')
 local internal = assert(QbInventory.internal, 'qbinventory internal API must load before useables')
 
--- --- weapons ---
-
 -- Equip/holster toggle. The weapon item stays in the player's inventory the
 -- whole time it's equipped -- simplest, desync-free behaviour (matches vanilla
 -- weapon-wheel semantics), rather than a remove-on-equip/restore-on-holster
@@ -54,8 +52,6 @@ end
 exports.kora_core:onSharedChange('weapons', function(_, name, def)
     refreshWeaponUseable(name, def)
 end)
-
--- --- consumables ---
 
 -- name -> { hunger?, thirst?, stress?, drunk?, high? } deltas, applied via
 -- exports.kora_core:incrementMetaData (clamped 0-100). drunk/high are new
@@ -111,8 +107,6 @@ end
 for name in pairs(CONSUMABLE_EFFECTS) do
     api.createUseable(name, consumableUseable)
 end
-
--- --- ammunition ---
 
 -- Loading a magazine into the weapon in the player's hands.
 --

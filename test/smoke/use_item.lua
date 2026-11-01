@@ -92,7 +92,7 @@ exports = setmetatable({}, {
 dofile('server/persistence.lua')
 dofile('server.lua')
 
--- buildItem derivation ------------------------------------------------------
+-- buildItem derivation
 
 local buildItem = QbInventory.internal.buildItem
 
@@ -119,7 +119,7 @@ playersItems[7] = {
     [5] = { name = 'weapon_pistol', amount = 1, slot = 5, useable = false, info = {} },
 }
 
--- intentUse response signals whether the client should close the panel -----
+-- intentUse response signals whether the client should close the panel
 
 local ok, payload = QbInventory.internal.openSelf(7)
 H.ok(ok, 'own inventory opens')
@@ -163,7 +163,7 @@ local flareOK, flareResult = intent(7, {
 H.ok(flareOK, 'using a legacy shouldClose = false item succeeds')
 H.equal(flareResult.preventClose, true, 'legacy shouldClose = false keeps the panel open through intentUse too')
 
--- setItems cannot forge preventClose/useTime onto a stored item ------------
+-- setItems cannot forge preventClose/useTime onto a stored item
 
 local setOK = QbInventory.api.setItems(7, {
     [4] = { name = 'potion', amount = 1, slot = 4, preventClose = true, useTime = 999999 },
@@ -172,7 +172,7 @@ H.ok(setOK, 'setItems accepts a validated replacement')
 H.equal(playersItems[7][4].preventClose, false, 'a caller cannot forge preventClose through setItems')
 H.equal(playersItems[7][4].useTime, 2500, 'a caller cannot forge useTime through setItems -- the real item useTime wins')
 
--- downed / dead players cannot open or use items (server-enforced) ----------
+-- downed / dead players cannot open or use items (server-enforced)
 
 local function useSlot2() return QbInventory.api.useItem(7, 4) end
 
