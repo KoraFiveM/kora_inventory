@@ -89,12 +89,19 @@ Kora.keybind.add({
         local slots = {}
         for slot = 1, HOTBAR_SLOTS do
             local item = items[slot]
+            -- Player data carries no artwork URL; the grid gets it from the shared
+            -- item definition, so read the same definition here or items with no
+            -- bundled file (bread) would show only the placeholder.
+            local def = type(item) == 'table' and type(item.name) == 'string'
+                and exports.kora_core:getShared('items', item.name:lower()) or nil
+            def = type(def) == 'table' and def or {}
             slots[slot] = type(item) == 'table' and {
                 slot = slot,
                 name = item.name,
                 label = item.label,
                 amount = item.amount or item.count or 1,
-                image = item.image,
+                image = item.image or def.image,
+                imageUrl = item.imageUrl or def.imageUrl,
             } or { slot = slot }
         end
 
