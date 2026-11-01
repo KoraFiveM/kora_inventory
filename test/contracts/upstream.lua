@@ -3,7 +3,7 @@
 return {
     qbInventory = {
         commit = '5edddc339c87b9099c8f4f6f493f61d0916716ec',
-        server = { 'AddItem', 'AddToStash', 'CanAddItem', 'ClearInventory', 'ClearStash', 'CloseInventory', 'CreateInventory', 'CreateShop', 'GetFirstSlotByItem', 'GetFreeWeight', 'GetInventory', 'GetItemByName', 'GetItemBySlot', 'GetItemCount', 'GetItemsByName', 'GetSlots', 'GetSlotsByItem', 'GetTotalWeight', 'HasItem', 'LoadInventory', 'OpenInventory', 'OpenInventoryById', 'OpenShop', 'RemoveFromStash', 'RemoveInventory', 'RemoveItem', 'SaveInventory', 'SetInventory', 'SetItemData', 'UseItem' },
+        server = { 'AddHook', 'AddItem', 'AddListener', 'AddToStash', 'CanAddItem', 'ClearInventory', 'ClearStash', 'CloseInventory', 'CreateInventory', 'CreateShop', 'GetFirstSlotByItem', 'GetFreeWeight', 'GetInventory', 'GetItemByName', 'GetItemBySlot', 'GetItemCount', 'GetItemsByName', 'GetSlots', 'GetSlotsByItem', 'GetTotalWeight', 'HasItem', 'LoadInventory', 'OpenInventory', 'OpenInventoryById', 'OpenShop', 'RemoveFromStash', 'RemoveHook', 'RemoveInventory', 'RemoveItem', 'RemoveListener', 'SaveInventory', 'SetInventory', 'SetItemData', 'UseItem' },
         client = { 'HasItem' },
     },
     oxInventory = {

@@ -75,7 +75,11 @@ for _, info in ipairs({
     H.equal(grid.label, info.label or definition.label, 'label override is preserved')
     H.equal(grid.weight, info.weight or definition.weight, 'weight override is preserved')
     H.equal(grid.description, info.description or definition.description, 'description override is preserved')
-    H.equal(legacyReceipts[#legacyReceipts], receipt, 'legacy event carries the same resolved receipt')
+    local legacy = legacyReceipts[#legacyReceipts]
+    for _, field in ipairs({ 'name', 'label', 'image', 'imageUrl', 'amount', 'action' }) do
+        H.equal(legacy[field], receipt[field], 'legacy event carries the same resolved ' .. field)
+    end
+    H.equal(legacy.koraReceipt, true, 'legacy copy is marked so the client bridge does not render it twice')
     H.ok(api.RemoveItem(1, 'card', 2, 1), 'remove succeeds, including the last item in a slot')
     local removed = receipts[#receipts]
     H.equal(removed.action, 'remove', 'remove action')

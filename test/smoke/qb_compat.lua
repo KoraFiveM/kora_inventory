@@ -71,6 +71,7 @@ QbInventory.internal.canAdd = function(identifier, name, amount)
     H.equal(amount, 2, 'adapter preserves amount')
     return true
 end
+QbInventory.internal.createItemHook = function(_, _, _, _, info) return true, info end
 QbInventory.internal.bump = function() bumps = bumps + 1 end
 QbInventory.internal.broadcast = function() broadcasts = broadcasts + 1 end
 -- Mirrors server.lua's addTo/removeFrom write funnel closely enough to prove

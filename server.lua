@@ -259,10 +259,11 @@ local function showItemBox(src, name, amount, action, item)
     }
     TriggerClientEvent('qbinventory:client:itemBox', src, payload)
     -- The upstream name, for legacy client scripts. Argument order is
-    -- upstream's (itemData, type, amount). kora_inventory's own client bridge
-    -- registers this as a no-op, so its UI still renders exactly one receipt
-    -- from the native event above.
-    TriggerClientEvent('qb-inventory:client:ItemBox', src, payload, action, amount)
+    -- upstream's (itemData, type, amount). `koraReceipt` tells kora_inventory's
+    -- own client bridge not to render this copy a second time.
+    local legacy = inventory.copy(payload)
+    legacy.koraReceipt = true
+    TriggerClientEvent('qb-inventory:client:ItemBox', src, legacy, action, amount)
 end
 
 local secondaryOptionFields = { 'label', 'coords', 'distance', 'bucket', 'groups', 'owner', 'prices', 'currency', 'policyOwner' }
@@ -3626,6 +3627,15 @@ inventory.internal = {
     lock = lock,
     open = open,
     openSelf = openSelf,
+    openInventory = openInventory,
+    openedBy = function(inventoryKey)
+        for src, session in pairs(sessions) do
+            if session.secondary == inventoryKey or session.primary == inventoryKey then
+                return src
+            end
+        end
+        return false
+    end,
     close = close,
     canAccess = canAccess,
     sameDropBucket = sameDropBucket,

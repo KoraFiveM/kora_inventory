@@ -67,6 +67,8 @@ server_scripts {
     -- their surfaces are enforced against test/contracts/upstream.lua by
     -- test/smoke/provider_contract.lua.
     'server/compat/qb.lua',
+    -- AddHook/AddListener registry; subscribes to the engine's hook dispatcher.
+    'server/compat/qb_hooks.lua',
     -- Upstream qb-inventory's net-event transport, translated onto the
     -- validated transfer funnel. Loads after server.lua (needs I.api/I.internal)
     -- and after compat/qb.lua purely to keep the qb surface together.

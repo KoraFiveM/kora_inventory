@@ -35,7 +35,33 @@ local function firstSlotByItem(items, itemName)
     return found[1]
 end
 
+-- inventory.api is installed by server.lua in the live resource. Keeping a blank
+-- fallback permits this transport-free adapter to be unit-tested in isolation.
+local native = inventory.api or {}
+
+local function wholeNumber(value)
+    local number = tonumber(value)
+    if number and number >= 1 and number % 1 == 0 then
+        return number
+    end
+    return nil
+end
+
+local prefixKinds = { trunk = true, glovebox = true, drop = true }
+
+---Stock identifiers name trunks, gloveboxes and drops as `<kind>-<id>`; kora
+---keys them `<kind>:<id>`. The prefix is only honoured when the resolved
+---inventory really is that kind, so `trunk-player:7` can never reach a player.
 local function resolve(identifier, preferredType)
+    if type(identifier) == 'string' then
+        local kind, rest = identifier:match('^(%a+)%-(.+)$')
+        if prefixKinds[kind] then
+            local key, found = internal.resolveInventory(rest, kind)
+            if found and found.type == kind then
+                return key, found
+            end
+        end
+    end
     return internal.resolveInventory(identifier, preferredType)
 end
 
@@ -107,6 +133,9 @@ local function setItemData(identifier, itemName, dataKey, value, slot)
         end
         local items = internal.copy(current.items)
         items[selected][dataKey] = internal.copy(value)
+        if dataKey == 'info' then
+            items[selected].metadata = internal.copy(value)
+        end
         return internal.setInventoryItems(key, items)
     end)
 end
@@ -130,11 +159,32 @@ local function createInventory(identifier, data)
     if type(identifier) ~= 'string' or identifier == '' then
         return
     end
-    local existing = select(2, resolve(identifier, 'stash'))
+    local existingKey, existing = resolve(identifier, 'stash')
+    data = type(data) == 'table' and data or {}
     if existing then
+        if existing.type ~= 'stash' or existing.policyOwner then
+            return
+        end
+        local slotCount = wholeNumber(data.slots)
+        local weight = tonumber(data.maxWeight or data.maxweight)
+        if not data.label and not slotCount and not weight then
+            return
+        end
+        internal.lock({ existingKey }, function()
+            local key, current = resolve(existingKey)
+            if not current then
+                return
+            end
+            current.label = data.label or current.label
+            current.slots = slotCount or current.slots
+            if weight and weight >= 0 then
+                current.maxWeight = weight
+            end
+            internal.bump(key)
+            internal.broadcast(key)
+        end)
         return
     end
-    data = type(data) == 'table' and data or {}
     internal.createSecondary('stash', identifier, {
         label = data.label or identifier,
         slots = data.slots,
@@ -177,6 +227,7 @@ local function getInventory(identifier)
         slots = inventory.slots,
         maxweight = inventory.maxWeight,
         maxWeight = inventory.maxWeight,
+        isOpen = internal.openedBy and internal.openedBy(inventoryKey) or false,
         items = internal.copy(inventory.items or {}),
     }
 end
@@ -189,29 +240,74 @@ local function canAddItem(identifier, itemName, amount)
     return internal.canAdd(identifier, wanted, amount)
 end
 
----Upstream: AddToStash(stashId, itemName, amount, slot, info) writes the item
----straight into the named stash. An explicit slot is honoured as-is; without
----one the authority's own addTo funnel picks a stack/free slot the same way
----every other mutation here does -- never hand-roll placement against a
----copied item table.
-local function addToStash(stashId, itemName, amount, slot, info)
-    local wanted = lower(itemName)
-    amount = tonumber(amount)
-    if not wanted or not amount or amount <= 0 then
-        return false
+local stashOnly = { stash = true }
+local storageTypes = { stash = true, trunk = true, glovebox = true, drop = true, temporary = true }
+
+local function qbHooks()
+    return inventory.compat and inventory.compat.qbHooks
+end
+
+local function hookData(inv, identifier, item, slot, amount, reason, resource, side)
+    local data = {
+        item = item,
+        amount = amount,
+        reason = reason,
+        resource = resource,
+    }
+    local snapshot = {
+        label = inv.label,
+        slots = inv.slots,
+        maxweight = inv.maxWeight,
+        items = internal.copy(inv.items or {}),
+    }
+    if side == 'to' then
+        data.toId, data.toInventory, data.toType, data.toSlot = identifier, snapshot, inv.type, slot
+    else
+        data.fromId, data.fromInventory, data.fromType, data.fromSlot = identifier, snapshot, inv.type, slot
     end
-    local inventoryKey, inventory = resolve(stashId, 'stash')
-    if not inventory or inventory.type ~= 'stash' then
-        return false
+    return data
+end
+
+---Adds to a trusted server-resolved secondary inventory. Placement, capacity,
+---revision, broadcast and the createItem hook all stay behind the authority
+---funnels; the caller only picks which of the allowed storage types it may
+---reach. Shops are read only there, and evidence, confiscation and portable
+---container inventories keep their own bounded domain APIs.
+local function addToSecondary(identifier, itemName, amount, slot, info, reason, allowed)
+    local wanted = lower(itemName)
+    amount = wholeNumber(amount)
+    if not wanted or not amount then
+        return false, 'invalid item or amount'
+    end
+    local inventoryKey, inventory = resolve(identifier, 'stash')
+    if not inventory or not allowed[inventory.type] then
+        return false, 'inventory not found'
     end
     return internal.lock({ inventoryKey }, function()
         local key, current = resolve(inventoryKey)
-        if not current then
-            return false
+        if not current or not allowed[current.type] then
+            return false, 'inventory not found'
         end
-        local ok = internal.addTo(key, wanted, amount, slot, info or {})
+        local metadata = info
+        if
+            QbInventory.weapons
+            and QbInventory.weapons.isWeapon
+            and QbInventory.weapons.prepareMetadata
+            and QbInventory.weapons.isWeapon(wanted)
+        then
+            local prepared, prepareErr = QbInventory.weapons.prepareMetadata(wanted, internal.copy(info or {}))
+            if not prepared then
+                return false, prepareErr
+            end
+            metadata = prepared
+        end
+        local hookOK, hookInfo = internal.createItemHook(nil, key, wanted, amount, metadata)
+        if not hookOK then
+            return false, hookInfo
+        end
+        local ok, err = internal.addTo(key, wanted, amount, slot, hookInfo or {}, reason, slot ~= nil)
         if not ok then
-            return false
+            return false, err
         end
         internal.bump(key)
         internal.broadcast(key)
@@ -219,36 +315,35 @@ local function addToStash(stashId, itemName, amount, slot, info)
     end)
 end
 
----Upstream: RemoveFromStash(stashId, itemName, amount, slot). A named slot is
----removed from directly and must already hold at least `amount` of the named
----item; otherwise every matching slot is drained (lowest slot first) until
----`amount` is satisfied. The whole removal is refused up front if the stash
----does not hold enough, rather than draining some slots and then reporting
----failure with the stash already half-emptied.
-local function removeFromStash(stashId, itemName, amount, slot)
+---Removes from a secondary inventory. A named slot is removed from directly and
+---must already hold at least `amount` of the named item; otherwise matching
+---slots are drained lowest first. The whole removal is refused up front if the
+---inventory does not hold enough, rather than draining some slots and then
+---reporting failure with the inventory half emptied.
+local function removeFromSecondary(identifier, itemName, amount, slot, allowed)
     local wanted = lower(itemName)
     amount = tonumber(amount)
     if not wanted or not amount or amount <= 0 then
-        return false
+        return false, 'invalid item or amount'
     end
-    local inventoryKey, inventory = resolve(stashId, 'stash')
-    if not inventory or inventory.type ~= 'stash' then
-        return false
+    local inventoryKey, inventory = resolve(identifier, 'stash')
+    if not inventory or not allowed[inventory.type] then
+        return false, 'inventory not found'
     end
     return internal.lock({ inventoryKey }, function()
         local key, current = resolve(inventoryKey)
-        if not current then
-            return false
+        if not current or not allowed[current.type] then
+            return false, 'inventory not found'
         end
         if slot ~= nil then
             slot = tonumber(slot)
             local item = slot and current.items[slot]
             if not item or lower(item.name) ~= wanted or item.amount < amount then
-                return false
+                return false, 'item not in slot'
             end
-            local ok = internal.removeFrom(key, slot, amount)
+            local ok, err = internal.removeFrom(key, slot, amount)
             if not ok then
-                return false
+                return false, err
             end
             internal.bump(key)
             internal.broadcast(key)
@@ -260,7 +355,7 @@ local function removeFromStash(stashId, itemName, amount, slot)
             available = available + current.items[candidateSlot].amount
         end
         if available < amount then
-            return false
+            return false, 'not enough of item'
         end
         local remaining = amount
         for _, candidateSlot in ipairs(candidates) do
@@ -269,9 +364,9 @@ local function removeFromStash(stashId, itemName, amount, slot)
             end
             local item = current.items[candidateSlot]
             local take = math.min(remaining, item.amount)
-            local ok = internal.removeFrom(key, candidateSlot, take)
+            local ok, err = internal.removeFrom(key, candidateSlot, take)
             if not ok then
-                return false
+                return false, err
             end
             remaining = remaining - take
         end
@@ -279,6 +374,134 @@ local function removeFromStash(stashId, itemName, amount, slot)
         internal.broadcast(key)
         return true
     end)
+end
+
+local function addToStash(stashId, itemName, amount, slot, info)
+    return addToSecondary(stashId, itemName, amount, tonumber(slot) or nil, type(info) == 'table' and info or nil, nil, stashOnly)
+end
+
+local function removeFromStash(stashId, itemName, amount, slot)
+    return removeFromSecondary(stashId, itemName, amount, slot, stashOnly)
+end
+
+---True when `identifier` addresses a player inventory (a server id).
+local function playerSource(identifier)
+    if type(identifier) ~= 'number' then
+        return nil
+    end
+    local _, found = resolve(identifier)
+    return found and found.type == 'player' and identifier or nil
+end
+
+---Stock AddItem(identifier, item, amount, slot, info, reason, isInternalMove).
+---`identifier` is a player source or a stash/trunk/glovebox/drop identifier.
+---The ItemAdded hook runs before the commit and may cancel it or replace the
+---metadata; the listener runs after. Returns a bare boolean like upstream, with
+---the refusal reason as a second value.
+local function addItem(identifier, itemName, amount, slot, info, reason, isInternalMove)
+    local wanted = lower(itemName)
+    if not wanted then
+        return false, 'invalid item'
+    end
+    amount = tonumber(amount) or 1
+    slot = tonumber(slot) or nil
+    info = type(info) == 'table' and info or nil
+
+    local src = playerSource(identifier)
+    local inventoryKey, target
+    if src then
+        inventoryKey, target = resolve(src)
+    else
+        inventoryKey, target = resolve(identifier, 'stash')
+        if not target or not storageTypes[target.type] then
+            return false, 'inventory not found'
+        end
+    end
+
+    local hooks = qbHooks()
+    local resource = GetInvokingResource and GetInvokingResource() or nil
+    local data
+    if not isInternalMove and hooks and hooks.active('ItemAdded') then
+        local definition = internal.itemDef(wanted)
+        local pending = definition and internal.buildItem(wanted, amount, slot, info) or nil
+        if not pending then
+            return false, 'unknown item'
+        end
+        data = hookData(target, identifier, pending, slot, amount, reason, resource or 'qb-inventory', 'to')
+        local mutated = hooks.trigger('ItemAdded', pending.type, data)
+        if mutated == false then
+            return false, 'cancelled by hook'
+        end
+        if type(mutated) == 'table' then
+            info = mutated
+        end
+    end
+
+    local ok, err
+    if src then
+        ok, err = native.AddItem(src, wanted, amount, slot, info, reason)
+    else
+        ok, err = addToSecondary(inventoryKey, wanted, amount, slot, info, reason, storageTypes)
+    end
+    if ok and data and hooks then
+        hooks.notify('ItemAdded', data.item.type, data)
+    end
+    return not not ok, err
+end
+
+---Stock RemoveItem(identifier, item, amount, slot, reason, isInternalMove).
+---Same identifier forms as AddItem. Without a slot kora drains matching slots
+---lowest first; upstream refuses unless the first matching slot alone holds
+---enough, so kora accepts a superset of upstream's successful calls.
+local function removeItem(identifier, itemName, amount, slot, reason, isInternalMove)
+    local wanted = lower(itemName)
+    if not wanted then
+        return false, 'invalid item'
+    end
+    amount = tonumber(amount)
+    if not amount then
+        return false, 'invalid amount'
+    end
+    slot = tonumber(slot) or nil
+
+    local src = playerSource(identifier)
+    local target
+    if src then
+        _, target = resolve(src)
+    else
+        _, target = resolve(identifier, 'stash')
+        if not target or not storageTypes[target.type] then
+            return false, 'inventory not found'
+        end
+    end
+
+    local hooks = qbHooks()
+    local resource = GetInvokingResource and GetInvokingResource() or nil
+    local data
+    if not isInternalMove and hooks and hooks.active('ItemRemoved') then
+        local chosen = slot or firstSlotByItem(target.items, wanted)
+        local held = chosen and target.items[chosen]
+        if not held or lower(held.name) ~= wanted then
+            return false, 'item not in slot'
+        end
+        local copy = internal.copy(held)
+        copy.amount = amount
+        data = hookData(target, identifier, copy, chosen, amount, reason, resource or 'qb-inventory', 'from')
+        if hooks.trigger('ItemRemoved', copy.type, data) == false then
+            return false, 'cancelled by hook'
+        end
+    end
+
+    local ok, err
+    if src then
+        ok, err = native.RemoveItem(src, wanted, amount, slot, reason)
+    else
+        ok, err = removeFromSecondary(identifier, wanted, amount, slot, storageTypes)
+    end
+    if ok and data and hooks then
+        hooks.notify('ItemRemoved', data.item.type, data)
+    end
+    return not not ok, err
 end
 
 -- This module does NOT call exports(). It builds a table which
@@ -307,15 +530,19 @@ local api = {
 -- Full upstream qb-inventory compatibility uses the same authority methods,
 -- but keeps its provider-specific return shapes separate from kora_inventory's
 -- native exports (and from ox_inventory's identically named exports).
--- inventory.api is installed by server.lua in the live resource. Keeping a blank
--- fallback permits this transport-free adapter to be unit-tested in isolation.
-local native = inventory.api or {}
 
 ---Upstream: LoadInventory(source, citizenid) -> slot-keyed item table.
----`citizenid` is accepted and ignored: kora_core owns player persistence and has
----already loaded PlayerData.items by the time anything can call this.
-api.LoadInventory = function(source, _citizenid)
-    return inventory.copy(native.GetInventory(source) or {})
+---An online `source` returns its live PlayerData.items; otherwise `citizenid` is
+---read through kora_core, which owns player persistence (no inventory SQL here).
+api.LoadInventory = function(source, citizenid)
+    local items = native.GetInventory(tonumber(source) or -1)
+    if items == nil and type(citizenid) == 'string' and citizenid ~= '' then
+        local ok, data = pcall(function()
+            return exports.kora_core:getOfflinePlayerData(citizenid)
+        end)
+        items = ok and type(data) == 'table' and data.items or nil
+    end
+    return inventory.copy(items or {})
 end
 
 ---Upstream: SaveInventory(source, offline). Keep player persistence inside
@@ -378,28 +605,49 @@ api.UseItem = function(first, second, third)
     return native.useItem(first, type(second) == 'table' and second.slot or second)
 end
 
+---Opens another player's inventory through the full access check: distance,
+---routing bucket and the server's inspection policy still apply.
 api.OpenInventoryById = function(source, target)
-    return inventory.internal.open(source, 'player:' .. tostring(tonumber(target) or -1))
+    target = tonumber(target)
+    if not target or not playerSource(target) then
+        return false, 'player not found'
+    end
+    return inventory.internal.open(source, 'player:' .. target)
 end
 
 ---Upstream: CreateShop(shopData) -- ONE table. `shopData.name` names the shop;
 ---a table with no `name` is treated as a collection of shops keyed by name.
 ---The older CreateShop(name, data) form is still accepted.
+local function shopWithSlots(shopData)
+    local rows = shopData.items or shopData.inventory
+    if type(rows) == 'table' then
+        local highest = 0
+        for slot in pairs(rows) do
+            highest = math.max(highest, tonumber(slot) or 0)
+        end
+        shopData.slots = math.max(tonumber(shopData.slots) or 0, #rows, highest)
+        if shopData.slots < 1 then
+            shopData.slots = nil
+        end
+    end
+    return shopData
+end
+
 api.CreateShop = function(first, second)
     if type(first) == 'string' then
-        return native.RegisterShop(first, second or {})
+        return native.RegisterShop(first, shopWithSlots(second or {}))
     end
     if type(first) ~= 'table' then
         return nil, 'CreateShop requires a shop table'
     end
     if first.name then
-        return native.RegisterShop(first.name, first)
+        return native.RegisterShop(first.name, shopWithSlots(first))
     end
 
     local last, err
     for shopName, shopData in pairs(first) do
         if type(shopData) == 'table' then
-            last, err = native.RegisterShop(shopData.name or shopName, shopData)
+            last, err = native.RegisterShop(shopData.name or shopName, shopWithSlots(shopData))
             if not last then
                 return nil, err
             end
@@ -411,7 +659,22 @@ end
 api.OpenShop = function(source, name)
     return native.OpenInventory(source, name, { type = 'shop', id = name })
 end
+---Upstream: OpenInventory(source, identifier, data). A nil identifier opens the
+---player's own inventory. A `trunk-`/`glovebox-`/`drop-` identifier that names an
+---existing kora inventory opens that one through the full access check; any
+---other string is a stash, created on demand by this trusted server call.
 api.OpenInventory = function(source, identifier, data)
+    if identifier == nil then
+        return internal.openInventory(source, 'player', source)
+    end
+    if type(identifier) ~= 'string' or identifier == '' then
+        return false, 'invalid inventory identifier'
+    end
+    local inventoryKey, found = resolve(identifier)
+    local kind = identifier:match('^(%a+)%-')
+    if found and prefixKinds[kind] and found.type == kind then
+        return internal.open(source, inventoryKey, type(data) == 'table' and data or nil)
+    end
     return native.OpenInventory(source, identifier, data)
 end
 
@@ -428,17 +691,76 @@ end
 ---Upstream: GetInventory(identifier) -> the whole inventory record, not just
 ---its items. Returns the detached descriptor built above.
 api.GetInventory = getInventory
-api.GetItemBySlot = native.GetItemBySlot
-api.GetItemByName = native.GetItemByName
-api.GetItemsByName = native.GetItemsByName
-api.GetItemCount = native.GetItemCount
-api.GetFreeWeight = native.GetFreeWeight
+api.GetItemBySlot = function(source, slot)
+    slot = tonumber(slot)
+    if not slot or not playerSource(tonumber(source)) then
+        return nil
+    end
+    return native.GetItemBySlot(tonumber(source), slot)
+end
+api.GetItemByName = function(source, itemName)
+    if not playerSource(tonumber(source)) then
+        return nil
+    end
+    return native.GetItemByName(tonumber(source), itemName)
+end
+---Upstream returns nil (not an empty list) for an unknown player.
+api.GetItemsByName = function(source, itemName)
+    if not playerSource(tonumber(source)) then
+        return nil
+    end
+    return native.GetItemsByName(tonumber(source), itemName)
+end
+api.GetItemCount = function(source, items)
+    if not playerSource(tonumber(source)) then
+        return nil
+    end
+    return native.GetItemCount(tonumber(source), items)
+end
+---Upstream returns 0 when the player is missing; the native export would
+---report a full inventory's worth of free weight.
+api.GetFreeWeight = function(source)
+    if not playerSource(tonumber(source)) then
+        return 0
+    end
+    return native.GetFreeWeight(tonumber(source))
+end
 -- Upstream HasItem(source, items, amount) accepts a name, an array of names,
--- or a {name = count} map, and returns a plain boolean. server.lua's native
--- hasItem already handles all three shapes identically, so this is a straight
--- wire-up -- it was simply never copied onto the compat table, which left
--- exports['qb-inventory']:HasItem(...) resolving to nothing on the server.
-api.HasItem = native.HasItem
+-- or a {name = count} map, and returns a plain boolean. A string goes straight
+-- to the native check. Tables follow upstream: an explicit `amount` applies to
+-- every entry and overrides the per-name counts of the map form, an array
+-- without `amount` only needs each item present, and an empty table is false.
+-- Counts are summed across slots, where upstream compares one slot at a time.
+api.HasItem = function(source, items, amount)
+    source = tonumber(source)
+    if type(items) ~= 'table' then
+        return native.HasItem(source, items, amount)
+    end
+    if not source or not playerSource(source) then
+        return false
+    end
+    local isArray = #items > 0
+    local wanted = 0
+    for _ in pairs(items) do
+        wanted = wanted + 1
+    end
+    if wanted == 0 then
+        return false
+    end
+    local held = {}
+    for _, item in pairs(native.GetInventory(source) or {}) do
+        local name = lower(item.name)
+        held[name] = (held[name] or 0) + (tonumber(item.amount) or 0)
+    end
+    for key, value in pairs(items) do
+        local name = lower(isArray and value or key)
+        local required = tonumber(amount) or (not isArray and tonumber(value)) or 1
+        if not name or (held[name] or 0) < required then
+            return false
+        end
+    end
+    return true
+end
 ---Upstream: CanAddItem(identifier, item, amount) -> true, or false plus a
 ---reason of exactly 'weight' or 'slots' (bare false for an unresolvable
 ---inventory or unknown item). internal.canAdd already speaks that vocabulary
@@ -455,8 +777,8 @@ api.CanAddItem = function(identifier, item, amount)
     return false
 end
 api.ClearInventory = native.ClearInventory
-api.AddItem = native.AddItem
-api.RemoveItem = native.RemoveItem
+api.AddItem = addItem
+api.RemoveItem = removeItem
 
 inventory.compat = inventory.compat or {}
 inventory.compat.qb = api
