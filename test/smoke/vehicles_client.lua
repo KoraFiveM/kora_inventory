@@ -34,6 +34,7 @@ env.Entity = function(id) return { state = { ['qbvehiclekeys:locked'] = f.vehicl
 env.GetVehicleDoorLockStatus = function(id) return f.vehicles[id].lock or 0 end
 env.NetworkGetEntityIsNetworked = function(id) return f.vehicles[id].networked ~= false end
 env.NetworkGetNetworkIdFromEntity = function(id) return 500 + id end
+env.AddEventHandler = function() end
 assert(loadfile('client/vehicles.lua', 't', env))()
 local V = env.QbInventory.vehicleStorage
 

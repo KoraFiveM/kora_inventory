@@ -276,6 +276,16 @@ Options (all under `Config.qbinventory.vehicles`): `enabled`, `gloveboxEnabled`,
 `bootSkipClasses`. Set `enabled = false` if another resource drives vehicle
 storage; `exports.kora_inventory:openInventory('trunk', netId)` still works.
 
+Optional trunk animation (`vehicles.trunkAnimation`, default `enabled = true`):
+when a trunk is opened with the inventory key the player turns to the boot,
+the boot door opens (bonnet for `frontBootModels`) and `dict`/`clip`/`flag`
+loop while the trunk panel is open, so nearby players see it. The animation
+stops and the door is shut again (only if it was opened by this feature) when the
+session closes for any reason, the player dies or walks away, or the resource
+stops. `openDoor = false` plays the animation without touching the door. Trunks
+opened by other resources through `openInventory` are not animated; glovebox
+opening is not animated.
+
 ## Item containers, evidence, and confiscation
 
 `server/containers.lua` is a server-only domain module. It registers no NUI

@@ -298,6 +298,21 @@ Config.qbinventory = {
         -- opening a trunk. Larger than `distance` because the boot sits at the
         -- far end of the vehicle, well away from its centre.
         trunkDistance = 7.0,
+        -- Visible trunk animation for the inventory-key trunk path: the player
+        -- turns to the boot, the boot (or bonnet for frontBootModels) door opens
+        -- and an anim loops while the trunk panel is open. Everything is undone
+        -- when the inventory closes (Escape, out of range, item use, death) or
+        -- the resource stops; a door that was already open is left open.
+        -- dict/clip pick the animation, flag is the TaskPlayAnim flag
+        -- (49 = loop + upper body + keep moving), openDoor = false skips the
+        -- door. Set enabled = false to turn the whole feature off.
+        trunkAnimation = {
+            enabled = true,
+            dict = 'mini@repair',
+            clip = 'fixing_a_ped',
+            flag = 49,
+            openDoor = true,
+        },
         -- Refuse trunk access while the vehicle is locked (kora_vehiclekeys
         -- state bag or the native door lock status).
         respectLocks = true,

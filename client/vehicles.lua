@@ -21,6 +21,15 @@ local SEARCH_RADIUS = 12.0
 -- Boot position sits this far beyond the bumper, so it is reachable from outside.
 local BOOT_OUTSET = 0.3
 local lastRequest = -REQUEST_COOLDOWN_MS
+-- A trunk request is only paired with the session it produced for this long.
+local PENDING_TRUNK_MS = 5000
+-- Extra metres beyond bootReach before the trunk animation gives up.
+local ANIM_LEAVE_MARGIN = 1.5
+local CONTROL_WAIT_MS = 500
+local BONNET_DOOR, BOOT_DOOR = 4, 5
+
+local pendingTrunk -- { vehicle, at } set by request(), consumed by the session event
+local activeAnim   -- the trunk animation currently owned by this file
 
 local function settings()
     return (Config.qbinventory and Config.qbinventory.vehicles) or {}
@@ -89,12 +98,144 @@ function vehicleStorage.findBootVehicle(coords, cfg)
     return best
 end
 
+local function animSettings()
+    local cfg = settings().trunkAnimation
+    if type(cfg) ~= 'table' or cfg.enabled ~= true then
+        return nil
+    end
+    return cfg
+end
+
+local function stopTrunkAnimation()
+    local anim = activeAnim
+    if not anim then
+        return
+    end
+    activeAnim = nil
+    local ped = PlayerPedId()
+    if anim.played and IsEntityPlayingAnim(ped, anim.dict, anim.clip, 3) then
+        StopAnimTask(ped, anim.dict, anim.clip, 1.0)
+    end
+    -- Only shut a door this script opened; never one the player or another
+    -- script already had open.
+    if anim.openedDoor and DoesEntityExist(anim.vehicle) then
+        if NetworkHasControlOfEntity(anim.vehicle) then
+            SetVehicleDoorShut(anim.vehicle, anim.door, false)
+        else
+            NetworkRequestControlOfEntity(anim.vehicle)
+            SetVehicleDoorShut(anim.vehicle, anim.door, false)
+        end
+    end
+end
+vehicleStorage.stopTrunkAnimation = stopTrunkAnimation
+
+local function loadAnimDict(dict)
+    if HasAnimDictLoaded(dict) then
+        return true
+    end
+    RequestAnimDict(dict)
+    local deadline = GetGameTimer() + 2000
+    while not HasAnimDictLoaded(dict) and GetGameTimer() < deadline do
+        Wait(0)
+    end
+    return HasAnimDictLoaded(dict)
+end
+
+---Face the boot, open its door and play the configured animation while the
+---trunk session is open. Everything is undone by stopTrunkAnimation().
+local function startTrunkAnimation(vehicle, cfg)
+    stopTrunkAnimation()
+    local vcfg = settings()
+    local model = GetEntityModel(vehicle)
+    local mine = {
+        vehicle = vehicle,
+        dict = tostring(cfg.dict or 'mini@repair'),
+        clip = tostring(cfg.clip or 'fixing_a_ped'),
+        door = hasFrontBoot(model, vcfg.frontBootModels) and BONNET_DOOR or BOOT_DOOR,
+    }
+    activeAnim = mine
+    CreateThread(function()
+        local ped = PlayerPedId()
+        local boot = vehicleStorage.bootPosition(vehicle, vcfg)
+        TaskTurnPedToFaceCoord(ped, boot.x, boot.y, boot.z, 600)
+
+        if cfg.openDoor ~= false and GetVehicleDoorAngleRatio(vehicle, mine.door) < 0.1 then
+            if not NetworkHasControlOfEntity(vehicle) then
+                NetworkRequestControlOfEntity(vehicle)
+                local deadline = GetGameTimer() + CONTROL_WAIT_MS
+                while activeAnim == mine and not NetworkHasControlOfEntity(vehicle) and GetGameTimer() < deadline do
+                    Wait(0)
+                end
+            end
+            if activeAnim ~= mine then
+                return
+            end
+            -- Opened even without control: the local state still shows for us and
+            -- is replicated when we are the owner (the usual case for a driver).
+            SetVehicleDoorOpen(vehicle, mine.door, false, false)
+            mine.openedDoor = true
+        end
+
+        if activeAnim == mine and loadAnimDict(mine.dict) and activeAnim == mine then
+            TaskPlayAnim(ped, mine.dict, mine.clip, 4.0, -4.0, -1, tonumber(cfg.flag) or 49, 0.0, false, false, false)
+            mine.played = true
+        end
+
+        local limit = (tonumber(vcfg.bootReach) or 1.8) + ANIM_LEAVE_MARGIN
+        while activeAnim == mine do
+            Wait(250)
+            if activeAnim ~= mine then
+                break
+            end
+            local api = QbInventory.clientApi
+            local at = GetEntityCoords(PlayerPedId())
+            local now = vehicleStorage.bootPosition(vehicle, vcfg)
+            local dx, dy = now.x - at.x, now.y - at.y
+            if not (api and api.getCurrentSession())
+                or IsEntityDead(PlayerPedId())
+                or not DoesEntityExist(vehicle)
+                or dx * dx + dy * dy > limit * limit then
+                stopTrunkAnimation()
+            end
+        end
+    end)
+end
+
+AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
+    local pending = pendingTrunk
+    pendingTrunk = nil
+    local cfg = animSettings()
+    local key = type(payload) == 'table' and type(payload.secondary) == 'table' and payload.secondary.key
+    if not (cfg and pending and type(key) == 'string' and key:sub(1, 6) == 'trunk:'
+        and GetGameTimer() - pending.at <= PENDING_TRUNK_MS and DoesEntityExist(pending.vehicle)) then
+        return
+    end
+    startTrunkAnimation(pending.vehicle, cfg)
+end)
+
+AddEventHandler('qbinventory:ui:sessionClosed', function()
+    pendingTrunk = nil
+    stopTrunkAnimation()
+end)
+
+AddEventHandler('qbinventory:ui:rejected', function()
+    pendingTrunk = nil
+end)
+
+AddEventHandler('onClientResourceStop', function(name)
+    if name == GetCurrentResourceName() then
+        pendingTrunk = nil
+        stopTrunkAnimation()
+    end
+end)
+
 local function request(kind, vehicle)
     if not NetworkGetEntityIsNetworked(vehicle) then
         notify('This vehicle has no storage you can open.')
         return true
     end
     lastRequest = GetGameTimer()
+    pendingTrunk = kind == 'trunk' and { vehicle = vehicle, at = lastRequest } or nil
     QbInventory.clientApi.openInventory(kind, NetworkGetNetworkIdFromEntity(vehicle))
     return true
 end
