@@ -247,14 +247,44 @@ exports.kora_inventory:dropTake(src, dropId, slot, amount)
 
 ### Hooks and inspection access
 ```lua
-exports.kora_inventory:registerHook(eventName, callback, options)  -- e.g. 'buyItem'
-exports.kora_inventory:removeHooks(id)
+exports.kora_inventory:registerHook(eventName, callback, options)  -- returns an ox hook id "resource:event:n"
+exports.kora_inventory:removeHooks(id)                              -- caller's own hook; no id removes all of the caller's hooks
 exports.kora_inventory:registerInspectionAccess(callback)           -- callback(source, target, sourceData, targetData)
 exports.kora_inventory:removeInspectionAccess(id)
 ```
-Hooks may return `false` to deny an action with the default reason, or a string
-to deny it with a specific user-facing reason. A table return value continues
-to update purchase metadata where supported.
+`registerHook` follows ox_inventory's `modules/hooks/server.lua`. The callback
+gets `(payload, source)`; `payload.source` is always set. Events and ox payloads:
+
+| Event | Payload |
+|---|---|
+| `swapItems` | `action` (`move`/`swap`/`stack`/`give`), `fromInventory`/`toInventory` (ox ids: a player's server id, the bare stash/drop/shop id, `newdrop` for a new ground drop), `fromType`/`toType`, `fromSlot`/`toSlot` (ox slot tables `name, count, metadata, slot, weight`; `toSlot` is a number when the target is empty), `count`, `dropId` (new drops) |
+| `buyItem` | `shopType`, `shopId`, `toInventory`, `toSlot`, `fromSlot`, `itemName`, `metadata`, `count`, `price`, `totalPrice`, `currency` |
+| `createItem` | `inventoryId`, `item` (ox definition), `metadata`, `count`, `resource` |
+| `craftItem` | `benchId`, `benchIndex`, `recipe` (`name, count, ingredients = {item = count}`), `toInventory`, `toSlot` |
+| `openInventory` | `inventoryId`, `inventoryType` |
+| `openShop` | `shopId`, `shopType`, `label`, `slots`, `items`, `groups`, `coords`, `distance` |
+| `usingItem` | `inventoryId`, `item` (slot table), `consume` |
+
+Kora keeps `itemName` and the kora inventory keys (`fromKey`, `toKey`,
+`inventoryKey`, e.g. `stash:box`) as extra fields. Gives and ground drops fire
+`swapItems` (`give`, and `move` to `newdrop`) after kora's validation and
+before anything moves; hooks can observe or cancel but never bypass kora's
+checks. `buyItem` fires after validation and the affordability check but before the payment is taken (so it is affordable) and
+before delivery; cancelling takes no money. `createItem` is not cancellable: only a
+returned table (which replaces the metadata) has an effect, `false` is ignored.
+Elsewhere returning `false` cancels. A returned string also cancels (with that reason) only for `kora_*` owners or `koraKeys = true` hooks; for other resources, as in ox, only `false` cancels.
+
+Options: `itemFilter = { item = true }` (checks `fromSlot`/`item`/`itemName`/
+`recipe`, then `toSlot`), `inventoryFilter = { '^stash' }` (array of Lua
+patterns tested against the from/to/inventory id; a kora exact-key map such as
+`{ ['stash:box'] = true }` is also accepted), `typeFilter = { stash = true }`
+(`inventoryType`/`shopType`/`fromType`) and `print = true`. After the guarded
+action finishes, `TriggerEvent(hookId, success, payload)` fires for every hook
+that ran (about 50 ms later), so a hook can be registered without a callback to
+listen for outcomes only. First-party `kora_*` resources keep receiving kora
+keys in the id fields (and may also match `toType` in `typeFilter`) for
+backwards compatibility; pass `koraKeys = true/false` in the options to force
+either form.
 Opening another player's inventory is default-deny; a registered inspection
 policy (or `Config.qbinventory.playerInspection.access`) must return `true`
 for an authorised police/admin/consent flow.

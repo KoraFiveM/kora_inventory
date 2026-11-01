@@ -12,7 +12,7 @@ local secondaryGenerations = {}
 local sessions = {}
 local dropViewers = {}
 local hooks = {}
-local runHooks
+local runHooks, finishHooks
 local audit = {}
 local locks = {}
 local ownPlayerWrites = {}
@@ -20,7 +20,7 @@ local inspectionHooks = {}
 local ownedStashTemplates = {}
 local persistenceHydrated, persistenceRestoreError = false, nil
 
-local nextHookId = 1
+local hookCounters = {}
 local nextDropId = 1
 local nextInspectionHookId = 1
 
@@ -1102,54 +1102,323 @@ local function removeFrom(inventoryKey, slot, amount)
     return removeSecondary(inv, slot, amount)
 end
 
-function runHooks(name, src, payload)
-    for _, hook in pairs(hooks[name] or {}) do
-        local filter = hook.options or {}
-        local match = (not filter.itemFilter or filter.itemFilter[payload.itemName])
-            and (not filter.inventoryFilter or filter.inventoryFilter[payload.fromInventory] or filter.inventoryFilter[payload.toInventory] or filter.inventoryFilter[payload.inventoryId])
-            and (not filter.typeFilter or filter.typeFilter[payload.fromType] or filter.typeFilter[payload.toType])
-        if match then
-            -- `src` is appended as a SECOND argument (not prepended) so an
-            -- existing single-arg `function(payload)` hook keeps working
-            -- unmodified -- it just never reads the extra parameter.
-            local ok, result = pcall(hook.callback, payload, src)
-            if not ok then
-                print(('^3[qbinventory]^7 hook %d failed: %s'):format(hook.id, result))
-            elseif result == false then
-                return false, 'action denied by hook'
-            elseif type(result) == 'string' then
-                return false, result
-            elseif type(result) == 'table' then
-                payload.metadata = result
-            end
+-- ox hook engine ------------------------------------------------------------
+-- Mirrors ox_inventory/modules/hooks/server.lua. Hooks are kept in registration
+-- order per event; every payload carries `source` and uses ox shapes (slot
+-- tables, ox inventory ids). Kora's own keys travel as extra fields
+-- (`fromKey`, `toKey`, `inventoryKey`). First-party `kora_*` resources that
+-- predate this engine keep receiving kora keys in the id fields unless they
+-- pass `koraKeys = false`; anyone else can opt in with `koraKeys = true`.
+
+---ox-format inventory id for a kora inventory record: the server id for a
+---player, the bare id for stash/drop/shop/etc. (`trunk`/`glove` + plate, as ox).
+---@param inv table|nil
+---@param inventoryKey string|nil
+---@return string|number|nil
+local function oxInventoryId(inv, inventoryKey)
+    if inv and inv.id ~= nil then
+        if inv.type == 'player' then
+            return tonumber(inv.source) or tonumber(inv.id) or inv.id
+        elseif inv.type == 'trunk' then
+            return 'trunk' .. tostring(inv.id)
+        elseif inv.type == 'glovebox' then
+            return 'glove' .. tostring(inv.id)
+        end
+        return inv.id
+    end
+    if type(inventoryKey) ~= 'string' then
+        return inventoryKey
+    end
+    local kind, id = inventoryKey:match('^([^:]+):(.+)$')
+    if kind == 'player' then
+        return tonumber(id) or id
+    elseif kind == 'trunk' then
+        return 'trunk' .. id
+    elseif kind == 'glovebox' then
+        return 'glove' .. id
+    end
+    return id or inventoryKey
+end
+
+---ox-shaped slot table (`name`, `count`, `metadata`, `slot`, `weight`...) for a
+---kora item record. Always a detached copy.
+---@param item table|nil
+---@param slot integer|nil
+---@param count integer|nil overrides the stack count (a partial move)
+---@return table|nil
+local function oxSlot(item, slot, count)
+    if type(item) ~= 'table' then
+        return nil
+    end
+    local metadata = inventory.copy(item.info or item.metadata or {})
+    local out = {
+        name = item.name,
+        label = item.label,
+        count = count or item.amount or item.count,
+        metadata = metadata,
+        slot = slot or item.slot,
+        stack = not item.unique,
+    }
+    local single = inventory.copy(item)
+    single.amount = out.count
+    out.weight = inventory.itemWeight(single)
+    return out
+end
+
+local function hookLegacyKeys(hook)
+    local flag = hook.options.koraKeys
+    if flag ~= nil then
+        return flag == true
+    end
+    return type(hook.owner) == 'string' and hook.owner:sub(1, 5) == 'kora_'
+end
+
+local function hookItemFilter(filter, item, secondItem)
+    local name = type(item) == 'table' and item.name or item
+    if not name or not filter[name] then
+        if type(secondItem) ~= 'table' or not filter[secondItem.name] then
+            return false
         end
     end
     return true
 end
 
+local function matchesPattern(value, pattern)
+    if value == nil then
+        return false
+    end
+    local ok, found = pcall(string.match, tostring(value), pattern)
+    return ok and found ~= nil
+end
+
+local function hookInventoryFilter(filter, hook, payload, fromInventory, toInventory)
+    if #filter > 0 then
+        for i = 1, #filter do
+            if matchesPattern(fromInventory, filter[i]) or matchesPattern(toInventory, filter[i]) then
+                return true
+            end
+        end
+        return false
+    end
+    -- kora's map form: exact inventory key (or ox id) => true
+    for _, candidate in ipairs({
+        payload.fromKey or false,
+        payload.toKey or false,
+        payload.inventoryKey or false,
+        fromInventory or false,
+        toInventory or false,
+    }) do
+        if candidate ~= false and filter[candidate] then
+            return true
+        end
+    end
+    return false
+end
+
+local function hookTypeFilter(filter, hook, payload)
+    local kind = payload.inventoryType or payload.shopType or payload.fromType
+    if kind ~= nil and filter[kind] then
+        return true
+    end
+    -- kora's old swapItems filter also matched the destination type.
+    return hookLegacyKeys(hook) and payload.toType ~= nil and filter[payload.toType] or false
+end
+
+local function schedulePostEvents(handle, success, payload)
+    local ids = handle and handle.ids
+    if not ids or #ids == 0 or handle.finished then
+        return
+    end
+    handle.finished = true
+    local function fire()
+        payload.hookId = nil
+        for i = 1, #ids do
+            TriggerEvent(ids[i], success, payload)
+        end
+    end
+    if SetTimeout then
+        SetTimeout(50, fire)
+    else
+        fire()
+    end
+end
+
+---Settle the post-event of a hook run: `TriggerEvent(hookId, success, payload)`
+---for each hook that ran, as ox does when the guarded action finishes.
+---@param handle table|nil third return value of runHooks
+---@param success boolean
+function finishHooks(handle, success)
+    if handle then
+        schedulePostEvents(handle, success and true or false, handle.payload)
+    end
+end
+
+---Run the `name` hooks. `src` is stamped onto `payload.source` and also passed
+---as the callback's second argument. `false` cancels (a string cancels with
+---that reason, kora's older convention, honoured only for hooks in kora-keys
+---mode: kora_* owners or `koraKeys = true`; in ox only `false` cancels); only `createItem` takes a returned
+---table, which replaces `payload.metadata`.
+---@return boolean ok
+---@return string|nil err
+---@return table handle pass to finishHooks when the guarded action ends
+function runHooks(name, src, payload)
+    payload.source = payload.source or src
+    local handle = { ids = {}, payload = payload }
+    local list = hooks[name]
+    if not list then
+        return true, nil, handle
+    end
+    local fromInventory = payload.fromInventory ~= nil and tostring(payload.fromInventory)
+        or payload.inventoryId ~= nil and tostring(payload.inventoryId)
+        or payload.shopType ~= nil and tostring(payload.shopType)
+        or nil
+    local toInventory = payload.toInventory ~= nil and tostring(payload.toInventory) or nil
+    -- Snapshot: a hook may register or remove hooks while it runs.
+    local snapshot = {}
+    for i = 1, #list do
+        snapshot[i] = list[i]
+    end
+    for _, hook in ipairs(snapshot) do
+        local filter = hook.options
+        local match = true
+        if filter.itemFilter then
+            match = hookItemFilter(
+                filter.itemFilter,
+                payload.fromSlot or payload.item or payload.itemName or payload.recipe,
+                payload.toSlot
+            )
+        end
+        if match and filter.inventoryFilter then
+            match = hookInventoryFilter(filter.inventoryFilter, hook, payload, fromInventory, toInventory)
+        end
+        if match and filter.typeFilter then
+            match = hookTypeFilter(filter.typeFilter, hook, payload)
+        end
+        if match then
+            payload.hookId = hook.id
+            if filter.print then
+                print(('^3[qbinventory]^7 Triggering event hook "%s".'):format(hook.id))
+            end
+            handle.ids[#handle.ids + 1] = hook.id
+            if hook.callback then
+                local view = payload
+                if hookLegacyKeys(hook) then
+                    view = {}
+                    for k, v in pairs(payload) do
+                        view[k] = v
+                    end
+                    if payload.fromKey ~= nil then view.fromInventory = payload.fromKey end
+                    if payload.toKey ~= nil then view.toInventory = payload.toKey end
+                    if payload.inventoryKey ~= nil then view.inventoryId = payload.inventoryKey end
+                end
+                local ok, result = pcall(hook.callback, view, src)
+                if not ok then
+                    print(('^3[qbinventory]^7 hook %s failed: %s'):format(hook.id, result))
+                elseif name == 'createItem' then
+                    if type(result) == 'table' then
+                        payload.metadata = result
+                    end
+                elseif result == false or (type(result) == 'string' and hookLegacyKeys(hook)) then
+                    if filter.print then
+                        print(('^3[qbinventory]^7 Event hook "%s" has rejected the action.'):format(hook.id))
+                    end
+                    local reason = type(result) == 'string' and result or 'action denied by hook'
+                    schedulePostEvents(handle, false, payload)
+                    return false, reason, handle
+                end
+            end
+        end
+    end
+    payload.hookId = nil
+    return true, nil, handle
+end
+
 ---ox `createItem` hook. Fires when an item is newly created in an inventory
 ---(public AddItem paths and shop purchases; never for moves, swaps, gives or
 ---rollbacks). Payload follows ox: { inventoryId, item (ox item definition),
----metadata, count }; a returned table replaces the metadata, `false` cancels.
----@return boolean ok
----@return table|string|nil metadataOrErr
+---metadata, count, resource }. A returned table replaces the metadata; any
+---other return (including `false`) leaves creation untouched, as in ox.
+---@return boolean ok always true (kept for the existing call sites)
+---@return table metadata
 local function createItemHook(src, inventoryKey, name, amount, metadata)
-    if not hooks.createItem or next(hooks.createItem) == nil then
+    if not hooks.createItem or #hooks.createItem == 0 then
         return true, metadata
     end
     local def = itemDef(name)
+    local inv = inventories[inventoryKey]
     local payload = {
-        inventoryId = inventoryKey,
+        inventoryId = oxInventoryId(inv, inventoryKey),
+        inventoryKey = inventoryKey,
         itemName = type(name) == 'string' and name:lower() or name,
         item = def and inventory.toOxItemDef(def, name) or { name = name },
         metadata = inventory.copy(metadata or {}),
         count = amount,
+        resource = GetInvokingResource() or resourceName,
     }
-    local ok, err = runHooks('createItem', src, payload)
-    if not ok then
-        return false, err
-    end
+    local _, _, handle = runHooks('createItem', src, payload)
+    finishHooks(handle, true)
     return true, payload.metadata
+end
+
+local function shopAccount(shop)
+    return shop.currency == 'money' and 'cash' or shop.currency
+end
+
+---Advisory affordability check made before the buyItem hook (ox runs the hook
+---after it too). It never charges; removeMoney stays the authority.
+---@return boolean affordable
+---@return string|nil err
+local function canAffordPurchase(src, shop, total)
+    if total <= 0 then
+        return true
+    end
+    local okCall, balance = pcall(function()
+        return exports.kora_core:getMoney(src, shopAccount(shop))
+    end)
+    if okCall and type(balance) == 'number' and balance < total then
+        return false, 'insufficient funds'
+    end
+    return true
+end
+
+---Give a charged purchase back in full (ignoreTax, so no tax is skimmed off the
+---refund). A failed refund is logged loudly because money would be lost.
+local function refundPurchase(src, shop, total)
+    if total <= 0 then
+        return true
+    end
+    local refunded = exports.kora_core:addMoney(src, shopAccount(shop), total, 'qbinventory-refund', true)
+    if not refunded then
+        print(('^1[qbinventory]^7 purchase refund of %s failed for player %s'):format(tostring(total), tostring(src)))
+    end
+    return refunded and true or false
+end
+
+---ox `buyItem` hook, run after the purchase is validated and affordable but
+---BEFORE the payment is taken. Returns false + reason to cancel (nothing was
+---charged); otherwise the caller charges and reports through finishHooks.
+---@return boolean ok
+---@return string|nil err
+---@return table|nil handle
+local function buyItemHook(src, shop, slot, item, count, price, metadata)
+    local fromSlot = oxSlot(item, slot, item.amount)
+    fromSlot.price = price
+    fromSlot.currency = shop.currency or 'money'
+    return runHooks('buyItem', src, {
+        shopType = shop.id,
+        shopId = shop.id,
+        toInventory = src,
+        toSlot = nil,
+        fromSlot = fromSlot,
+        itemName = item.name,
+        metadata = inventory.copy(metadata or {}),
+        count = count,
+        price = price,
+        totalPrice = price * count,
+        currency = shop.currency or 'money',
+        fromKey = shop.key,
+        toKey = playerKey(src),
+    })
 end
 
 -- Sessions and transfers ----------------------------------------------------
@@ -1199,10 +1468,36 @@ local function open(src, secondaryKey, opts)
     if not ok then
         return false, err
     end
-    local hookOK, hookErr = runHooks('openInventory', src, { inventoryId = secondaryKey, inventoryType = second.type })
+    local hookOK, hookErr, hookHandle
+    if second.type == 'shop' then
+        -- ox fires openShop (not openInventory) for shops.
+        local shopItems = {}
+        for slot, item in pairs(second.stock or second.items or {}) do
+            shopItems[slot] = oxSlot(item, slot)
+            shopItems[slot].price = item.price
+        end
+        hookOK, hookErr, hookHandle = runHooks('openShop', src, {
+            shopId = second.id,
+            shopType = second.id,
+            label = second.label,
+            slots = second.slots,
+            items = shopItems,
+            groups = inventory.copy(second.groups),
+            coords = inventory.copy(second.coords),
+            distance = second.distance,
+            inventoryKey = secondaryKey,
+        })
+    else
+        hookOK, hookErr, hookHandle = runHooks('openInventory', src, {
+            inventoryId = oxInventoryId(second, secondaryKey),
+            inventoryKey = secondaryKey,
+            inventoryType = second.type,
+        })
+    end
     if not hookOK then
         return false, hookErr
     end
+    finishHooks(hookHandle, true)
     local token = ('%s:%d:%d'):format(src, now(), math.random(100000, 999999))
     sessions[src] = { token = token, primary = primary, secondary = secondaryKey, expires = now() + config.sessionTtl }
     local payload =
@@ -1313,6 +1608,8 @@ local function transfer(src, request)
             return false, 'portable containers cannot be stored in another container'
         end
     end
+    -- Kora's own event payload (itemsMoved subscribers); the ox hook payload
+    -- below is built separately.
     local payload = {
         action = 'swapItems',
         fromInventory = fromKey,
@@ -1325,12 +1622,30 @@ local function transfer(src, request)
         count = amount,
         metadata = inventory.copy(item.info),
     }
-    local hookOK, hookErr = runHooks('swapItems', src, payload)
+    local hookTarget = toSlot and to.items[toSlot] or nil
+    local hookStacks = hookTarget
+        and hookTarget.name == item.name
+        and not hookTarget.unique
+        and not item.unique
+        and inventory.sameInfo(hookTarget.info, item.info)
+    local hookOK, hookErr, hookHandle = runHooks('swapItems', src, {
+        action = hookTarget and (hookStacks and 'stack' or 'swap') or 'move',
+        fromInventory = oxInventoryId(from, fromKey),
+        fromType = from.type,
+        fromSlot = oxSlot(item, fromSlot),
+        toInventory = oxInventoryId(to, toKey),
+        toType = to.type,
+        toSlot = hookTarget and oxSlot(hookTarget, toSlot) or toSlot,
+        count = amount,
+        itemName = item.name,
+        fromKey = fromKey,
+        toKey = toKey,
+    })
     if not hookOK then
         recordAudit('transfer-rejected', src, { reason = hookErr, item = item.name })
         return false, hookErr
     end
-    return lock({ fromKey, toKey }, function()
+    local committed, committedResult, committedExtra = lock({ fromKey, toKey }, function()
         -- Revalidate inside the critical section; every external request carries revisions.
         local session, currentFrom, currentTo =
             validSession(src, request.token, fromKey, toKey, request.fromRevision, request.toRevision)
@@ -1428,6 +1743,8 @@ local function transfer(src, request)
         removeEmptyDrop(currentFrom, src)
         return true, result
     end)
+    finishHooks(hookHandle, committed == true)
+    return committed, committedResult, committedExtra
 end
 
 -- Validated client intents --------------------------------------------------
@@ -1522,12 +1839,35 @@ local function intentDrop(src, request)
         if not current or revision(session.primary) ~= tonumber(request.primaryRevision) then
             return false, 'stale inventory'
         end
+        -- ox: a new ground drop is a 'move' to 'newdrop' carrying the id the
+        -- drop will get. The id is reserved here so the hook sees the real one.
+        local dropId = nextDropId
+        nextDropId = nextDropId + 1
+        local dropOK, dropErr, dropHandle = runHooks('swapItems', src, {
+            action = 'move',
+            fromInventory = src,
+            fromType = 'player',
+            fromSlot = oxSlot(current.items[slot] or item, slot),
+            toInventory = 'newdrop',
+            toType = 'drop',
+            toSlot = 1,
+            count = amount,
+            dropId = dropId,
+            itemName = item.name,
+            fromKey = session.primary,
+            toKey = key('drop', dropId),
+        })
+        if not dropOK then
+            return false, dropErr
+        end
         local removedOK, removedErr, removed = removePlayer(src, slot, amount)
         if not removedOK then
+            finishHooks(dropHandle, false)
             return false, removedErr
         end
         removed.slot = 1
-        local id = dropCreate(GetEntityCoords(ped), { [1] = removed }, GetPlayerRoutingBucket(src))
+        local id = dropCreate(GetEntityCoords(ped), { [1] = removed }, GetPlayerRoutingBucket(src), dropId)
+        finishHooks(dropHandle, true)
         bump(session.primary)
         broadcast(session.primary)
         recordAudit('drop', src, { id = id, item = removed.name, amount = amount })
@@ -1643,12 +1983,31 @@ local function intentGive(src, request)
             return false, receiveErr
         end
 
+        -- ox fires swapItems with action 'give' once the give is validated and
+        -- before anything moves; a hook may observe or cancel, never bypass.
+        local giveOK, giveErr, giveHandle = runHooks('swapItems', src, {
+            action = 'give',
+            fromInventory = src,
+            fromType = 'player',
+            fromSlot = oxSlot(currentItem, slot),
+            toInventory = target,
+            toType = 'player',
+            count = amount,
+            itemName = currentItem.name,
+            fromKey = session.primary,
+            toKey = recipientKey,
+        })
+        if not giveOK then
+            return false, giveErr
+        end
         local removedOK, removedErr, removed = removePlayer(src, slot, amount)
         if not removedOK then
+            finishHooks(giveHandle, false)
             return false, removedErr
         end
         local addedOK, addedErr = addPlayer(target, removed.name, amount, nil, removed.info, 'give')
         if not addedOK then
+            finishHooks(giveHandle, false)
             local rollbackOK, rollbackErr = addPlayer(src, removed.name, amount, slot, removed.info, 'give-rollback')
             if not rollbackOK then
                 print(
@@ -1662,6 +2021,7 @@ local function intentGive(src, request)
         bump(recipientKey)
         broadcast(session.primary)
         broadcast(recipientKey)
+        finishHooks(giveHandle, true)
         recordAudit('give', src, { to = target, item = removed.name, amount = amount, slot = slot })
         TriggerEvent('qbinventory:server:itemsMoved', src, {
             action = 'give',
@@ -1702,11 +2062,6 @@ local function intentBuy(src, request)
         return false, 'out of stock'
     end
     local price = tonumber(item.price or (shop.prices and shop.prices[item.name])) or 0
-    local hookOK, hookErr =
-        runHooks('buyItem', src, { shopId = shop.id, itemName = item.name, count = count, totalPrice = price * count })
-    if not hookOK then
-        return false, hookErr
-    end
 
     return lock({ shopKey, session.primary }, function()
         local _, currentShop, currentPlayer = validSession(
@@ -1724,17 +2079,6 @@ local function intentBuy(src, request)
         if not currentItem or currentItem.amount < count then
             return false, 'out of stock'
         end
-        if price > 0 then
-            local paid, payErr = exports.kora_core:removeMoney(
-                src,
-                currentShop.currency == 'money' and 'cash' or currentShop.currency,
-                price * count,
-                'qbinventory-shop'
-            )
-            if not paid then
-                return false, payErr
-            end
-        end
         local purchaseInfo = inventory.copy(currentItem.info or {})
         if
             inventory.weapons
@@ -1748,28 +2092,27 @@ local function intentBuy(src, request)
             end
             purchaseInfo = prepared
         end
-        local hookOK, hookInfo = createItemHook(src, playerKey(src), currentItem.name, count, purchaseInfo)
-        if not hookOK then
-            if price > 0 then
-                exports.kora_core:addMoney(
-                    src,
-                    currentShop.currency == 'money' and 'cash' or currentShop.currency,
-                    price * count,
-                    'qbinventory-refund'
-                )
-            end
-            return false, hookInfo
+        local total = price * count
+        local affordable, affordErr = canAffordPurchase(src, currentShop, total)
+        if not affordable then
+            return false, affordErr
         end
-        local added, addErr, addedItem = addPlayer(src, currentItem.name, count, nil, hookInfo, 'purchase')
-        if not added then
-            if price > 0 then
-                exports.kora_core:addMoney(
-                    src,
-                    currentShop.currency == 'money' and 'cash' or currentShop.currency,
-                    price * count,
-                    'qbinventory-refund'
-                )
+        local buyOK, buyErr, buyHandle = buyItemHook(src, currentShop, slot, currentItem, count, price, purchaseInfo)
+        if not buyOK then
+            return false, buyErr
+        end
+        if price > 0 then
+            local paid, payErr = exports.kora_core:removeMoney(src, shopAccount(currentShop), total, 'qbinventory-shop')
+            if not paid then
+                finishHooks(buyHandle, false)
+                return false, payErr
             end
+        end
+        local hookOK, hookInfo = createItemHook(src, playerKey(src), currentItem.name, count, purchaseInfo)
+        local added, addErr, addedItem = addPlayer(src, currentItem.name, count, nil, hookInfo, 'purchase')
+        finishHooks(buyHandle, added == true)
+        if not added then
+            refundPurchase(src, currentShop, total)
             return false, addErr
         end
         currentItem.amount = currentItem.amount - count
@@ -2327,6 +2670,14 @@ hasUseable = function(name)
     local containers = QbInventory.containers
     return containers and containers.isPortableItem and containers.isPortableItem({ name = name }) or false
 end
+---ox `consume` for a usingItem hook: how much of the stack a use consumes.
+---@param name string
+---@return number
+local function useConsume(name)
+    local def = itemDef(name)
+    local ox = def and inventory.toOxItemDef(def, name)
+    return ox and ox.consume or 0
+end
 ---@param src integer
 ---@param slotOrName integer|string
 ---@return boolean used
@@ -2340,15 +2691,19 @@ useItem = function(src, slotOrName)
         notifyDownedBlocked(src)
         return false, 'you cannot use items while downed'
     end
-    local allowed, err = runHooks('usingItem', src, {
+    local allowed, err, useHandle = runHooks('usingItem', src, {
         itemName = item.name,
-        item = inventory.copy(item),
-        inventoryId = playerKey(src),
+        item = oxSlot(item, type(slotOrName) == 'number' and slotOrName or item.slot),
+        inventoryId = src,
+        inventoryKey = playerKey(src),
         inventoryType = 'player',
+        -- ox: the amount the item will consume on use (0 for non-consumables).
+        consume = useConsume(item.name),
     })
     if not allowed then
         return false, err
     end
+    finishHooks(useHandle, true)
     local containers = QbInventory.containers
     if
         type(slotOrName) == 'number'
@@ -2470,10 +2825,13 @@ end
 ---@param items table<integer, table>
 ---@param bucket integer|nil Trusted bucket; omitted retains global server-created drops.
 ---@return integer id
-dropCreate = function(coords, items, bucket)
+dropCreate = function(coords, items, bucket, reservedId)
     bucket = bucket or nil
-    local id = nextDropId
-    nextDropId = nextDropId + 1
+    local id = reservedId
+    if not id then
+        id = nextDropId
+        nextDropId = nextDropId + 1
+    end
     local inv = secondary('drop', id, {
         label = 'Ground drop',
         coords = coords,
@@ -2840,11 +3198,6 @@ local function buyItem(src, shopId, slot, count)
         return false, 'out of stock'
     end
     local price = tonumber(item.price or (shop.prices and shop.prices[item.name])) or 0
-    local hookOK, hookErr =
-        runHooks('buyItem', src, { shopId = shopId, itemName = item.name, count = count, totalPrice = price * count })
-    if not hookOK then
-        return false, hookErr
-    end
     return lock({ shop.key, playerKey(src) }, function()
         shop = getInventory(key('shop', shopId))
         item = shop and (shop.stock or shop.items)[slot] or nil
@@ -2852,17 +3205,6 @@ local function buyItem(src, shopId, slot, count)
             return false, 'out of stock'
         end
         price = tonumber(item.price or (shop.prices and shop.prices[item.name])) or 0
-        if price > 0 then
-            local paid, payErr = exports.kora_core:removeMoney(
-                src,
-                shop.currency == 'money' and 'cash' or shop.currency,
-                price * count,
-                'qbinventory-shop'
-            )
-            if not paid then
-                return false, payErr
-            end
-        end
         local purchaseInfo = inventory.copy(item.info or {})
         if
             inventory.weapons
@@ -2876,28 +3218,27 @@ local function buyItem(src, shopId, slot, count)
             end
             purchaseInfo = prepared
         end
-        local hookOK, hookInfo = createItemHook(src, playerKey(src), item.name, count, purchaseInfo)
-        if not hookOK then
-            if price > 0 then
-                exports.kora_core:addMoney(
-                    src,
-                    shop.currency == 'money' and 'cash' or shop.currency,
-                    price * count,
-                    'qbinventory-refund'
-                )
-            end
-            return false, hookInfo
+        local total = price * count
+        local affordable, affordErr = canAffordPurchase(src, shop, total)
+        if not affordable then
+            return false, affordErr
         end
-        local added, addErr = addPlayer(src, item.name, count, nil, hookInfo)
-        if not added then
-            if price > 0 then
-                exports.kora_core:addMoney(
-                    src,
-                    shop.currency == 'money' and 'cash' or shop.currency,
-                    price * count,
-                    'qbinventory-refund'
-                )
+        local buyOK, buyErr, buyHandle = buyItemHook(src, shop, slot, item, count, price, purchaseInfo)
+        if not buyOK then
+            return false, buyErr
+        end
+        if price > 0 then
+            local paid, payErr = exports.kora_core:removeMoney(src, shopAccount(shop), total, 'qbinventory-shop')
+            if not paid then
+                finishHooks(buyHandle, false)
+                return false, payErr
             end
+        end
+        local hookOK, hookInfo = createItemHook(src, playerKey(src), item.name, count, purchaseInfo)
+        local added, addErr = addPlayer(src, item.name, count, nil, hookInfo)
+        finishHooks(buyHandle, added == true)
+        if not added then
+            refundPurchase(src, shop, total)
             return false, addErr
         end
         item.amount = item.amount - count
@@ -2960,23 +3301,41 @@ local function importOxItems(definitions, opts)
     return registered, errors
 end
 
+---ox `registerHook`. Returns the ox hook id (`resource:event:index`). `options`
+---takes `itemFilter` (name map), `inventoryFilter` (array of Lua patterns; a
+---kora exact-key map is also accepted), `typeFilter` (type map) and `print`.
+---The callback may be omitted to subscribe to the post-event only.
 ---@param eventName string
----@param callback function|table
+---@param callback function|table|nil
 ---@param options table|nil
----@return integer hookId
+---@return string hookId
 local function registerHook(eventName, callback, options)
-    assert(type(eventName) == 'string' and inventory.isCallable(callback), 'eventName and callback are required')
+    assert(type(eventName) == 'string', 'eventName and callback are required')
+    if callback == nil and type(options) == 'table' then
+        -- ox: `registerHook(event, nil, options)` hooks only the post-event.
+    else
+        assert(inventory.isCallable(callback), 'eventName and callback are required')
+    end
+    local owner = GetInvokingResource() or resourceName
     hooks[eventName] = hooks[eventName] or {}
-    local id = nextHookId
-    nextHookId = nextHookId + 1
-    hooks[eventName][id] =
-        { id = id, callback = callback, options = options or {}, owner = GetInvokingResource() or resourceName }
+    local index = (hookCounters[eventName] or 0) + 1
+    hookCounters[eventName] = index
+    local id = ('%s:%s:%s'):format(owner, eventName, index)
+    hooks[eventName][#hooks[eventName] + 1] =
+        { id = id, callback = callback, options = options or {}, owner = owner }
     return id
 end
----@param id integer
+---Remove hooks registered by the calling resource: one by id, or all of them
+---when no id is given. Hooks owned by another resource are never touched.
+---@param id string|nil
 local function removeHooks(id)
+    local caller = GetInvokingResource() or resourceName
     for _, list in pairs(hooks) do
-        list[id] = nil
+        for i = #list, 1, -1 do
+            if list[i].owner == caller and (id == nil or list[i].id == id) then
+                table.remove(list, i)
+            end
+        end
     end
 end
 
@@ -3216,6 +3575,7 @@ inventory.internal = {
     itemDef = itemDef,
     createItemHook = createItemHook,
     runHooks = runHooks,
+    finishHooks = finishHooks,
     view = view,
     bump = bump,
     broadcast = broadcast,
@@ -3807,10 +4167,10 @@ AddEventHandler('onResourceStop', function(name)
     if inventory.vehicles and inventory.vehicles.cleanupResource then
         inventory.vehicles.cleanupResource(name)
     end
-    for eventName, list in pairs(hooks) do
-        for id, hook in pairs(list) do
-            if hook.owner == name then
-                list[id] = nil
+    for _, list in pairs(hooks) do
+        for i = #list, 1, -1 do
+            if list[i].owner == name then
+                table.remove(list, i)
             end
         end
     end

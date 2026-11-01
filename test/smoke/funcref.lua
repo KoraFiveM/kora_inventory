@@ -85,7 +85,7 @@ H.ok(not pcall(registered.registerInspectionAccess, {}), 'registerInspectionAcce
 
 -- registerHook: same seam, not yet reached at boot but the identical defect.
 local hookId = registered.registerHook('swapItems', funcref(function() return true end))
-H.ok(type(hookId) == 'number', 'registerHook accepts a cross-resource funcref')
+H.equal(hookId, 'kora_police:swapItems:1', 'registerHook accepts a cross-resource funcref and returns an ox hook id')
 H.ok(not pcall(registered.registerHook, 'swapItems', {}), 'registerHook still rejects a non-callable')
 H.ok(not pcall(registered.registerHook, 42, function() end), 'registerHook still rejects a non-string event')
 
