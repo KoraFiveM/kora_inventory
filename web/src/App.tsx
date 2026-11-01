@@ -332,8 +332,8 @@ interface ActiveItemBox extends ItemBoxReceipt { id: number }
 const ITEM_BOX_ACTIONS = {
     add: { eyebrow: "Received", sign: "+", tone: "gain" },
     purchase: { eyebrow: "Purchased", sign: "+", tone: "gain" },
-    remove: { eyebrow: "Removed", sign: "−", tone: "loss" },
-    use: { eyebrow: "Used", sign: "−", tone: "loss" },
+    remove: { eyebrow: "Removed", sign: "-", tone: "loss" },
+    use: { eyebrow: "Used", sign: "-", tone: "loss" },
 } as const
 
 function ItemBoxStack({ boxes }: { boxes: ActiveItemBox[] }) {
@@ -341,12 +341,13 @@ function ItemBoxStack({ boxes }: { boxes: ActiveItemBox[] }) {
     return <aside className="item-box-stack" aria-live="polite" aria-label="Item receipts">
         {boxes.map((box) => {
             // A receipt for an action this build does not know about still
-            // reads correctly as an unsigned change rather than a false gain.
+            // reads correctly as an unsigned change rather than a false gain. A signed
+            // receipt shows +1 / -1 only; the x multiplier is for unsigned ones.
             const action = ITEM_BOX_ACTIONS[box.action] ?? { eyebrow: "Updated", sign: "", tone: "neutral" }
             return <div className={`item-box item-box-${action.tone}`} key={box.id}>
                 <ItemArtwork item={box} className="item-box-art" />
                 <div><p>{action.eyebrow}</p><strong>{box.label ?? box.name}</strong></div>
-                <b>{action.sign}×{box.amount}</b>
+                <b>{action.sign ? `${action.sign}${box.amount}` : `×${box.amount}`}</b>
             </div>
         })}
     </aside>
