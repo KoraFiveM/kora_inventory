@@ -653,8 +653,13 @@ name `Ammu-Nation`, letting kora_lib render `Weapons: Ammu-Nation` while groupin
 it with other weapon shops.
 
 The bundled liquor shop follows the same contract. Each location declares its
-own storefront name (`Rob's Liquor` or `24/7`) while all of them use the
+own storefront name (`Rob's Liquor`) while all of them use the
 canonical `Liquor` category and the same server-validated shop stock.
+
+The bundled convenience store (`Config.qbinventory.shops.convenience`, all 24/7
+counters) is a separate shop with the same contract. Its "Open shop" target sits
+on the counter, next to kora_robberies registers. Set `enabled = false` to drop
+the shop, its targets and blips (default `true`).
 
 The initial catalog includes standard kora_core weapons and the registered
 `pistol_ammo`, `smg_ammo`, `shotgun_ammo`, `rifle_ammo`, `mg_ammo`, and

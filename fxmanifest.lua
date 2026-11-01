@@ -31,6 +31,7 @@ shared_scripts {
     'config/shops/ammunation.lua',
     'config/shops/vendingmachine.lua',
     'config/shops/liquorstore.lua',
+    'config/shops/convenience.lua',
     'shared.lua',
 }
 
@@ -59,6 +60,7 @@ server_scripts {
     'server/shops/ammunation.lua',
     'server/shops/vendingmachine.lua',
     'server/shops/liquorstore.lua',
+    'server/shops/convenience.lua',
     -- Server-only compatibility helpers. Each builds a table which
     -- server/compat/providers.lua publishes under its provider identity; a
     -- compat module never calls exports() itself. The identities are LIVE and
@@ -90,6 +92,7 @@ client_scripts {
     'client/shops/ammunation.lua',
     'client/shops/vendingmachine.lua',
     'client/shops/liquorstore.lua',
+    'client/shops/convenience.lua',
     -- Legacy qb-inventory event/command adapter. It has no NUI authority and
     -- only routes requested targets through client.lua's validated transport.
     'client/compat.lua',

@@ -48,6 +48,8 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/ammunation_client.lua
 "${LUA:-lua}" test/smoke/liquorstore.lua
 "${LUA:-lua}" test/smoke/liquorstore_client.lua
+"${LUA:-lua}" test/smoke/convenience.lua
+"${LUA:-lua}" test/smoke/convenience_client.lua
 "${LUA:-lua}" test/smoke/shop_sprites.lua
 "${LUA:-lua}" test/smoke/ammo.lua
 "${LUA:-lua}" test/smoke/vendingmachine.lua

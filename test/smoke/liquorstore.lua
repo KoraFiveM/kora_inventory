@@ -33,7 +33,7 @@ H.equal(shop.blip.label, nil, 'kora_lib composes the map label from category and
 local storefronts = {}
 for _, location in ipairs(shop.locations) do storefronts[location.name] = true end
 H.ok(storefronts["Rob's Liquor"], 'Rob\'s Liquor locations retain their storefront name')
-H.ok(storefronts['24/7'], '24/7 locations can share the Liquor category')
+H.ok(not storefronts['24/7'], '24/7 counters live in the convenience shop, not the liquor shop')
 
 -- Each location must carry an explicit bucket: the server policy fails closed
 -- on a missing one, so a row without it is a shop nobody can ever open.
