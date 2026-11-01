@@ -584,6 +584,28 @@ function crafting.craft(src, recipeId, context, amount)
                 return false, hookErr
             end
         end
+        -- ox `craftItem` hook (bridge to registerHook). Payload fields follow
+        -- ox's documented craftItem payload as best known (UNVERIFIED against
+        -- upstream source): source, benchId, benchIndex, recipe, toInventory,
+        -- toSlot. Returning false (or a string) cancels the craft.
+        if internal.runHooks then
+            local first = recipe.outputs and recipe.outputs[1]
+            local hookOK, hookErr = internal.runHooks('craftItem', src, {
+                source = src,
+                benchId = type(context) == 'table' and (context.benchId or context.id) or nil,
+                benchIndex = type(context) == 'table' and context.benchIndex or nil,
+                recipe = copy(recipe),
+                recipeId = recipe.id,
+                itemName = first and itemName(first.name or first.item) or nil,
+                toInventory = inventoryKey,
+                inventoryId = inventoryKey,
+                amount = parsedAmount,
+                context = context,
+            })
+            if not hookOK then
+                return false, hookErr
+            end
+        end
         local committed, commitErr = internal.setInventoryItems(inventoryKey, planned)
         if not committed then
             return false, commitErr

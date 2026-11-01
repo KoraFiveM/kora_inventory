@@ -38,6 +38,8 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/weapon_shot_client.lua
 "${LUA:-lua}" test/smoke/ox_client.lua
 "${LUA:-lua}" test/smoke/ox_adapter.lua
+"${LUA:-lua}" test/smoke/ox_items_hooks.lua
+"${LUA:-lua}" test/smoke/ox_craft_hook.lua
 "${LUA:-lua}" test/smoke/confiscation.lua
 "${LUA:-lua}" test/smoke/drop_buckets.lua
 "${LUA:-lua}" test/smoke/drops_client.lua

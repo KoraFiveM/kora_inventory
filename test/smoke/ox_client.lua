@@ -381,4 +381,15 @@ end
 local code = source:gsub('%-%-[^\n]*', '')
 H.ok(not code:find('LocalPlayer', 1, true), 'the dead ox:stashTarget state write is gone')
 
+-- Items() returns ox-format definitions translated from kora's records.
+local waterDef = Ox.Items('WATER')
+H.equal(waterDef.name, 'water', 'client Items(name) resolves case-insensitively')
+H.equal(waterDef.stack, true, 'client Items(name) carries ox stack flag')
+H.equal(waterDef.client.image, 'water.png', 'client Items(name) has client.image')
+H.equal(type(waterDef.server), 'table', 'client Items(name) has server table')
+H.equal(Ox.Items('nope'), nil, 'client Items(unknown) is nil')
+H.equal(Ox.Items().bread.client.image, 'bread.png', 'client Items() entries are ox-shaped')
+H.equal(Ox.ItemList('bread').close, true, 'client ItemList(name) is ox-shaped')
+H.equal(sharedItemList.water.client, nil, 'kora record untouched by translation')
+
 H.finish()

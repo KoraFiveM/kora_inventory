@@ -728,3 +728,29 @@ Cash rewards honor the configured item-backed cash authority and retain a zero l
 Validation: `lua test/smoke/player_exchange.lua` exercises the actual kora_core fences and inventory planners with a controlled SQL transport, including repeated/changed requests, cash items, marked bills, capacity, source reuse, unknown commits, delayed workers, offline restart recovery and ordinary writes blocked by all three fences.
 
 Run `python3 test/exchange_database.py` for the optional database check. It starts a disposable socket-only MariaDB instance, captures the actual exchange planner SQL, and executes it with kora_sql's checked transaction runner. It verifies receipt/player atomicity, duplicate rejection after restart, precondition rollback, missing commit acknowledgements, and recovery reads waiting for older transactions. It does not exercise a connected FiveM player.
+
+## ox_inventory item data and hooks
+
+- `exports.ox_inventory:Items()` / `Items(name)` / `ItemList` (server and
+  client) return **ox-format** definitions (`name, label, weight, stack, close,
+  description, consume, client = {image, ...}, server = {...}`) translated from
+  kora_core's registry by `QbInventory.toOxItemDef`. Kora's own fields stay on
+  the table as extra keys; the registry itself is never modified. The returned
+  tables are copies.
+- Hooks (`registerHook`): besides `usingItem`, `buyItem`, `openInventory` and
+  `swapItems`, `createItem` fires when an item is newly created (public
+  `addItem`/ox `AddItem`/shop purchases; not for moves, swaps, gives or
+  rollbacks). Payload: `inventoryId, item (ox definition), metadata, count`
+  (+ `itemName`). A returned table replaces the metadata; `false` cancels.
+  `craftItem` fires from `CraftItem` before anything is consumed: payload
+  `source, benchId, benchIndex, recipe, recipeId, toInventory, amount` (+
+  `itemName` = first output); `false` cancels. The exact ox payload field
+  names for `craftItem`, and cancel support for `createItem`, are not verified
+  against upstream. Crafted outputs do not fire `createItem`. `inventoryFilter`
+  also matches `payload.inventoryId` exactly (no patterns).
+- Kora-only export (not an ox API): `exports.kora_inventory:ImportOxItems(defs,
+  { overwrite = false })` registers ox `data/items.lua` entries (name-keyed map
+  or array) into kora_core's item registry. Existing items are skipped unless
+  `overwrite`. `stack = false` -> `unique`, `close` -> `shouldClose`,
+  `client.image` -> `image`; ox `client`/`server`/`consume`/`degrade`/`decay`
+  are preserved on the record. Returns `registered, errors`.

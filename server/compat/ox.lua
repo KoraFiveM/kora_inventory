@@ -516,6 +516,12 @@ function ox.AddItem(reference, item, count, metadata, slot, callback)
     if not key or not inv then
         return false, 'invalid_inventory'
     end
+    -- ox `createItem` hook: may replace the metadata (returned table) or cancel.
+    local hookOK, hookMetadata = core.createItemHook(inv.source, key, name, count, normaliseMetadata(metadata) or {})
+    if not hookOK then
+        return false, hookMetadata
+    end
+    metadata = hookMetadata
     local carried, why = core.canAdd(key, name, count, slot, normaliseMetadata(metadata) or {})
     if not carried then
         return false, why or 'inventory_full'
@@ -1181,12 +1187,13 @@ end
 -- name-keyed map upstream's Items() returns.
 function ox.Items(name)
     if name ~= nil then
-        return copy(core.itemDef(name))
+        local def = core.itemDef(name)
+        return def and inventory.toOxItemDef(def, type(name) == 'string' and name:lower() or name) or nil
     end
     local out = {}
     for _, def in ipairs(exports.kora_core:allShared('items') or {}) do
         if type(def) == 'table' and type(def.name) == 'string' then
-            out[def.name] = copy(def)
+            out[def.name] = inventory.toOxItemDef(def)
         end
     end
     return out
