@@ -18,9 +18,27 @@ function QbInventory.useGate(item)
     if useTime <= 0 then
         return true
     end
-    local completed = Kora.progressbar.start({ label = item.label or item.name, duration = useTime, canCancel = true })
-    return completed == true
+    -- This bar belongs to the use being submitted from the open panel, so the
+    -- busy gate must not close that panel underneath it.
+    QbInventory.useGateActive = true
+    local ok, completed = pcall(function()
+        return Kora.progressbar.start({ label = item.label or item.name, duration = useTime, canCancel = true })
+    end)
+    QbInventory.useGateActive = false
+    return ok and completed == true
 end
+
+-- Close an open panel the moment a progress bar starts. Only polls while a
+-- session exists.
+CreateThread(function()
+    while true do
+        Wait(session and 250 or 1000)
+        if session and QbInventory.isBusy() then
+            QbInventory.notifyBusyBlocked()
+            TriggerServerEvent('qbinventory:server:close', session.token)
+        end
+    end
+end)
 
 RegisterNetEvent('qbinventory:client:sessionOpened', function(payload)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
@@ -100,11 +118,37 @@ function QbInventory.notifyDownedBlocked()
     Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_downed'), type = 'error' })
 end
 
+---True while a kora_lib progress bar is running (other than the use gate's
+---own bar) and Config.qbinventory.blockWhileBusy is on. UX gate only; the
+---server refuses to drop/give/move a slot being used regardless.
+---@return boolean
+function QbInventory.isBusy()
+    if Config.qbinventory.blockWhileBusy == false or QbInventory.useGateActive then
+        return false
+    end
+    return Kora.progressbar.isActive() == true
+end
+
+local lastBusyNotify = 0
+---Notify that an action was blocked while busy, rate limited.
+function QbInventory.notifyBusyBlocked()
+    local now = GetGameTimer()
+    if now - lastBusyNotify < (tonumber(Config.qbinventory.downedNotifyCooldown) or 3000) then
+        return
+    end
+    lastBusyNotify = now
+    Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_busy'), type = 'error' })
+end
+
 ---Open an inventory through the server. `data` is intent only; the server
 ---resolves/access-checks the inventory before it emits a session snapshot.
 ---@param invType string
 ---@param data any
 local function openInventory(invType, data)
+    if QbInventory.isBusy() then
+        QbInventory.notifyBusyBlocked()
+        return
+    end
     TriggerServerEvent('qbinventory:server:open', invType, data)
 end
 

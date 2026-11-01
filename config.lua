@@ -44,6 +44,17 @@ Config.qbinventory = {
     downedAllowedItems = {},
     -- Minimum milliseconds between "you cannot do that while downed" notifies.
     downedNotifyCooldown = 3000,
+    -- Anti-exploit: while an item is being used (a useable handler is running,
+    -- e.g. kora_consumables waiting on its progress bar) or any kora_lib
+    -- progress bar is active, the inventory cannot be opened (and is closed if
+    -- open) and hotbar use is refused. The server also refuses to drop, give
+    -- or move the slot being used, so the item cannot be dropped mid-use and
+    -- kept together with its effect. Set false to restore the old behaviour.
+    blockWhileBusy = true,
+    -- Safety timeout (ms): a slot stays locked at most this long if a useable
+    -- handler never returns. It is cleared as soon as the handler finishes,
+    -- errors, or the player disconnects.
+    busyTimeout = 30000,
     defaultSlots = 50,
     defaultMaxWeight = 100000,
     interactionDistance = 3.0,

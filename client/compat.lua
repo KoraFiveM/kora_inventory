@@ -27,6 +27,10 @@ local function openSelf()
     if selfOpening or LocalPlayer.state.inv_busy then
         return false
     end
+    if QbInventory.isBusy() then
+        QbInventory.notifyBusyBlocked()
+        return false
+    end
     selfOpening = true
     -- kora_inventory validates the local player's server ID before granting the
     -- short-lived session. We intentionally do not inspect nearby vehicles,

@@ -70,6 +70,39 @@ local function notifyDownedBlocked(src)
     lastDownedNotify[src] = now
     Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_downed'), type = 'error' })
 end
+-- Slots whose useable handler is still running, per source. A handler such as
+-- kora_consumables blocks on a client progress bar and only removes the item at
+-- the end, so without this the item could be dropped/given/moved mid-use and be
+-- kept together with its effect.
+local busySlots = {}
+local lastBusyNotify = {}
+---@param src integer
+---@param slot integer|nil
+---@return boolean
+local function isSlotBusy(src, slot)
+    if config.blockWhileBusy == false then
+        return false
+    end
+    local slots = busySlots[src]
+    local entry = slots and slot and slots[slot]
+    if not entry then
+        return false
+    end
+    if GetGameTimer() - entry > (tonumber(config.busyTimeout) or 30000) then
+        slots[slot] = nil
+        return false
+    end
+    return true
+end
+local function notifyBusyBlocked(src)
+    local now = GetGameTimer()
+    if lastBusyNotify[src] and now - lastBusyNotify[src] < (tonumber(config.downedNotifyCooldown) or 3000) then
+        return
+    end
+    lastBusyNotify[src] = now
+    Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_busy'), type = 'error' })
+end
+local BUSY_ERROR = 'item is currently being used'
 local function downedItemAllowed(name)
     for _, allowed in ipairs(config.downedAllowedItems or {}) do
         if type(allowed) == 'string' and type(name) == 'string' and allowed:lower() == name:lower() then
@@ -1577,6 +1610,11 @@ local function transfer(src, request)
             return false, 'invalid target slot'
         end
     end
+    local ownKey = playerKey(src)
+    if (fromKey == ownKey and isSlotBusy(src, fromSlot)) or (toKey == ownKey and isSlotBusy(src, toSlot)) then
+        notifyBusyBlocked(src)
+        return false, BUSY_ERROR
+    end
     local containerApi = QbInventory.containers
     if
         to.type == 'container'
@@ -1812,6 +1850,10 @@ local function intentDrop(src, request)
     if not item or not amount or amount > item.amount then
         return false, 'invalid item amount'
     end
+    if isSlotBusy(src, slot) then
+        notifyBusyBlocked(src)
+        return false, BUSY_ERROR
+    end
     local ped = GetPlayerPed(src)
     if not ped or ped == 0 then
         return false, 'player entity unavailable'
@@ -1903,6 +1945,10 @@ local function intentGive(src, request)
     local amount = inventory.amount(request.payload.amount, item and item.amount)
     if not item or not amount or amount > item.amount then
         return false, 'invalid item amount'
+    end
+    if isSlotBusy(src, slot) then
+        notifyBusyBlocked(src)
+        return false, BUSY_ERROR
     end
 
     local recipientKey = playerKey(target)
@@ -2699,7 +2745,20 @@ useItem = function(src, slotOrName)
     end
     local handler = useables[item.name] or builtInUseables[item.name]
     if handler then
+        local busySlot = type(slotOrName) == 'number' and slotOrName or item.slot
+        if isSlotBusy(src, busySlot) then
+            notifyBusyBlocked(src)
+            return false, BUSY_ERROR
+        end
+        local track = config.blockWhileBusy ~= false and busySlot
+        if track then
+            busySlots[src] = busySlots[src] or {}
+            busySlots[src][track] = GetGameTimer()
+        end
         local ok, result = pcall(handler, src, inventory.copy(item))
+        if track and busySlots[src] then
+            busySlots[src][track] = nil
+        end
         if not ok then
             return false, result
         end
@@ -4115,6 +4174,7 @@ AddEventHandler('qbcore:server:inventoryChanged', function(src)
 end)
 
 AddEventHandler('playerDropped', function()
+    busySlots[source], lastBusyNotify[source] = nil, nil
     dropViewers[source] = nil
     close(source, 'disconnected')
 end)
