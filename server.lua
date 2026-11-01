@@ -1942,7 +1942,13 @@ local function intentGive(src, request)
     end
     local slot = math.floor(tonumber(request.payload.slot) or 0)
     local item = primary.items[slot]
-    local amount = inventory.amount(request.payload.amount, item and item.amount)
+    -- inventory.amount floors fractions and falls back to the whole stack for
+    -- anything non-numeric; a given amount must be a positive whole number.
+    local requested = request.payload.amount
+    if requested ~= nil and (type(requested) ~= 'number' or requested ~= math.floor(requested) or requested < 1) then
+        return false, 'invalid item amount'
+    end
+    local amount = inventory.amount(requested, item and item.amount)
     if not item or not amount or amount > item.amount then
         return false, 'invalid item amount'
     end

@@ -7,6 +7,7 @@ import { TouchBackend } from "react-dnd-touch-backend"
 import { closeSession, sendIntent } from "@/lib/nui"
 import { openDevHarness } from "@/lib/dev"
 import { watchDragRelease } from "@/lib/dragReset"
+import { clampGiveAmount } from "@/lib/giveAmount"
 import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, UiConfig } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 import { predictMove, refreshedInventories, restoreInventories, type Prediction } from "@/lib/optimistic"
@@ -736,7 +737,7 @@ function InventoryApp() {
                         <div className="amount-action">
                             <button className="quiet-action" disabled={movePending} onClick={() => void submit("drop", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: selectedCount })}>Drop {selectedCount}</button>
                         </div>
-                        {giveAvailable && <button className="quiet-action" disabled={movePending} onClick={() => void submit("give", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: 1 })}>Give one</button>}
+                        {giveAvailable && <button className="quiet-action" disabled={movePending} onClick={() => void submit("give", { inventory: filteredSelected.inventory.id, slot: filteredSelected.item.slot, amount: clampGiveAmount(selectedCount, filteredSelected.item.amount) })}>Give {selectedCount}</button>}
                     </>}
                 </>}
             </> : <div className="empty-detail"><span className="empty-detail-icon"><PackageOpen size={30} /></span><h1>Inspect an item</h1><p>{selected ? `${(selected.item.label ?? selected.item.name)} is hidden by the current search.` : "Select an item to see its details. Drag it between slots to move or stack it, or drag it outside the window to drop it."}</p></div>}</aside>}
