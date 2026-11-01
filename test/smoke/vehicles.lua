@@ -47,7 +47,7 @@ end
 GetVehicleNumberPlateText = function(entity) return entities[entity].plate end
 GetVehicleClass = nil
 GetEntityModel = function(entity) return entity end
-Kora.lookup.vehicle = function(model) return { metadata = { class = entities[model].class } } end
+Kora.lookup.get = function(ns, model) assert(ns == 'vehicle'); return { metadata = { class = entities[model].class } } end
 
 local V = dofile('server/vehicles.lua')
 H.equal(V.normalisePlate('  ab   12  '), 'AB 12', 'plate whitespace is canonical')
@@ -67,7 +67,19 @@ H.equal(assert(V.validate(7, 'trunk', 101)).class, 6, 'documented lookup class o
 entities[101].class = 'MOTORCYCLE'
 H.equal(V.validate(7, 'trunk', 101), nil, 'model class still enforces disabled storage')
 entities[101].class = 'unknown'
-H.equal(V.validate(7, 'trunk', 101), nil, 'unknown model classes cannot bypass capacity policy')
+H.equal(assert(V.validate(7, 'trunk', 101)).slots, 50, 'unknown model classes use the default capacity row')
+Config.qbinventory.vehicles.unknownClassFallback = false
+H.equal(V.validate(7, 'trunk', 101), nil, 'unknownClassFallback = false refuses unknown classes')
+Config.qbinventory.vehicles.unknownClassFallback = true
+local realGet, printed = Kora.lookup.get, 0
+local realPrint = print
+print = function() printed = printed + 1 end
+Kora.lookup.get = function() error('No such export lookup_get in resource kora_lib') end
+H.equal(assert(V.validate(7, 'glovebox', 101)).slots, 8, 'a failing lookup falls back to the default glovebox')
+V.validate(7, 'trunk', 101); V.validate(7, 'trunk', 101)
+print = realPrint
+H.equal(printed, 1, 'a failing lookup is logged once per model')
+Kora.lookup.get = realGet
 entities[101].class = 0
 H.equal(V.validate(7, 'trunk', 102), nil, 'non-vehicle entity is rejected')
 entities[101].bucket = 2

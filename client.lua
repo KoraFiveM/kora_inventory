@@ -77,6 +77,29 @@ RegisterNetEvent('qbinventory:client:rejected', function(reason)
     TriggerEvent('qbinventory:ui:rejected', { reason = reason })
 end)
 
+---True while kora_ambulance has the local player downed or dead. UX gate only;
+---server.lua enforces the same rule authoritatively.
+---@return boolean
+function QbInventory.isDowned()
+    if Config.qbinventory.blockWhenDowned == false then
+        return false
+    end
+    local data = exports.kora_core:getPlayerData()
+    local metadata = data and data.metadata
+    return type(metadata) == 'table' and (metadata.isdead == true or metadata.inlaststand == true)
+end
+
+local lastDownedNotify = 0
+---Notify that an action was blocked while downed, rate limited.
+function QbInventory.notifyDownedBlocked()
+    local now = GetGameTimer()
+    if now - lastDownedNotify < (tonumber(Config.qbinventory.downedNotifyCooldown) or 3000) then
+        return
+    end
+    lastDownedNotify = now
+    Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_downed'), type = 'error' })
+end
+
 ---Open an inventory through the server. `data` is intent only; the server
 ---resolves/access-checks the inventory before it emits a session snapshot.
 ---@param invType string
@@ -297,3 +320,14 @@ AddEventHandler('onClientResourceStop', function(name)
         closeInventory()
     end
 end)
+
+-- Close an open inventory the moment the player goes down (kora_ambulance sets
+-- these metadata keys; kora_core replicates them).
+for _, key in ipairs({ 'isdead', 'inlaststand' }) do
+    exports.kora_core:onPlayerDataChange({ 'metadata', key }, function(_, value)
+        if value == true and session and QbInventory.isDowned() then
+            closeInventory()
+            QbInventory.notifyDownedBlocked()
+        end
+    end)
+end

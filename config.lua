@@ -21,6 +21,16 @@ Config.qbinventory = {
     -- inventory is closed; the only visual is the accent outline on those
     -- slots inside the open panel (ui.showHotbar). 0 disables the key binds.
     hotbarSlots = 5,
+    -- Downed / last stand / dead players (kora_ambulance sets the
+    -- `isdead` / `inlaststand` player metadata, replicated by kora_core) cannot
+    -- open the inventory, use hotbar keys or use items. Enforced on the
+    -- server as well as the client. Set false to restore the old behaviour.
+    blockWhenDowned = true,
+    -- Item names that may still be used while downed (e.g. { "bandage" }).
+    -- Only affects item use; opening the inventory stays blocked. Default none.
+    downedAllowedItems = {},
+    -- Minimum milliseconds between "you cannot do that while downed" notifies.
+    downedNotifyCooldown = 3000,
     defaultSlots = 50,
     defaultMaxWeight = 100000,
     interactionDistance = 3.0,
@@ -206,6 +216,10 @@ Config.qbinventory = {
         -- Refuse trunk access while the vehicle is locked (kora_vehiclekeys
         -- state bag or the native door lock status).
         respectLocks = true,
+        -- When kora_lib cannot tell the vehicle class (unknown/addon model or
+        -- lookup unavailable) use the `default` row of `classes` below. Set to
+        -- false to refuse vehicle storage for such vehicles instead.
+        unknownClassFallback = true,
         -- Models whose boot is at the FRONT (rear/mid-engine cars). Everything
         -- else uses the rear boot. Spawn names, case-insensitive.
         frontBootModels = {
@@ -519,6 +533,11 @@ if Kora and Kora.config and Kora.config.adopt then
         min = 2.0,
         max = 20.0,
         step = 0.5,
+        live = true,
+    })
+    Config.qbinventory.vehicles.unknownClassFallback = Kora.config.boolean(Config.qbinventory.vehicles.unknownClassFallback, {
+        label = 'Default storage for unknown vehicle classes',
+        description = 'When the vehicle class cannot be resolved, use the default row of the storage-by-class table. Disable to refuse trunk and glovebox access for such vehicles.',
         live = true,
     })
     Config.qbinventory.vehicles.respectLocks = Kora.config.boolean(Config.qbinventory.vehicles.respectLocks, {

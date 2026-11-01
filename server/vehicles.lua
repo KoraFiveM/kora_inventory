@@ -118,16 +118,39 @@ local function isLocked(entity)
     return false
 end
 
+local warnedModels = {}
+
+---Resolve a model hash to its GTA vehicle class through kora_lib's lookup.
+---Never raises: a missing/failed lookup yields nil (logged once per model) and
+---the caller falls back to the default capacity row.
+function vehicles.modelClass(model)
+    local ok, record = pcall(function()
+        return Kora.lookup.get('vehicle', model)
+    end)
+    if not ok then
+        if not warnedModels[model] then
+            warnedModels[model] = true
+            print(('[kora_inventory] vehicle class lookup failed for model %s, using default capacity: %s')
+                :format(tostring(model), tostring(record)))
+        end
+        return nil
+    end
+    local metadataClass = type(record) == 'table' and type(record.metadata) == 'table' and record.metadata.class
+    return asInteger(metadataClass)
+        or (type(metadataClass) == 'string' and vehicleClasses[metadataClass:upper()] or nil)
+end
+
 ---Find the capacity policy for a server-resolved GTA vehicle class.
 function vehicles.capacity(kind, class)
     if not storageKind(kind) then
         return nil, 'invalid vehicle storage type'
     end
     class = asInteger(class)
-    if class == nil or class < 0 then
+    if class ~= nil and class < 0 then
         return nil, 'invalid vehicle class'
     end
-    local row = (vehicleConfig.classes or {})[class] or (vehicleConfig.classes or {}).default or {}
+    -- An unresolved class (nil) uses the `default` row of the class table.
+    local row = (class ~= nil and (vehicleConfig.classes or {})[class]) or (vehicleConfig.classes or {}).default or {}
     local capacity = row[kind]
     if capacity == false or capacity == nil then
         return nil, 'vehicle storage unavailable'
@@ -239,10 +262,10 @@ function vehicles.validate(src, kind, networkId, expectedPlate)
     if expectedPlate and plate ~= expectedPlate then
         return nil, 'vehicle changed'
     end
-    local record = Kora.lookup.vehicle(GetEntityModel(entity))
-    local metadataClass = record and record.metadata and record.metadata.class
-    local class = asInteger(metadataClass)
-        or (type(metadataClass) == 'string' and vehicleClasses[metadataClass:upper()] or nil)
+    local class = vehicles.modelClass(GetEntityModel(entity))
+    if class == nil and vehicleConfig.unknownClassFallback == false then
+        return nil, 'invalid vehicle class'
+    end
     local capacity, capacityErr = vehicles.capacity(kind, class)
     if not capacity then
         return nil, capacityErr

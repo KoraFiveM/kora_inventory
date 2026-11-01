@@ -204,6 +204,10 @@ RegisterCommand('inventory', function()
     if IsPauseMenuActive() or IsNuiFocused() then
         return
     end
+    if QbInventory.isDowned() then
+        QbInventory.notifyDownedBlocked()
+        return
+    end
     -- TAB also drives kora_lib's zone and entity-placement creators;
     -- all are independent keybinds, so an active creator session
     -- must explicitly veto this one rather than relying on FiveM to pick

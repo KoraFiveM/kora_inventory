@@ -31,6 +31,17 @@ local function useHotbarSlot(slot)
         return
     end
 
+    if QbInventory.isDowned() then
+        local allowed = false
+        for _, name in ipairs(Config.qbinventory.downedAllowedItems or {}) do
+            allowed = allowed or (type(name) == 'string' and name:lower() == tostring(item.name):lower())
+        end
+        if not allowed then
+            QbInventory.notifyDownedBlocked()
+            return
+        end
+    end
+
     -- Same progress-bar gate as the NUI 'use' path in client.lua, shared
     -- through QbInventory so a cancelled bar never reaches the server here
     -- either.
