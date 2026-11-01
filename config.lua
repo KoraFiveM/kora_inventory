@@ -206,6 +206,10 @@ Config.qbinventory = {
         -- Refuse trunk access while the vehicle is locked (kora_vehiclekeys
         -- state bag or the native door lock status).
         respectLocks = true,
+        -- When kora_lib cannot tell the vehicle class (unknown/addon model or
+        -- lookup unavailable) use the `default` row of `classes` below. Set to
+        -- false to refuse vehicle storage for such vehicles instead.
+        unknownClassFallback = true,
         -- Models whose boot is at the FRONT (rear/mid-engine cars). Everything
         -- else uses the rear boot. Spawn names, case-insensitive.
         frontBootModels = {
@@ -519,6 +523,11 @@ if Kora and Kora.config and Kora.config.adopt then
         min = 2.0,
         max = 20.0,
         step = 0.5,
+        live = true,
+    })
+    Config.qbinventory.vehicles.unknownClassFallback = Kora.config.boolean(Config.qbinventory.vehicles.unknownClassFallback, {
+        label = 'Default storage for unknown vehicle classes',
+        description = 'When the vehicle class cannot be resolved, use the default row of the storage-by-class table. Disable to refuse trunk and glovebox access for such vehicles.',
         live = true,
     })
     Config.qbinventory.vehicles.respectLocks = Kora.config.boolean(Config.qbinventory.vehicles.respectLocks, {

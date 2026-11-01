@@ -15,7 +15,7 @@ QB.world.resolveNetworkEntity = function(src, networkId, options)
     if math.sqrt(dx * dx + dy * dy + dz * dz) > options.maxDistance then return nil, 'too_far' end
     return networkId
 end
-QB.lookup.vehicle = function() return { metadata = { class = 'SUPER' } } end
+QB.lookup.get = function() return { metadata = { class = 'SUPER' } } end
 _G.QB, _G.Kora = QB, QB
 
 local vehicle = { coords = { x = 5, y = 0, z = 0 }, bag = nil, lock = 0 }
