@@ -118,7 +118,12 @@ H.equal(hookCalls[1].src, 7, 'source passed')
 H.equal(hookCalls[1].payload.recipeId, 'oak_board', 'recipe id in payload')
 H.equal(hookCalls[1].payload.itemName, 'board', 'itemName is the first output for itemFilter')
 H.equal(hookCalls[1].payload.benchId, 'bench1', 'bench id from context')
-H.equal(hookCalls[1].payload.toInventory, 'player:7', 'toInventory in payload')
+H.equal(hookCalls[1].payload.toInventory, 7, 'toInventory is the player server id (ox)')
+H.equal(hookCalls[1].payload.toKey, 'player:7', 'kora key kept as an extra')
+H.equal(hookCalls[1].payload.recipe.name, 'board', 'ox recipe.name is the output item')
+H.equal(hookCalls[1].payload.recipe.count, 1, 'ox recipe.count is the output count')
+H.equal(hookCalls[1].payload.recipe.ingredients.wood, 2, 'ox recipe.ingredients maps item to count')
+H.equal(hookCalls[1].payload.benchIndex, nil, 'benchIndex absent without context')
 state['player:7'].items[1] = { slot = 1, name = 'wood', amount = 4, weight = 10, info = { grade = 'oak' } }
 local woodBefore = state['player:7'].items[1].amount
 verdict = false

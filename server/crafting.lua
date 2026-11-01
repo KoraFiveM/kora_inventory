@@ -584,23 +584,41 @@ function crafting.craft(src, recipeId, context, amount)
                 return false, hookErr
             end
         end
-        -- ox `craftItem` hook (bridge to registerHook). Payload fields follow
-        -- ox's documented craftItem payload as best known (UNVERIFIED against
-        -- upstream source): source, benchId, benchIndex, recipe, toInventory,
-        -- toSlot. Returning false (or a string) cancels the craft.
+        -- ox `craftItem` hook (bridge to registerHook). Payload follows
+        -- ox_inventory/modules/crafting/server.lua: source, benchId, benchIndex,
+        -- recipe ({ name, count, ingredients = { [item] = count }, ... }),
+        -- toInventory (the player's server id) and toSlot. Returning false
+        -- cancels the craft before anything is consumed.
+        local hookHandle
         if internal.runHooks then
             local first = recipe.outputs and recipe.outputs[1]
-            local hookOK, hookErr = internal.runHooks('craftItem', src, {
+            local ingredients = {}
+            for _, ingredient in ipairs(recipe.ingredients or {}) do
+                ingredients[ingredient.name] = (ingredients[ingredient.name] or 0) + ingredient.amount * parsedAmount
+            end
+            local oxRecipe = {
+                name = first and itemName(first.name or first.item) or nil,
+                count = first and first.amount and first.amount * parsedAmount or nil,
+                ingredients = ingredients,
+                metadata = first and copy(first.metadata) or nil,
+                id = recipe.id,
+                label = recipe.label,
+            }
+            local hookOK, hookErr
+            hookOK, hookErr, hookHandle = internal.runHooks('craftItem', src, {
                 source = src,
                 benchId = type(context) == 'table' and (context.benchId or context.id) or nil,
                 benchIndex = type(context) == 'table' and context.benchIndex or nil,
-                recipe = copy(recipe),
+                recipe = oxRecipe,
+                toInventory = src,
+                toSlot = type(context) == 'table' and context.toSlot or nil,
+                -- kora extras
                 recipeId = recipe.id,
-                itemName = first and itemName(first.name or first.item) or nil,
-                toInventory = inventoryKey,
-                inventoryId = inventoryKey,
+                itemName = oxRecipe.name,
                 amount = parsedAmount,
                 context = context,
+                inventoryKey = inventoryKey,
+                toKey = inventoryKey,
             })
             if not hookOK then
                 return false, hookErr
@@ -608,7 +626,13 @@ function crafting.craft(src, recipeId, context, amount)
         end
         local committed, commitErr = internal.setInventoryItems(inventoryKey, planned)
         if not committed then
+            if internal.finishHooks then
+                internal.finishHooks(hookHandle, false)
+            end
             return false, commitErr
+        end
+        if internal.finishHooks then
+            internal.finishHooks(hookHandle, true)
         end
         local scaledOutputs = {}
         for _, output in ipairs(recipe.outputs) do

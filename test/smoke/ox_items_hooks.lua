@@ -160,14 +160,13 @@ H.equal(seen, nil, 'removeHooks detaches createItem')
 
 local deny = Q.api.registerHook('createItem', function() return false end)
 local denied = Q.api.addItem(7, 'potion', 1)
-H.equal(denied, false, 'a false return cancels creation')
-for _, item in pairs(playersItems[7]) do H.ok(item.name ~= 'potion', 'cancelled item was not created') end
+H.ok(denied, 'a false return does NOT cancel creation (ox semantics)')
 Q.api.removeHooks(deny)
 
 -- ox AddItem export fires the hook too
 local oxSeen
 local oxId = Q.api.registerHook('createItem', function(payload) oxSeen = { a = payload.metadata.a }; return { via = 'ox' } end,
-    { inventoryFilter = { ['player:7'] = true } })
+    { inventoryFilter = { '^7$' } })
 local added = ox.AddItem(7, 'potion', 1, { a = 1 })
 H.ok(added, 'ox.AddItem succeeds')
 H.equal(oxSeen.a, 1, 'ox.AddItem passes metadata')

@@ -740,17 +740,14 @@ Run `python3 test/exchange_database.py` for the optional database check. It star
   kora_core's registry by `QbInventory.toOxItemDef`. Kora's own fields stay on
   the table as extra keys; the registry itself is never modified. The returned
   tables are copies.
-- Hooks (`registerHook`): besides `usingItem`, `buyItem`, `openInventory` and
-  `swapItems`, `createItem` fires when an item is newly created (public
-  `addItem`/ox `AddItem`/shop purchases; not for moves, swaps, gives or
-  rollbacks). Payload: `inventoryId, item (ox definition), metadata, count`
-  (+ `itemName`). A returned table replaces the metadata; `false` cancels.
-  `craftItem` fires from `CraftItem` before anything is consumed: payload
-  `source, benchId, benchIndex, recipe, recipeId, toInventory, amount` (+
-  `itemName` = first output); `false` cancels. The exact ox payload field
-  names for `craftItem`, and cancel support for `createItem`, are not verified
-  against upstream. Crafted outputs do not fire `createItem`. `inventoryFilter`
-  also matches `payload.inventoryId` exactly (no patterns).
+- Hooks (`registerHook`) follow ox_inventory's hook module: string ids
+  (`resource:event:n`), `payload.source`, ox slot tables and ids, `swapItems`
+  actions `move`/`swap`/`stack`/`give` (gives and ground drops included),
+  full `buyItem`/`craftItem`/`createItem`/`openShop`/`usingItem` payloads,
+  pattern-array `inventoryFilter`, `print`, post-events and owner-scoped
+  `removeHooks`. `createItem` ignores `false` (only a returned table replaces
+  the metadata). Crafted outputs do not fire `createItem`. See
+  `docs/index.md` ("Hooks and inspection access") for the payload table.
 - Kora-only export (not an ox API): `exports.kora_inventory:ImportOxItems(defs,
   { overwrite = false })` registers ox `data/items.lua` entries (name-keyed map
   or array) into kora_core's item registry. Existing items are skipped unless
