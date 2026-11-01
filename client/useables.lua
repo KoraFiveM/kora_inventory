@@ -41,7 +41,6 @@ end)
 
 local PARACHUTE_ANIM = { dict = 'clothingshirt', clip = 'try_shirt_positive_d', flag = 49 }
 local BAG_COMPONENT = 5
-local FREEMODE_MODELS = { [joaat('mp_m_freemode_01')] = 'male', [joaat('mp_f_freemode_01')] = 'female' }
 
 -- Puts the parachute pack on the ped's back (bag component) and returns what
 -- was there so it can be restored. Freemode peds only: other models have no
@@ -51,7 +50,8 @@ local function wearParachutePack(ped)
     if type(bag) ~= 'table' or bag.enabled == false then
         return nil
     end
-    local sex = FREEMODE_MODELS[GetEntityModel(ped)]
+    local model = GetEntityModel(ped)
+    local sex = (model == joaat('mp_m_freemode_01') and 'male') or (model == joaat('mp_f_freemode_01') and 'female') or nil
     local look = sex and bag[sex]
     if type(look) ~= 'table' or tonumber(look.drawable) == nil then
         return nil
