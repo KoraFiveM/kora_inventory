@@ -89,6 +89,15 @@ honoured when set to something other than `QB`). Existing serials are never
 rewritten. Stored durability is rounded to 2 decimals, and the item inspector
 rounds fractional values to `Config.Inspector.decimals` (default 1).
 
+`Config.Hotbar` positions the on-screen hotbar (show-hotbar key, default `U`):
+`bottomOffset` (default 90) on foot and `vehicleBottomOffset` (default 130) in a
+vehicle, both in px from the bottom of the screen. Raise them to clear your HUD.
+
+A drawn weapon is always holstered and removed from the ped when its item leaves
+the inventory by any route (drop, give, stash/trunk/glovebox, server removal,
+sale): the server sends `qbinventory:client:weaponRemoved`, and the client also
+re-checks after every replicated inventory update.
+
 `Config.ShopHints` draws a small marker and a `[ALT] Shop` hint (locale key
 `shop_hints.text`) at every fixed shop point within `drawDistance`, coloured
 from kora_theme's primary colour. Set `hint = false` on a shop to opt it out;

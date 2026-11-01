@@ -19,6 +19,17 @@ Config.Inspector = {
     decimals = 1,
 }
 
+-- On-screen hotbar (the overlay shown by the show-hotbar key). Distance in CSS
+-- pixels from the bottom edge of the screen to the bottom of the hotbar. The
+-- defaults sit above kora_hud's status circles and the minimap strip; on foot
+-- and seated are separate because the vehicle HUD takes more room. Raise the
+-- numbers to move the hotbar up, lower them to move it down. Colours follow
+-- kora_theme.
+Config.Hotbar = {
+    bottomOffset = 90, -- on foot
+    vehicleBottomOffset = 130, -- in a vehicle
+}
+
 -- Draws a small marker (and optional "[ALT] Shop" text) at every fixed shop
 -- interaction point (convenience, liquor, Ammu-Nation, ...). Colour follows
 -- kora_theme's primary colour. Set `hint = false` on a shop's config to opt that

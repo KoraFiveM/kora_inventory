@@ -258,8 +258,13 @@ H.equal(carry.equippedWeapon(7), nil, 'an unequip report puts the weapon back on
 carry.toggle(7, playersItems[7][9])
 netEvents['qbinventory:server:weaponToggled'](9)
 playersItems[7][9] = nil
+clientEvents = {}
 localEvents['qbcore:server:inventoryChanged'](7)
 H.equal(carry.equippedWeapon(7), nil, 'losing the held item clears the equipped record')
+H.equal(lastClientEvent().name, 'qbinventory:client:weaponRemoved',
+    'the owning client is told to holster, not only the server record cleared')
+H.equal(lastClientEvent().source, 7, 'the strip goes to the player who lost the item')
+H.equal(lastClientEvent().payload, 'weapon_bat', 'the strip names the weapon that left')
 
 -- state bag
 
@@ -312,6 +317,12 @@ H.ok(manifest:find("'server/weaponcarry.lua'", 1, true) and manifest:find("'clie
 H.ok(server:find('damage = damageSettings(item.name)', 1, true)
     and client:find('applyDamageSettings(hash, request.damage)', 1, true),
     'damage settings travel from the shared weapon definition to a successful inventory draw')
+H.ok(server:find("'qbinventory:client:weaponRemoved'", 1, true)
+    and client:find("RegisterNetEvent('qbinventory:client:weaponRemoved'", 1, true)
+    and client:find('RemoveWeaponFromPed(ped, hash)', 1, true),
+    'a weapon whose item left the inventory is stripped from the ped by the client')
+H.ok(client:find("onPlayerDataChange({ 'items' }", 1, true),
+    'the client re-verifies the drawn weapon after every inventory update')
 local weaponClient = client:sub(1, assert(client:find('-- --- carried props', 1, true)) - 1)
 H.ok(not weaponClient:find('while true do', 1, true)
     and weaponClient:find('SetWeaponDamageModifier', 1, true),

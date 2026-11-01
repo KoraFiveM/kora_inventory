@@ -356,10 +356,10 @@ function ItemBoxStack({ boxes }: { boxes: ActiveItemBox[] }) {
     </aside>
 }
 
-interface HotbarState { id: number; slots: Array<Partial<InventoryItem> & { slot: number }> }
+interface HotbarState { id: number; bottom?: number; slots: Array<Partial<InventoryItem> & { slot: number }> }
 
 function HotbarHud({ hotbar }: { hotbar: HotbarState }) {
-    return <aside className="hotbar-hud" aria-label="Hotbar">
+    return <aside className="hotbar-hud" aria-label="Hotbar" style={Number.isFinite(hotbar.bottom) ? { bottom: `${hotbar.bottom}px` } : undefined}>
         {hotbar.slots.map((item) => <div className={`hotbar-slot${item.name ? "" : " hotbar-slot-empty"}`} key={item.slot}>
             <kbd>{item.slot}</kbd>
             {item.name ? <>
@@ -492,11 +492,15 @@ function InventoryApp() {
             images: { ...current.images, ...(config.images ?? {}) },
         }))
     })
-    useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number }>("qbinventory:nui:hotbar", ({ slots, seconds }) => {
+    useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number }>("qbinventory:nui:hotbar", ({ slots, seconds, bottom }) => {
         if (!Array.isArray(slots) || !(Number(seconds) > 0)) return
         window.clearTimeout(hotbarTimeout.current)
-        setHotbar({ id: Date.now(), slots })
+        setHotbar({ id: Date.now(), slots, bottom: Number.isFinite(bottom) ? Number(bottom) : undefined })
         hotbarTimeout.current = window.setTimeout(() => setHotbar(null), Number(seconds) * 1000)
+    })
+    useNuiEvent<{ bottom?: number }>("qbinventory:nui:hotbarPosition", ({ bottom }) => {
+        if (!Number.isFinite(bottom)) return
+        setHotbar((current) => current ? { ...current, bottom: Number(bottom) } : current)
     })
     useNuiEvent<SessionSnapshot>("qbinventory:nui:sessionOpened", (snapshot) => {
         window.clearTimeout(hotbarTimeout.current); setHotbar(null)

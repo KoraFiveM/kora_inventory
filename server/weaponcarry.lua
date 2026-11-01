@@ -314,6 +314,11 @@ RegisterNetEvent('qbinventory:server:weaponToggled', function(slot)
     local owned = inventory.api.getItemBySlot(src, request.slot)
     if not owned or owned.name ~= request.name then
         pending[src] = nil
+        -- The item left the inventory while its draw bar ran; the client has
+        -- already put the weapon in hand, so take it back out.
+        if request.action == 'draw' then
+            TriggerClientEvent('qbinventory:client:weaponRemoved', src, request.name)
+        end
         return
     end
 
@@ -445,9 +450,6 @@ end)
 -- one handler covers picking a rifle up, dropping it, and moving it in or out
 -- of the hotbar range.
 AddEventHandler('qbcore:server:inventoryChanged', function(src, path, value)
-    if not enabled() then
-        return
-    end
     local holding = equipped[src]
     if holding then
         -- Metadata on the held weapon cannot change the list worn on the body.
@@ -459,9 +461,15 @@ AddEventHandler('qbcore:server:inventoryChanged', function(src, path, value)
         local owned = exports.kora_core:getPlayerData(src, { 'items', holding.slot })
         if not owned or owned.name ~= holding.name then
             equipped[src] = nil
+            -- The server only forgot the weapon; the ped still holds it. Tell
+            -- that client to holster and strip it (dropped, given, moved to a
+            -- stash/trunk, removed by another resource, sold).
+            TriggerClientEvent('qbinventory:client:weaponRemoved', src, holding.name)
         end
     end
-    publish(src)
+    if enabled() then
+        publish(src)
+    end
 end)
 
 AddEventHandler('playerDropped', function()

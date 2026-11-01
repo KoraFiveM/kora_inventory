@@ -9,6 +9,7 @@ Config = { qbinventory = {
     weaponCarry = { enabled = false },
     weapons = { ballistics = { enabled = true } },
 } }
+exports = { kora_core = { onPlayerDataChange = function() end, getPlayerData = function() return {} end } }
 Kora = {
     cache = {
         ped = function() pedExports = pedExports + 1; return ped end,

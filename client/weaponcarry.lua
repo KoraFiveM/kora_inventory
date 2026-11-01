@@ -22,6 +22,7 @@ end
 -- route (weapon wheel, disarm, death) so the server can put the prop back.
 local drawn
 local drawnSlot
+local drawnName
 local toggling = false
 local trainingWeapon
 local modifiedWeapon
@@ -70,9 +71,46 @@ local function reportUnequipped()
     clearDamageSettings()
     drawn = nil
     drawnSlot = nil
+    drawnName = nil
     resetShotCadence()
     TriggerServerEvent('qbinventory:server:weaponUnequipped')
 end
+
+---Take a drawn weapon out of the ped's hands and clear the carry state,
+---because the item that backed it is no longer in the inventory.
+local function stripDrawn(name)
+    local hash = name and joaat(name) or drawn
+    local ped = Kora.cache.ped()
+    if hash and hash ~= joaat('weapon_unarmed') then
+        if Kora.cache.weapon() == hash then
+            SetCurrentPedWeapon(ped, joaat('weapon_unarmed'), true)
+        end
+        RemoveWeaponFromPed(ped, hash)
+    end
+    clearDamageSettings()
+    resetShotCadence()
+    drawn, drawnSlot, drawnName = nil, nil, nil
+end
+
+-- The server saw the equipped item leave the inventory (dropped, given, moved
+-- into a container, removed or sold).
+RegisterNetEvent('qbinventory:client:weaponRemoved', function(name)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
+    if type(name) ~= 'string' then
+        return
+    end
+    if drawn == joaat(name) then
+        stripDrawn(name)
+    elseif not drawn and not toggling then
+        -- A draw confirmed after the item had already gone.
+        local hash = joaat(name)
+        if HasPedGotWeapon(Kora.cache.ped(), hash, false) then
+            stripDrawn(name)
+        end
+    end
+end)
 
 ---The animation for one draw/holster.
 ---
@@ -170,6 +208,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
         clearDamageSettings()
         drawn = nil
         drawnSlot = nil
+        drawnName = nil
     else
         local ammo = math.max(0, math.floor(tonumber(request.ammo) or 0))
         if not HasPedGotWeapon(ped, hash, false) then
@@ -190,6 +229,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
         applyDamageSettings(hash, request.damage)
         drawn = hash
         drawnSlot = tonumber(request.slot)
+        drawnName = request.name
     end
 
     if request.slot then
@@ -284,6 +324,22 @@ Kora.cache.onChange('weapon', function(weapon)
         reportUnequipped()
     end
 end)
+-- Safety net for the server event above: after every replicated inventory
+-- update, a drawn weapon must still be backed by its item in its slot.
+exports.kora_core:onPlayerDataChange({ 'items' }, function()
+    if not drawn or not drawnSlot or not drawnName or toggling then
+        return
+    end
+    local data = exports.kora_core:getPlayerData()
+    local item = type(data) == 'table' and type(data.items) == 'table' and data.items[drawnSlot] or nil
+    if type(item) == 'table' and tostring(item.name):lower() == drawnName:lower() then
+        return
+    end
+    local name = drawnName
+    reportUnequipped()
+    stripDrawn(name)
+end)
+
 Kora.cache.onChange('isDead', function(isDead)
     if isDead then
         reportUnequipped()

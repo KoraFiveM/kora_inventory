@@ -120,6 +120,21 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     TriggerEvent('qbinventory:client:requestGiveAvailability')
 end)
 
+-- Distance from the screen bottom (px) for the on-screen hotbar, from
+-- Config.Hotbar. Read per call so a live config edit applies on the next show.
+local function hotbarBottom()
+    local settings = Config.Hotbar or {}
+    local key = Kora.cache.vehicle() and 'vehicleBottomOffset' or 'bottomOffset'
+    local fallback = key == 'bottomOffset' and 90 or 130
+    local value = tonumber(settings[key])
+    return math.floor(math.max(0, math.min(600, value or fallback)))
+end
+
+-- The hotbar may be on screen while the player gets in or out; move it then.
+Kora.cache.onChange('vehicle', function()
+    send('qbinventory:nui:hotbarPosition', { bottom = hotbarBottom() })
+end)
+
 -- Local presentation relay for client/hotbar.lua's show-hotbar key. Works
 -- without an open session, so theme and config are pushed first.
 AddEventHandler('qbinventory:ui:hotbarShow', function(payload)
@@ -128,6 +143,7 @@ AddEventHandler('qbinventory:ui:hotbarShow', function(payload)
     end
     pushTheme()
     pushConfig()
+    payload.bottom = hotbarBottom()
     send('qbinventory:nui:hotbar', payload)
 end)
 

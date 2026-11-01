@@ -52,8 +52,25 @@ SetNuiFocus, TriggerEvent = function() end, function() end
 SendNUIMessage = function(message) messages[#messages + 1] = message end
 GetCurrentResourceName = function() return 'kora_inventory' end
 QBTheme = { refresh = function() end }
-Kora = { notify = { send = function() end } }
+local inVehicle, cacheHandlers = false, {}
+Kora = {
+    notify = { send = function() end },
+    cache = { vehicle = function() return inVehicle and 1 or nil end, onChange = function(key, fn) cacheHandlers[key] = fn end },
+}
 dofile(arg[1] or 'client/ui.lua')
+
+-- Hotbar overlay position: Config.Hotbar offsets, switched by vehicle state.
+H.equal(Config.Hotbar.bottomOffset, 90, 'hotbar on-foot offset defaults to 90px')
+H.equal(Config.Hotbar.vehicleBottomOffset, 130, 'hotbar vehicle offset defaults to 130px')
+handlers['qbinventory:ui:hotbarShow']({ slots = {}, seconds = 5 })
+H.equal(messages[#messages].data.bottom, 90, 'the hotbar is shown at the on-foot offset')
+inVehicle = true
+handlers['qbinventory:ui:hotbarShow']({ slots = {}, seconds = 5 })
+H.equal(messages[#messages].data.bottom, 130, 'the hotbar is shown at the vehicle offset when seated')
+inVehicle = false
+cacheHandlers.vehicle()
+H.equal(messages[#messages].action, 'qbinventory:nui:hotbarPosition', 'leaving a vehicle repositions the visible hotbar')
+H.equal(messages[#messages].data.bottom, 90, 'and uses the on-foot offset again')
 local function view(id, revision)
     return { key = id, revision = revision, items = {}, slots = 4 }
 end

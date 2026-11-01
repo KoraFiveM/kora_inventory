@@ -6,6 +6,7 @@ local events, cacheHandlers, damageCalls, criticalCalls, sent = {}, {}, {}, {}, 
 local currentWeapon = 0
 
 Config = { qbinventory = { weaponCarry = { enabled = false } } }
+exports = { kora_core = { onPlayerDataChange = function() end, getPlayerData = function() return {} end } }
 Kora = {
     cache = {
         ped = function() return 42 end,
