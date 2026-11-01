@@ -754,3 +754,18 @@ Run `python3 test/exchange_database.py` for the optional database check. It star
   `overwrite`. `stack = false` -> `unique`, `close` -> `shouldClose`,
   `client.image` -> `image`; ox `client`/`server`/`consume`/`degrade`/`decay`
   are preserved on the record. Returns `registered, errors`.
+
+## Parachute
+
+`server/useables.lua` registers a built-in use handler for the `parachute`
+item. Using it plays a short pack-up animation, gives the player
+`GADGET_PARACHUTE` and consumes one item. The server only consumes the item
+after the client confirms the parachute was equipped, and a player who already
+has one equipped is told so and keeps the item.
+
+`Config.qbinventory.builtinUsables`:
+
+- `parachute` (default `true`) - set `false` to leave the item to another
+  resource.
+- `parachuteTime` (default `1500`) - animation length in ms; `0` skips it.
+- `parachuteTint` (default `nil`) - optional `SetPedParachuteTintIndex` value.

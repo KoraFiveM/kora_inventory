@@ -38,3 +38,43 @@ RegisterNetEvent('qbinventory:client:consumeEffect', function(_, effects)
         flashTimecycle('spectator5', 6000)
     end
 end)
+
+local PARACHUTE_ANIM = { dict = 'clothingshirt', anim = 'try_shirt_positive_d', flag = 49 }
+
+-- Gives the parachute after a short pack-up animation, then tells the server
+-- so it can consume the item. Nothing is sent (and nothing consumed) when one
+-- is already equipped or the player is interrupted.
+RegisterNetEvent('qbinventory:client:useParachute', function(request)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
+    local chute = joaat('gadget_parachute')
+    local ped = Kora.cache.ped()
+    if HasPedGotWeapon(ped, chute, false) then
+        Kora.notify.send({
+            title = Kora.lang('inventory.title'),
+            message = Kora.lang('inventory.parachute_equipped'),
+            type = 'error',
+        })
+        return
+    end
+
+    local duration = math.floor(tonumber(request and request.time) or 0)
+    if duration > 0 then
+        if Kora.stream.loadAnimDict(PARACHUTE_ANIM.dict, nil, { timeout = 2000 }) then
+            TaskPlayAnim(ped, PARACHUTE_ANIM.dict, PARACHUTE_ANIM.anim, 8.0, -8.0, duration, PARACHUTE_ANIM.flag, 0, false, false, false)
+        end
+        Wait(duration)
+        ClearPedTasks(ped)
+        if Kora.cache.ped() ~= ped or IsPedDeadOrDying(ped, true) then
+            return
+        end
+    end
+
+    GiveWeaponToPed(ped, chute, 1, false, true)
+    local tint = tonumber(request and request.tint)
+    if tint then
+        SetPedParachuteTintIndex(ped, math.floor(tint))
+    end
+    TriggerServerEvent('qbinventory:server:parachuteEquipped')
+end)

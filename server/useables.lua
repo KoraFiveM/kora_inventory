@@ -223,3 +223,49 @@ end
 exports.kora_core:onSharedChange('items', function(_, name, def)
     refreshAmmoUseable(name, def)
 end)
+
+-- Parachute. Using the item hands the player GADGET_PARACHUTE and consumes one.
+-- The ped's weapons live on the client, so the server only asks: it remembers
+-- the slot it asked about and consumes the item when the client confirms the
+-- parachute was actually equipped (see the client half). A client that is
+-- already wearing one, or dies mid-pack, never confirms and keeps the item.
+local PARACHUTE_ITEM = 'parachute'
+local parachutePending = {}
+
+local function builtinConfig()
+    return Config.qbinventory.builtinUsables or {}
+end
+
+local function parachuteUseable(src, item)
+    parachutePending[src] = { slot = item.slot, expires = GetGameTimer() + 15000 }
+    TriggerClientEvent('qbinventory:client:useParachute', src, {
+        time = math.floor(tonumber(builtinConfig().parachuteTime) or 1500),
+        tint = tonumber(builtinConfig().parachuteTint),
+    })
+    return true
+end
+
+if builtinConfig().parachute ~= false then
+    internal.setBuiltInUseable(PARACHUTE_ITEM, parachuteUseable)
+end
+
+RegisterNetEvent('qbinventory:server:parachuteEquipped', function()
+    if GetInvokingResource() then
+        return
+    end
+    local src = source
+    local request = parachutePending[src]
+    parachutePending[src] = nil
+    if not request or GetGameTimer() > request.expires then
+        return
+    end
+    local owned = api.getItemBySlot(src, request.slot)
+    if not owned or owned.name ~= PARACHUTE_ITEM then
+        return
+    end
+    api.removeItem(src, PARACHUTE_ITEM, 1, request.slot, 'used parachute')
+end)
+
+AddEventHandler('playerDropped', function()
+    parachutePending[source] = nil
+end)

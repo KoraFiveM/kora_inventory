@@ -21,6 +21,19 @@ Config.qbinventory = {
     -- inventory is closed; the only visual is the accent outline on those
     -- slots inside the open panel (ui.showHotbar). 0 disables the key binds.
     hotbarSlots = 5,
+    -- Built-in use handlers owned by kora_inventory for items that otherwise
+    -- have no handler anywhere. Set an entry to false to leave that item to
+    -- another resource (it then falls back to the legacy UseItem event).
+    builtinUsables = {
+        -- Using the `parachute` item gives the player GADGET_PARACHUTE and
+        -- consumes one item. Refused (item kept) while a parachute is already
+        -- equipped.
+        parachute = true,
+        -- Milliseconds of the pack-up animation before the parachute is given.
+        parachuteTime = 1500,
+        -- Optional SetPedParachuteTintIndex value (0-7). nil leaves the default.
+        parachuteTint = nil,
+    },
     -- Downed / last stand / dead players (kora_ambulance sets the
     -- `isdead` / `inlaststand` player metadata, replicated by kora_core) cannot
     -- open the inventory, use hotbar keys or use items. Enforced on the

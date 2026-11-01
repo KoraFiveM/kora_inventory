@@ -86,6 +86,11 @@ exports = setmetatable({}, {
     end,
 })
 
+RegisterNetEvent = function() end
+AddEventHandler = function() end
+GetInvokingResource = function() return nil end
+GetGameTimer = function() return 0 end
+
 dofile('server/useables.lua')
 
 -- registration

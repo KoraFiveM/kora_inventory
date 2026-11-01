@@ -1,6 +1,7 @@
 {
   "inventory": {
     "title": "Inventory",
-    "blocked_downed": "You can't do that while downed."
+    "blocked_downed": "You can't do that while downed.",
+    "parachute_equipped": "You already have a parachute equipped."
   }
 }
