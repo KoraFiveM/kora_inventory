@@ -55,4 +55,56 @@ H.equal(A.access(7, { type = 'shop', id = 'ammunation' }), false, 'server reject
 player.bucket = 0
 H.equal(A.access(7, { type = 'shop', id = 'other' }), false, 'policy cannot be reused for another shop')
 
+-- Restocking: depleted rows and sold-out rows return, nothing is lowered.
+local stored = {
+    [1] = { name = 'weapon_knife', amount = 12, price = 250, label = 'Knife' },
+    [3] = { name = 'weapon_pistol', amount = 99, price = 7500 },
+}
+local sets = 0
+exports.kora_inventory.GetShopItems = function(_, id)
+    H.equal(id, 'ammunation', 'restock reads the ammunation shelf')
+    return stored
+end
+exports.kora_inventory.SetShopItems = function(_, id, items)
+    sets = sets + 1
+    stored = items
+    return true
+end
+H.ok(A.restock(), 'restock succeeds')
+H.equal(stored[1].amount, shop.inventory[1].amount, 'a depleted row is topped back up')
+H.equal(stored[2].name, shop.inventory[2].name, 'a sold-out row is restored')
+H.equal(stored[2].price, shop.inventory[2].price, 'with its configured price')
+H.equal(stored[3].amount, 99, 'a level above the configured amount is never lowered')
+H.equal(sets, 1, 'one write for the whole shelf')
+H.ok(A.restock(), 'restock is repeatable')
+H.equal(sets, 1, 'a full shelf is not rewritten')
+H.equal(shop.limitedStock, true, 'stock is limited by default')
+H.equal(shop.restockIntervalMinutes, 30, 'restock interval defaults to 30 minutes')
+
+-- Restocking: depleted rows and sold-out rows return, nothing is lowered.
+local stored = {
+    [1] = { name = 'weapon_knife', amount = 12, price = 250, label = 'Knife' },
+    [3] = { name = 'weapon_pistol', amount = 99, price = 7500 },
+}
+local sets = 0
+exports.kora_inventory.GetShopItems = function(_, id)
+    H.equal(id, 'ammunation', 'restock reads the ammunation shelf')
+    return stored
+end
+exports.kora_inventory.SetShopItems = function(_, id, items)
+    sets = sets + 1
+    stored = items
+    return true
+end
+H.ok(A.restock(), 'restock succeeds')
+H.equal(stored[1].amount, shop.inventory[1].amount, 'a depleted row is topped back up')
+H.equal(stored[2].name, shop.inventory[2].name, 'a sold-out row is restored')
+H.equal(stored[2].price, shop.inventory[2].price, 'with its configured price')
+H.equal(stored[3].amount, 99, 'a level above the configured amount is never lowered')
+H.equal(sets, 1, 'one write for the whole shelf')
+H.ok(A.restock(), 'restock is repeatable')
+H.equal(sets, 1, 'a full shelf is not rewritten')
+H.equal(shop.limitedStock, true, 'stock is limited by default')
+H.equal(shop.restockIntervalMinutes, 30, 'restock interval defaults to 30 minutes')
+
 H.finish()

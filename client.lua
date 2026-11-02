@@ -221,10 +221,22 @@ end
 ---@param intent table
 ---@return boolean accepted
 ---@return any result
+local buyInFlight
+
 local function submitIntent(intent)
     if not session or type(intent) ~= 'table' then
         return false, 'no active session'
     end
+    -- The bundled UI shows every verdict itself (it passes announce = false),
+    -- so a refusal must not also raise a toast for the same action. Third
+    -- party renderers keep the toast.
+    local announce = intent.announce ~= false
+    local function reject(reason)
+        if announce then
+            TriggerEvent('qbinventory:ui:rejected', { reason = reason })
+        end
+    end
+    local requestToken = session.token
     -- The built-in UI sends an envelope; keep the direct action shape accepted
     -- for third-party client renderers too.
     if intent.sessionId and intent.sessionId ~= session.token then
@@ -240,14 +252,14 @@ local function submitIntent(intent)
     end
     if action == 'give' then
         if payload.inventory and payload.inventory ~= session.primary.key then
-            TriggerEvent('qbinventory:ui:rejected', { reason = 'items can only be given from your inventory' })
+            reject('items can only be given from your inventory')
             return false, 'invalid give inventory'
         end
         local slot = math.floor(tonumber(payload.slot) or 0)
         local item = session.primary.items and session.primary.items[slot]
         local amount = QbInventory.amount(payload.amount, 1)
         if not item or not amount or amount > item.amount then
-            TriggerEvent('qbinventory:ui:rejected', { reason = 'invalid item amount' })
+            reject('invalid item amount')
             return false, 'invalid item amount'
         end
         nextGiveRequestId = nextGiveRequestId + 1
@@ -281,20 +293,49 @@ local function submitIntent(intent)
                 TriggerEvent('qbinventory:client:useStarted')
             end
         end
-        local ok, result = callServer('intent', 'qbinventory:server:intent', {
+        -- Buys are sent one at a time. A second buy made while one is in
+        -- flight waits for it instead of racing it (two buys validated against
+        -- the same revision and balance would refuse each other).
+        if action == 'buy' then
+            while buyInFlight do
+                Citizen.Await(buyInFlight)
+                if not session or session.token ~= requestToken then
+                    return false, 'stale session'
+                end
+            end
+            buyInFlight = promise.new()
+        end
+        local called, ok, result = pcall(callServer, 'intent', 'qbinventory:server:intent', {
             token = session.token,
             action = action,
             payload = payload,
             primaryRevision = session.primary and session.primary.revision,
             secondaryRevision = session.secondary and session.secondary.revision,
         })
+        if action == 'buy' then
+            local gate = buyInFlight
+            buyInFlight = nil
+            gate:resolve(true)
+        end
+        if not called then
+            ok, result = false, 'inventory request failed'
+        end
+        -- The session this request belonged to was closed or replaced while it
+        -- was in flight. Whatever the server said ("invalid session" included)
+        -- is about a session the player has already left: report nothing.
+        if not session or session.token ~= requestToken then
+            if action == 'use' then
+                QbInventory.useInFlight = false
+            end
+            return false, 'stale session'
+        end
         if action == 'use' then
             QbInventory.useInFlight = false
         end
         if not ok then
             -- A callback that errored or timed out has no reason; never hand the
             -- browser a blank one.
-            TriggerEvent('qbinventory:ui:rejected', { reason = result or 'inventory request failed' })
+            reject(result or 'inventory request failed')
             if clearedBusy then
                 TriggerEvent('qbinventory:client:useRejected')
             end
@@ -307,7 +348,7 @@ local function submitIntent(intent)
         return ok == true, result
     end
     if action ~= 'move' and action ~= 'split' and action ~= 'transfer' and action ~= 'swapItems' then
-        TriggerEvent('qbinventory:ui:rejected', { reason = 'unsupported intent' })
+        reject('unsupported intent')
         return false, 'unsupported intent'
     end
     local secondaryKey = session.secondary and session.secondary.key
@@ -315,7 +356,7 @@ local function submitIntent(intent)
     local to = payload.toInventory or (payload.toSecondary and secondaryKey or session.primary.key)
     local fromView = from == session.primary.key and session.primary or session.secondary
     local toView = to == session.primary.key and session.primary or session.secondary
-    local ok, result = callServer('transfer', 'qbinventory:server:transfer', {
+    local called, ok, result = pcall(callServer, 'transfer', 'qbinventory:server:transfer', {
         token = session.token,
         fromInventory = from,
         toInventory = to,
@@ -325,8 +366,14 @@ local function submitIntent(intent)
         fromRevision = fromView and fromView.revision,
         toRevision = toView and toView.revision,
     })
+    if not called then
+        ok, result = false, 'inventory request failed'
+    end
+    if not session or session.token ~= requestToken then
+        return false, 'stale session'
+    end
     if not ok then
-        TriggerEvent('qbinventory:ui:rejected', { reason = result or 'inventory request failed' })
+        reject(result or 'inventory request failed')
     end
     return ok == true, result
 end

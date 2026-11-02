@@ -18,6 +18,34 @@ Config.qbinventory.shops.ammunation = {
     maxWeight = 40000,
     currency = 'cash',
     interactionDistance = 2.25,
+
+    -- Shopkeeper peds (client-side, presentation only: the server still
+    -- validates the counter position and bucket before every open).
+    -- Every location below that has a `ped` spot gets a frozen, invincible
+    -- clerk unless disabled. `enabled = false` turns all shopkeepers off; a
+    -- single store opts out with `shopkeeper = false` on its location entry.
+    -- A location may also set `shopkeeperUnlessStarted = "<resource>"` to skip
+    -- its ped while that resource is running (it supplies the clerk itself).
+    -- `ped` coordinates are the floor/feet height (the same convention as
+    -- the `z` of a counter location); the ped is spawned 1.0 lower than `z`
+    -- because CreatePed positions the ped by its root, not its feet.
+    -- `radius` is how close (metres) the player must be for the clerk to
+    -- spawn; it is deleted again when they leave.
+    shopkeeper = {
+        enabled = true,
+        model = 's_m_m_ammucountry',
+        radius = 60.0,
+    },
+
+    -- Finite stock and restocking (server side). Purchases always reduce the
+    -- shared stock below. Every `restockIntervalMinutes` the server tops each
+    -- row back up to its configured `amount` (rows sold out entirely return
+    -- too). 0 or less turns the timer off, so stock only goes down.
+    -- `limitedStock = false` removes stock limits instead: a row is topped
+    -- back up to its configured amount right after each purchase.
+    -- A restock never lowers a stock level.
+    limitedStock = true,
+    restockIntervalMinutes = 30,
     blip = {
         enabled = true,
         sprite = 110,
@@ -72,17 +100,44 @@ Config.qbinventory.shops.ammunation = {
     -- of these exact locations and in the listed routing bucket. Do not make
     -- an unrestricted location entry: a client can request the shop ID from
     -- anywhere, but cannot satisfy the server's access callback from there.
+    -- x/y/z is the counter marker (interaction point); `ped` is where that
+    -- store's shopkeeper stands (see `shopkeeper` above).
     locations = {
-        { x = 809.49, y = -2157.27, z = 29.62, heading = 330.0, bucket = 0 },
-        { x = 1693.41, y = 3760.16, z = 34.71, heading = 225.0, bucket = 0 },
-        { x = -330.68, y = 6083.45, z = 31.45, heading = 45.0, bucket = 0 },
-        { x = 252.63, y = -50.00, z = 69.94, heading = 72.0, bucket = 0 },
-        { x = 22.09, y = -1107.28, z = 29.80, heading = 160.0, bucket = 0 },
-        { x = 2567.48, y = 294.30, z = 108.73, heading = 270.0, bucket = 0 },
-        { x = -1117.59, y = 2698.60, z = 18.55, heading = 130.0, bucket = 0 },
-        { x = 842.44, y = -1033.42, z = 28.19, heading = 0.0, bucket = 0 },
-        { x = -3172.50, y = 1085.13, z = 20.84, heading = 245.0, bucket = 0 },
-        { x = -1304.00, y = -394.90, z = 36.70, heading = 345.0, bucket = 0 },
-        { x = -662.10, y = -935.30, z = 21.83, heading = 90.0, bucket = 0 },
+        -- Cypress Flats
+        { x = 809.49, y = -2157.27, z = 29.62, heading = 330.0, bucket = 0,
+          ped = { x = 809.26, y = -2159.28, z = 29.62, heading = 352.70 } },
+        -- Sandy Shores
+        { x = 1693.41, y = 3760.16, z = 34.71, heading = 225.0, bucket = 0,
+          ped = { x = 1692.49, y = 3761.49, z = 34.71, heading = 226.57 } },
+        -- Paleto Bay
+        { x = -330.68, y = 6083.45, z = 31.45, heading = 45.0, bucket = 0,
+          ped = { x = -331.27, y = 6085.68, z = 31.45, heading = 225.48 } },
+        -- Hawick
+        { x = 252.63, y = -50.00, z = 69.94, heading = 72.0, bucket = 0,
+          ped = { x = 253.64, y = -51.28, z = 69.94, heading = 69.81 } },
+        -- Legion Square. kora_mdt spawns the records clerk (weapons licence
+        -- and sale records) here, so the shop does not add a second ped while
+        -- kora_mdt runs; move that clerk to this spot (see kora_mdt config).
+        { x = 22.09, y = -1107.28, z = 29.80, heading = 160.0, bucket = 0,
+          ped = { x = 23.24, y = -1105.29, z = 29.80, heading = 159.43 },
+          shopkeeperUnlessStarted = 'kora_mdt' },
+        -- Tataviam Mountains
+        { x = 2567.48, y = 294.30, z = 108.73, heading = 270.0, bucket = 0,
+          ped = { x = 2567.27, y = 292.41, z = 108.73, heading = 358.82 } },
+        -- Great Chaparral
+        { x = -1117.59, y = 2698.60, z = 18.55, heading = 130.0, bucket = 0,
+          ped = { x = -1118.68, y = 2700.34, z = 18.55, heading = 221.58 } },
+        -- La Mesa
+        { x = 842.44, y = -1033.42, z = 28.19, heading = 0.0, bucket = 0,
+          ped = { x = 841.78, y = -1035.43, z = 28.19, heading = 1.50 } },
+        -- Chumash
+        { x = -3172.04, y = 1088.26, z = 20.84, heading = 245.0, bucket = 0,
+          ped = { x = -3173.48, y = 1089.19, z = 20.84, heading = 243.41 } },
+        -- Morningwood
+        { x = -1305.58, y = -394.77, z = 36.70, heading = 345.0, bucket = 0,
+          ped = { x = -1304.09, y = -395.16, z = 36.70, heading = 71.33 } },
+        -- Little Seoul
+        { x = -662.10, y = -935.30, z = 21.83, heading = 90.0, bucket = 0,
+          ped = { x = -661.67, y = -933.26, z = 21.83, heading = 175.79 } },
     },
 }

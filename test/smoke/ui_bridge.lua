@@ -52,6 +52,7 @@ RegisterNetEvent = AddEventHandler
 local nui = {}
 RegisterNUICallback = function(name, fn) nui[name] = fn end
 SetNuiFocus, TriggerEvent = function() end, function() end
+GetGameTimer = function() return 0 end
 local timers = {}
 SetTimeout = function(ms, fn) timers[#timers + 1] = { ms = ms, fn = fn } end
 SendNUIMessage = function(message) messages[#messages + 1] = message end

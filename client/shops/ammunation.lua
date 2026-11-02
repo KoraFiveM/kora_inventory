@@ -56,6 +56,91 @@ AddEventHandler('onClientResourceStop', function(resource)
     end
 end)
 
+-- Shopkeeper peds (Config.qbinventory.shops.ammunation.shopkeeper). Purely
+-- presentation: they are scoped local entities that exist only while the
+-- player is near, and the server never trusts them.
+local shopkeepers = {}
+local stoppedResources = {}
+
+local function resourceRunning(name)
+    if stoppedResources[name] then
+        return false
+    end
+    return type(GetResourceState) == 'function' and GetResourceState(name) == 'started'
+end
+
+local function shopkeeperSpot(location)
+    local options = shop.shopkeeper
+    if type(options) ~= 'table' or options.enabled == false then
+        return nil
+    end
+    if location.shopkeeper == false or type(location.ped) ~= 'table' then
+        return nil
+    end
+    if location.shopkeeperUnlessStarted and resourceRunning(location.shopkeeperUnlessStarted) then
+        return nil
+    end
+    return location.ped, options
+end
+
+local function refreshShopkeepers()
+    for _, handle in ipairs(shopkeepers) do
+        handle.remove()
+    end
+    shopkeepers = {}
+
+    for _, location in ipairs(shop.locations or {}) do
+        local ped, options = shopkeeperSpot(location)
+        if ped then
+            local ok, handle = pcall(Kora.entities.createScoped, options.model or 's_m_m_ammucountry', {
+                x = ped.x,
+                y = ped.y,
+                -- Config z is floor height; a ped is positioned by its root.
+                z = ped.z - 1.0,
+                heading = ped.heading,
+            }, {
+                preset = 'static',
+                radius = tonumber(options.radius) or 60.0,
+            })
+            if ok and handle then
+                shopkeepers[#shopkeepers + 1] = handle
+            else
+                print(('^3[kora_inventory]^7 Ammu-Nation shopkeeper could not be registered: %s'):format(tostring(handle)))
+            end
+        end
+    end
+end
+
+CreateThread(function()
+    -- Give resources named by shopkeeperUnlessStarted a moment to start.
+    Wait(2000)
+    refreshShopkeepers()
+end)
+
+-- Only a resource a location defers to can change which peds exist.
+local function isDeferredTo(resource)
+    for _, location in ipairs(shop.locations or {}) do
+        if location.shopkeeperUnlessStarted == resource then
+            return true
+        end
+    end
+    return false
+end
+
+AddEventHandler('onClientResourceStart', function(resource)
+    stoppedResources[resource] = nil
+    if isDeferredTo(resource) then
+        refreshShopkeepers()
+    end
+end)
+
+AddEventHandler('onClientResourceStop', function(resource)
+    if isDeferredTo(resource) then
+        stoppedResources[resource] = true
+        refreshShopkeepers()
+    end
+end)
+
 for _, location in ipairs(shop.locations or {}) do
     if shop.blip and shop.blip.enabled then
         local blip = QbInventory.createShopBlip(Config.qbinventory.shops.ammunation.blip.category, { x = location.x, y = location.y, z = location.z }, shop.blip)

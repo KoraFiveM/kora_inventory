@@ -16,6 +16,8 @@ shop.blip.enabled = false
 
 local handlers, activeZones, nextId = {}, {}, 0
 RegisterNetEvent = function() end
+CreateThread = function() end -- shopkeeper spawning is covered by ammunation_shopkeepers.lua
+GetCurrentResourceName = function() return "kora_inventory" end
 AddEventHandler = function(name, callback)
     handlers[name] = handlers[name] or {}
     handlers[name][#handlers[name] + 1] = callback

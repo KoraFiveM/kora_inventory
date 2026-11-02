@@ -5,6 +5,7 @@ local activeSession
 local activeToken
 local activePlayerId
 local activeSecondaryId
+local lastSessionChange = 0
 
 local allowedIntents = {
     close = true,
@@ -93,6 +94,7 @@ local function closeSession(reason)
     activeToken = nil
     activePlayerId = nil
     activeSecondaryId = nil
+    lastSessionChange = GetGameTimer()
     SetNuiFocus(false, false)
 end
 
@@ -122,6 +124,7 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
 
     activeToken = payload.token
     activeSession = payload.sessionId or payload.token
+    lastSessionChange = GetGameTimer()
     local wire = {
         sessionId = activeSession,
         token = payload.token,
@@ -225,8 +228,24 @@ AddEventHandler('qbinventory:ui:sessionClosed', function(payload, legacyReason)
     closeSession(type(payload) == 'table' and payload.reason or legacyReason)
 end)
 
+-- Refusals about a session that has just been closed or reopened, and the same
+-- refusal repeated for a burst of identical requests, are noise: the player
+-- sees one notice per distinct problem.
+local STALE_REASONS = { ['invalid session'] = true, ['stale session'] = true, ['no active session'] = true, ['session expired'] = true }
+local STALE_WINDOW, REPEAT_WINDOW = 3000, 1500
+local lastNotice = { reason = nil, at = 0 }
+
 AddEventHandler('qbinventory:ui:rejected', function(payload)
     local reason = type(payload) == 'table' and payload.reason or payload
+    local stamp = GetGameTimer()
+    local text = tostring(reason or 'Action rejected')
+    if STALE_REASONS[text] and stamp - lastSessionChange < STALE_WINDOW then
+        return
+    end
+    if text == lastNotice.reason and stamp - lastNotice.at < REPEAT_WINDOW then
+        return
+    end
+    lastNotice.reason, lastNotice.at = text, stamp
     Kora.notify.send({
         title = 'Inventory',
         message = tostring(reason or 'Action rejected'),
@@ -376,8 +395,13 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
             token = data.token,
             intent = data.intent,
             payload = data.payload,
+            announce = false,
         })
-        if not called then
+        if data.sessionId ~= activeSession then
+            -- Closed or reopened while this was in flight: the browser has
+            -- already dropped its queue, so its old verdict is not reported.
+            delivered = true
+        elseif not called then
             print(('^3[qbinventory]^7 intent failed: %s'):format(tostring(ok)))
             deliver(false, 'inventory request failed')
         else
@@ -414,6 +438,7 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
         token = data.token,
         intent = data.intent,
         payload = data.payload,
+        announce = false,
     })
     if not called then
         print(('^3[qbinventory]^7 intent failed: %s'):format(tostring(ok)))

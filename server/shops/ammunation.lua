@@ -63,6 +63,63 @@ local shopKey = exports.kora_inventory:RegisterShop(shop.id, {
     access = access,
 })
 
+-- Restocking. Purchases deplete the shared shelf; this tops every configured
+-- row back up to its declared amount (a row that sold out returns whole). It
+-- only ever raises a level, never lowers one, and it goes through the same
+-- locked shop-stock funnel as any other restock integration.
+local function restock()
+    local current, err = exports.kora_inventory:GetShopItems(shop.id)
+    if not current then
+        return false, err
+    end
+    local changed = false
+    for index, row in ipairs(shop.inventory or {}) do
+        local slot = math.floor(tonumber(row.slot) or index)
+        local stocked = current[slot]
+        if not stocked then
+            current[slot] = { name = row.name, amount = row.amount, price = row.price }
+            changed = true
+        elseif stocked.name == row.name and stocked.amount < row.amount then
+            stocked.amount = row.amount
+            changed = true
+        end
+    end
+    if not changed then
+        return true
+    end
+    return exports.kora_inventory:SetShopItems(shop.id, current)
+end
+
+local restockQueued = false
+if type(CreateThread) == 'function' and type(Wait) == 'function' then
+    local minutes = tonumber(shop.restockIntervalMinutes) or 0
+    if shop.limitedStock ~= false and minutes > 0 then
+        CreateThread(function()
+            while true do
+                Wait(math.floor(minutes * 60000))
+                local ok, restocked, reason = pcall(restock)
+                if not ok or restocked == false then
+                    print(('^3[kora_inventory]^7 Ammu-Nation restock failed: %s'):format(tostring(ok and reason or restocked)))
+                end
+            end
+        end)
+    end
+end
+if shop.limitedStock == false and type(AddEventHandler) == 'function' then
+    -- Unlimited stock: refill just after the purchase commits (the event fires
+    -- inside the purchase lock, so it is deferred to avoid re-entering it).
+    AddEventHandler('qbinventory:server:itemPurchased', function(_, purchase)
+        if restockQueued or type(purchase) ~= 'table' or purchase.shopId ~= shop.id then
+            return
+        end
+        restockQueued = true
+        SetTimeout(0, function()
+            restockQueued = false
+            restock()
+        end)
+    end)
+end
+
 -- Returning the narrow policy surface makes deterministic smoke coverage and
 -- server integrations possible without making a new client-facing API.
 return {
@@ -70,4 +127,5 @@ return {
     key = shopKey,
     access = access,
     isAtApprovedLocation = isAtApprovedLocation,
+    restock = restock,
 }

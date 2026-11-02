@@ -730,6 +730,38 @@ the shop, its targets and blips (default `true`). `blip.category` (default
 the same applies to the Ammu-Nation and liquor `blip.category`. An unknown value
 logs one warning naming the option and the blip is created without a category.
 
+Ammu-Nation options (`config/shops/ammunation.lua`):
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `shopkeeper.enabled` | `true` | Spawn a frozen, invincible clerk ped at every location that has a `ped` spot. |
+| `shopkeeper.model` / `shopkeeper.radius` | `s_m_m_ammucountry` / `60.0` | Ped model; metres within which the (client-side) ped exists. |
+| `locations[n].ped` | per store | `{ x, y, z, heading }` where that store's clerk stands. `z` is floor height; the ped spawns 1.0 lower (root offset), like the counter `z`. |
+| `locations[n].shopkeeper` | unset | `false` removes the ped from that one store. |
+| `locations[n].shopkeeperUnlessStarted` | `kora_mdt` at Legion Square | Skip this store's ped while that resource runs (kora_mdt spawns the weapons-licence records clerk there). |
+| `limitedStock` | `true` | `false` removes stock limits: a purchased row is refilled right after the sale. |
+| `restockIntervalMinutes` | `30` | Every N minutes each row is topped back up to its configured `amount` (sold-out rows return); `0` disables the timer. A restock never lowers a level. |
+
+A buy made while another is in flight waits for it, and a refusal is reported
+once: the bundled UI shows it, so no extra notification is raised, and nothing is
+reported for a session that was closed or reopened in the meantime.
+
+Ammu-Nation options (`config/shops/ammunation.lua`):
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `shopkeeper.enabled` | `true` | Spawn a frozen, invincible clerk ped at every location that has a `ped` spot. |
+| `shopkeeper.model` / `shopkeeper.radius` | `s_m_m_ammucountry` / `60.0` | Ped model; metres within which the (client-side) ped exists. |
+| `locations[n].ped` | per store | `{ x, y, z, heading }` where that store clerk stands. `z` is floor height; the ped spawns 1.0 lower (root offset), like the counter `z`. |
+| `locations[n].shopkeeper` | unset | `false` removes the ped from that one store. |
+| `locations[n].shopkeeperUnlessStarted` | `kora_mdt` at Legion Square | Skip this store ped while that resource runs (kora_mdt spawns the weapons-licence records clerk there). |
+| `limitedStock` | `true` | `false` removes stock limits: a purchased row is refilled right after the sale. |
+| `restockIntervalMinutes` | `30` | Every N minutes each row is topped back up to its configured `amount` (sold-out rows return); `0` disables the timer. A restock never lowers a level. |
+
+A buy made while another is in flight waits for it, and a refusal is reported
+once: the bundled UI shows it, so no extra notification is raised, and nothing is
+reported for a session that was closed or reopened in the meantime.
+
 The initial catalog includes standard kora_core weapons and the registered
 `pistol_ammo`, `smg_ammo`, `shotgun_ammo`, `rifle_ammo`, `mg_ammo`, and
 `snp_ammo` packs. Load the three Ammu-Nation files after

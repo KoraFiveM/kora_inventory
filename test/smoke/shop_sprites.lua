@@ -28,6 +28,8 @@ H.equal(override.spriteCoords.x, 9, 'a location can override the icon position')
 -- The shop clients pass it through when they register.
 local zones = {}
 RegisterNetEvent = function() end
+CreateThread = function() end
+GetCurrentResourceName = function() return "kora_inventory" end
 AddEventHandler = function() end
 exports = {
     kora_inventory = { openInventory = function() end },
