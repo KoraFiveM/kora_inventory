@@ -7,13 +7,12 @@
 -- opts out with `hint = false` (or `enabled = false`). Vending machines are model
 -- targets with no fixed points, so they get no marker.
 --
--- Cost: one thread that sleeps 1000 ms while no point is within
--- Config.ShopHints.drawDistance and only runs per frame when one is. Coordinates
--- and the theme colour are cached; no export is called per frame.
+-- Cost: one Kora.zones sphere (radius Config.ShopHints.drawDistance) per point.
+-- Nothing runs while the player is far from every point; a per-frame draw thread
+-- starts when the first sphere is entered and ends when the last one is left.
+-- Coordinates and the theme colour are cached; no export is called per frame.
 
 local FALLBACK_COLOR = { r = 149, g = 255, b = 0 } -- only if kora_theme is not started
-local IDLE_WAIT = 1000
-local NEAR_REFRESH = 500
 local FLIPPED_TYPES = { [20] = true, [21] = true, [22] = true } -- chevrons point up by default
 
 local points = {}
@@ -60,52 +59,58 @@ local function run()
     local rotation = FLIPPED_TYPES[markerType] and 180.0 or 0.0
     local alpha = math.max(0, math.min(255, math.floor(tonumber(config.alpha) or 160)))
     local drawDistance = tonumber(config.drawDistance) or 10.0
-    local limit = drawDistance * drawDistance
+    if drawDistance <= 0 then return end
     local bob, spin = marker.bob == true, marker.rotate == true
     local text -- resolved on first approach so locale loading order never matters
 
-    CreateThread(function()
-        local near = {}
-        while true do
-            local here = GetEntityCoords(PlayerPedId())
-            local hadNear = #near > 0
-            near = {}
-            for i = 1, #points do
-                local point = points[i]
-                local dx, dy, dz = here.x - point.x, here.y - point.y, here.z - point.z
-                if dx * dx + dy * dy + dz * dz <= limit then
-                    near[#near + 1] = point
-                end
-            end
+    local near = {} -- points whose sphere the player is inside
+    local drawing = false
 
-            if #near == 0 then
-                Wait(IDLE_WAIT)
-            else
-                if not hadNear then
-                    refreshColor()
-                    if config.showText == true then text = Kora.lang('shop_hints.text') end
-                end
-                local textColor = { r = color.r, g = color.g, b = color.b, a = 255 }
-                local untilRefresh = GetGameTimer() + NEAR_REFRESH
-                while GetGameTimer() < untilRefresh do
-                    local bobOffset = bob and math.sin(GetGameTimer() / 400.0) * 0.05 or 0.0
-                    for i = 1, #near do
-                        local point = near[i]
-                        DrawMarker(markerType, point.x, point.y, point.z + bobOffset, 0.0, 0.0, 0.0, rotation, 0.0, 0.0,
-                            scale.x, scale.y, scale.z, color.r, color.g, color.b, alpha, false, true, 2,
-                            spin, nil, nil, false)
-                        if text then
-                            Kora.drawing.text3d({ x = point.x, y = point.y, z = point.z + 0.45 }, text, {
-                                maxDistance = drawDistance,
-                                color = textColor,
-                            })
-                        end
-                    end
-                    Wait(0)
+    local function draw()
+        refreshColor()
+        if config.showText == true then text = Kora.lang('shop_hints.text') end
+        local textColor = { r = color.r, g = color.g, b = color.b, a = 255 }
+        while #near > 0 do
+            local bobOffset = bob and math.sin(GetGameTimer() / 400.0) * 0.05 or 0.0
+            for i = 1, #near do
+                local point = near[i]
+                DrawMarker(markerType, point.x, point.y, point.z + bobOffset, 0.0, 0.0, 0.0, rotation, 0.0, 0.0,
+                    scale.x, scale.y, scale.z, color.r, color.g, color.b, alpha, false, true, 2,
+                    spin, nil, nil, false)
+                if text then
+                    Kora.drawing.text3d({ x = point.x, y = point.y, z = point.z + 0.45 }, text, {
+                        maxDistance = drawDistance,
+                        color = textColor,
+                    })
                 end
             end
+            Wait(0)
         end
-    end)
+        drawing = false
+    end
+
+    for i = 1, #points do
+        local point = points[i]
+        Kora.zones.sphere({
+            coords = vector3(point.x, point.y, point.z),
+            radius = drawDistance,
+            onEnter = function()
+                near[#near + 1] = point
+                if not drawing then
+                    drawing = true
+                    CreateThread(draw)
+                end
+            end,
+            onExit = function()
+                for j = 1, #near do
+                    if near[j] == point then
+                        table.remove(near, j)
+                        break
+                    end
+                end
+            end,
+        })
+    end
 end
 
 run()

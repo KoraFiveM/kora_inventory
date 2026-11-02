@@ -28,22 +28,30 @@ function QbInventory.useGate(item)
     return ok and completed == true
 end
 
--- Close an open panel the moment a progress bar starts. Only polls while a
--- session exists.
-CreateThread(function()
-    while true do
-        Wait(session and 250 or 1000)
-        if session and QbInventory.isBusy() then
-            -- A bar started by a use submitted from this very panel (the
-            -- consumable handler's own bar) is not the player being busy with
-            -- something else: close quietly, no "can't do that" notice.
-            if not QbInventory.useInFlight then
-                QbInventory.notifyBusyBlocked()
+-- Close an open panel the moment a progress bar starts. The poll thread only
+-- exists while a session does: it starts when a session opens and ends when the
+-- session closes.
+local busyWatching = false
+
+local function watchBusy()
+    if busyWatching then return end
+    busyWatching = true
+    CreateThread(function()
+        while session do
+            Wait(250)
+            if session and QbInventory.isBusy() then
+                -- A bar started by a use submitted from this very panel (the
+                -- consumable handler's own bar) is not the player being busy with
+                -- something else: close quietly, no "can't do that" notice.
+                if not QbInventory.useInFlight then
+                    QbInventory.notifyBusyBlocked()
+                end
+                TriggerServerEvent('qbinventory:server:close', session.token)
             end
-            TriggerServerEvent('qbinventory:server:close', session.token)
         end
-    end
-end)
+        busyWatching = false
+    end)
+end
 
 RegisterNetEvent('qbinventory:client:sessionOpened', function(payload)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
@@ -53,6 +61,7 @@ RegisterNetEvent('qbinventory:client:sessionOpened', function(payload)
         return
     end
     session = payload
+    watchBusy()
     -- Presentation events deliberately use a separate namespace. Triggering the
     -- network handler's own event name would recursively invoke this handler.
     TriggerEvent('qbinventory:ui:sessionOpened', {

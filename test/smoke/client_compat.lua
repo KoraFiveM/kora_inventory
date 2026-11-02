@@ -37,6 +37,10 @@ H.ok(not source:find('GetVehicle', 1, true), 'does not discover vehicles client-
 -- the progress bar of a use that this very panel submitted.
 local clientSource = assert(io.open('client.lua', 'rb')):read('a')
 H.ok(clientSource:find('QbInventory.useInFlight = true', 1, true), 'a use marks itself in flight')
-H.ok(clientSource:find('if not QbInventory.useInFlight then\n                QbInventory.notifyBusyBlocked()', 1, true),
+H.ok(clientSource:find('if not QbInventory.useInFlight then%s+QbInventory.notifyBusyBlocked%(%)'),
     'busy poll stays silent while the panel own use is in flight')
+-- No permanent idle poll: the thread is started by a session opening and ends with it.
+H.ok(not clientSource:find('Wait(session and 250 or 1000)', 1, true), 'no always-on busy poll while no session exists')
+H.ok(clientSource:find('while session do', 1, true) and clientSource:find('watchBusy()', 1, true),
+    'the busy poll runs only while a session is open')
 H.finish()

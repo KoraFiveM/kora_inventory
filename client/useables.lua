@@ -66,12 +66,17 @@ local function wearParachutePack(ped)
     return previous, worn
 end
 
+-- Local mirror of the cached ped so the wait loop below reads an upvalue instead
+-- of making an export call every iteration.
+local currentPed = Kora.cache.ped()
+Kora.cache.onChange('ped', function(ped) currentPed = ped end)
+
 -- Restores the previous bag once the parachute is deployed or gone. Nothing is
 -- touched if the player changed their bag meanwhile (e.g. via the clothing menu).
 local function restoreBagWhenDone(ped, chute, previous, worn)
     CreateThread(function()
         Wait(1000)
-        while Kora.cache.ped() == ped and not IsPedDeadOrDying(ped, true) do
+        while currentPed == ped and not IsPedDeadOrDying(ped, true) do
             local state = GetPedParachuteState(ped)
             if not HasPedGotWeapon(ped, chute, false) or state >= 1 then
                 break

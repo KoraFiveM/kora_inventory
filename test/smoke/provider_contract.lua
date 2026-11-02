@@ -89,6 +89,7 @@ Kora.anim = setmetatable({}, { __index = function() return function() end end })
 Kora.blips = setmetatable({}, { __index = function() return function() end end })
 Kora.theme = setmetatable({}, { __index = function() return function() end end })
 Kora.keybind = { add = function() return { remove = function() return true end } end }
+vector3 = function(x, y, z) return { x = x, y = y, z = z } end
 QBTheme = { refresh = function() end, apply = function() return {} end }
 
 GetCurrentResourceName = function() return 'kora_inventory' end
