@@ -10,7 +10,8 @@ import { watchDragRelease } from "@/lib/dragReset"
 import { clampGiveAmount } from "@/lib/giveAmount"
 import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, UiConfig } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
-import { predictMove, refreshedInventories, restoreInventories, type Prediction } from "@/lib/optimistic"
+import { predictBuy, predictMove, refreshedInventories, restoreInventories, type Prediction } from "@/lib/optimistic"
+import { createIntentResults } from "@/lib/intentResults"
 import { createMoveQueue, isNoopMove, type MoveJob, type MoveQueue } from "@/lib/moveQueue"
 import { formatMetaValue } from "@/lib/format"
 
@@ -27,16 +28,18 @@ const MAX_QUEUED_MOVES = 8
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "moveTimeoutMs" | "inspectorDecimals">> & { images: NonNullable<UiConfig["images"]> } = {
+const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals">> & { images: NonNullable<UiConfig["images"]> } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
     rightClickSplit: true,
     optimisticMoves: true,
     queueMoves: true,
-    // A move that gets no answer would otherwise stay pending for good. Short on
-    // purpose: a locked drag is felt immediately (config.lua: ui.moveTimeoutMs).
-    moveTimeoutMs: 1500,
+    directTransport: true,
+    // A move that gets no answer would otherwise stay pending for good. Generous
+    // because nothing blocks while it waits: a lag spike must not look like a
+    // failure and snap the item back (config.lua: ui.moveTimeoutMs).
+    moveTimeoutMs: 6000,
     inspectorDecimals: 1,
     scale: 1,
     images: {
@@ -214,6 +217,8 @@ function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHot
     const classes = [
         "slot", item && "slot-filled", selected && "slot-selected", isDragging && "slot-drag-source",
         inventory.type === "shop" && "slot-priced",
+        // Painted ahead of the server and not confirmed yet: dimmed until its patch lands.
+        item?.pending && "slot-pending",
         // Accent outline on the hotbar range. `hotbar` is decided by the panel,
         // not here: the range only means anything on the player's own
         // inventory, and a stash's first five slots are not bound to anything.
@@ -229,6 +234,7 @@ function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHot
         aria-label={item ? `${item.label ?? item.name}, slot ${index}` : `Empty slot ${index}`}
         aria-pressed={selected || undefined}
         aria-disabled={busy || undefined}
+        data-pending={item?.pending || undefined}
         // A new gesture starts clean: a drag that ended without a click (released
         // on another slot, or outside the window) must not swallow the next real click.
         onMouseDown={() => { suppressClick.current = false }}
@@ -445,6 +451,9 @@ function InventoryApp() {
     const configRef = useRef(uiConfig)
     configRef.current = uiConfig
     const resyncing = useRef(false)
+    // Verdicts the Lua bridge delivers after it has acknowledged an intent's fetch.
+    const results = useRef(createIntentResults())
+    const nextRequestId = useRef(1)
 
     // Asks the server to re-send the authoritative state. Used after a move that
     // was refused, errored or never answered, when the browser cannot know what
@@ -476,6 +485,7 @@ function InventoryApp() {
     const queue = queueRef.current
     const clearPendingMove = useCallback(() => {
         queue.reset()
+        results.current.reset()
         optimistic.current = undefined
     }, [queue])
 
@@ -493,6 +503,7 @@ function InventoryApp() {
             rightClickSplit: config.rightClickSplit ?? current.rightClickSplit,
             optimisticMoves: config.optimisticMoves ?? current.optimisticMoves,
             queueMoves: config.queueMoves ?? current.queueMoves,
+            directTransport: config.directTransport ?? current.directTransport,
             moveTimeoutMs: Number.isFinite(config.moveTimeoutMs) && Number(config.moveTimeoutMs) > 0 ? Number(config.moveTimeoutMs) : current.moveTimeoutMs,
             inspectorDecimals: Number.isFinite(config.inspectorDecimals) ? Number(config.inspectorDecimals) : current.inspectorDecimals,
             scale: Number.isFinite(config.scale) && Number(config.scale) > 0 ? Number(config.scale) : current.scale,
@@ -532,6 +543,10 @@ function InventoryApp() {
         if (queue.pending) queue.reject(message)
         else setError(message)
     })
+    useNuiEvent<{ requestId?: number; ok?: boolean; error?: string }>("qbinventory:nui:intentResult", ({ requestId, ok, error }) => {
+        if (typeof requestId !== "number") return
+        results.current.deliver(requestId, ok === true ? { ok: true } : { ok: false, error: error === "timeout" ? "Inventory did not respond" : error })
+    })
     useNuiEvent<{ available?: boolean }>("qbinventory:nui:giveAvailability", ({ available }) => setGiveAvailable(available === true))
     useNuiEvent<ItemBoxReceipt>("qbinventory:nui:itemBox", (receipt) => {
         if (!receipt || typeof receipt.name !== "string" || !Number.isFinite(receipt.amount) || receipt.amount < 1) return
@@ -562,11 +577,13 @@ function InventoryApp() {
             }
             return {
                 send: async () => {
-                    const response = await sendIntent({ sessionId: current.sessionId, token: current.token, intent, payload })
+                    const requestId = nextRequestId.current++
+                    const response = await sendIntent({ sessionId: current.sessionId, token: current.token, intent, payload, requestId })
                     // The Vite harness has no Lua authority to send a patch back. Keep
                     // it usable without weakening the runtime's authoritative lock.
                     if (import.meta.env.DEV && awaiting?.length) queue.patched(awaiting)
-                    return response
+                    // Acknowledged only: the server's verdict follows as intentResult.
+                    return response?.pending ? results.current.wait(requestId) : response
                 },
                 // A patch that refreshed an inventory dropped it from `before`, so
                 // only what the server has not corrected since is put back.
@@ -599,7 +616,8 @@ function InventoryApp() {
             if (isNoopMove({ id: from.id, slot: fromSlot }, { id: to.id, slot: toSlot })) return undefined
             if (from.type === "shop") {
                 if (current.player.id !== to.id) return "Shop items can only be purchased into your inventory"
-                return { intent: "buy", payload: { inventory: from.id, slot: fromSlot, amount: 1 }, awaiting: [from.id, to.id] }
+                const prediction = configRef.current.optimisticMoves ? predictBuy(current, { shopInventory: from.id, slot: fromSlot, amount: 1 }) : undefined
+                return { intent: "buy", payload: { inventory: from.id, slot: fromSlot, amount: 1 }, awaiting: [from.id, to.id], prediction }
             }
             if (to.type === "shop") return "Shop inventory is read only"
             const amount = requestedAmount ?? item.amount
@@ -682,8 +700,11 @@ function InventoryApp() {
         if (inventory.type !== "shop" || !session) return
         const stock = Math.max(1, Math.floor(item.amount))
         const count = Math.min(Math.max(1, Math.floor(amount)), stock)
-        void submit("buy", { inventory: inventory.id, slot: item.slot, amount: count }, [inventory.id, session.player.id])
-    }, [session, submit])
+        enqueueRequest((current) => {
+            const prediction = configRef.current.optimisticMoves ? predictBuy(current, { shopInventory: inventory.id, slot: item.slot, amount: count }) : undefined
+            return { intent: "buy", payload: { inventory: inventory.id, slot: item.slot, amount: count }, awaiting: [inventory.id, current.player.id], prediction }
+        })
+    }, [enqueueRequest, session])
     // Shared by the Enter-key shortcut on a selected item and the slot
     // grid's double-click handler below -- both just trigger whatever the
     // detail panel's own primary-action button would (buy in a shop, use
@@ -704,6 +725,13 @@ function InventoryApp() {
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
     }, [activateSelected, close, locked, movePending, selected, splitTarget])
+
+    // A refusal notice is information, not a state: let it go once it has been read.
+    useEffect(() => {
+        if (!error) return
+        const timer = window.setTimeout(() => setError(undefined), 6000)
+        return () => window.clearTimeout(timer)
+    }, [error])
 
     // Read by styles.css for text and slot sizes; 1 leaves every size as authored.
     useEffect(() => { document.documentElement.style.setProperty("--ui-scale", String(uiConfig.scale)) }, [uiConfig.scale])

@@ -159,6 +159,58 @@ local function closeInventory()
     end
 end
 
+-- Direct request transport (Config.qbinventory.ui.directTransport, default on).
+-- The bundled UI's move/buy/drop/use requests go to the server as one plain
+-- net event and come back as one, instead of through kora_lib's callback layer
+-- (token handshake, an export that awaits a promise, and a cross-resource hop
+-- on each side). Same handlers, same validation on the server; only the
+-- carrier differs. A request that gets no answer resolves as a timeout rather
+-- than hanging the NUI callback that issued it.
+local nextRequestId = 0
+local pendingCalls = {}
+local DIRECT_DEADLINE = 30000
+
+local function directTransport()
+    local ui = (Config.qbinventory or {}).ui or {}
+    return ui.directTransport ~= false
+end
+
+RegisterNetEvent('qbinventory:client:callResult', function(requestId, ok, result)
+    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        return
+    end
+    local waiting = pendingCalls[requestId]
+    if not waiting then
+        return
+    end
+    pendingCalls[requestId] = nil
+    waiting:resolve({ ok = ok == true, result = result })
+end)
+
+---@param action string 'transfer' or 'intent'
+---@param callbackName string the kora_lib callback carrying the same request
+---@param request table
+---@return boolean ok
+---@return any result
+local function callServer(action, callbackName, request)
+    if not directTransport() then
+        return Kora.callback.trigger(callbackName, request)
+    end
+    nextRequestId = nextRequestId + 1
+    local requestId = nextRequestId
+    local answer = promise.new()
+    pendingCalls[requestId] = answer
+    SetTimeout(DIRECT_DEADLINE, function()
+        if pendingCalls[requestId] then
+            pendingCalls[requestId] = nil
+            answer:resolve({ ok = false, result = 'timeout' })
+        end
+    end)
+    TriggerServerEvent('qbinventory:server:call', requestId, action, request)
+    local reply = Citizen.Await(answer)
+    return reply.ok, reply.result
+end
+
 ---Submit a slot transfer from the active session. The server supplies and
 ---checks both revisions, so stale UI state cannot overwrite another viewer.
 ---@param intent table
@@ -220,7 +272,7 @@ local function submitIntent(intent)
                 TriggerEvent('qbinventory:client:useStarted')
             end
         end
-        local ok, result = Kora.callback.trigger('qbinventory:server:intent', {
+        local ok, result = callServer('intent', 'qbinventory:server:intent', {
             token = session.token,
             action = action,
             payload = payload,
@@ -251,7 +303,7 @@ local function submitIntent(intent)
     local to = payload.toInventory or (payload.toSecondary and secondaryKey or session.primary.key)
     local fromView = from == session.primary.key and session.primary or session.secondary
     local toView = to == session.primary.key and session.primary or session.secondary
-    local ok, result = Kora.callback.trigger('qbinventory:server:transfer', {
+    local ok, result = callServer('transfer', 'qbinventory:server:transfer', {
         token = session.token,
         fromInventory = from,
         toInventory = to,

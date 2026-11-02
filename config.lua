@@ -124,6 +124,11 @@ Config.qbinventory = {
     -- rule. Changes apply to the next request.
     sessionTtl = 120000,
     sessionSliding = true,
+    -- Log a "slow ... request" line to the server console when answering one
+    -- inventory request (move, buy, drop, use) takes the server this many
+    -- milliseconds or more. A move normally takes a few; 0 turns the line off.
+    -- Use it to tell a slow server from a slow network when drags feel late.
+    slowRequestMs = 250,
     dropDistance = 2.0,
 
     -- A dropped item leaves a real bag on the floor to walk up to, rather than
@@ -184,12 +189,16 @@ Config.qbinventory = {
         -- Applied the next time the inventory opens.
         rightClickSplit = true,
 
-        -- Paint a drag-and-drop move in the browser straight away instead of
-        -- waiting for the server's reply, then reconcile with the server's own
-        -- inventory; a refused or unanswered move is rolled back exactly. The
-        -- server still validates and decides every move -- this only changes
-        -- when the result is drawn. Set to false to show moves only once the
-        -- server has confirmed them. Applied the next time the inventory opens.
+        -- Paint a drag-and-drop move or a shop purchase in the browser straight
+        -- away instead of waiting for the server's reply, then reconcile with
+        -- the server's own inventory. The painted item is dimmed (and dashed)
+        -- until the server confirms it, and never jumps back to the source slot
+        -- while it waits; a move the server refuses, fails or does not answer
+        -- in time is undone with a notice saying why. The server still
+        -- validates and decides every move and charges every purchase -- this
+        -- only changes when the result is drawn. Set to false to show moves
+        -- only once the server has confirmed them. Applied the next time the
+        -- inventory opens.
         optimisticMoves = true,
 
         -- While a move is waiting for the server, further drags are queued and
@@ -201,14 +210,26 @@ Config.qbinventory = {
         -- answers. Applied the next time the inventory opens.
         queueMoves = true,
 
+        -- Send the bundled UI's requests to the server as one direct net event
+        -- (and get the verdict back as one) instead of through kora_lib's
+        -- callback layer, and acknowledge the browser's fetch at once so it never
+        -- sits pending behind a busy cursor. The server runs the very same
+        -- handlers and checks either way; this only changes the carrier. Set to
+        -- false to fall back to kora_lib callbacks (the blocking reply, with the
+        -- short 1500 ms deadline below as its default). Third-party renderers
+        -- calling the callbacks are unaffected. Applied the next time the
+        -- inventory opens.
+        directTransport = true,
+
         -- Milliseconds the UI waits for the server to answer a move before
-        -- rolling it back as unanswered and re-syncing (500-60000). While a
-        -- request is outstanding the browser shows a busy cursor, so keep this
-        -- short; raise it only if your server is slow to answer, otherwise slow
-        -- answers are shown as failures. The same deadline bounds how long a
-        -- confirmed move waits for its confirming patch. Applied the next time
-        -- the inventory opens.
-        moveTimeoutMs = 1500,
+        -- rolling it back as unanswered and re-syncing (500-60000). With
+        -- directTransport nothing blocks while it waits, so the default is
+        -- generous: a lag spike should not be shown as a failure. With
+        -- directTransport off the browser shows a busy cursor while a request
+        -- is outstanding, so keep it near 1500. The same deadline bounds how
+        -- long a confirmed move waits for its confirming patch. Applied the
+        -- next time the inventory opens.
+        moveTimeoutMs = 6000,
 
         -- Legacy form of moveTimeoutMs, in seconds (0.5-60). Not set by
         -- default; only read when moveTimeoutMs is absent from your config.
@@ -598,6 +619,15 @@ if Kora and Kora.config and Kora.config.adopt then
             label = 'Visible carried-weapon components',
             description = 'Maps an inventory component item name to the exact GTA component model name rendered on a holstered weapon. Only entries in this allow-list are sent to clients, preventing item metadata from requesting arbitrary native components.',
         })
+    Config.qbinventory.slowRequestMs = Kora.config.number(Config.qbinventory.slowRequestMs, {
+        label = 'Log slow inventory requests (milliseconds)',
+        description = 'Prints a line to the server console when answering one inventory request (move, purchase, drop, use) takes at least this long. A move normally takes a few milliseconds. 0 turns the line off. Applies from the next request.',
+        min = 0,
+        max = 10000,
+        step = 50,
+        scope = 'server',
+        live = true,
+    })
     Config.qbinventory.sessionSliding = Kora.config.boolean(Config.qbinventory.sessionSliding, {
         label = 'Renew an open inventory while it is used',
         description = 'When on, every move, purchase or drop a player makes keeps their open inventory (and a vending machine approval) alive, so it only closes after sitting idle for the session time. Turn it off to close every inventory a fixed time after it was opened, even in the middle of use. Applies from the next request.',
@@ -682,9 +712,14 @@ if Kora and Kora.config and Kora.config.adopt then
         description = 'When on (and instant moves are on), you can keep dragging items while an earlier move is still waiting for the server; the extra moves are sent one after another. Turn it off to block dragging until the server has answered. Changes apply the next time a player opens their inventory.',
         live = true,
     })
+    Config.qbinventory.ui.directTransport = Kora.config.boolean(Config.qbinventory.ui.directTransport, {
+        label = 'Send inventory requests directly to the server',
+        description = 'When on, the inventory talks to the server over one direct network event instead of kora_lib callbacks, and the browser is never left waiting behind a busy cursor. The server checks every request the same way either way. Turn it off only to fall back to kora_lib callbacks. Changes apply the next time a player opens their inventory.',
+        live = true,
+    })
     Config.qbinventory.ui.moveTimeoutMs = Kora.config.number(Config.qbinventory.ui.moveTimeoutMs, {
         label = 'Inventory move timeout (milliseconds)',
-        description = 'How long the inventory waits for the server to answer a move before undoing it, re-syncing and reporting that the server did not respond. The cursor shows as busy while a request is outstanding, so keep it short; raise it only if your server is slow to answer. Changes apply the next time a player opens their inventory.',
+        description = 'How long the inventory waits for the server to answer a move before undoing it, re-syncing and reporting that the server did not respond. Direct requests do not block while they wait, so a few seconds is safe; with direct requests turned off the cursor shows as busy during the wait, so keep it near 1500. Changes apply the next time a player opens their inventory.',
         min = 500,
         max = 60000,
         step = 100,

@@ -583,6 +583,21 @@ end
 
 local function viewItems(source)
     local items = inventory.copy(source or {})
+    -- One registry lookup per distinct item name instead of one cross-resource
+    -- export call per slot: a move builds several views, and every slot of a
+    -- stack-heavy inventory used to cost its own getShared round trip.
+    local lookup, definitions = itemDef, {}
+    local function cachedDef(name)
+        if type(name) ~= 'string' then
+            return lookup(name)
+        end
+        local def = definitions[name]
+        if def == nil then
+            def = lookup(name) or false
+            definitions[name] = def
+        end
+        return def or nil
+    end
     -- Older player records predate `imageUrl`. Resolve presentation fields from
     -- the current core registry at render time so no player-inventory migration
     -- is needed merely to adopt the remote artwork catalogue.
@@ -590,7 +605,7 @@ local function viewItems(source)
         -- Trusted server integrations may attach bookkeeping to durable stock.
         -- It is authority state, not item metadata, and must never reach NUI.
         item.serverData = nil
-        local def = item and itemDef(item.name)
+        local def = item and cachedDef(item.name)
         if def then
             item.image = def.image or item.image
             item.imageUrl = def.imageUrl or item.imageUrl
@@ -4120,11 +4135,64 @@ end)
 Kora.callback.register('qbinventory:server:open', function(src, invType, data)
     return openInventory(src, invType, data)
 end)
+-- Server-side time a request took, logged when it exceeds
+-- Config.qbinventory.slowRequestMs (0 turns it off). The server answers a move
+-- in a few milliseconds; if a tester still sees seconds, this line is how to
+-- tell the server's share of the wait from the network's and the client's.
+local function timedRequest(action, src, handler, request)
+    local started = GetGameTimer()
+    local called, ok, result, extra = pcall(handler, src, request)
+    local elapsed = GetGameTimer() - started
+    local threshold = tonumber(config.slowRequestMs) or 0
+    if threshold > 0 and elapsed >= threshold then
+        print(('^3[qbinventory]^7 slow %s request from player %s: %d ms server-side'):format(action, tostring(src), elapsed))
+    end
+    return called, ok, result, extra
+end
+
 Kora.callback.register('qbinventory:server:transfer', function(src, request)
-    return replyingTransfer(src, request)
+    local called, ok, result, extra = timedRequest('transfer', src, replyingTransfer, request)
+    if not called then
+        error(ok, 0)
+    end
+    return ok, result, extra
 end)
 Kora.callback.register('qbinventory:server:intent', function(src, request)
-    return handleIntent(src, request)
+    local called, ok, result, extra = timedRequest('intent', src, handleIntent, request)
+    if not called then
+        error(ok, 0)
+    end
+    return ok, result, extra
+end)
+
+-- Direct request transport for the bundled UI (Config.qbinventory.ui.directTransport).
+-- One reliable event in, one out: the verdict is sent the moment the handler
+-- returns, after the patches it produced (same ordered channel, so the client
+-- applies the new inventories before it hears "ok"). It skips kora_lib's
+-- callback layer -- a token handshake, two cross-resource hops and a promise
+-- await on the client -- which added latency to every drag and which a request
+-- could silently fall out of (a dropped token means no answer at all). The
+-- callbacks above stay registered for third-party renderers.
+local directHandlers = { transfer = replyingTransfer, intent = handleIntent }
+RegisterNetEvent('qbinventory:server:call', function(requestId, action, request)
+    if GetInvokingResource() then
+        return
+    end
+    local src = source
+    if type(requestId) ~= 'number' or requestId < 1 or requestId % 1 ~= 0 or requestId > 2 ^ 31 then
+        return
+    end
+    local handler = type(action) == 'string' and directHandlers[action] or nil
+    if not handler then
+        TriggerClientEvent('qbinventory:client:callResult', src, requestId, false, 'unsupported request')
+        return
+    end
+    local called, ok, result = timedRequest(action, src, handler, request)
+    if not called then
+        print(('^1[qbinventory]^7 %s request failed: %s'):format(action, tostring(ok)))
+        ok, result = false, 'request failed'
+    end
+    TriggerClientEvent('qbinventory:client:callResult', src, requestId, ok == true, result)
 end)
 -- Legacy hotbar event: never trust the transmitted item record. The only
 -- accepted slot is resolved again from qbcore-owned PlayerData before use.

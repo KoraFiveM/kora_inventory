@@ -34,7 +34,9 @@ H.ok(source:find('optimisticMoves = ui.optimisticMoves ~= false', 1, true), 'opt
 
 H.equal(Config.qbinventory.ui.queueMoves, true, 'drags queue behind a pending move by default instead of being refused')
 H.ok(source:find('queueMoves = ui.queueMoves ~= false', 1, true), 'queueMoves is pushed to the NUI on every config push')
-H.equal(Config.qbinventory.ui.moveTimeoutMs, 1500, 'move timeout defaults to a short 1500 ms')
+H.equal(Config.qbinventory.ui.moveTimeoutMs, 6000, 'move timeout defaults to 6000 ms: nothing blocks while the direct transport waits')
+H.equal(Config.qbinventory.ui.directTransport, true, 'the direct transport defaults on')
+H.ok(source:find('directTransport = directTransport(),', 1, true), 'directTransport is pushed to the NUI on every config push')
 H.equal(Config.qbinventory.ui.moveTimeout, nil, 'the legacy seconds option is not set by default')
 H.ok(source:find('moveTimeoutMs = moveTimeoutMs(),', 1, true),
     'the move timeout is read live and pushed in milliseconds')
@@ -186,7 +188,7 @@ do
     nui['qbinventory:nui:intent'](envelope('move', {}), function(result) calls[#calls + 1] = result end)
     H.equal(#calls, 1, 'a prompt reply answers once')
     H.equal(#timers, 1, 'a deadline is armed for a move')
-    H.equal(timers[1].ms, 1500, 'the deadline is the configured move timeout')
+    H.equal(timers[1].ms, 6000, 'the deadline is the configured move timeout')
     timers[1].fn()
     H.equal(#calls, 1, 'the deadline firing after the answer does not answer twice')
 
@@ -211,6 +213,71 @@ do
     nui['qbinventory:nui:intent'](envelope('use', {}), function() end)
     H.equal(#timers, 0, 'use arms no deadline')
     submit = function() return true end
+end
+-- Direct transport: a request id gets an immediate acknowledgement (the fetch is
+-- never left pending) and the verdict follows as an NUI message, exactly once.
+do
+    local function request(intent, id) local data = envelope(intent, {}) data.requestId = id return data end
+    local function results()
+        local out = {}
+        for _, message in ipairs(messages) do
+            if message.action == 'qbinventory:nui:intentResult' then out[#out + 1] = message.data end
+        end
+        return out
+    end
+    for i = #messages, 1, -1 do messages[i] = nil end
+    timers = {}
+    submit = function() return true end
+    local ack = answers('qbinventory:nui:intent', request('move', 41), 'direct accepted')
+    H.equal(ack.pending, true, 'the fetch is acknowledged as pending')
+    H.equal(ack.requestId, 41, 'with the browser request id')
+    H.equal(#results(), 1, 'the verdict is delivered as a message')
+    H.equal(results()[1].requestId, 41, 'tagged with the request id')
+    H.equal(results()[1].ok, true, 'a success')
+    timers[1].fn()
+    H.equal(#results(), 1, 'the deadline firing after the verdict delivers nothing more')
+
+    for i = #messages, 1, -1 do messages[i] = nil end
+    submit = function() return false, 'over weight' end
+    answers('qbinventory:nui:intent', request('move', 42), 'direct rejected')
+    H.equal(results()[1].ok, false, 'a refusal is delivered as a failure')
+    H.equal(results()[1].error, 'over weight', 'with the reason')
+
+    for i = #messages, 1, -1 do messages[i] = nil end
+    submit = function() error('transport exploded') end
+    answers('qbinventory:nui:intent', request('move', 43), 'direct raises')
+    H.equal(results()[1].ok, false, 'an error inside the transport is delivered as a failure')
+
+    -- A server that never replies: the fetch is long since answered; the deadline delivers the failure.
+    for i = #messages, 1, -1 do messages[i] = nil end
+    timers = {}
+    local calls = {}
+    local routine = coroutine.wrap(function()
+        submit = function() coroutine.yield() return true end
+        nui['qbinventory:nui:intent'](request('move', 44), function(result) calls[#calls + 1] = result end)
+    end)
+    routine()
+    H.equal(#calls, 1, 'the browser was acknowledged without waiting for the server')
+    H.equal(#results(), 0, 'no verdict while the server is silent')
+    timers[1].fn()
+    H.equal(results()[1].error, 'timeout', 'the deadline delivers a timeout')
+    routine()
+    H.equal(#results(), 1, 'a late server result is dropped')
+
+    -- use may wait on a progress bar: no deadline.
+    timers = {}
+    submit = function() return true end
+    answers('qbinventory:nui:intent', request('use', 45), 'direct use')
+    H.equal(#timers, 0, 'use arms no deadline here either')
+
+    -- With the option off the blocking reply is used even when an id is sent.
+    Config.qbinventory.ui.directTransport = false
+    for i = #messages, 1, -1 do messages[i] = nil end
+    submit = function() return true end
+    local blocking = answers('qbinventory:nui:intent', request('move', 46), 'blocking fallback')
+    H.equal(blocking.pending, nil, 'directTransport = false replies with the verdict itself')
+    H.equal(#results(), 0, 'and delivers no message')
+    Config.qbinventory.ui.directTransport = true
 end
 answers('qbinventory:nui:close', nil, 'nil data')
 answers('qbinventory:nui:close', {}, 'empty table')

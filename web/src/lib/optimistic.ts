@@ -10,6 +10,9 @@ import type { InventoryItem, InventoryView, SessionPatch, SessionSnapshot } from
  * outcome is not certain from the data the browser holds (stack rules, weight
  * caps, partial swaps) `predictMove` returns undefined and the move simply
  * waits for the server as it always did.
+ *
+ * Every item a prediction creates or changes carries `pending: true`, which the
+ * slot renders dimmed; the server's patch replaces the items and so clears it.
  */
 
 export interface MoveRequest {
@@ -34,6 +37,10 @@ export function slotItems(items: InventoryView["items"] | undefined): InventoryI
 }
 
 const sameMetadata = (a: InventoryItem, b: InventoryItem) => JSON.stringify(a.metadata ?? {}) === JSON.stringify(b.metadata ?? {})
+
+/** The server's stack rule: same name and metadata, and neither side unique or opted out. */
+const stacks = (a: InventoryItem, b: InventoryItem) =>
+    a.name === b.name && a.stack !== false && b.stack !== false && !a.unique && !b.unique && sameMetadata(a, b)
 
 function totalWeight(items: InventoryItem[]) {
     return items.reduce((sum, item) => sum + (Number(item.weight) || 0) * item.amount, 0)
@@ -67,15 +74,16 @@ export function predictMove(session: SessionSnapshot, request: MoveRequest): Pre
 
     if (!target) {
         if (!same && (source.weight === undefined || (Number(source.weight) || 0) * amount > weightLeft(to, toItems))) return undefined
-        const moved: InventoryItem = { ...source, slot: toSlot, amount }
+        const moved: InventoryItem = { ...source, slot: toSlot, amount, pending: true }
         if (amount === source.amount) fromItems.splice(fromItems.indexOf(source), 1)
         else source.amount -= amount
         toItems.push(moved)
-    } else if (target.name === source.name && source.stack !== false && target.stack !== false && sameMetadata(target, source)) {
-        // Server has no stack cap; `unique` is not sent to the browser, so an
-        // item that explicitly opts out of stacking is the only case skipped.
+    } else if (stacks(source, target)) {
+        // The server has no stack cap; an item opting out of stacking, or a
+        // unique one (weapons, serialled items), never merges.
         if (!same && (source.weight === undefined || (Number(source.weight) || 0) * amount > weightLeft(to, toItems))) return undefined
         target.amount += amount
+        target.pending = true
         if (amount === source.amount) fromItems.splice(fromItems.indexOf(source), 1)
         else source.amount -= amount
     } else {
@@ -89,6 +97,8 @@ export function predictMove(session: SessionSnapshot, request: MoveRequest): Pre
         }
         source.slot = toSlot
         target.slot = fromSlot
+        source.pending = true
+        target.pending = true
         if (!same) {
             fromItems.splice(fromItems.indexOf(source), 1, target)
             toItems.splice(toItems.indexOf(target), 1, source)
@@ -118,4 +128,58 @@ export function refreshedInventories(patch: SessionPatch): string[] {
 export function restoreInventories(session: SessionSnapshot, before: Map<string, InventoryView>): SessionSnapshot {
     const pick = (inv: InventoryView) => before.get(inv.id) ?? inv
     return { ...session, player: pick(session.player), secondary: session.secondary && pick(session.secondary) }
+}
+
+export interface BuyRequest {
+    shopInventory: string
+    slot: number
+    amount: number
+}
+
+/**
+ * A shop purchase as the server will commit it: the stock row loses `amount`
+ * and the player gets the item on a matching stack, or the first free slot.
+ * Price and funds stay the server's call -- the browser holds no balance -- so
+ * a purchase it cannot afford is painted and then undone with the server's
+ * reason. Returns undefined whenever the outcome is not certain from what the
+ * browser holds (unknown weight, over weight, no room, a unique multi-buy).
+ */
+export function predictBuy(session: SessionSnapshot, request: BuyRequest): Prediction | undefined {
+    const shop = session.secondary
+    const player = session.player
+    if (!shop || shop.type !== "shop" || shop.id !== request.shopInventory) return undefined
+
+    const shopItems = slotItems(shop.items).map((item) => ({ ...item }))
+    const stock = shopItems.find((item) => item.slot === request.slot)
+    const { amount } = request
+    if (!stock || !Number.isInteger(amount) || amount < 1 || amount > stock.amount) return undefined
+    if (stock.weight === undefined || (stock.unique && amount > 1)) return undefined
+
+    const playerItems = slotItems(player.items).map((item) => ({ ...item }))
+    if (player.maxWeight !== undefined && totalWeight(playerItems) + (Number(stock.weight) || 0) * amount > player.maxWeight) return undefined
+
+    const bought: InventoryItem = { ...stock, slot: 0, amount, pending: true }
+    delete bought.price
+    const stack = playerItems.find((item) => stacks(item, bought))
+    if (stack) {
+        stack.amount += amount
+        stack.pending = true
+    } else {
+        let free = 1
+        const taken = new Set(playerItems.map((item) => item.slot))
+        while (taken.has(free)) free++
+        if (free > player.slots) return undefined
+        bought.slot = free
+        playerItems.push(bought)
+    }
+
+    if (amount === stock.amount) shopItems.splice(shopItems.indexOf(stock), 1)
+    else stock.amount -= amount
+
+    const nextPlayer = view(player, playerItems, totalWeight(playerItems))
+    const nextShop = view(shop, shopItems, shop.weight ?? 0)
+    return {
+        session: { ...session, player: nextPlayer, secondary: nextShop },
+        before: new Map<string, InventoryView>([[player.id, player], [shop.id, shop]]),
+    }
 }

@@ -21,6 +21,10 @@ export interface InventoryItem {
     durability?: number
     price?: number
     stack?: boolean
+    /** Instance-unique items (weapons, serialled items) never stack. */
+    unique?: boolean
+    /** Set by the browser on an item it painted ahead of the server; never sent by it. */
+    pending?: boolean
     container?: boolean
     useable?: boolean
     /** Ms the client runs kora_lib's progress bar for before a use resolves. */
@@ -62,6 +66,15 @@ export interface IntentPayload {
     token: string
     intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync"
     payload: Record<string, unknown>
+    /** Lets the Lua bridge answer the fetch at once and deliver the verdict as `qbinventory:nui:intentResult`. */
+    requestId?: number
+}
+
+/** What the intent callback answers: a verdict, or an acknowledgement that one will follow. */
+export interface IntentResponse {
+    ok: boolean
+    error?: string
+    pending?: boolean
 }
 
 /** Server-authored receipt sent only when Config.qbinventory.itemBoxes allows it. */
@@ -98,8 +111,10 @@ export interface UiConfig {
     queueMoves?: boolean
     /** Decimals shown for fractional inspector values (Config.Inspector.decimals). */
     inspectorDecimals?: number
-    /** Milliseconds before an unanswered move is rolled back (Config.qbinventory.ui.moveTimeout, in seconds). */
+    /** Milliseconds before an unanswered move is rolled back (Config.qbinventory.ui.moveTimeoutMs). */
     moveTimeoutMs?: number
+    /** The bridge delivers verdicts as messages instead of holding the fetch (Config.qbinventory.ui.directTransport). */
+    directTransport?: boolean
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string

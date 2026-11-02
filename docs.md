@@ -502,9 +502,10 @@ Nothing in it is authority and the inventory engine never reads it.
 | `centreWhenSolo` | With no second inventory open, show only a compact centred player grid; selecting an item slides its inspector and actions out in a drawer. |
 | `showHotbar` | Outline slots `1..hotbarSlots` on the player's own inventory in the accent colour, so the keys `client/hotbar.lua` already binds are visible rather than folklore. |
 | `rightClickSplit` | Right-click on a stack of 2+ opens the split dialog (default `true`); `false` makes right-click do nothing. |
-| `optimisticMoves` | Draw a drag-and-drop move (move, stack, swap, split) immediately and undo it if the server refuses or does not answer within `moveTimeout` (default `true`); `false` shows a move only after the server confirms it. The server validates every move either way. |
+| `optimisticMoves` | Draw a drag-and-drop move (move, stack, swap, split) or a shop purchase immediately and undo it if the server refuses, fails or does not answer within `moveTimeoutMs` (default `true`). The painted item is dimmed with a dashed border (theme tokens only) until the server's inventory replaces it, and it never jumps back to the source slot while it waits; a refusal restores the source and shows the server's reason. `false` shows a move only after the server confirms it. The server validates every move and charges every purchase either way; the browser only predicts. |
 | `queueMoves` | With `optimisticMoves`, keep the inventory draggable while a move waits for the server: further drags are queued (up to 8) and sent in order; a refused or unanswered move undoes itself, the server is asked to re-send the real state, and the drags queued behind it still go out (default `true`). `false` blocks dragging until the server answers. The busy (wait) cursor is never shown either way. |
-| `moveTimeoutMs` | Milliseconds (500-60000, default `1500`) the UI waits for the server to answer a move before undoing it and re-syncing. The bundled bridge answers the browser at this deadline even if the server never replies, so the busy cursor can never outlast it, and a move the server confirmed no longer waits for its confirming patch longer than this. |
+| `directTransport` | Send the bundled UI's requests to the server as one direct net event (`qbinventory:server:call`) and receive the verdict as one (`qbinventory:client:callResult`), instead of through kora_lib's callback layer, and acknowledge the browser's fetch at once so it never sits pending behind a busy cursor (default `true`). The server runs the same handlers and checks either way; the kora_lib callbacks `qbinventory:server:transfer` / `qbinventory:server:intent` stay registered for third-party renderers. `false` restores the blocking kora_lib callback path. |
+| `moveTimeoutMs` | Milliseconds (500-60000, default `6000`) the UI waits for the server to answer a move before undoing it and re-syncing. With `directTransport` nothing blocks while it waits, so the default tolerates a lag spike; with it off the browser holds a busy cursor while a request is outstanding, so use about `1500`. A move the server confirmed no longer waits for its confirming patch longer than this. |
 | `moveTimeout` | Legacy form of `moveTimeoutMs`, in seconds. Not set by default; only read when `moveTimeoutMs` is absent from your config. |
 | `images` | Item artwork resolution -- see below. |
 
@@ -512,6 +513,18 @@ Nothing in it is authority and the inventory engine never reads it.
 know where it is otherwise. It stays a read of the same single value
 `client/hotbar.lua` binds its keys from, so the outline and the keys cannot
 disagree.
+
+### Request timing
+
+Every inventory request (move, purchase, drop, use) is validated and answered
+by the server in the same tick it arrives -- there is no `Wait`, progress bar or
+database write on that path (secondary inventories persist on the 5 s flush,
+player items through kora_core's own dirty-column save). With
+`Config.qbinventory.slowRequestMs` (default `250`, `0` = off) the server prints
+`slow <action> request from player <id>: <n> ms server-side` for any request
+that takes at least that long, so a drag that still feels late can be traced:
+no such line means the time was spent on the network or in the client, not in
+the server's handler.
 
 ### Item artwork
 

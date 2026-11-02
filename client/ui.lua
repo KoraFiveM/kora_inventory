@@ -38,16 +38,22 @@ end
 -- disagree.
 -- How long the UI, and this bridge, wait for the server to answer a request
 -- before giving up on it (ms). Config.qbinventory.ui.moveTimeoutMs, or the
--- older moveTimeout in seconds when only that is configured. Short on purpose:
--- the browser's fetch to the intent callback stays pending (busy cursor) until
--- it is answered.
+-- older moveTimeout in seconds when only that is configured. With the direct
+-- transport the browser's fetch is acknowledged at once, so a long deadline
+-- costs nothing (no busy cursor, no snap-back at a normal lag spike); the
+-- blocking fallback keeps the short one because its fetch stays pending.
+local function directTransport()
+    local ui = (Config.qbinventory or {}).ui or {}
+    return ui.directTransport ~= false
+end
+
 local function moveTimeoutMs()
     local ui = (Config.qbinventory or {}).ui or {}
     local ms = tonumber(ui.moveTimeoutMs)
     if not ms and tonumber(ui.moveTimeout) then
         ms = tonumber(ui.moveTimeout) * 1000
     end
-    return math.floor(math.max(500, math.min(60000, ms or 1500)))
+    return math.floor(math.max(500, math.min(60000, ms or (directTransport() and 6000 or 1500))))
 end
 
 local function pushConfig()
@@ -64,6 +70,9 @@ local function pushConfig()
         queueMoves = ui.queueMoves ~= false,
         -- How long the UI waits for the server before rolling a move back.
         moveTimeoutMs = moveTimeoutMs(),
+        -- The server's verdict arrives as `qbinventory:nui:intentResult`
+        -- instead of holding the browser's fetch open.
+        directTransport = directTransport(),
         -- Read on every push so a live config change applies on the next open.
         scale = math.max(0.5, math.min(2.0, tonumber(ui.scale) or 1.0)),
         images = ui.images,
@@ -338,6 +347,42 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
         or type(data.payload) ~= 'table'
     then
         cb({ ok = false, error = 'invalid intent' })
+        return
+    end
+
+    -- Direct transport: acknowledge the fetch immediately and deliver the
+    -- server's verdict as an NUI message tagged with the browser's request id.
+    -- Nothing is left pending in the browser, so there is no busy cursor, and
+    -- the browser decides when a slow answer is a failure. Browsers that send
+    -- no request id (an older bundle, the dev harness) get the blocking reply.
+    local requestId = tonumber(data.requestId)
+    if requestId and directTransport() then
+        cb({ ok = true, pending = true, requestId = requestId })
+        local delivered = false
+        local function deliver(ok, err)
+            if delivered then
+                return
+            end
+            delivered = true
+            send('qbinventory:nui:intentResult', { requestId = requestId, ok = ok == true, error = ok and nil or err })
+        end
+        if data.intent ~= 'use' then
+            SetTimeout(moveTimeoutMs(), function()
+                deliver(false, 'timeout')
+            end)
+        end
+        local called, ok, result = pcall(QbInventory.clientApi.submitIntent, {
+            sessionId = data.sessionId,
+            token = data.token,
+            intent = data.intent,
+            payload = data.payload,
+        })
+        if not called then
+            print(('^3[qbinventory]^7 intent failed: %s'):format(tostring(ok)))
+            deliver(false, 'inventory request failed')
+        else
+            deliver(ok == true, type(result) == 'string' and result or 'action rejected')
+        end
         return
     end
 

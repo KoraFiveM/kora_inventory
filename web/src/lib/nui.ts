@@ -1,4 +1,4 @@
-import type { IntentPayload } from "./types"
+import type { IntentPayload, IntentResponse } from "./types"
 
 declare global {
     interface Window {
@@ -14,7 +14,7 @@ function resourceName() {
 }
 
 /** The sole browser-to-Lua transport. Inventory state never bypasses this UI. */
-export async function sendIntent(intent: IntentPayload) {
+export async function sendIntent(intent: IntentPayload): Promise<IntentResponse> {
     if (browser) return { ok: true }
 
     const response = await fetch(`https://${resourceName()}/qbinventory:nui:intent`, {
@@ -22,7 +22,7 @@ export async function sendIntent(intent: IntentPayload) {
         headers: { "Content-Type": "application/json; charset=UTF-8" },
         body: JSON.stringify(intent),
     })
-    return response.json() as Promise<{ ok: boolean; error?: string }>
+    return response.json() as Promise<IntentResponse>
 }
 
 export async function closeSession(sessionId: string, token: string) {

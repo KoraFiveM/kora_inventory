@@ -121,6 +121,12 @@ h2 { margin-bottom: 0; font-size: calc(15px * var(--ui-scale, 1)); letter-spacin
 .slot-move-target { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft) / .58); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
 .slot-selected.slot-move-target { border-color: hsl(var(--primary)); }
 .slot-drag-source { cursor: grabbing; opacity: .34; }
+/* Painted ahead of the server (Config.qbinventory.ui.optimisticMoves) and not
+   confirmed yet: dashed and dimmed in the theme's own tokens until the server's
+   inventory replaces it, which is the only way this class ever goes away. */
+.slot-pending { border-style: dashed; border-color: hsl(var(--brand-border)); }
+.slot-pending .item-art, .slot-pending .item-footer, .slot-pending .item-amount { opacity: .62; animation: slot-pending-pulse 1.1s ease-in-out infinite alternate; }
+@keyframes slot-pending-pulse { from { opacity: .5; } to { opacity: .78; } }
 /* Hotbar range (slots 1..Config.qbinventory.hotbarSlots) on the player's own
    inventory. Drawn as ONE continuous accent frame around the whole run rather
    than a box per slot: five separate outlines read as five special slots, and
