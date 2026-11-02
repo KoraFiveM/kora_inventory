@@ -82,9 +82,16 @@ function vehicleDoors.doorIndex(vehicle, part)
     return frontTrunk and BOOT_DOOR or BONNET_DOOR
 end
 
+---Native BOOL results reach Lua as 1 or false, never true, so they are read
+---for truthiness and never compared with true.
+---@return boolean
+local function nativeTrue(value)
+    return value ~= nil and value ~= false and value ~= 0
+end
+
 ---False for vehicles that have no such lid (bikes, boats, many trucks).
 function vehicleDoors.hasDoor(vehicle, part)
-    return GetIsDoorValid(vehicle, vehicleDoors.doorIndex(vehicle, part)) == true
+    return nativeTrue(GetIsDoorValid(vehicle, vehicleDoors.doorIndex(vehicle, part)))
 end
 
 function vehicleDoors.isOpen(vehicle, part)
@@ -111,7 +118,7 @@ function vehicleDoors.isAimedAt(vehicle, part, point)
 end
 
 local function insideVehicle(vehicle)
-    return GetVehiclePedIsIn(PlayerPedId(), false) == vehicle
+    return Kora.cache.vehicle() == vehicle
 end
 
 ---Open or close a lid for everyone. The network owner replicates door state,
@@ -160,9 +167,8 @@ end
 
 ---/trunk and /hood: driver seat only.
 function vehicleDoors.toggleFromDriverSeat(part)
-    local ped = PlayerPedId()
-    local vehicle = GetVehiclePedIsIn(ped, false)
-    if vehicle == 0 or GetPedInVehicleSeat(vehicle, -1) ~= ped then
+    local vehicle = Kora.cache.vehicle()
+    if not vehicle or vehicle == 0 or Kora.cache.seat() ~= -1 then
         notify('vehicle_doors.driver_only')
         return false
     end

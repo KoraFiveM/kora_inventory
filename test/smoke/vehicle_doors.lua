@@ -26,7 +26,11 @@ env.QbInventory = { clientApi = {
     openInventory = function(kind, id) f.opened[#f.opened + 1] = { kind = kind, id = id } end,
 } }
 local Kora = {
-    cache = { vehicle = function() return false end, coords = function() return { x = 0, y = 0, z = 0 } end },
+    cache = {
+        vehicle = function() return f.inVehicle ~= 0 and f.inVehicle or false end,
+        seat = function() return f.inVehicle ~= 0 and f.seat or false end,
+        coords = function() return { x = 0, y = 0, z = 0 } end,
+    },
     notify = { send = function(payload) f.notices[#f.notices + 1] = payload.message end },
     locale = { translate = function(_, key) return key end },
     entities = { requestControl = function(vehicle)
@@ -47,9 +51,8 @@ env.DoesEntityExist = function() return true end
 env.NetworkGetEntityIsNetworked = function() return true end
 env.NetworkGetNetworkIdFromEntity = function(v) return 500 + v end
 env.PlayerPedId = function() return 99 end
-env.GetVehiclePedIsIn = function() return f.inVehicle end
-env.GetPedInVehicleSeat = function() return f.seat end
-env.GetIsDoorValid = function() return f.valid end
+-- FiveM hands BOOL natives to Lua as 1 or false, never true.
+env.GetIsDoorValid = function() return f.valid and 1 or false end
 env.GetVehicleDoorAngleRatio = function(_, door) return f.doors[door] or 0.0 end
 env.SetVehicleDoorOpen = function(_, door) f.doors[door] = 1.0; f.doorCalls[#f.doorCalls + 1] = 'open:' .. door end
 env.SetVehicleDoorShut = function(_, door) f.doors[door] = 0.0; f.doorCalls[#f.doorCalls + 1] = 'shut:' .. door end
@@ -109,6 +112,13 @@ H.equal(can(trunkClose, 1, rear), true, 'open trunk: Close trunk')
 f.doors[4] = 1.0
 H.equal(can(hoodClose, 1, front), true, 'open hood: Close hood')
 
+-- The native's 1 (FiveM's BOOL true) counts as a lid; true is accepted too.
+reset()
+H.equal(D.hasDoor(1, 'trunk'), true, 'GetIsDoorValid 1: trunk present')
+env.GetIsDoorValid = function() return true end
+H.equal(D.hasDoor(1, 'hood'), true, 'GetIsDoorValid true: hood present')
+env.GetIsDoorValid = function() return f.valid and 1 or false end
+
 -- A vehicle without the lid hides the entry.
 reset(); f.valid = false
 H.equal(can(trunkOpen, 1, rear), false, 'no trunk door: hidden')
@@ -158,7 +168,7 @@ H.equal(f.doorCalls[1], 'open:5', 'respectLocks off: locked trunk opens')
 
 -- Commands: driver seat only.
 reset()
-f.inVehicle, f.seat = 1, 99
+f.inVehicle, f.seat = 1, -1
 f.commands.trunk()
 H.equal(f.doorCalls[1], 'open:5', '/trunk opens the trunk')
 f.commands.trunk()
@@ -175,7 +185,7 @@ H.equal(f.notices[#f.notices], 'You must be in the driver seat.', 'passenger sea
 f.inVehicle = 0
 f.commands.hood()
 H.equal(f.notices[#f.notices], 'You must be in the driver seat.', 'on foot: /hood tells the driver-seat rule')
-f.seat, f.inVehicle = 99, 1
+f.seat, f.inVehicle = -1, 1
 f.lockedBag = true
 f.commands.trunk()
 H.equal(f.doorCalls[1], 'open:5', 'driver seat of a locked vehicle can still open the trunk')
