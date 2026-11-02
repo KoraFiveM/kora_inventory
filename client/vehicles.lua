@@ -67,6 +67,15 @@ local function isLocked(vehicle)
     return (tonumber(GetVehicleDoorLockStatus(vehicle)) or 0) >= 2
 end
 
+vehicleStorage.isLocked = isLocked
+
+---True for the rear/mid-engine models listed in frontBootModels, whose trunk is
+---under the front (bonnet) lid.
+function vehicleStorage.hasFrontBoot(vehicle, cfg)
+    cfg = cfg or settings()
+    return hasFrontBoot(GetEntityModel(vehicle), cfg.frontBootModels)
+end
+
 ---World position of the boot of a vehicle, from its model dimensions.
 function vehicleStorage.bootPosition(vehicle, cfg)
     cfg = cfg or settings()
@@ -238,6 +247,28 @@ local function request(kind, vehicle)
     pendingTrunk = kind == 'trunk' and { vehicle = vehicle, at = lastRequest } or nil
     QbInventory.clientApi.openInventory(kind, NetworkGetNetworkIdFromEntity(vehicle))
     return true
+end
+
+---Open the trunk inventory of a specific vehicle (the ALT menu entry). Follows
+---the same switches and lock rule as the inventory key; the server still
+---resolves distance, class and lock itself.
+---@param vehicle number
+---@return boolean requested
+function vehicleStorage.openTrunk(vehicle)
+    local cfg = settings()
+    local api = QbInventory.clientApi
+    if cfg.enabled == false or cfg.trunkEnabled == false or not api or api.getCurrentSession()
+        or LocalPlayer.state.inv_busy or not vehicle or not DoesEntityExist(vehicle) then
+        return false
+    end
+    if GetGameTimer() - lastRequest < REQUEST_COOLDOWN_MS then
+        return true
+    end
+    if cfg.respectLocks ~= false and isLocked(vehicle) then
+        notify('This vehicle is locked.')
+        return false
+    end
+    return request('trunk', vehicle)
 end
 
 ---Handle the inventory key for vehicle storage.

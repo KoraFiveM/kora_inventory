@@ -6,6 +6,19 @@
     "parachute_equipped": "You already have a parachute equipped.",
     "parachute_equipping": "Putting on parachute..."
   },
+  "vehicle_doors": {
+    "title": "Vehicle",
+    "trunk_open": "Open trunk",
+    "trunk_close": "Close trunk",
+    "hood_open": "Open hood",
+    "hood_close": "Close hood",
+    "trunk_storage": "Trunk storage",
+    "locked": "This vehicle is locked.",
+    "no_trunk": "This vehicle has no trunk.",
+    "no_hood": "This vehicle has no hood.",
+    "driver_only": "You must be in the driver seat.",
+    "no_control": "Could not reach the vehicle. Try again."
+  },
   "shop_hints": {
     "text": "[ALT] Shop"
   }

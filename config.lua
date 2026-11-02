@@ -334,6 +334,34 @@ Config.qbinventory = {
             flag = 49,
             openDoor = true,
         },
+        -- Trunk and hood toggles (client/vehicle_doors.lua). With kora_target
+        -- running, aiming ALT at the trunk or hood of a vehicle lists Open/Close
+        -- for that lid (hidden when the vehicle has no such lid), and the trunk
+        -- also lists Trunk storage. The driver can use /trunk and /hood from the
+        -- seat. Doors are opened with network control, so everyone sees them.
+        -- The trunk is the rear lid, or the front lid for frontBootModels.
+        --   enabled          master switch for everything below
+        --   targetOptions    Open/Close trunk and hood in the ALT menu
+        --   inventoryOption  Trunk storage in the ALT menu when aiming at the trunk
+        --   commands         /trunk and /hood in the driver seat
+        --   commandNames     rename the commands (false or '' for one disables it);
+        --                    read once when the resource starts
+        --   respectLocks     a locked vehicle cannot be opened from outside
+        --                    (closing, and anything from inside, is always allowed)
+        --   targetDistance   metres from the player to the aimed point
+        --   partDepth        metres from the end of the vehicle that count as the
+        --                    trunk or hood when aiming
+        -- Text comes from locales/*.json (vehicle_doors.*).
+        doors = {
+            enabled = true,
+            targetOptions = true,
+            inventoryOption = true,
+            commands = true,
+            commandNames = { trunk = 'trunk', hood = 'hood' },
+            respectLocks = true,
+            targetDistance = 3.0,
+            partDepth = 1.3,
+        },
         -- Refuse trunk access while the vehicle is locked (kora_vehiclekeys
         -- state bag or the native door lock status).
         respectLocks = true,
@@ -669,6 +697,49 @@ if Kora and Kora.config and Kora.config.adopt then
     Config.qbinventory.vehicles.unknownClassFallback = Kora.config.boolean(Config.qbinventory.vehicles.unknownClassFallback, {
         label = 'Default storage for unknown vehicle classes',
         description = 'When the vehicle class cannot be resolved, use the default row of the storage-by-class table. Disable to refuse trunk and glovebox access for such vehicles.',
+        live = true,
+    })
+    local doorConfig = Config.qbinventory.vehicles.doors or {}
+    Config.qbinventory.vehicles.doors = doorConfig
+    doorConfig.enabled = Kora.config.boolean(doorConfig.enabled, {
+        label = 'Trunk and hood toggles',
+        description = 'Master switch for the ALT-menu Open/Close trunk and hood entries and the /trunk and /hood commands. Applies on the next use.',
+        live = true,
+    })
+    doorConfig.targetOptions = Kora.config.boolean(doorConfig.targetOptions, {
+        label = 'Trunk and hood in the ALT menu',
+        description = 'Shows Open/Close trunk or hood in the target menu while aiming at that end of a vehicle that has that lid. Applies on the next aim.',
+        live = true,
+    })
+    doorConfig.inventoryOption = Kora.config.boolean(doorConfig.inventoryOption, {
+        label = 'Trunk storage in the ALT menu',
+        description = 'Shows Trunk storage in the target menu while aiming at the trunk of a vehicle. It follows the trunk switches and lock rule of the inventory key. Applies on the next aim.',
+        live = true,
+    })
+    doorConfig.commands = Kora.config.boolean(doorConfig.commands, {
+        label = 'Trunk and hood commands',
+        description = 'Lets the driver toggle the trunk and hood with /trunk and /hood. Command names come from the commandNames entries in config.lua and are read when the resource starts. Applies on the next use.',
+        live = true,
+    })
+    doorConfig.respectLocks = Kora.config.boolean(doorConfig.respectLocks, {
+        label = 'Locked vehicles keep trunk and hood shut',
+        description = 'When on, the trunk and hood of a locked vehicle cannot be opened from outside. Closing them, and opening them from inside the vehicle, is always allowed. Applies on the next use.',
+        live = true,
+    })
+    doorConfig.targetDistance = Kora.config.number(doorConfig.targetDistance, {
+        label = 'Trunk and hood reach (metres)',
+        description = 'How close the aimed point on the vehicle must be to the player for the ALT-menu trunk and hood entries to appear. Applies on the next aim.',
+        min = 1.0,
+        max = 10.0,
+        step = 0.5,
+        live = true,
+    })
+    doorConfig.partDepth = Kora.config.number(doorConfig.partDepth, {
+        label = 'Trunk and hood zone depth (metres)',
+        description = 'How far in from the front or rear end of a vehicle the aim point still counts as the hood or trunk. Raise it if players struggle to get the entry to appear. Applies on the next aim.',
+        min = 0.5,
+        max = 3.0,
+        step = 0.1,
         live = true,
     })
     Config.qbinventory.vehicles.respectLocks = Kora.config.boolean(Config.qbinventory.vehicles.respectLocks, {

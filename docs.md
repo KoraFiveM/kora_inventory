@@ -286,6 +286,27 @@ stops. `openDoor = false` plays the animation without touching the door. Trunks
 opened by other resources through `openInventory` are not animated; glovebox
 opening is not animated.
 
+### Trunk and hood toggles
+
+`client/vehicle_doors.lua` (needs kora_target, already a dependency) adds, under
+`Config.qbinventory.vehicles.doors`:
+
+- ALT menu: aiming at the trunk of a vehicle lists Open/Close trunk and Trunk
+  storage; aiming at the hood lists Open/Close hood. The aimed point must lie in
+  the front or rear `partDepth` metres of the vehicle, near its centre line, and
+  an entry is hidden when the vehicle has no such lid (`GetIsDoorValid`). The
+  trunk is the rear lid, or the front lid for `vehicles.frontBootModels`.
+- `/trunk` and `/hood` toggle the lid from the driver seat only.
+- Doors are opened after taking network control of the vehicle, so every player
+  sees the same door state. With `doors.respectLocks` (default on) a locked
+  vehicle cannot be opened from outside; closing, and opening from inside the
+  vehicle, is always allowed. Trunk storage follows `vehicles.respectLocks`.
+
+Options: `enabled`, `targetOptions`, `inventoryOption`, `commands`,
+`commandNames` (read once at start), `respectLocks`, `targetDistance`,
+`partDepth`; all default on / sensible values. Text lives in
+`locales/*.json` under `vehicle_doors`.
+
 ## Item containers, evidence, and confiscation
 
 `server/containers.lua` is a server-only domain module. It registers no NUI

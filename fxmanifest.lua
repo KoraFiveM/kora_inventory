@@ -91,6 +91,8 @@ client_scripts {
     'client/drops.lua',
     -- Inventory-key access to glovebox/trunk; intent only, the server resolves the vehicle.
     'client/vehicles.lua',
+    -- ALT-menu trunk/hood toggles and the /trunk and /hood commands.
+    'client/vehicle_doors.lua',
     'client/shops/ammunation.lua',
     'client/shops/vendingmachine.lua',
     'client/shops/liquorstore.lua',
