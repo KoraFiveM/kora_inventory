@@ -34,7 +34,12 @@ CreateThread(function()
     while true do
         Wait(session and 250 or 1000)
         if session and QbInventory.isBusy() then
-            QbInventory.notifyBusyBlocked()
+            -- A bar started by a use submitted from this very panel (the
+            -- consumable handler's own bar) is not the player being busy with
+            -- something else: close quietly, no "can't do that" notice.
+            if not QbInventory.useInFlight then
+                QbInventory.notifyBusyBlocked()
+            end
             TriggerServerEvent('qbinventory:server:close', session.token)
         end
     end
@@ -261,7 +266,11 @@ local function submitIntent(intent)
         local item = slot and session.primary.items and session.primary.items[slot]
         local clearedBusy = item and item.preventClose ~= true
         if action == 'use' then
+            -- Set for the whole use (gate bar, server handler and its own
+            -- bar) so the busy poll above can tell it from foreign activity.
+            QbInventory.useInFlight = true
             if not QbInventory.useGate(item) then
+                QbInventory.useInFlight = false
                 -- Cancelled (or never started) progress bar: treat exactly
                 -- like a rejected use attempt, without ever contacting the
                 -- server, so the effect can never apply for a bar the player
@@ -279,6 +288,9 @@ local function submitIntent(intent)
             primaryRevision = session.primary and session.primary.revision,
             secondaryRevision = session.secondary and session.secondary.revision,
         })
+        if action == 'use' then
+            QbInventory.useInFlight = false
+        end
         if not ok then
             -- A callback that errored or timed out has no reason; never hand the
             -- browser a blank one.

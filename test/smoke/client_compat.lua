@@ -32,4 +32,11 @@ H.ok(not source:find('SendNUIMessage', 1, true), 'compat bridge has no NUI autho
 H.ok(not source:find('SetNuiFocus', 1, true), 'compat bridge has no focus authority')
 H.ok(not source:find('other.inventory', 1, true), 'does not trust legacy item lists')
 H.ok(not source:find('GetVehicle', 1, true), 'does not discover vehicles client-side')
+
+-- The busy poll must not announce "you can't do that while using an item" for
+-- the progress bar of a use that this very panel submitted.
+local clientSource = assert(io.open('client.lua', 'rb')):read('a')
+H.ok(clientSource:find('QbInventory.useInFlight = true', 1, true), 'a use marks itself in flight')
+H.ok(clientSource:find('if not QbInventory.useInFlight then\n                QbInventory.notifyBusyBlocked()', 1, true),
+    'busy poll stays silent while the panel own use is in flight')
 H.finish()
