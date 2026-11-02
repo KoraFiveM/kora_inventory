@@ -55,11 +55,17 @@ Config.qbinventory.shops.liquorstore = {
     -- Counter positions. Each entry needs an explicit `bucket`: the server-side
     -- access check fails closed on a missing or non-numeric one rather than
     -- widening the shop's opening surface (see server/shops/liquorstore.lua).
+    -- `ped` = clerk spot (Config.ShopClerks; client/shop_clerks.lua).
     locations = {
-        { name = "Rob's Liquor", x = 1135.81, y = -982.28, z = 46.42, heading = 280.0, bucket = 0 }, -- Little Bighorn Ave
-        { name = "Rob's Liquor", x = -1222.92, y = -906.98, z = 12.33, heading = 30.0, bucket = 0 }, -- Prosperity St, Vespucci
-        { name = "Rob's Liquor", x = -1487.55, y = -379.11, z = 40.16, heading = 135.0, bucket = 0 }, -- San Andreas Ave, Morningwood
-        { name = "Rob's Liquor", x = -2968.24, y = 390.91, z = 15.04, heading = 85.0, bucket = 0 }, -- Great Ocean Hwy, Chumash
-        { name = "Rob's Liquor", x = 1166.02, y = 2708.93, z = 38.16, heading = 180.0, bucket = 0 }, -- Route 68, Harmony
+        { name = "Rob's Liquor", x = 1135.81, y = -982.28, z = 46.42, heading = 280.0, bucket = 0,
+          ped = { x = 1134.35, y = -983.23, z = 46.42, heading = 276.56 } }, -- Little Bighorn Ave
+        { name = "Rob's Liquor", x = -1222.92, y = -906.98, z = 12.33, heading = 30.0, bucket = 0,
+          ped = { x = -1221.38, y = -907.89, z = 12.33, heading = 34.41 } }, -- Prosperity St, Vespucci
+        { name = "Rob's Liquor", x = -1487.55, y = -379.11, z = 40.16, heading = 135.0, bucket = 0,
+          ped = { x = -1486.76, y = -377.55, z = 40.16, heading = 139.54 } }, -- San Andreas Ave, Morningwood
+        { name = "Rob's Liquor", x = -2968.24, y = 390.91, z = 15.04, heading = 85.0, bucket = 0,
+          ped = { x = -2966.40, y = 391.56, z = 15.04, heading = 84.53 } }, -- Great Ocean Hwy, Chumash
+        { name = "Rob's Liquor", x = 1166.02, y = 2708.93, z = 38.16, heading = 180.0, bucket = 0,
+          ped = { x = 1165.22, y = 2710.77, z = 38.16, heading = 176.93 } }, -- Route 68, Harmony
     },
 }

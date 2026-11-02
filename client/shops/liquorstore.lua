@@ -35,6 +35,8 @@ local function registerLiquorStoreTargets()
                     label = ('Browse %s'):format(location.name),
                     icon = 'wine',
                     onSelect = openLiquorStore,
+                    -- The clerk ped offers the same option while it is spawned.
+                    canInteract = function() return not QbInventory.shopClerkActive(location) end,
                 },
             },
         }, location))

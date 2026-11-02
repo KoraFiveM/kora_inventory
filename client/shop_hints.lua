@@ -1,6 +1,7 @@
 -- Optional world marker (and short "[ALT] Shop" text) at every fixed shop
 -- interaction point, so players can see where to point kora_target. Presentation
--- only: it never opens a shop and the server still validates every open.
+-- only (and the text is dropped at counters with a shop clerk ped, see
+-- Config.ShopClerks.showLabel): it never opens a shop and the server still validates every open.
 --
 -- Points come from each shop's `locations` in Config.qbinventory.shops, so any
 -- shop type with a fixed location list is covered without code changes. A shop
@@ -35,13 +36,18 @@ end
 
 local function collectPoints()
     points = {}
+    local clerkLabel = Config.ShopClerks and Config.ShopClerks.showLabel == true
     local config = Config.ShopHints
     if type(config) ~= 'table' or config.enabled ~= true then return end
     local zOffset = tonumber(config.marker and config.marker.zOffset) or 0.0
     for _, shop in pairs((Config.qbinventory and Config.qbinventory.shops) or {}) do
         if type(shop) == 'table' and shop.enabled ~= false and shop.hint ~= false then
             for _, location in ipairs(shop.locations or {}) do
-                points[#points + 1] = { x = location.x, y = location.y, z = location.z + zOffset }
+                local hasClerk = QbInventory and QbInventory.shopHasClerk and QbInventory.shopHasClerk(shop, location)
+                points[#points + 1] = {
+                    x = location.x, y = location.y, z = location.z + zOffset,
+                    noText = hasClerk and not clerkLabel or nil,
+                }
             end
         end
     end
@@ -77,7 +83,7 @@ local function run()
                 DrawMarker(markerType, point.x, point.y, point.z + bobOffset, 0.0, 0.0, 0.0, rotation, 0.0, 0.0,
                     scale.x, scale.y, scale.z, color.r, color.g, color.b, alpha, false, true, 2,
                     spin, nil, nil, false)
-                if text then
+                if text and not point.noText then
                     Kora.drawing.text3d({ x = point.x, y = point.y, z = point.z + 0.45 }, text, {
                         maxDistance = drawDistance,
                         color = textColor,

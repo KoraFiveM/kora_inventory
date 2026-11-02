@@ -101,7 +101,20 @@ re-checks after every replicated inventory update.
 `Config.ShopHints` draws a small marker and a `[ALT] Shop` hint (locale key
 `shop_hints.text`) at every fixed shop point within `drawDistance`, coloured
 from kora_theme's primary colour. Set `hint = false` on a shop to opt it out;
-vending machines (model targets) have no fixed point and get none.
+vending machines (model targets) have no fixed point and get none. The text is
+not drawn at counters served by a clerk ped unless `Config.ShopClerks.showLabel`.
+
+`Config.ShopClerks` (client/shop_clerks.lua) places a frozen, invincible clerk
+ped behind each 24/7 and liquor counter whose location has a
+`ped = { x, y, z, heading }` spot (z = floor height). The ped plays
+`scenario` (default `WORLD_HUMAN_CLIPBOARD`), exists only within `radius`
+(default 40 m) of the player and offers "Open shop" through kora_target
+(`interactionDistance`, default 3). Options: `enabled` (true), `showLabel`
+(false), `model`, `scenario`, `radius`, `interactionDistance`. Per shop,
+`clerk = { model, scenario, radius, enabled }` or `clerk = false`; per
+location, `ped.model`/`ped.scenario` or `clerk = false`. With `enabled = false`
+the old counter zone and floating label are used unchanged. Ammu-Nation keeps
+its `shopkeeper` peds. Peds are removed when the resource stops.
 
 When `Config.qbinventory.weapons.ballistics.enabled` is set (the default), a
 weapon's `info.loadedBullets` contains one generated record for every loaded

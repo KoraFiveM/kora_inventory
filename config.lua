@@ -49,6 +49,22 @@ Config.ShopHints = {
     showText = true, -- locale key shop_hints.text, drawn above the marker
 }
 
+-- Shop clerk peds at the general shops (24/7, liquor): a frozen, invincible
+-- clerk stands behind the counter and opens the shop through kora_target.
+-- Locations opt in with a `ped` spot ({ x, y, z, heading }, z = floor height);
+-- see config/shops/*.lua. Ammu-Nation keeps its own shop.shopkeeper peds.
+-- Per shop, `clerk = { model, scenario, radius, enabled }` overrides these
+-- (`clerk = false` turns clerks off for that shop); a location can override
+-- with `ped.model` / `ped.scenario` or opt out with `clerk = false`.
+Config.ShopClerks = {
+    enabled = true, -- false = no clerk peds; the old counter zone and label are used
+    showLabel = false, -- true keeps the floating "[ALT] Shop" text (Config.ShopHints) at counters that have a clerk
+    model = 's_m_m_ammucountry', -- default clerk model
+    scenario = 'WORLD_HUMAN_CLIPBOARD', -- scenario the clerk plays; '' = stand still
+    radius = 40.0, -- metres: the ped spawns when a player comes this close and is deleted when they leave
+    interactionDistance = 3.0, -- kora_target distance to the clerk
+}
+
 Config.qbinventory = {
     playerSlots = 41,
     playerMaxWeight = 120000,

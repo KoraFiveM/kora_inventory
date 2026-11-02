@@ -37,6 +37,8 @@ local function registerConvenienceStoreTargets()
                     label = ('Open shop (%s)'):format(location.name),
                     icon = 'basket-shopping',
                     onSelect = openConvenienceStore,
+                    -- The clerk ped offers the same option while it is spawned.
+                    canInteract = function() return not QbInventory.shopClerkActive(location) end,
                 },
             },
         }, location))

@@ -97,6 +97,9 @@ client_scripts {
     'client/shops/vendingmachine.lua',
     'client/shops/liquorstore.lua',
     'client/shops/convenience.lua',
+    -- Clerk peds at the 24/7 and liquor counters (Config.ShopClerks). Before
+    -- shop_hints so it can drop the label where a clerk stands.
+    'client/shop_clerks.lua',
     -- Optional marker/text at fixed shop points (Config.ShopHints).
     'client/shop_hints.lua',
     -- Legacy qb-inventory event/command adapter. It has no NUI authority and
