@@ -255,6 +255,10 @@ RegisterCommand('inventory', function()
         QbInventory.notifyDownedBlocked()
         return
     end
+    if QbInventory.isCuffed() then
+        QbInventory.notifyCuffedBlocked()
+        return
+    end
     -- TAB also drives kora_lib's zone and entity-placement creators;
     -- all are independent keybinds, so an active creator session
     -- must explicitly veto this one rather than relying on FiveM to pick

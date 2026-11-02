@@ -30,6 +30,11 @@ local function useHotbarSlot(slot)
         return
     end
 
+    if QbInventory.isCuffed() then
+        QbInventory.notifyCuffedBlocked()
+        return
+    end
+
     local data = exports.kora_core:getPlayerData()
     local item = data and data.items and data.items[slot]
     if type(item) ~= 'table' then

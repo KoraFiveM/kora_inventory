@@ -121,6 +121,33 @@ function QbInventory.isDowned()
     return type(metadata) == 'table' and (metadata.isdead == true or metadata.inlaststand == true)
 end
 
+---True while the local player is cuffed: the `koraCuffed` bag kora_police publishes,
+---or the `ishandcuffed` metadata kora_core replicates. UX gate only; server.lua
+---enforces the same rule authoritatively.
+---@return boolean
+function QbInventory.isCuffed()
+    if Config.qbinventory.blockWhenCuffed == false then
+        return false
+    end
+    if LocalPlayer.state.koraCuffed == true then
+        return true
+    end
+    local data = exports.kora_core:getPlayerData()
+    local metadata = data and data.metadata
+    return type(metadata) == 'table' and metadata.ishandcuffed == true
+end
+
+local lastCuffedNotify = 0
+---Notify that an action was blocked while cuffed, rate limited.
+function QbInventory.notifyCuffedBlocked()
+    local now = GetGameTimer()
+    if now - lastCuffedNotify < (tonumber(Config.qbinventory.downedNotifyCooldown) or 3000) then
+        return
+    end
+    lastCuffedNotify = now
+    Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_cuffed'), type = 'error' })
+end
+
 local lastDownedNotify = 0
 ---Notify that an action was blocked while downed, rate limited.
 function QbInventory.notifyDownedBlocked()
@@ -502,3 +529,11 @@ for _, key in ipairs({ 'isdead', 'inlaststand' }) do
         end
     end)
 end
+
+-- Same for being cuffed (kora_police sets `ishandcuffed`; kora_core replicates it).
+exports.kora_core:onPlayerDataChange({ 'metadata', 'ishandcuffed' }, function(_, value)
+    if value == true and session and QbInventory.isCuffed() then
+        closeInventory()
+        QbInventory.notifyCuffedBlocked()
+    end
+end)

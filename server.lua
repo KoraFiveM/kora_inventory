@@ -60,6 +60,27 @@ local function isDowned(src)
     local metadata = exports.kora_core:getPlayerData(src, { 'metadata' })
     return type(metadata) == 'table' and (metadata.isdead == true or metadata.inlaststand == true)
 end
+---True when the player is cuffed. Reads the kora_core metadata the server owns
+---(kora_police writes `ishandcuffed`), so a client cannot clear it.
+---@param src integer
+---@return boolean
+local function isCuffed(src)
+    if config.blockWhenCuffed == false then
+        return false
+    end
+    local metadata = exports.kora_core:getPlayerData(src, { 'metadata' })
+    return type(metadata) == 'table' and metadata.ishandcuffed == true
+end
+local lastCuffedNotify = {}
+local function notifyCuffedBlocked(src)
+    local now = GetGameTimer()
+    local cooldown = tonumber(config.downedNotifyCooldown) or 3000
+    if lastCuffedNotify[src] and now - lastCuffedNotify[src] < cooldown then
+        return
+    end
+    lastCuffedNotify[src] = now
+    Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_cuffed'), type = 'error' })
+end
 local lastDownedNotify = {}
 local function notifyDownedBlocked(src)
     local now = GetGameTimer()
@@ -1563,6 +1584,12 @@ local function validSession(src, token, fromKey, toKey, expectedFrom, expectedTo
     if not session or token ~= session.token then
         return nil, nil, 'invalid session'
     end
+    -- Cuffed after the inventory was opened: nothing moves, drops or is used.
+    if isCuffed(src) then
+        close(src, 'cuffed')
+        notifyCuffedBlocked(src)
+        return nil, nil, 'you cannot use inventories while cuffed'
+    end
     if now() > session.expires then
         close(src, 'expired')
         return nil, nil, 'session expired'
@@ -2743,6 +2770,10 @@ useItem = function(src, slotOrName)
         notifyDownedBlocked(src)
         return false, 'you cannot use items while downed'
     end
+    if isCuffed(src) then
+        notifyCuffedBlocked(src)
+        return false, 'you cannot use items while cuffed'
+    end
     local allowed, err, useHandle = runHooks('usingItem', src, {
         itemName = item.name,
         item = oxSlot(item, type(slotOrName) == 'number' and slotOrName or item.slot),
@@ -3196,6 +3227,10 @@ local function openInventory(src, invType, data)
     if isDowned(src) then
         notifyDownedBlocked(src)
         return false, 'you cannot open inventories while downed'
+    end
+    if isCuffed(src) then
+        notifyCuffedBlocked(src)
+        return false, 'you cannot open inventories while cuffed'
     end
     local inventoryKey
     if invType == 'player' then

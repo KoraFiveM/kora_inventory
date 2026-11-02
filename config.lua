@@ -109,6 +109,12 @@ Config.qbinventory = {
     -- open the inventory, use hotbar keys or use items. Enforced on the
     -- server as well as the client. Set false to restore the old behaviour.
     blockWhenDowned = true,
+    -- Cuffed players (kora_police sets the `ishandcuffed` player metadata and the
+    -- replicated `koraCuffed` state bag) cannot open their inventory, use hotbar
+    -- keys or use items, and an open inventory is closed the moment they are
+    -- cuffed. Enforced on the server (metadata) as well as the client. Set false
+    -- to let cuffed players keep using their inventory.
+    blockWhenCuffed = true,
     -- Item names that may still be used while downed (e.g. { "bandage" }).
     -- Only affects item use; opening the inventory stays blocked. Default none.
     downedAllowedItems = {},

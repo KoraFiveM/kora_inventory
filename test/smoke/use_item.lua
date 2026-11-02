@@ -208,4 +208,31 @@ Config.qbinventory.blockWhenDowned = true
 playersMetadata[7] = { isdead = false, inlaststand = false }
 H.ok((useSlot2()), 'a standing player can use items again')
 
+-- cuffed players cannot open or use items either (server-enforced; kora_police
+-- sets the ishandcuffed metadata)
+
+NOTIFIED = {}
+NOW = NOW + 5000
+playersMetadata[7] = { ishandcuffed = true }
+local cuffedUse, cuffedErr = useSlot2()
+H.equal(cuffedUse, false, 'a cuffed player cannot use items')
+H.ok(cuffedErr:find('cuffed', 1, true), 'the refusal says why')
+H.equal(#NOTIFIED, 1, 'the blocked attempt notifies once')
+useSlot2()
+H.equal(#NOTIFIED, 1, 'repeated attempts inside the cooldown do not spam')
+H.equal(select(1, QBCallbacks['qbinventory:server:open'](7, 'player', 7)), false, 'a cuffed player cannot open an inventory')
+local cuffedIntent = intent(7, {
+    token = payload.token, action = 'use',
+    payload = { slot = 2 }, primaryRevision = payload.primary.revision,
+})
+H.equal(cuffedIntent, false, 'a request on a session opened before the cuff is refused and closes it')
+
+Config.qbinventory.blockWhenCuffed = false
+H.ok((useSlot2()), 'blockWhenCuffed = false restores the old behaviour')
+Config.qbinventory.blockWhenCuffed = true
+
+playersMetadata[7] = {}
+H.ok((useSlot2()), 'an uncuffed player can use items again')
+H.ok(QbInventory.internal.openSelf(7), 'and open their inventory again')
+
 H.finish()

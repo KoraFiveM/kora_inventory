@@ -54,4 +54,11 @@ H.ok(read('config.lua'):find('hotbarSeconds = 5', 1, true), 'the hotbar display 
 
 H.ok(manifest:find("'client/hotbar.lua'", 1, true), 'the hotbar module is loaded by the manifest')
 
+H.ok(hotbar:find('QbInventory.isCuffed()', 1, true),
+    'the hotbar refuses to use an item while the player is cuffed')
+H.ok(client:find('LocalPlayer.state.koraCuffed', 1, true) and client:find("{ 'metadata', 'ishandcuffed' }", 1, true),
+    'the client reads the cuffed bag/metadata and closes an open inventory when cuffed')
+H.ok(read('client/compat.lua'):find('QbInventory.isCuffed()', 1, true),
+    'the inventory command refuses to open while the player is cuffed')
+
 H.finish()

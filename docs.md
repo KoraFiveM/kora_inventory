@@ -719,6 +719,13 @@ type, stock, both revisions, access/distance, and server-side payment before
 adding the server-resolved item to the qbcore-owned player inventory. A failed
 add after payment is refunded by the server.
 
+A cuffed player (`ishandcuffed` metadata, set by kora_police and mirrored to the
+`koraCuffed` player state bag) cannot open an inventory, use an item or hotbar
+slot, or move, drop or give anything: the server refuses `useItem`,
+`openInventory` and every session request, and closes a session that was open
+when the cuff went on. The client mirrors this (inventory command, hotbar keys,
+panel closes on cuff). `Config.qbinventory.blockWhenCuffed = false` turns it off.
+
 ### Bundled Ammu-Nation
 
 `config/shops/ammunation.lua` defines one finite-stock `ammunation` shop and
