@@ -98,11 +98,16 @@ the inventory by any route (drop, give, stash/trunk/glovebox, server removal,
 sale): the server sends `qbinventory:client:weaponRemoved`, and the client also
 re-checks after every replicated inventory update.
 
-`Config.ShopHints` draws a small marker and a `[ALT] Shop` hint (locale key
-`shop_hints.text`) at every fixed shop point within `drawDistance`, coloured
-from kora_theme's primary colour. Set `hint = false` on a shop to opt it out;
-vending machines (model targets) have no fixed point and get none. The text is
-not drawn at counters served by a clerk ped unless `Config.ShopClerks.showLabel`.
+`Config.ShopHints` draws a small marker at every fixed shop point within
+`drawDistance`, coloured from kora_theme's primary colour. Set `hint = false`
+on a shop to opt it out; vending machines (model targets) have no fixed point
+and get none. The floating `[ALT] Shop` text (locale key `shop_hints.text`) is
+off by default (`showText = false`). With `showText = true` it is still never
+drawn at a counter served by a ped - a 24/7 or liquor clerk or an Ammu-Nation
+shopkeeper - unless `Config.ShopClerks.showLabel = true`. By shop type: 24/7 and
+liquor have a ped at every counter with a `ped` spot (all but Senora Fwy and
+Grapeseed), Ammu-Nation at all 11 stores (Legion Square's comes from kora_mdt
+while it runs), vending machines have no fixed point and no text.
 
 `Config.ShopClerks` (client/shop_clerks.lua) places a frozen, invincible clerk
 ped behind each 24/7 and liquor counter whose location has a
@@ -110,11 +115,12 @@ ped behind each 24/7 and liquor counter whose location has a
 `scenario` (default `WORLD_HUMAN_CLIPBOARD`), exists only within `radius`
 (default 40 m) of the player and offers "Open shop" through kora_target
 (`interactionDistance`, default 3). Options: `enabled` (true), `showLabel`
-(false), `model`, `scenario`, `radius`, `interactionDistance`. Per shop,
+(false; also covers Ammu-Nation shopkeepers), `model`, `scenario`, `radius`,
+`interactionDistance`. Per shop,
 `clerk = { model, scenario, radius, enabled }` or `clerk = false`; per
 location, `ped.model`/`ped.scenario` or `clerk = false`. With `enabled = false`
-the old counter zone and floating label are used unchanged. Ammu-Nation keeps
-its `shopkeeper` peds. Peds are removed when the resource stops.
+the old counter zone is used unchanged (and the label only if
+`Config.ShopHints.showText`). Ammu-Nation keeps its `shopkeeper` peds. Peds are removed when the resource stops.
 
 When `Config.qbinventory.weapons.ballistics.enabled` is set (the default), a
 weapon's `info.loadedBullets` contains one generated record for every loaded

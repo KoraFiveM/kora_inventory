@@ -1,7 +1,10 @@
 -- Optional world marker (and short "[ALT] Shop" text) at every fixed shop
 -- interaction point, so players can see where to point kora_target. Presentation
--- only (and the text is dropped at counters with a shop clerk ped, see
--- Config.ShopClerks.showLabel): it never opens a shop and the server still validates every open.
+-- only: it never opens a shop and the server still validates every open.
+-- This file is the only place that draws the "[ALT] Shop" text. It is off by
+-- default (Config.ShopHints.showText) and, when enabled, is still dropped at any
+-- counter served by a ped - 24/7, liquor or Ammu-Nation - unless
+-- Config.ShopClerks.showLabel (see QbInventory.shopHasClerk).
 --
 -- Points come from each shop's `locations` in Config.qbinventory.shops, so any
 -- shop type with a fixed location list is covered without code changes. A shop
@@ -43,10 +46,10 @@ local function collectPoints()
     for _, shop in pairs((Config.qbinventory and Config.qbinventory.shops) or {}) do
         if type(shop) == 'table' and shop.enabled ~= false and shop.hint ~= false then
             for _, location in ipairs(shop.locations or {}) do
-                local hasClerk = QbInventory and QbInventory.shopHasClerk and QbInventory.shopHasClerk(shop, location)
+                local hasPed = QbInventory and QbInventory.shopHasClerk and QbInventory.shopHasClerk(shop, location)
                 points[#points + 1] = {
                     x = location.x, y = location.y, z = location.z + zOffset,
-                    noText = hasClerk and not clerkLabel or nil,
+                    noText = hasPed and not clerkLabel or nil,
                 }
             end
         end

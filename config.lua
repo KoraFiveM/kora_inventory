@@ -31,7 +31,9 @@ Config.Hotbar = {
 }
 
 -- Draws a small marker (and optional "[ALT] Shop" text) at every fixed shop
--- interaction point (convenience, liquor, Ammu-Nation, ...). Colour follows
+-- interaction point (convenience, liquor, Ammu-Nation, ...). The text is off by
+-- default (`showText`); when on, it is still hidden at counters that have a ped
+-- (any shop type) unless Config.ShopClerks.showLabel. Colour follows
 -- kora_theme's primary colour. Set `hint = false` on a shop's config to opt that
 -- shop out. Vending machines are model targets without fixed points and get no
 -- marker. Plain {x,y,z} tables rather than vec3, like the other offsets here.
@@ -46,19 +48,20 @@ Config.ShopHints = {
         bob = true,
         rotate = true,
     },
-    showText = true, -- locale key shop_hints.text, drawn above the marker
+    showText = false, -- true draws locale key shop_hints.text above the marker at counters without a ped
 }
 
 -- Shop clerk peds at the general shops (24/7, liquor): a frozen, invincible
 -- clerk stands behind the counter and opens the shop through kora_target.
 -- Locations opt in with a `ped` spot ({ x, y, z, heading }, z = floor height);
--- see config/shops/*.lua. Ammu-Nation keeps its own shop.shopkeeper peds.
+-- see config/shops/*.lua. Ammu-Nation keeps its own shop.shopkeeper peds (they
+-- also hide the floating label, see showLabel).
 -- Per shop, `clerk = { model, scenario, radius, enabled }` overrides these
 -- (`clerk = false` turns clerks off for that shop); a location can override
 -- with `ped.model` / `ped.scenario` or opt out with `clerk = false`.
 Config.ShopClerks = {
     enabled = true, -- false = no clerk peds; the old counter zone and label are used
-    showLabel = false, -- true keeps the floating "[ALT] Shop" text (Config.ShopHints) at counters that have a clerk
+    showLabel = false, -- true keeps the floating "[ALT] Shop" text (needs Config.ShopHints.showText) at counters that have a ped, clerk or Ammu-Nation shopkeeper
     model = 's_m_m_ammucountry', -- default clerk model
     scenario = 'WORLD_HUMAN_CLIPBOARD', -- scenario the clerk plays; '' = stand still
     radius = 40.0, -- metres: the ped spawns when a player comes this close and is deleted when they leave

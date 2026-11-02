@@ -5,7 +5,9 @@
 --
 -- A location gets a clerk when it has a `ped` spot ({ x, y, z, heading }, z =
 -- floor height) and Config.ShopClerks.enabled is on. Ammu-Nation has its own
--- shopkeeper system (shop.shopkeeper) and is skipped here.
+-- shopkeeper system (shop.shopkeeper, client/shops/ammunation.lua) and is skipped
+-- here, but QbInventory.shopHasClerk still reports its shopkeepers so the
+-- floating label is dropped there too.
 --
 -- Cost: one Kora.zones sphere per clerk (Config.ShopClerks.radius). The ped
 -- exists only while the player is inside that sphere and is deleted when they
@@ -46,9 +48,21 @@ local function resolveClerk(shop, location)
     }
 end
 
--- True when this location has a clerk configured. shop_hints uses it to drop
--- the floating label (Config.ShopClerks.showLabel) at clerk-served counters.
+-- Ammu-Nation's own shopkeeper system: a location has a ped when shop.shopkeeper
+-- is enabled, the location has a `ped` spot and has not set `shopkeeper = false`.
+-- `shopkeeperUnlessStarted` still counts: that resource supplies the clerk there.
+local function hasShopkeeper(shop, location)
+    local options = shop.shopkeeper
+    if type(options) ~= 'table' or options.enabled == false then return false end
+    return location.shopkeeper ~= false and type(location.ped) == 'table'
+end
+
+-- True when this location is served by a ped, of any shop type: a general-shop
+-- clerk (this file) or an Ammu-Nation shopkeeper. shop_hints uses it to drop the
+-- floating label (Config.ShopClerks.showLabel) at ped-served counters.
 function QbInventory.shopHasClerk(shop, location)
+    if type(shop) ~= 'table' or type(location) ~= 'table' or shop.enabled == false then return false end
+    if shop.shopkeeper ~= nil then return hasShopkeeper(shop, location) end
     return resolveClerk(shop, location) ~= nil
 end
 

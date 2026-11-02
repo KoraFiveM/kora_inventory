@@ -11,7 +11,7 @@
 --
 -- A location's `ped = { x, y, z, heading }` places its clerk (Config.ShopClerks;
 -- client/shop_clerks.lua); Senora Fwy and Grapeseed have no ped spot yet and
--- keep the floating label. Per-shop overrides: `clerk = { model, scenario }`.
+-- are served by the counter target only. Per-shop overrides: `clerk = { model, scenario }`.
 --
 -- Config.qbinventory.shops.convenience.enabled = false removes the shop, its
 -- targets and its blips (default true). Stock rows must be real items in

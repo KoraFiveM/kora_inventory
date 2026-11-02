@@ -82,8 +82,24 @@ H.ok(zone.removed and zones[2].removed, 'resource stop removes the zones')
 -- Opt-outs.
 H.equal(QbInventory.shopHasClerk(convenience, convenience.locations[1]), true, 'clerk configured')
 H.equal(QbInventory.shopHasClerk(convenience, convenience.locations[9]), false, 'no spot, no clerk')
-H.equal(QbInventory.shopHasClerk(Config.qbinventory.shops.ammunation, Config.qbinventory.shops.ammunation.locations[1]), false,
-    'Ammu-Nation keeps its own shopkeepers')
+local ammunation = Config.qbinventory.shops.ammunation
+H.equal(QbInventory.shopHasClerk(ammunation, ammunation.locations[1]), true,
+    'Ammu-Nation shopkeepers count as a ped (no label), though they are not clerks')
+H.equal(QbInventory.shopHasClerk(ammunation, ammunation.locations[5]), true,
+    'Legion Square counts too: kora_mdt supplies the clerk while it runs')
+ammunation.locations[1].shopkeeper = false
+H.equal(QbInventory.shopHasClerk(ammunation, ammunation.locations[1]), false, 'location.shopkeeper = false')
+ammunation.locations[1].shopkeeper = nil
+local savedPed = ammunation.locations[1].ped
+ammunation.locations[1].ped = nil
+H.equal(QbInventory.shopHasClerk(ammunation, ammunation.locations[1]), false, 'no ped spot, no shopkeeper')
+ammunation.locations[1].ped = savedPed
+ammunation.shopkeeper.enabled = false
+H.equal(QbInventory.shopHasClerk(ammunation, ammunation.locations[1]), false, 'shopkeeper.enabled = false')
+ammunation.shopkeeper.enabled = true
+for i, location in ipairs(ammunation.locations) do
+    H.equal(QbInventory.shopHasClerk(ammunation, location), true, 'every Ammu-Nation store has a ped (' .. i .. ')')
+end
 liquor.clerk = false
 H.equal(QbInventory.shopHasClerk(liquor, liquor.locations[1]), false, 'shop.clerk = false')
 liquor.clerk = nil
@@ -96,6 +112,7 @@ H.equal(QbInventory.shopHasClerk(liquor, liquor.locations[1]), false, 'global to
 -- shop_hints: label dropped only at clerk counters.
 Config.ShopClerks.enabled = true
 Config.ShopHints.enabled = true
+Config.ShopHints.showText = true -- text is off by default; check it is still dropped at ped counters
 local texts = {}
 Kora.lang = function(k) return k end
 Kora.drawing = { text3d = function(_, text) texts[#texts + 1] = text end }
@@ -123,5 +140,28 @@ Config.ShopClerks.showLabel = true
 hintZones = {}
 dofile('client/shop_hints.lua')
 H.equal(drawAt(1), 1, 'showLabel = true keeps the text')
+
+-- Ammu-Nation: the floating text is dropped at every store, shown again with showLabel.
+Config.ShopClerks.showLabel = false
+Config.qbinventory.shops = { a = ammunation }
+hintZones, threads = {}, {}
+dofile('client/shop_hints.lua')
+for i = 1, #ammunation.locations do
+    H.equal(drawAt(i), 0, 'no [ALT] Shop text at Ammu-Nation store ' .. i)
+end
+Config.ShopClerks.showLabel = true
+hintZones = {}
+dofile('client/shop_hints.lua')
+H.equal(drawAt(1), 1, 'showLabel = true keeps the text at Ammu-Nation')
+
+-- Default config: text is off everywhere, ped or not.
+Config.ShopClerks.showLabel = false
+Config.ShopHints.showText = false
+Config.qbinventory.shops = { c = convenience, a = ammunation }
+hintZones = {}
+dofile('client/shop_hints.lua')
+for i = 1, #hintZones do
+    H.equal(drawAt(i), 0, 'default config draws no floating text at point ' .. i)
+end
 
 H.finish()
