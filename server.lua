@@ -2995,6 +2995,9 @@ local function refreshRegistration(inv, opts, skipDirty)
     if inv.type == 'shop' then
         inv.prices = opts.prices or inv.prices or {}
         inv.currency = opts.currency or 'money'
+        -- Registration-time policy, never persisted: `weightLimit = false`
+        -- lets SetShopItems/restocks exceed maxWeight (see setInventoryItems).
+        inv.weightLimit = opts.weightLimit ~= false
     end
     if not skipDirty and inventory.persistence and inventory.persistence.markDirty then
         inventory.persistence.markDirty(inv)
@@ -3176,6 +3179,7 @@ local function registerShop(id, data)
         inv.items = inv.stock -- a shop is rendered as an inventory; stock is its authoritative slot table.
     else
         inv.stock = inv.stock or inv.items
+        inv.items = inv.stock -- one table, as above; never render a stale copy.
     end
     inv.prices = data.prices or inv.prices or {}
     if inventory.persistence and inventory.persistence.markDirty then
@@ -3604,7 +3608,12 @@ setInventoryItems = function(reference, items)
         copyItemExtensions(built, rawItem)
         checked[slot] = built
     end
-    if inventory.totalWeight(checked) > inv.maxWeight then
+    -- A shop registered with `weightLimit = false` is a catalogue (its stock
+    -- is not a container load: RegisterShop never weighs the seed either), so
+    -- a restock cannot be refused for weight. Every other inventory, and any
+    -- shop that keeps the default, stays capped at maxWeight.
+    if not (inv.type == 'shop' and inv.weightLimit == false)
+        and inventory.totalWeight(checked) > inv.maxWeight then
         return false, 'over weight'
     end
     inv.items = checked

@@ -16,6 +16,12 @@ Config.qbinventory.shops.ammunation = {
     label = 'Ammu-Nation',
     slots = 32,
     maxWeight = 40000,
+    -- Shop stock is a catalogue, not a container load: the default shelf
+    -- weighs ~634 kg, far over any container weight. `weightLimit = false`
+    -- means restocks (and SetShopItems) are never refused for weight;
+    -- `true` caps the shelf at `maxWeight` (rows that do not fit are not
+    -- restocked and are named in the server log).
+    weightLimit = false,
     currency = 'cash',
     interactionDistance = 2.25,
 

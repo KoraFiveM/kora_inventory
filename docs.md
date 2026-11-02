@@ -412,6 +412,14 @@ slot keeps its own `price` field. Unlike the stash pair they reject an unknown
 id instead of lazily creating one -- a shop is a deliberate registration with
 prices and an access policy.
 
+`shopSet` refuses a shelf heavier than the shop's `maxWeight` ("over weight"),
+which is what a player-stocked shelf (e.g. a business till) wants. A catalogue
+shop whose stock is not a container load registers with
+`RegisterShop(id, { ..., weightLimit = false })` (default `true`), and then
+`shopSet` never refuses it for weight. The option is registration-time policy and
+is not persisted. A restored shop's panel and purchases always use the same,
+persisted stock.
+
 qb-style aliases are also exported (`AddItem`, `RemoveItem`, `OpenInventory`,
 `GetStashItems`, `RegisterStash`, and so on), alongside ox-style constructors
 `RegisterStash`, `CreateTemporaryStash`, `RegisterShop`, `BuyItem`,
@@ -740,23 +748,8 @@ Ammu-Nation options (`config/shops/ammunation.lua`):
 | `locations[n].shopkeeper` | unset | `false` removes the ped from that one store. |
 | `locations[n].shopkeeperUnlessStarted` | `kora_mdt` at Legion Square | Skip this store's ped while that resource runs (kora_mdt spawns the weapons-licence records clerk there). |
 | `limitedStock` | `true` | `false` removes stock limits: a purchased row is refilled right after the sale. |
-| `restockIntervalMinutes` | `30` | Every N minutes each row is topped back up to its configured `amount` (sold-out rows return); `0` disables the timer. A restock never lowers a level. |
-
-A buy made while another is in flight waits for it, and a refusal is reported
-once: the bundled UI shows it, so no extra notification is raised, and nothing is
-reported for a session that was closed or reopened in the meantime.
-
-Ammu-Nation options (`config/shops/ammunation.lua`):
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `shopkeeper.enabled` | `true` | Spawn a frozen, invincible clerk ped at every location that has a `ped` spot. |
-| `shopkeeper.model` / `shopkeeper.radius` | `s_m_m_ammucountry` / `60.0` | Ped model; metres within which the (client-side) ped exists. |
-| `locations[n].ped` | per store | `{ x, y, z, heading }` where that store clerk stands. `z` is floor height; the ped spawns 1.0 lower (root offset), like the counter `z`. |
-| `locations[n].shopkeeper` | unset | `false` removes the ped from that one store. |
-| `locations[n].shopkeeperUnlessStarted` | `kora_mdt` at Legion Square | Skip this store ped while that resource runs (kora_mdt spawns the weapons-licence records clerk there). |
-| `limitedStock` | `true` | `false` removes stock limits: a purchased row is refilled right after the sale. |
-| `restockIntervalMinutes` | `30` | Every N minutes each row is topped back up to its configured `amount` (sold-out rows return); `0` disables the timer. A restock never lowers a level. |
+| `restockIntervalMinutes` | `30` | Every N minutes each row is topped back up to its configured `amount` (sold-out rows return); `0` disables the timer. A restock never lowers a level. If a row cannot be restocked, the server log names it (slot, item, reason) and the other rows are still restocked. A slot that holds a different item than the config row (e.g. after reordering `inventory`) is reported once and left alone. |
+| `weightLimit` | `false` | `false`: the shelf is a catalogue, so restocks are never refused for weight (the default stock weighs ~634 kg). `true`: the shelf is capped at `maxWeight` and rows that do not fit are not restocked (each is logged). |
 
 A buy made while another is in flight waits for it, and a refusal is reported
 once: the bundled UI shows it, so no extra notification is raised, and nothing is

@@ -404,6 +404,14 @@ function persistence.load(kind, id)
             return nil, ('stored shop stock is malformed: %s'):format(stockErr)
         end
     end
+    -- A shop is rendered from `items` but sold from `stock`; at runtime they
+    -- are one table. Both columns are saved, so restoring them separately
+    -- left the panel showing the old `items` snapshot while purchases only
+    -- lowered `stock` (stock looked like it refilled instantly after every
+    -- restart). Purchases and restocks write `stock`, so it is authoritative.
+    if row.inventory_type == 'shop' and stock then
+        items = stock
+    end
     return {
         type = row.inventory_type,
         id = row.inventory_id,
