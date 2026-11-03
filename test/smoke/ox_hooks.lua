@@ -224,12 +224,18 @@ check(p.toInventory == 'newdrop' and p.toType == 'drop' and p.action == 'move', 
 check(p.dropId == dropId, 'hook sees the id the drop is created with')
 check(p.fromInventory == 7 and p.fromSlot.name == 'water_bottle', 'drop fromSlot is an ox slot')
 api.removeHooks()
-api.registerHook('swapItems', function(payload) return payload.toInventory ~= 'newdrop' and true or false end)
+-- a second drop at the same spot merges into the first bag instead of creating another
+sl = lease(7, 'player', 7)
+local merged, mergedId = callbacks['qbinventory:server:intent'](7, { action = 'drop', token = sl.token,
+    primaryRevision = sl.primary.revision, payload = { slot = 1, amount = 1 } })
+check(merged and mergedId == dropId, 'a nearby drop merges into the existing ground drop')
+api.registerHook('swapItems', function(payload) return payload.toType ~= 'drop' and true or false end)
 sl = lease(7, 'player', 7)
 local count = #api.GetInventory(7)
 local waterBefore = api.GetItemCount(7, 'water_bottle')
 local denied = callbacks['qbinventory:server:intent'](7, { action = 'drop', token = sl.token,
     primaryRevision = internal.getRevision('player:7'), payload = { slot = 1, amount = 1 } })
+-- the earlier drop is within mergeRadius, so this one is a move into that drop; hooks still see and can cancel it
 check(not denied and #api.GetInventory(7) == count and api.GetItemCount(7, 'water_bottle') == waterBefore, 'a cancelled drop removes nothing')
 api.removeHooks()
 

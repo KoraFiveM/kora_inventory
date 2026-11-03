@@ -166,6 +166,10 @@ Config.qbinventory = {
     -- any other inventory. Deleting or spoofing the prop gains nothing.
     drops = {
         enabled = true,
+        -- Metres. An item dropped within this distance of an existing ground
+        -- drop (same routing bucket, with room for it) goes into that drop
+        -- instead of creating another bag. 0 turns merging off.
+        mergeRadius = 1.5,
         model = 'prop_med_bag_01b',
         -- Drop coordinates come from the player's ped, which is roughly a metre
         -- off the floor. Trace down to the ground so the bag sits on the

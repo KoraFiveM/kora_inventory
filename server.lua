@@ -29,7 +29,7 @@ local setInventoryItems
 local canCarry
 local hasUseable
 local useItem
-local dropCreate
+local dropCreate, canAddToInventory
 -- `owner = true` registrations are templates, not one globally shared stash.
 -- The actual secondary record is created lazily per citizen when they open it.
 
@@ -1873,6 +1873,26 @@ local function intentUse(src, request)
     return true, { preventClose = preventClose }
 end
 
+---Nearest live ground drop within config.drops.mergeRadius of `coords` that
+---can take `name` x `amount`, so several drops in one spot share one bag.
+---Returns the inventory key, or nil when merging is off or nothing fits.
+local function findMergeDrop(src, coords, name, amount, metadata)
+    local radius = tonumber(config.drops and config.drops.mergeRadius) or 0
+    if radius <= 0 then return nil end
+    local bestKey, bestDistance
+    for inventoryKey, inv in pairs(inventories) do
+        if inv.type == 'drop' and inv.coords and not inv.blocked and sameDropBucket(src, inv) then
+            local dx, dy, dz = coords.x - inv.coords.x, coords.y - inv.coords.y, coords.z - inv.coords.z
+            local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+            if distance <= radius and (not bestDistance or distance < bestDistance)
+                and canAddToInventory(inventoryKey, name, amount, nil, metadata) then
+                bestKey, bestDistance = inventoryKey, distance
+            end
+        end
+    end
+    return bestKey
+end
+
 local function intentDrop(src, request)
     local session = sessions[src]
     if not session or type(request.payload) ~= 'table' then
@@ -1907,10 +1927,56 @@ local function intentDrop(src, request)
         return false, 'player entity unavailable'
     end
 
-    return lock({ session.primary }, function()
+    local coords = GetEntityCoords(ped)
+    local mergeKey = findMergeDrop(src, coords, item.name, amount, item.info)
+    local lockKeys = { session.primary }
+    if mergeKey then lockKeys[2] = mergeKey end
+
+    return lock(lockKeys, function()
         local current = getInventory(session.primary)
         if not current or revision(session.primary) ~= tonumber(request.primaryRevision) then
             return false, 'stale inventory'
+        end
+        local target = mergeKey and getInventory(mergeKey)
+        if target and (target.type ~= 'drop' or target.blocked
+            or not canAddToInventory(mergeKey, item.name, amount, nil, item.info)) then
+            target = nil
+        end
+        if target then
+            -- Merge into the bag already on the ground instead of creating another one.
+            local mergeOK, mergeErr, mergeHandle = runHooks('swapItems', src, {
+                action = 'move',
+                fromInventory = src,
+                fromType = 'player',
+                fromSlot = oxSlot(current.items[slot] or item, slot),
+                toInventory = target.id,
+                toType = 'drop',
+                count = amount,
+                itemName = item.name,
+                fromKey = session.primary,
+                toKey = mergeKey,
+            })
+            if not mergeOK then
+                return false, mergeErr
+            end
+            local takenOK, takenErr, taken = removePlayer(src, slot, amount)
+            if not takenOK then
+                finishHooks(mergeHandle, false)
+                return false, takenErr
+            end
+            local addedOK, addedErr = addSecondary(target, taken.name, taken.amount, nil, taken.info)
+            if not addedOK then
+                addPlayer(src, taken.name, taken.amount, slot, taken.info, 'drop-rollback')
+                finishHooks(mergeHandle, false)
+                return false, addedErr
+            end
+            finishHooks(mergeHandle, true)
+            bump(mergeKey)
+            broadcast(mergeKey)
+            bump(session.primary)
+            broadcast(session.primary)
+            recordAudit('drop', src, { id = target.id, item = taken.name, amount = amount, merged = true })
+            return true, target.id
         end
         -- ox: a new ground drop is a 'move' to 'newdrop' carrying the id the
         -- drop will get. The id is reserved here so the hook sees the real one.
@@ -1939,7 +2005,7 @@ local function intentDrop(src, request)
             return false, removedErr
         end
         removed.slot = 1
-        local id = dropCreate(GetEntityCoords(ped), { [1] = removed }, GetPlayerRoutingBucket(src), dropId)
+        local id = dropCreate(coords, { [1] = removed }, GetPlayerRoutingBucket(src), dropId)
         finishHooks(dropHandle, true)
         bump(session.primary)
         broadcast(session.primary)
@@ -3499,7 +3565,7 @@ local function resolveInventoryRef(reference, preferredType)
     return nil, nil
 end
 
-local function canAddToInventory(reference, name, amount, slot, metadata)
+canAddToInventory = function(reference, name, amount, slot, metadata)
     local inventoryKey, inv = resolveInventoryRef(reference)
     local count = inventory.amount(amount, 1)
     local item, err
