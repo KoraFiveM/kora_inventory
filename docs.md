@@ -400,7 +400,10 @@ optional drops.
 It never reads or writes `PlayerData.items` or `players.inventory`; those remain
 kora_core's canonical player store.
 
-The kora_sql migration creates `qbinventory_inventories` (items, properties and
+Tables are created automatically at startup by kora_sql (`Kora.sql.ensureTables`)
+from the declaration in `server/schema.lua`; there is no SQL to import by hand.
+Existing installs only gain any missing columns or keys, never altered ones. The
+schema covers `qbinventory_inventories` (items, properties and
 revision), `qbinventory_shop_stock`, audit, migration-state/row and quarantine
 tables. Legacy rows are copied, never deleted or updated. An already imported
 row with the same checksum is skipped; a changed legacy row is reported rather

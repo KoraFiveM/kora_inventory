@@ -20,7 +20,7 @@ local function setup()
     end
     local driver = {}
     function driver.isReady() return true end
-    function driver.migrate(_, _, _, callback) callback(true) end
+    function driver.ensureTables(_, specs, _, callback) f.ensured = specs; callback({ { warnings = {} } }) end
     local function submit(request, callback)
         request.callback = callback
         f.calls[#f.calls + 1] = request
@@ -55,11 +55,13 @@ local function setup()
     end }
     local function load(path) assert(loadfile(path, 't', env))() end
     load('config.lua'); load('shared.lua'); load('../kora_sql/init.lua')
+    load('server/schema.lua')
     load(arg[1] or 'server/persistence.lua')
     -- Run only real bootstrap, leaving the permanent periodic flusher dormant.
     assert(f.threads[1])()
     f.env, f.persistence = env, env.QbInventory.persistence
     H.equal(f.persistence.getStatus().ready, true, 'actual bootstrap enables persistence')
+    H.equal(f.ensured, env.QBInventorySchema, 'bootstrap declares the schema through kora_sql')
     function f.start()
         local thread = coroutine.create(f.persistence.flush)
         local ok, err = coroutine.resume(thread)

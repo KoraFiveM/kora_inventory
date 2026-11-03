@@ -29,7 +29,7 @@ return function(database)
         if not values[1] then error(values[2]) end;return table.unpack(values,2,values.n)
     end end})
     local sql=Kora.sql
-    sql.ready,sql.migrateFiles=function() return true end,function() return true end
+    sql.ready,sql.ensureTables=function() return true end,function() return true end
     sql.query=function(query,params)
         if query:find('qbcore_player_column_operations',1,true) then
             local rows={};for _,row in pairs(f.db.fences) do

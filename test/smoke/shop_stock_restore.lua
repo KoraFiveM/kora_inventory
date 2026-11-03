@@ -36,7 +36,7 @@ Kora = {
     distance = { player = function() return true end },
     sql = {
         ready = function() return true end,
-        migrateFiles = function() return {} end,
+        ensureTables = function() return {} end,
         query = function(_, params)
             if #params == 0 then return rows end
             for _, row in ipairs(rows) do

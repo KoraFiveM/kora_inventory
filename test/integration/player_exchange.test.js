@@ -2,12 +2,22 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
 const mysql = require(path.join(root, '../kora_sql/node_modules/mysql2/promise'));
 const { TransactionRunner } = require(path.join(root, '../kora_sql/server/js/transaction'));
+const { SchemaManager } = require(path.join(root, '../kora_sql/server/js/schema'));
+function exchangeSchema() {
+    const dump = spawnSync('lua', ['-'], { cwd: root, encoding: 'utf8', input: `
+        dofile('test/exchange_fixture.lua')(); dofile('server/schema.lua')
+        for _,spec in ipairs(QBInventorySchema) do
+            if spec.name=='qbinventory_player_exchanges' then print('SPEC:'..json.encode(spec)) end
+        end
+    ` });
+    assert.equal(dump.status, 0, dump.stderr);
+    return JSON.parse(dump.stdout.split('SPEC:')[1].trim());
+}
 function emittedStatements() {
     const capture = spawnSync('lua', ['-'], { cwd: root, encoding: 'utf8', input: `
         local f=dofile('test/exchange_fixture.lua')(); assert(f.login(1,'CID1'))
@@ -40,8 +50,8 @@ test('actual exchange SQL and qbsql checked transactions on disposable MariaDB',
     try {
         await pool.query('CREATE TABLE players(citizenid VARCHAR(50) PRIMARY KEY, inventory LONGTEXT, money LONGTEXT, metadata LONGTEXT, deleted_at TIMESTAMP NULL) ENGINE=InnoDB');
         await t.test('migration is repeatable and receipts precede the guarded player mutation', async () => {
-            const migration = fs.readFileSync(path.join(root, 'sql/003_player_exchanges.sql'), 'utf8');
-            await pool.query(migration); await pool.query(migration); await reset();
+            const schema = new SchemaManager({ write: pool }); const spec = exchangeSchema();
+            await schema.ensureTable(spec); await schema.ensureTable(spec); await reset();
             assert.match(fixture.statements[0].query, /^INSERT INTO `qbinventory_player_exchanges`/);
             assert.match(fixture.statements[1].query, /^UPDATE `players`/);
             assert.equal(fixture.statements[0].expectedRows, 1); assert.equal(fixture.statements[1].expectedRows, 1);

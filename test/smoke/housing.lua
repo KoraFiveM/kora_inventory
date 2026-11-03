@@ -58,7 +58,7 @@ local function setup(database, skipRestore)
         callback = { register = function() end }, distance = { player = function() return not f.far end }, sql = {},
     }
     local sql = env.Kora.sql
-    sql.ready, sql.migrateFiles = function() return true end, function() return true end
+    sql.ready, sql.ensureTables = function() return true end, function() return true end
     sql.query = function(statement, params)
         if f.failRead then return nil, 'controlled read failure' end
         if statement:find('FROM `qbinventory_inventories`', 1, true) then

@@ -38,6 +38,7 @@ shared_scripts {
 server_scripts {
     -- Owns secondary-inventory schema, persistence and non-destructive legacy
     -- import. It is deliberately loaded before the inventory authority.
+    'server/schema.lua',
     'server/persistence.lua',
     'server.lua',
     'server/recovery.lua',
@@ -120,7 +121,6 @@ client_scripts {
 ui_page 'web/build/index.html'
 
 files {
-    'sql/*.sql',
     'locales/*.json',
     'web/build/index.html',
     'web/build/assets/**/*',

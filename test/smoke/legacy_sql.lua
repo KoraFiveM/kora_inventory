@@ -49,7 +49,7 @@ local function setup(initial, boot)
         elseif f.fail == kind then f.fail = nil; callback(nil, 'controlled SQL failure')
         else callback(work()) end
     end
-    local driver = { isReady = function() return true end, migrate = function(_, _, _, cb) cb(true) end }
+    local driver = { isReady = function() return true end, ensureTables = function(_, _, _, cb) cb({ { warnings = {} } }) end }
     function driver.query(_, sql, params, cb)
         local kind = sql:find('ORDER BY `updated_at`', 1, true) and 'restore'
             or sql:find('WHERE `inventory_type` = ?', 1, true) and 'load'
@@ -105,7 +105,7 @@ local function setup(initial, boot)
         allShared = function() return {} end,
     } }, { __call = function(_, name, fn) f.exports[name] = fn end })
     local function load(path) assert(loadfile(path, 't', env))() end
-    load('config.lua'); load('shared.lua'); load('../kora_sql/init.lua'); load('server/persistence.lua'); load('server.lua')
+    load('config.lua'); load('shared.lua'); load('../kora_sql/init.lua'); load('server/schema.lua'); load('server/persistence.lua'); load('server.lua')
     f.env, f.persistence, f.internal = env, env.QbInventory.persistence, env.QbInventory.internal
     function f.resume(thread)
         local ok, value, err = coroutine.resume(thread); assert(ok, value); return value, err

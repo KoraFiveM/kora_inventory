@@ -52,12 +52,6 @@ local function checksum(str)
     return ('%016x%016x'):format(forwardHash, reverseHash) .. string.rep('0', 32)
 end
 
-local MIGRATIONS = {
-    { version = 1, name = 'secondary_inventories', file = 'sql/001_secondary_inventories.sql' },
-    { version = 2, name = 'recovery_operations', file = 'sql/002_recovery_operations.sql' },
-    { version = 3, name = 'player_exchanges', file = 'sql/003_player_exchanges.sql' },
-}
-
 local function encode(value)
     local ok, output = pcall(json.encode, value or {})
     return ok and output or nil
@@ -804,15 +798,20 @@ local function bootstrap()
         log('1', state.lastError)
         return
     end
-    local applied, migrationErr = Kora.sql.migrateFiles(resource, MIGRATIONS, checksum)
+    local reports, migrationErr = Kora.sql.ensureTables(QBInventorySchema)
     if migrationErr then
         state.lastError = migrationErr
         log('1', ('schema migration failed: %s'):format(migrationErr))
         return
     end
+    for _, report in ipairs(type(reports) == 'table' and reports or {}) do
+        for _, warning in ipairs(type(report) == 'table' and report.warnings or {}) do
+            log('3', ('schema warning: %s'):format(tostring(warning)))
+        end
+    end
     state.ready = true
     log('2', 'secondary-inventory schema ready.')
-    TriggerEvent('qbinventory:server:persistenceReady', applied)
+    TriggerEvent('qbinventory:server:persistenceReady', reports)
 end
 
 RegisterCommand('qbinventory-migrate', function(source, args)

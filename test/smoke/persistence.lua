@@ -7,8 +7,14 @@ local function read(path)
 end
 
 local source = read('server/persistence.lua')
-local schema = read('sql/001_secondary_inventories.sql')
+local schema = read('server/schema.lua')
 local manifest = read('fxmanifest.lua')
+Kora = { sql = { NULL = {} } }
+dofile('server/schema.lua')
+H.ok(#QBInventorySchema == 8, 'schema declares all eight tables')
+H.ok(source:find('Kora.sql.ensureTables(QBInventorySchema)', 1, true), 'bootstrap applies the schema declaration')
+H.ok(not manifest:find('sql/*.sql', 1, true), 'manifest ships no SQL migration files')
+H.ok(manifest:find('server/schema.lua', 1, true) < manifest:find('server/persistence.lua', 1, true), 'schema loads before persistence')
 
 H.ok(source:find('inventory.persistence = persistence', 1, true), 'persistence is exposed to server authority')
 H.ok(source:find("inv.type == 'player'", 1, true), 'player inventories are excluded')
