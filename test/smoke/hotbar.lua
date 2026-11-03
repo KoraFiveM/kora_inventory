@@ -61,4 +61,10 @@ H.ok(client:find('LocalPlayer.state.koraCuffed', 1, true) and client:find("{ 'me
 H.ok(read('client/compat.lua'):find('QbInventory.isCuffed()', 1, true),
     'the inventory command refuses to open while the player is cuffed')
 
+H.ok(client:find('function QbInventory.isUiBlocked()', 1, true)
+    and client:find('if QbInventory.isUiBlocked() then', 1, true)
+    and client:find('Kora.state.onChange(blockBag', 1, true),
+    'isBusy honours the generic UI-block bag and an open inventory closes via a state bag handler')
+H.ok(read('config.lua'):find('uiBlockBag = "koraUiBlocked"', 1, true), 'the UI-block bag name is configurable and defaults to koraUiBlocked')
+
 H.finish()

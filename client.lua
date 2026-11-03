@@ -159,11 +159,33 @@ function QbInventory.notifyDownedBlocked()
     Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_downed'), type = 'error' })
 end
 
+---Name of the generic UI-block state bag (Config.qbinventory.uiBlockBag), or nil
+---when the feature is turned off.
+---@return string|nil
+local function uiBlockBagName()
+    local name = Config.qbinventory.uiBlockBag
+    if type(name) == 'string' and name ~= '' then
+        return name
+    end
+    return nil
+end
+
+---True while another resource (e.g. kora_emotemenu's Emote Maker freecam) has
+---set the local player's UI-block bag. Not affected by blockWhileBusy.
+---@return boolean
+function QbInventory.isUiBlocked()
+    local name = uiBlockBagName()
+    return name ~= nil and LocalPlayer.state[name] == true
+end
+
 ---True while a kora_lib progress bar is running (other than the use gate's
 ---own bar) and Config.qbinventory.blockWhileBusy is on. UX gate only; the
 ---server refuses to drop/give/move a slot being used regardless.
 ---@return boolean
 function QbInventory.isBusy()
+    if QbInventory.isUiBlocked() then
+        return true
+    end
     if Config.qbinventory.blockWhileBusy == false or QbInventory.useGateActive then
         return false
     end
@@ -528,6 +550,19 @@ for _, key in ipairs({ 'isdead', 'inlaststand' }) do
             QbInventory.notifyDownedBlocked()
         end
     end)
+end
+
+-- Same for the generic UI-block bag: close at once rather than waiting for the
+-- busy watcher's next tick. Bound once at load, so the bag name is read then.
+do
+    local blockBag = uiBlockBagName()
+    if blockBag then
+        Kora.state.onChange(blockBag, nil, function(context)
+            if context.value ~= true or not session then return end
+            if context.bagName ~= ('player:%d'):format(GetPlayerServerId(PlayerId())) then return end
+            closeInventory()
+        end)
+    end
 end
 
 -- Same for being cuffed (kora_police sets `ishandcuffed`; kora_core replicates it).

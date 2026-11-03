@@ -138,6 +138,13 @@ Config.qbinventory = {
     -- or move the slot being used, so the item cannot be dropped mid-use and
     -- kept together with its effect. Set false to restore the old behaviour.
     blockWhileBusy = true,
+    -- Generic "UI blocked" player state bag. While another resource sets this bag
+    -- to true on the local player (kora_emotemenu does so during the Emote Maker
+    -- freecam), the inventory cannot be opened, hotbar use is refused and an
+    -- open inventory is closed the moment the bag turns true. Independent of
+    -- blockWhileBusy. The name is read once at resource start. Set false or "" to
+    -- ignore the bag.
+    uiBlockBag = "koraUiBlocked",
     -- Safety timeout (ms): a slot stays locked at most this long if a useable
     -- handler never returns. It is cleared as soon as the handler finishes,
     -- errors, or the player disconnects.

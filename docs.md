@@ -741,6 +741,16 @@ slot, or move, drop or give anything: the server refuses `useItem`,
 when the cuff went on. The client mirrors this (inventory command, hotbar keys,
 panel closes on cuff). `Config.qbinventory.blockWhenCuffed = false` turns it off.
 
+### Generic UI block
+
+A resource that needs the screen to itself (kora_emotemenu's Emote Maker
+freecam) sets the local player state bag named by `Config.qbinventory.uiBlockBag`
+(default `koraUiBlocked`) to `true`, and back to `false`/`nil` when done.
+While it is true the inventory command, the hotbar and the compat open path
+refuse (as for a running progress bar), and an open inventory is closed by a
+state bag change handler. `uiBlockBag = false` (or `""`) disables it; the name
+is read once when the resource starts.
+
 ### Bundled Ammu-Nation
 
 `config/shops/ammunation.lua` defines one finite-stock `ammunation` shop and
