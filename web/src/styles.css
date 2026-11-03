@@ -1,6 +1,10 @@
 html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; background: transparent !important; pointer-events: none; }
 #root { position: relative; }
 
+/* Disable text selection across the UI (drag/click highlighting); inputs stay selectable. */
+html, body, #root, #root * { -webkit-user-select: none; user-select: none; }
+#root :is(input, textarea, [contenteditable="true"]) { -webkit-user-select: text; user-select: text; }
+
 /* FiveM users generally play at a wide range of resolutions.  The inventory
    should feel like an overlay, not a replacement for the entire game view.
    Keep scrolling for long inventories, but do not expose browser scrollbars
