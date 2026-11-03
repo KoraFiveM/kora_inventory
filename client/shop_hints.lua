@@ -1,6 +1,9 @@
--- Optional world marker (and short "[ALT] Shop" text) at every fixed shop
--- interaction point, so players can see where to point kora_target. Presentation
--- only: it never opens a shop and the server still validates every open.
+-- Optional world marker (and short "[ALT] Shop" text) at fixed shop interaction
+-- points, so players can see where to point kora_target. Presentation only: it
+-- never opens a shop and the server still validates every open.
+-- Counters served by a ped get no marker by default: the clerk or Ammu-Nation
+-- shopkeeper is the cue there (Config.ShopHints.markerAtPeds). A point with
+-- neither marker nor text gets no zone at all.
 -- This file is the only place that draws the "[ALT] Shop" text. It is off by
 -- default (Config.ShopHints.showText) and, when enabled, is still dropped at any
 -- counter served by a ped - 24/7, liquor or Ammu-Nation - unless
@@ -42,15 +45,22 @@ local function collectPoints()
     local clerkLabel = Config.ShopClerks and Config.ShopClerks.showLabel == true
     local config = Config.ShopHints
     if type(config) ~= 'table' or config.enabled ~= true then return end
+    local markerAtPeds = config.markerAtPeds == true
+    local showText = config.showText == true
     local zOffset = tonumber(config.marker and config.marker.zOffset) or 0.0
     for _, shop in pairs((Config.qbinventory and Config.qbinventory.shops) or {}) do
         if type(shop) == 'table' and shop.enabled ~= false and shop.hint ~= false then
             for _, location in ipairs(shop.locations or {}) do
                 local hasPed = QbInventory and QbInventory.shopHasClerk and QbInventory.shopHasClerk(shop, location)
-                points[#points + 1] = {
-                    x = location.x, y = location.y, z = location.z + zOffset,
-                    noText = hasPed and not clerkLabel or nil,
-                }
+                local noMarker = hasPed and not markerAtPeds
+                local noText = not showText or (hasPed and not clerkLabel)
+                if not (noMarker and noText) then
+                    points[#points + 1] = {
+                        x = location.x, y = location.y, z = location.z + zOffset,
+                        noMarker = noMarker or nil,
+                        noText = noText or nil,
+                    }
+                end
             end
         end
     end
@@ -83,9 +93,11 @@ local function run()
             local bobOffset = bob and math.sin(GetGameTimer() / 400.0) * 0.05 or 0.0
             for i = 1, #near do
                 local point = near[i]
-                DrawMarker(markerType, point.x, point.y, point.z + bobOffset, 0.0, 0.0, 0.0, rotation, 0.0, 0.0,
-                    scale.x, scale.y, scale.z, color.r, color.g, color.b, alpha, false, true, 2,
-                    spin, nil, nil, false)
+                if not point.noMarker then
+                    DrawMarker(markerType, point.x, point.y, point.z + bobOffset, 0.0, 0.0, 0.0, rotation, 0.0, 0.0,
+                        scale.x, scale.y, scale.z, color.r, color.g, color.b, alpha, false, true, 2,
+                        spin, nil, nil, false)
+                end
                 if text and not point.noText then
                     Kora.drawing.text3d({ x = point.x, y = point.y, z = point.z + 0.45 }, text, {
                         maxDistance = drawDistance,

@@ -109,59 +109,99 @@ liquor.locations[1].clerk = nil
 Config.ShopClerks.enabled = false
 H.equal(QbInventory.shopHasClerk(liquor, liquor.locations[1]), false, 'global toggle off restores the old path')
 
--- shop_hints: label dropped only at clerk counters.
+-- shop_hints: no marker and no text at counters served by a ped (clerk or
+-- Ammu-Nation shopkeeper) unless Config.ShopHints.markerAtPeds /
+-- Config.ShopClerks.showLabel; ped-less counters keep both.
 Config.ShopClerks.enabled = true
 Config.ShopHints.enabled = true
-Config.ShopHints.showText = true -- text is off by default; check it is still dropped at ped counters
-local texts = {}
+H.equal(Config.ShopHints.markerAtPeds, false, 'no marker at ped counters by default')
+local texts, markers = {}, {}
 Kora.lang = function(k) return k end
 Kora.drawing = { text3d = function(_, text) texts[#texts + 1] = text end }
 local hintZones, threads = {}, {}
 Kora.zones.sphere = function(o) hintZones[#hintZones + 1] = o; return { remove = function() end } end
-Config.qbinventory.shops = { c = convenience }
 CreateThread = function(fn) threads[#threads + 1] = coroutine.create(fn) end
 Wait = function() coroutine.yield() end
-DrawMarker = function() end
+DrawMarker = function(_, x, y) markers[#markers + 1] = { x = x, y = y } end
 GetGameTimer = function() return 0 end
 exports.kora_theme = { getPrimaryColor = function() return '#112233' end }
-dofile('client/shop_hints.lua')
-local function drawAt(i)
-    hintZones[i].onEnter()
-    texts = {}
-    for _, t in ipairs(threads) do coroutine.resume(t) end
-    hintZones[i].onExit()
-    for _, t in ipairs(threads) do coroutine.resume(t) end
-    threads = {}
-    return #texts
+local function loadHints(shops)
+    Config.qbinventory.shops = shops
+    hintZones, threads = {}, {}
+    dofile('client/shop_hints.lua')
 end
-H.equal(drawAt(1), 0, 'no [ALT] Shop text at a clerk counter')
-H.equal(drawAt(9), 1, 'the label stays where there is no clerk')
-Config.ShopClerks.showLabel = true
-hintZones = {}
-dofile('client/shop_hints.lua')
-H.equal(drawAt(1), 1, 'showLabel = true keeps the text')
-
--- Ammu-Nation: the floating text is dropped at every store, shown again with showLabel.
-Config.ShopClerks.showLabel = false
-Config.qbinventory.shops = { a = ammunation }
-hintZones, threads = {}, {}
-dofile('client/shop_hints.lua')
-for i = 1, #ammunation.locations do
-    H.equal(drawAt(i), 0, 'no [ALT] Shop text at Ammu-Nation store ' .. i)
+-- Enters and leaves every hint zone in turn; returns markers and texts drawn.
+local function drawAll()
+    texts, markers = {}, {}
+    for _, zone in ipairs(hintZones) do
+        zone.onEnter()
+        for _, t in ipairs(threads) do coroutine.resume(t) end
+        zone.onExit()
+        for _, t in ipairs(threads) do coroutine.resume(t) end
+        threads = {}
+    end
+    return #markers, #texts
 end
-Config.ShopClerks.showLabel = true
-hintZones = {}
-dofile('client/shop_hints.lua')
-H.equal(drawAt(1), 1, 'showLabel = true keeps the text at Ammu-Nation')
+local function pedCounters(shop)
+    local served, free = {}, 0
+    for _, location in ipairs(shop.locations) do
+        if QbInventory.shopHasClerk(shop, location) then
+            served[location.x .. ',' .. location.y] = true
+        else
+            free = free + 1
+        end
+    end
+    return served, #shop.locations, free
+end
+local convServed, convTotal, convFree = pedCounters(convenience)
+H.equal(convFree, 2, 'two 24/7 counters (Senora Fwy, Grapeseed) have no ped')
 
--- Default config: text is off everywhere, ped or not.
+Config.ShopHints.showText = true -- text is off by default; check it is still dropped at ped counters
+loadHints({ c = convenience })
+H.equal(#hintZones, convFree, 'counters with a clerk get no hint zone at all')
+local m, t = drawAll()
+H.equal(m, convFree, 'the marker stays where there is no clerk')
+H.equal(t, convFree, 'the label stays where there is no clerk')
+for _, marker in ipairs(markers) do
+    H.equal(convServed[marker.x .. ',' .. marker.y], nil, 'no marker at a clerk counter')
+end
+Config.ShopHints.markerAtPeds = true
+loadHints({ c = convenience })
+m, t = drawAll()
+H.equal(m, convTotal, 'markerAtPeds = true draws the marker at clerk counters too')
+H.equal(t, convFree, 'markerAtPeds does not bring the text back')
+Config.ShopClerks.showLabel = true
+loadHints({ c = convenience })
+m, t = drawAll()
+H.equal(t, convTotal, 'showLabel = true keeps the text')
+Config.ShopHints.markerAtPeds = false
+loadHints({ c = convenience })
+m, t = drawAll()
+H.equal(m, convFree, 'showLabel alone does not bring the marker back')
+H.equal(t, convTotal, 'showLabel alone keeps the text at clerk counters')
+
+-- Ammu-Nation: every store has a shopkeeper, so no marker and no text anywhere.
 Config.ShopClerks.showLabel = false
+loadHints({ a = ammunation })
+H.equal(#hintZones, 0, 'no marker or text zone at any Ammu-Nation store')
+Config.ShopHints.markerAtPeds = true
+loadHints({ a = ammunation })
+m, t = drawAll()
+H.equal(m, #ammunation.locations, 'markerAtPeds = true draws the marker at every Ammu-Nation')
+H.equal(t, 0, 'no [ALT] Shop text at any Ammu-Nation store')
+Config.ShopClerks.showLabel = true
+loadHints({ a = ammunation })
+m, t = drawAll()
+H.equal(t, #ammunation.locations, 'showLabel = true keeps the text at Ammu-Nation')
+
+-- Default config: no text anywhere, markers only at the ped-less 24/7 counters.
+Config.ShopClerks.showLabel = false
+Config.ShopHints.markerAtPeds = false
 Config.ShopHints.showText = false
-Config.qbinventory.shops = { c = convenience, a = ammunation }
-hintZones = {}
-dofile('client/shop_hints.lua')
-for i = 1, #hintZones do
-    H.equal(drawAt(i), 0, 'default config draws no floating text at point ' .. i)
-end
+loadHints({ c = convenience, a = ammunation, l = liquor })
+m, t = drawAll()
+H.equal(t, 0, 'default config draws no floating text')
+H.equal(m, convFree, 'default config draws markers only where no ped serves the counter')
+H.equal(#hintZones, convFree, 'default config registers no zone at ped counters')
 
 H.finish()

@@ -30,10 +30,12 @@ Config.Hotbar = {
     vehicleBottomOffset = 130, -- in a vehicle
 }
 
--- Draws a small marker (and optional "[ALT] Shop" text) at every fixed shop
--- interaction point (convenience, liquor, Ammu-Nation, ...). The text is off by
--- default (`showText`); when on, it is still hidden at counters that have a ped
--- (any shop type) unless Config.ShopClerks.showLabel. Colour follows
+-- Draws a small marker (and optional "[ALT] Shop" text) at fixed shop
+-- interaction points (convenience, liquor, Ammu-Nation, ...). Counters served by
+-- a ped (a 24/7/liquor clerk or an Ammu-Nation shopkeeper) get no marker unless
+-- `markerAtPeds`, so the ped is the only cue there. The text is off by default
+-- (`showText`); when on, it is still hidden at counters that have a ped (any
+-- shop type) unless Config.ShopClerks.showLabel. Colour follows
 -- kora_theme's primary colour. Set `hint = false` on a shop's config to opt that
 -- shop out. Vending machines are model targets without fixed points and get no
 -- marker. Plain {x,y,z} tables rather than vec3, like the other offsets here.
@@ -48,6 +50,7 @@ Config.ShopHints = {
         bob = true,
         rotate = true,
     },
+    markerAtPeds = false, -- true also draws the marker at counters served by a ped (clerk or Ammu-Nation shopkeeper)
     showText = false, -- true draws locale key shop_hints.text above the marker at counters without a ped
 }
 

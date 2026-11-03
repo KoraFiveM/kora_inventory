@@ -98,8 +98,11 @@ the inventory by any route (drop, give, stash/trunk/glovebox, server removal,
 sale): the server sends `qbinventory:client:weaponRemoved`, and the client also
 re-checks after every replicated inventory update.
 
-`Config.ShopHints` draws a small marker at every fixed shop point within
-`drawDistance`, coloured from kora_theme's primary colour. Set `hint = false`
+`Config.ShopHints` draws a small marker at fixed shop points within
+`drawDistance`, coloured from kora_theme's primary colour. A counter served by
+a ped (a 24/7 or liquor clerk or an Ammu-Nation shopkeeper) gets no marker
+unless `markerAtPeds = true` (default false), so the ped is the only cue there;
+with the defaults only Senora Fwy and Grapeseed 24/7 show one. Set `hint = false`
 on a shop to opt it out; vending machines (model targets) have no fixed point
 and get none. The floating `[ALT] Shop` text (locale key `shop_hints.text`) is
 off by default (`showText = false`). With `showText = true` it is still never
