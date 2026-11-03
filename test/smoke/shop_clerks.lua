@@ -21,7 +21,7 @@ for _, shop in ipairs({ convenience, liquor }) do
         if location.ped then withPed = withPed + 1 else without[#without + 1] = location end
     end
 end
-H.equal(withPed, 15, '14 tester spots plus the new Banham Canyon shop have a clerk')
+H.equal(withPed, 16, '14 tester spots plus the Banham Canyon and Davis LTD shops have a clerk')
 H.equal(#without, 2, 'Senora Fwy and Grapeseed have no ped spot')
 
 vector3 = function(x, y, z) return { x = x, y = y, z = z } end
@@ -49,7 +49,7 @@ exports = { kora_target = {
 QbInventory = {}
 dofile('client/shop_clerks.lua')
 
-H.equal(#zones, 15, 'one lazy zone per clerk, none for Ammu-Nation or ped-less counters')
+H.equal(#zones, 16, 'one lazy zone per clerk, none for Ammu-Nation or ped-less counters')
 H.equal(next(entities), nil, 'no ped exists before a player is near')
 
 local zone

@@ -76,5 +76,8 @@ Config.qbinventory.shops.convenience = {
         -- Banham Canyon (Richman Glen). The counter point sits 1 m in front of the clerk.
         { name = "24/7", x = -1820.25, y = 792.82, z = 138.09, heading = 132.82, bucket = 0,
           ped = { x = -1819.52, y = 793.50, z = 138.09, heading = 132.82 } },
+        -- Davis / Grove Street LTD. The counter point sits 1 m in front of the clerk.
+        { name = "24/7", x = -47.37, y = -1758.61, z = 29.42, heading = 49.29, bucket = 0,
+          ped = { x = -46.61, y = -1759.26, z = 29.42, heading = 49.29 } },
     },
 }
