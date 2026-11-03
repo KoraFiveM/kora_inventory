@@ -198,6 +198,15 @@ h2 { margin-bottom: 0; font-size: calc(15px * var(--ui-scale, 1)); letter-spacin
 .detail-header em { border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 3px 5px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .55); font-size: calc(7px * var(--ui-scale, 1)); font-style: normal; letter-spacing: .08em; white-space: nowrap; }
 .detail-close { display: grid; width: 22px; height: 22px; padding: 0; place-items: center; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .55); cursor: pointer; }
 .detail-close:hover { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+/* Config.Inspector.allowCopy: the inspector's text can be selected (the rest of
+   the UI stays unselectable, see the top of this file) and copied with the
+   header's Copy button. */
+#root .item-detail-copyable :is(h1, p, dl, dt, dd) { -webkit-user-select: text; user-select: text; cursor: text; }
+#root .item-detail-copyable ::selection { color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
+.detail-copy { display: inline-flex; align-items: center; gap: 4px; height: 22px; box-sizing: border-box; padding: 0 6px; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .55); font: inherit; font-size: calc(7px * var(--ui-scale, 1)); letter-spacing: .08em; cursor: pointer; }
+.detail-copy svg { display: block; flex: none; }
+.detail-copy:hover, .detail-copy-copied { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.detail-copy-failed { border-color: hsl(var(--destructive-border)); color: hsl(var(--destructive)); background: hsl(var(--destructive-soft)); }
 .item-detail:not(.item-detail-empty) .detail-header em { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
 .item-detail-empty { grid-template-rows: auto minmax(0, 1fr); align-content: stretch; background: linear-gradient(160deg, hsl(var(--surface-panel)), hsl(var(--background) / .68)); }
 .item-detail h1 { margin-bottom: 0; font-size: calc(16px * var(--ui-scale, 1)); line-height: 1.08; }

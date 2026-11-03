@@ -17,6 +17,8 @@ export interface InventoryItem {
     /** True when imageUrl came from item metadata rather than the definition. */
     imageOverride?: boolean
     metadata?: Record<string, unknown>
+    /** qb-style metadata table; items carry this or `metadata`. */
+    info?: Record<string, unknown>
     displayMeta?: Array<{ key: string; label: string; value: unknown }>
     durability?: number
     price?: number
@@ -111,6 +113,8 @@ export interface UiConfig {
     queueMoves?: boolean
     /** Decimals shown for fractional inspector values (Config.Inspector.decimals). */
     inspectorDecimals?: number
+    /** Inspector details are selectable and a Copy button copies the item as JSON (Config.Inspector.allowCopy). */
+    inspectorCopy?: boolean
     /** Milliseconds before an unanswered move is rolled back (Config.qbinventory.ui.moveTimeoutMs). */
     moveTimeoutMs?: number
     /** The bridge delivers verdicts as messages instead of holding the fetch (Config.qbinventory.ui.directTransport). */

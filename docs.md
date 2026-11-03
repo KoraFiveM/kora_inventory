@@ -87,7 +87,13 @@ New weapon serials are `<prefix>-<WEAPON>-<time>-<n>` from one generator
 A-Z0-9, max 12; the legacy `Config.qbinventory.weapons.serialPrefix` is still
 honoured when set to something other than `QB`). Existing serials are never
 rewritten. Stored durability is rounded to 2 decimals, and the item inspector
-rounds fractional values to `Config.Inspector.decimals` (default 1).
+rounds fractional values to `Config.Inspector.decimals` (default 1). With
+`Config.Inspector.allowCopy` (default true) the inspector's text and metadata
+can be selected, and its Copy button copies the selected item as JSON (`label`,
+`name`, `amount`, `slot`, `inventory`, `inventoryType`, `weight`, `price` for
+shop items, and the full `metadata`/`info` table). The copy uses a hidden
+textarea + `execCommand('copy')`, falling back to `navigator.clipboard`, since
+CEF often has no usable clipboard API. All other UI text stays unselectable.
 
 `Config.Hotbar` positions the on-screen hotbar (show-hotbar key, default `U`):
 `bottomOffset` (default 90) on foot and `vehicleBottomOffset` (default 130) in a

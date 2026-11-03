@@ -15,8 +15,13 @@ Config.SerialPrefix = 'KORA'
 -- Item inspector number formatting. Decimals shown for fractional metadata
 -- values such as Durability/Quality (0-3); trailing zeros are dropped, so 1
 -- shows 92.7 and 100.
+-- allowCopy: the inspector's details and metadata can be selected with the
+-- mouse, and a Copy button in its header copies the selected item (label,
+-- name, amount, slot, inventory, full metadata) as JSON. Text elsewhere in the
+-- inventory stays unselectable. false hides the button and keeps it all locked.
 Config.Inspector = {
     decimals = 1,
+    allowCopy = true,
 }
 
 -- On-screen hotbar (the overlay shown by the show-hotbar key). Distance in CSS

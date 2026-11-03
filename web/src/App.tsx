@@ -1,5 +1,5 @@
 import { SplitDialog } from "./SplitDialog"
-import { CircleAlert, PackageOpen, Search, X } from "lucide-react"
+import { Check, CircleAlert, ClipboardCopy, PackageOpen, Search, X } from "lucide-react"
 import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { DndProvider, useDrag, useDragDropManager, useDragLayer, useDrop } from "react-dnd"
@@ -14,6 +14,7 @@ import { predictBuy, predictMove, refreshedInventories, restoreInventories, type
 import { createIntentResults } from "@/lib/intentResults"
 import { createMoveQueue, isNoopMove, type MoveJob, type MoveQueue } from "@/lib/moveQueue"
 import { formatMetaValue } from "@/lib/format"
+import { copyText, itemCopyText } from "@/lib/clipboard"
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
 
@@ -28,7 +29,7 @@ const MAX_QUEUED_MOVES = 8
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals">> & { images: NonNullable<UiConfig["images"]> } = {
+const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy">> & { images: NonNullable<UiConfig["images"]> } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
@@ -41,6 +42,7 @@ const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo
     // failure and snap the item back (config.lua: ui.moveTimeoutMs).
     moveTimeoutMs: 6000,
     inspectorDecimals: 1,
+    inspectorCopy: true,
     scale: 1,
     images: {
         localPath: "nui://kora_inventory/images",
@@ -427,6 +429,7 @@ function InventoryApp() {
     const [selectedAmount, setSelectedAmount] = useState(1)
     const [splitTarget, setSplitTarget] = useState<Selection | undefined>()
     const [uiConfig, setUiConfig] = useState(DEFAULT_UI_CONFIG)
+    const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
     // With instant moves the inventory never locks behind the server: a drag made
     // while a move is in flight is queued and sent when that move settles.
     const unlocked = uiConfig.optimisticMoves && uiConfig.queueMoves
@@ -506,6 +509,7 @@ function InventoryApp() {
             directTransport: config.directTransport ?? current.directTransport,
             moveTimeoutMs: Number.isFinite(config.moveTimeoutMs) && Number(config.moveTimeoutMs) > 0 ? Number(config.moveTimeoutMs) : current.moveTimeoutMs,
             inspectorDecimals: Number.isFinite(config.inspectorDecimals) ? Number(config.inspectorDecimals) : current.inspectorDecimals,
+            inspectorCopy: config.inspectorCopy ?? current.inspectorCopy,
             scale: Number.isFinite(config.scale) && Number(config.scale) > 0 ? Number(config.scale) : current.scale,
             images: { ...current.images, ...(config.images ?? {}) },
         }))
@@ -744,6 +748,17 @@ function InventoryApp() {
     // A fresh selection always starts at one, so a large slider value can never
     // carry over onto a different stack or shop stock row.
     useEffect(() => { setSelectedAmount(1) }, [selected?.inventory.id, selected?.item.slot])
+    // Inspector "Copy" (Config.Inspector.allowCopy): the button shows the result
+    // briefly, and a new selection starts from the plain label again.
+    useEffect(() => { setCopyState("idle") }, [selected?.inventory.id, selected?.item.slot])
+    useEffect(() => {
+        if (copyState === "idle") return
+        const timer = window.setTimeout(() => setCopyState("idle"), 1500)
+        return () => window.clearTimeout(timer)
+    }, [copyState])
+    const copySelected = useCallback(async (selection: Selection) => {
+        setCopyState(await copyText(itemCopyText(selection.inventory, selection.item)) ? "copied" : "failed")
+    }, [])
     if (!session) return <UiConfigContext.Provider value={uiConfig}><DragGuard open={false} />{hotbar && <HotbarHud hotbar={hotbar} />}<ItemBoxStack boxes={itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
 
     // Solo layout starts as the player's inventory alone. Its inspector is a
@@ -763,8 +778,8 @@ function InventoryApp() {
             <section className="inventory-stage inventory-stage-player">
                 <InventoryPanel inventory={session.player} isPlayer selected={selected} busy={locked} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={noop} onSelect={selectSlot} onActivate={activateItem} onSplit={promptSplit} />
             </section>
-            {(!solo || selected) && <aside className={`item-detail${solo ? " item-detail-drawer" : ""}${filteredSelected ? "" : " item-detail-empty"}`} aria-label="Selected item actions">
-                <header className="detail-header"><span>Item inspector</span><span className="detail-header-actions"><em>{filteredSelected ? "Selected" : "Select an item"}</em>{solo && <button className="detail-close" onClick={() => setSelected(undefined)} aria-label="Close item drawer"><X size={14} /></button>}</span></header>
+            {(!solo || selected) && <aside className={`item-detail${solo ? " item-detail-drawer" : ""}${filteredSelected ? "" : " item-detail-empty"}${filteredSelected && uiConfig.inspectorCopy ? " item-detail-copyable" : ""}`} aria-label="Selected item actions">
+                <header className="detail-header"><span>Item inspector</span><span className="detail-header-actions"><em>{filteredSelected ? "Selected" : "Select an item"}</em>{filteredSelected && uiConfig.inspectorCopy && <button className={`detail-copy${copyState === "idle" ? "" : ` detail-copy-${copyState}`}`} onClick={() => void copySelected(filteredSelected)} aria-label="Copy item details and metadata" title="Copy item details and metadata (JSON)">{copyState === "copied" ? <Check size={12} /> : <ClipboardCopy size={12} />}<span>{copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy"}</span></button>}{solo && <button className="detail-close" onClick={() => setSelected(undefined)} aria-label="Close item drawer"><X size={14} /></button>}</span></header>
                 {filteredSelected ? <>
                 <ItemArtwork item={filteredSelected.item} className="detail-art" />
                 <p className="eyebrow">{filteredSelected.inventory.type === "shop" ? "shop item" : `slot ${filteredSelected.item.slot}`}</p>
