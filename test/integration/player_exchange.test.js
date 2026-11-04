@@ -12,7 +12,7 @@ function exchangeSchema() {
     const dump = spawnSync('lua', ['-'], { cwd: root, encoding: 'utf8', input: `
         dofile('test/exchange_fixture.lua')(); dofile('server/schema.lua')
         for _,spec in ipairs(QBInventorySchema) do
-            if spec.name=='qbinventory_player_exchanges' then print('SPEC:'..json.encode(spec)) end
+            if spec.name=='kora_inventory_player_exchanges' then print('SPEC:'..json.encode(spec)) end
         end
     ` });
     assert.equal(dump.status, 0, dump.stderr);
@@ -24,7 +24,7 @@ function emittedStatements() {
         assert(Core.inventory.addItem(1,'water_bottle',3)); f.rollback=true
         local read; local run=Kora.sql.transactionChecked
         Kora.sql.transactionChecked=function(statements,context)
-            if statements[1].query:find('SELECT * FROM \`qbinventory_player_exchanges\`',1,true) then read=statements[1] end
+            if statements[1].query:find('SELECT * FROM \`kora_inventory_player_exchanges\`',1,true) then read=statements[1] end
             return run(statements,context)
         end
         f.execute('settle',f.terms({take={{name='water_bottle',amount=2}},cash=100,dealerRep=2}))
@@ -40,7 +40,7 @@ test('actual exchange SQL and qbsql checked transactions on disposable MariaDB',
     const rows = async query => (await pool.query(query))[0];
     const snapshot = async () => (await rows('SELECT inventory,money,metadata FROM players WHERE citizenid="CID1"'))[0];
     const reset = async () => {
-        await pool.query('DELETE FROM qbinventory_player_exchanges; DELETE FROM players;');
+        await pool.query('DELETE FROM kora_inventory_player_exchanges; DELETE FROM players;');
         const before = fixture.before;
         await pool.query('INSERT INTO players(citizenid,inventory,money,metadata) VALUES (?,?,?,?)', [before.citizenid,before.inventory,before.money,before.metadata]);
     };
@@ -52,7 +52,7 @@ test('actual exchange SQL and qbsql checked transactions on disposable MariaDB',
         await t.test('migration is repeatable and receipts precede the guarded player mutation', async () => {
             const schema = new SchemaManager({ write: pool }); const spec = exchangeSchema();
             await schema.ensureTable(spec); await schema.ensureTable(spec); await reset();
-            assert.match(fixture.statements[0].query, /^INSERT INTO `qbinventory_player_exchanges`/);
+            assert.match(fixture.statements[0].query, /^INSERT INTO `kora_inventory_player_exchanges`/);
             assert.match(fixture.statements[1].query, /^UPDATE `players`/);
             assert.equal(fixture.statements[0].expectedRows, 1); assert.equal(fixture.statements[1].expectedRows, 1);
             assert.match(fixture.read.query, /FOR UPDATE$/);
@@ -67,7 +67,7 @@ test('actual exchange SQL and qbsql checked transactions on disposable MariaDB',
             const restarted = new TransactionRunner({ write: pool });
             assert.equal((await restarted.transactionChecked(fixture.statements, fixture.context)).code, 'duplicate');
             assert.deepEqual(await snapshot(), expected());
-            assert.equal((await rows('SELECT COUNT(*) n FROM qbinventory_player_exchanges'))[0].n, 1);
+            assert.equal((await rows('SELECT COUNT(*) n FROM kora_inventory_player_exchanges'))[0].n, 1);
         });
         await t.test('missing or deleted player rolls back the earlier receipt insert', async () => {
             for (const deleted of [false, true]) {
@@ -113,7 +113,7 @@ test('actual exchange SQL and qbsql checked transactions on disposable MariaDB',
                     await previous.beginTransaction();
                     for (const statement of fixture.statements) await previous.query(statement.query, statement.values);
                     assert.deepEqual(await snapshot(), original());
-                    assert.equal((await rows('SELECT COUNT(*) n FROM qbinventory_player_exchanges'))[0].n, 0);
+                    assert.equal((await rows('SELECT COUNT(*) n FROM kora_inventory_player_exchanges'))[0].n, 0);
                     let finished = false;
                     const restarted = new TransactionRunner({ write: pool, read: { getConnection() { throw new Error('Replica must not reconcile'); } } });
                     const recovery = read(restarted).then(value => { finished = true; return value; });

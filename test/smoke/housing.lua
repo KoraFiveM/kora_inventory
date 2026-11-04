@@ -61,7 +61,7 @@ local function setup(database, skipRestore)
     sql.ready, sql.ensureTables = function() return true end, function() return true end
     sql.query = function(statement, params)
         if f.failRead then return nil, 'controlled read failure' end
-        if statement:find('FROM `qbinventory_inventories`', 1, true) then
+        if statement:find('FROM `kora_inventory_inventories`', 1, true) then
             if params and #params > 0 then
                 local row = f.db.inventories[params[1] .. ':' .. params[2]]
                 return row and { copy(row) } or {}
@@ -73,12 +73,12 @@ local function setup(database, skipRestore)
     end
     sql.execute = function(statement, params)
         if f.failSave then return nil, 'controlled persistence failure' end
-        if statement:find('INSERT INTO `qbinventory_inventories`', 1, true) then
+        if statement:find('INSERT INTO `kora_inventory_inventories`', 1, true) then
             f.db.inventories[params[1] .. ':' .. params[2]] = {
                 inventory_type = params[1], inventory_id = params[2], label = params[3], slots = params[4], max_weight = params[5],
                 revision = params[6], items = params[7], properties = params[8],
             }
-        elseif statement:find('INSERT IGNORE INTO `qbinventory_recovery_operations`', 1, true) then
+        elseif statement:find('INSERT IGNORE INTO `kora_inventory_recovery_operations`', 1, true) then
             local key = params[1] .. ':' .. params[2]
             f.db.operations[key] = f.db.operations[key] or { provider = params[1], operation_key = params[2], stash_id = params[3], citizenid = params[4], status = 'pending' }
         end

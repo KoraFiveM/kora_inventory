@@ -403,12 +403,12 @@ kora_core's canonical player store.
 Tables are created automatically at startup by kora_sql (`Kora.sql.ensureTables`)
 from the declaration in `server/schema.lua`; there is no SQL to import by hand.
 Existing installs only gain any missing columns or keys, never altered ones. The
-schema covers `qbinventory_inventories` (items, properties and
-revision), `qbinventory_shop_stock`, audit, migration-state/row and quarantine
+schema covers `kora_inventory_inventories` (items, properties and
+revision), `kora_inventory_shop_stock`, audit, migration-state/row and quarantine
 tables. Legacy rows are copied, never deleted or updated. An already imported
 row with the same checksum is skipped; a changed legacy row is reported rather
 than overwriting a possibly-live kora_inventory record. Malformed JSON/item slots
-are retained in `qbinventory_quarantine` for operator review.
+are retained in `kora_inventory_quarantine` for operator review.
 
 Run these from the server console (or grant `command.qbinventory`):
 

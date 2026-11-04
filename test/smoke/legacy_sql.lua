@@ -64,7 +64,7 @@ local function setup(initial, boot)
         end, cb)
     end
     function driver.execute(_, sql, params, cb)
-        local kind = sql:find('INSERT INTO `qbinventory_inventories`', 1, true) and 'save' or 'execute'
+        local kind = sql:find('INSERT INTO `kora_inventory_inventories`', 1, true) and 'save' or 'execute'
         submit(kind, function()
             if kind == 'save' then f.rows[params[1] .. ':' .. params[2]] = {
                 inventory_type = params[1], inventory_id = params[2], label = params[3], slots = params[4],
@@ -86,8 +86,8 @@ local function setup(initial, boot)
             end, cb)
             return
         end
-        H.ok(statements[1].query:find('qbinventory_migration_rows', 1, true), 'delete transaction records durable import tombstone')
-        H.ok(statements[2].query:find('qbinventory_inventories', 1, true), 'delete transaction targets canonical table')
+        H.ok(statements[1].query:find('kora_inventory_migration_rows', 1, true), 'delete transaction records durable import tombstone')
+        H.ok(statements[2].query:find('kora_inventory_inventories', 1, true), 'delete transaction targets canonical table')
         local ambiguous = f.ambiguous
         f.ambiguous = nil
         submit('delete', function()

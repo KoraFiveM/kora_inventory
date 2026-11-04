@@ -35,7 +35,7 @@ ensure kora_core
 ensure kora_inventory
 ```
 kora_inventory creates its own secondary-inventory tables
-(`qbinventory_inventories`, `qbinventory_shop_stock`, migration-state/audit tables)
+(`kora_inventory_inventories`, `kora_inventory_shop_stock`, migration-state/audit tables)
 at startup from `server/schema.lua` — no manual schema import needed.
 
 If you're migrating off a real `qb-inventory`/`ox_inventory`, run one of these
@@ -48,7 +48,7 @@ qbinventory-migrate verify    -- validate stored item JSON, print migration stat
 qbinventory-migrate retry     -- revisit only previously failed/quarantined rows
 ```
 Legacy rows are copied, never deleted or updated, and malformed rows land in
-`qbinventory_quarantine` for review.
+`kora_inventory_quarantine` for review.
 
 ## Usage examples
 

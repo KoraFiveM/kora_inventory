@@ -197,7 +197,7 @@ local function saveShopStock(inv)
     if not next(rows) then
         return true
     end
-    local ok, err = dbUpsert('qbinventory_shop_stock', { 'shop_id', 'slot' }, rows)
+    local ok, err = dbUpsert('kora_inventory_shop_stock', { 'shop_id', 'slot' }, rows)
     if not ok then
         return false, err
     end
@@ -220,7 +220,7 @@ local function saveInventory(inv)
         return false, 'could not encode inventory'
     end
     local ok, err = db(
-        [[INSERT INTO `qbinventory_inventories`
+        [[INSERT INTO `kora_inventory_inventories`
         (`inventory_type`,`inventory_id`,`label`,`slots`,`max_weight`,`revision`,`items`,`properties`)
         VALUES (?,?,?,?,?,?,?,?)
         ON DUPLICATE KEY UPDATE `label`=VALUES(`label`), `slots`=VALUES(`slots`),
@@ -304,7 +304,7 @@ function persistence.delete(kind, id)
     local inventoryKey = ('%s:%s'):format(cleanKind, cleanId)
     local snapshot = dirty[inventoryKey]
     local ok, err = db(
-        'DELETE FROM `qbinventory_inventories` WHERE `inventory_type` = ? AND `inventory_id` = ?',
+        'DELETE FROM `kora_inventory_inventories` WHERE `inventory_type` = ? AND `inventory_id` = ?',
         { cleanKind, cleanId }
     )
     if not ok then
@@ -315,7 +315,7 @@ function persistence.delete(kind, id)
         dirty[inventoryKey] = nil
     end
     if cleanKind == 'shop' then
-        return db('DELETE FROM `qbinventory_shop_stock` WHERE `shop_id` = ?', { cleanId })
+        return db('DELETE FROM `kora_inventory_shop_stock` WHERE `shop_id` = ?', { cleanId })
     end
     return true
 end
@@ -331,16 +331,16 @@ function persistence.deleteLegacyPoliceTrash()
         return false, tokenError or 'inventory deletion receipt could not be created'
     end
     local called, result, err = pcall(Kora.sql.transactionChecked, {
-        { query = [[INSERT INTO `qbinventory_migration_rows`
+        { query = [[INSERT INTO `kora_inventory_migration_rows`
             (`source_name`,`source_key`,`source_checksum`,`inventory_type`,`inventory_id`,`status`)
             VALUES ('inventories','stash:policetrash',?,'stash','policetrash','deleted'),
                    ('stashitems','stash:policetrash',?,'stash','policetrash','deleted')
             ON DUPLICATE KEY UPDATE `status`='deleted', `imported_at`=CURRENT_TIMESTAMP]],
           values = { string.rep('0', 64), string.rep('0', 64) } },
-        { query = [[DELETE FROM `qbinventory_inventories`
+        { query = [[DELETE FROM `kora_inventory_inventories`
             WHERE `inventory_type` = 'stash' AND `inventory_id` = 'policetrash']] },
         -- ROW_COUNT() is the immediately preceding DELETE's durable result.
-        { query = [[UPDATE `qbinventory_migration_rows` SET `source_checksum`=CONCAT(?,':',ROW_COUNT())
+        { query = [[UPDATE `kora_inventory_migration_rows` SET `source_checksum`=CONCAT(?,':',ROW_COUNT())
             WHERE `source_name`='inventories' AND `source_key`='stash:policetrash']], values = { token }, expectedRows = 1 },
     })
     if not called then err, result = tostring(result), nil end
@@ -355,7 +355,7 @@ function persistence.deleteLegacyPoliceTrash()
     log('3', 'policetrash deletion is awaiting durable reconciliation')
     while true do
         local readOK, snapshot = pcall(Kora.sql.transactionChecked, {
-            { query = [[SELECT `source_checksum` FROM `qbinventory_migration_rows`
+            { query = [[SELECT `source_checksum` FROM `kora_inventory_migration_rows`
                 WHERE `source_name`='inventories' AND `source_key`='stash:policetrash' FOR UPDATE]] },
         })
         if readOK and snapshot and snapshot.success then
@@ -375,7 +375,7 @@ function persistence.load(kind, id)
     end
     local rows, err = dbQuery(
         [[SELECT `inventory_type`,`inventory_id`,`label`,`slots`,`max_weight`,`revision`,`items`,`properties`
-        FROM `qbinventory_inventories` WHERE `inventory_type` = ? AND `inventory_id` = ?]],
+        FROM `kora_inventory_inventories` WHERE `inventory_type` = ? AND `inventory_id` = ?]],
         { cleanType(kind), tostring(id) }
     )
     if not rows then
@@ -435,7 +435,7 @@ end
 function persistence.restoreAll()
     local rows, err = dbQuery(
         [[SELECT `inventory_type`,`inventory_id`,`label`,`slots`,`max_weight`,`revision`,`items`,`properties`
-        FROM `qbinventory_inventories` ORDER BY `updated_at` ASC]],
+        FROM `kora_inventory_inventories` ORDER BY `updated_at` ASC]],
         {}
     )
     if not rows then
@@ -462,7 +462,7 @@ function persistence.audit(action, actor, inv, details)
         return false, 'could not encode audit details'
     end
     return db(
-        [[INSERT INTO `qbinventory_audit` (`actor`,`action`,`inventory_type`,`inventory_id`,`details`)
+        [[INSERT INTO `kora_inventory_audit` (`actor`,`action`,`inventory_type`,`inventory_id`,`details`)
         VALUES (?,?,?,?,?)]],
         {
             actor and tostring(actor) or nil,
@@ -560,7 +560,7 @@ end
 
 local function migrationRow(source, sourceKey)
     local rows, err = dbQuery(
-        [[SELECT `source_checksum`,`status` FROM `qbinventory_migration_rows`
+        [[SELECT `source_checksum`,`status` FROM `kora_inventory_migration_rows`
         WHERE `source_name` = ? AND `source_key` = ?]],
         { source, sourceKey }
     )
@@ -572,7 +572,7 @@ end
 
 local function writeMigrationRow(source, sourceKey, sourceChecksum, status, kind, id, err)
     return db(
-        [[INSERT INTO `qbinventory_migration_rows`
+        [[INSERT INTO `kora_inventory_migration_rows`
         (`source_name`,`source_key`,`source_checksum`,`inventory_type`,`inventory_id`,`status`,`error`)
         VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `source_checksum`=VALUES(`source_checksum`),
         `inventory_type`=VALUES(`inventory_type`), `inventory_id`=VALUES(`inventory_id`),
@@ -585,7 +585,7 @@ end
 
 local function quarantine(source, sourceKey, raw, reason)
     local ok, err = db(
-        [[INSERT INTO `qbinventory_quarantine` (`source_name`,`source_key`,`reason`,`raw_payload`)
+        [[INSERT INTO `kora_inventory_quarantine` (`source_name`,`source_key`,`reason`,`raw_payload`)
         VALUES (?,?,?,?)]],
         { source, sourceKey, tostring(reason):sub(1, 255), tostring(raw) }
     )
@@ -594,7 +594,7 @@ end
 
 local function setMigrationState(source, status, report, err)
     return db(
-        [[INSERT INTO `qbinventory_migration_state`
+        [[INSERT INTO `kora_inventory_migration_state`
         (`source_name`,`status`,`last_started_at`,`last_finished_at`,`imported_count`,`skipped_count`,`quarantined_count`,`last_error`)
         VALUES (?, ?, CURRENT_TIMESTAMP, NULL, 0, 0, 0, NULL)
         ON DUPLICATE KEY UPDATE `status`=VALUES(`status`), `last_started_at`=CURRENT_TIMESTAMP,
@@ -605,7 +605,7 @@ end
 
 local function finishMigrationState(source, status, report, err)
     return db(
-        [[UPDATE `qbinventory_migration_state` SET `status`=?, `last_finished_at`=CURRENT_TIMESTAMP,
+        [[UPDATE `kora_inventory_migration_state` SET `status`=?, `last_finished_at`=CURRENT_TIMESTAMP,
         `imported_count`=?, `skipped_count`=?, `quarantined_count`=?, `last_error`=? WHERE `source_name`=?]],
         -- `err` sits mid-array and is nil on success, which would leave a hole.
         { status, report.imported, report.skipped, report.quarantined, err or Kora.sql.NULL, source }
@@ -766,7 +766,7 @@ function persistence.verifyMigration()
     if not state.ready then
         return nil, state.lastError or 'persistence is not ready'
     end
-    local rows, err = dbQuery([[SELECT `inventory_type`,`inventory_id`,`items` FROM `qbinventory_inventories`]], {})
+    local rows, err = dbQuery([[SELECT `inventory_type`,`inventory_id`,`items` FROM `kora_inventory_inventories`]], {})
     if not rows then
         return nil, err
     end
@@ -778,7 +778,7 @@ function persistence.verifyMigration()
                 { type = row.inventory_type, id = row.inventory_id, reason = itemErr }
         end
     end
-    local progress, stateErr = dbQuery('SELECT * FROM `qbinventory_migration_state` ORDER BY `source_name`', {})
+    local progress, stateErr = dbQuery('SELECT * FROM `kora_inventory_migration_state` ORDER BY `source_name`', {})
     if not progress then
         return nil, stateErr
     end

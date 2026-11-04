@@ -4,7 +4,7 @@ local persistence = inventory.persistence
 
 local function receipt(provider, operationKey)
     local result, err = Kora.sql.transactionChecked({ {
-        query = 'SELECT * FROM `qbinventory_recovery_operations` WHERE `provider`=? AND `operation_key`=? FOR UPDATE',
+        query = 'SELECT * FROM `kora_inventory_recovery_operations` WHERE `provider`=? AND `operation_key`=? FOR UPDATE',
         values = { provider, operationKey },
     } })
     if not result or not result.success then return nil, err or result and result.message or 'Recovery storage is unavailable.' end
@@ -99,7 +99,7 @@ local function claim(source, id, operationKey)
             local saved, saveErr = persistence.save(inv)
             if not saved then return reject(saveErr) end
             if not row then
-                local created, createErr = Kora.sql.execute('INSERT IGNORE INTO `qbinventory_recovery_operations` (`provider`,`operation_key`,`stash_id`,`citizenid`) VALUES (?,?,?,?)', { provider, operationKey, id, cid })
+                local created, createErr = Kora.sql.execute('INSERT IGNORE INTO `kora_inventory_recovery_operations` (`provider`,`operation_key`,`stash_id`,`citizenid`) VALUES (?,?,?,?)', { provider, operationKey, id, cid })
                 if not created then return reject(createErr or 'Recovery intent could not be saved.') end
             end
             local revision = inv.revision + 1
@@ -107,13 +107,13 @@ local function claim(source, id, operationKey)
             local encodedItems, encodedReceipt = json.encode(destination.items), json.encode(outcome)
             inv.durablePending = true
             local result, transactionErr = Kora.sql.transactionChecked({
-                { query = 'SELECT `operation_key` FROM `qbinventory_recovery_operations` WHERE `provider`=? AND `operation_key`=? AND `stash_id`=? AND `citizenid`=? AND `status`=\'pending\' FOR UPDATE',
+                { query = 'SELECT `operation_key` FROM `kora_inventory_recovery_operations` WHERE `provider`=? AND `operation_key`=? AND `stash_id`=? AND `citizenid`=? AND `status`=\'pending\' FOR UPDATE',
                     values = { provider, operationKey, id, cid }, expectedRows = 1, failureCode = 'conflict' },
-                { query = 'UPDATE `qbinventory_inventories` SET `items`=?,`revision`=? WHERE `inventory_type`=\'stash\' AND `inventory_id`=? AND `revision`=?',
+                { query = 'UPDATE `kora_inventory_inventories` SET `items`=?,`revision`=? WHERE `inventory_type`=\'stash\' AND `inventory_id`=? AND `revision`=?',
                     values = { '{}', revision, id, inv.revision }, expectedRows = 1, failureCode = 'conflict' },
                 { query = 'UPDATE `players` SET `inventory`=? WHERE `citizenid`=? AND `deleted_at` IS NULL',
                     values = { encodedItems, cid }, expectedRows = 1, failureCode = 'conflict' },
-                { query = 'UPDATE `qbinventory_recovery_operations` SET `status`=\'complete\',`destination_items`=?,`source_revision`=?,`receipt`=? WHERE `provider`=? AND `operation_key`=? AND `status`=\'pending\'',
+                { query = 'UPDATE `kora_inventory_recovery_operations` SET `status`=\'complete\',`destination_items`=?,`source_revision`=?,`receipt`=? WHERE `provider`=? AND `operation_key`=? AND `status`=\'pending\'',
                     values = { encodedItems, revision, encodedReceipt, provider, operationKey }, expectedRows = 1, failureCode = 'conflict' },
             }, context)
             if not result or result.code == 'indeterminate' then return false, transactionErr or 'Recovery outcome is pending. Retry the same claim.' end

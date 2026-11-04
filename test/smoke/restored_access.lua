@@ -46,7 +46,7 @@ Kora = {
             return {}
         end,
         execute = function(statement, params)
-            if statement:find('INSERT INTO `qbinventory_inventories`', 1, true) then
+            if statement:find('INSERT INTO `kora_inventory_inventories`', 1, true) then
                 local key = params[1] .. ':' .. params[2]
                 saved[key] = { items = json.decode(params[7]), properties = json.decode(params[8]), revision = params[6] }
                 for _, row in ipairs(rows) do

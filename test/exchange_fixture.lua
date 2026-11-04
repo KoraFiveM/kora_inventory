@@ -31,7 +31,7 @@ return function(database)
     local sql=Kora.sql
     sql.ready,sql.ensureTables=function() return true end,function() return true end
     sql.query=function(query,params)
-        if query:find('qbcore_player_column_operations',1,true) then
+        if query:find('kora_core_player_column_operations',1,true) then
             local rows={};for _,row in pairs(f.db.fences) do
                 if query:find('`resource`=?',1,true) and row.resource==params[1] or not query:find('`resource`=?',1,true) and row.citizenid==params[1] then rows[#rows+1]=copy(row) end
             end;return rows
@@ -39,7 +39,7 @@ return function(database)
         return {}
     end
     sql.single=function(query,params)
-        if query:find('qbcore_player_column_operations',1,true) then
+        if query:find('kora_core_player_column_operations',1,true) then
             for _,row in pairs(f.db.fences) do if row.citizenid==params[1] then return copy(row) end end;return nil
         end
         if query:find('FROM `players`',1,true) then return copy(f.db.players[params[1]]) end
@@ -49,7 +49,7 @@ return function(database)
     end
     sql.flush=function() return true end
     sql.update=function(query,params)
-        assert(query:find('DELETE FROM `qbcore_player_column_operations`',1,true),query)
+        assert(query:find('DELETE FROM `kora_core_player_column_operations`',1,true),query)
         if f.failRelease then return nil,'release unavailable' end
         for key,row in pairs(f.db.fences) do if row.resource==params[1] and row.operation_key==params[2] then f.db.fences[key]=nil end end
         return 3
@@ -75,17 +75,17 @@ return function(database)
     end
     sql.transactionChecked=function(statements,context)
         local first=statements[1]
-        if first.query:find('SELECT * FROM `qbinventory_player_exchanges`',1,true) then
+        if first.query:find('SELECT * FROM `kora_inventory_player_exchanges`',1,true) then
             if f.failRead then return nil,'read unavailable' end
             local row=f.db.receipts[first.values[1]..':'..first.values[2]]
             return {success=true,results={row and {copy(row)} or {}}}
         end
-        if first.query:find('INSERT INTO `qbcore_player_column_operations`',1,true) then
+        if first.query:find('INSERT INTO `kora_core_player_column_operations`',1,true) then
             for _,s in ipairs(statements) do local p=s.values;f.db.fences[p[1]..':'..p[2]]={citizenid=p[1],column_name=p[2],resource=p[3],operation_key=p[4],fingerprint=p[5]} end
             if f.afterFence then f.afterFence() end
             return {success=true}
         end
-        assert(first.query:find('INSERT INTO `qbinventory_player_exchanges`',1,true),first.query)
+        assert(first.query:find('INSERT INTO `kora_inventory_player_exchanges`',1,true),first.query)
         f.lastStatements,f.lastContext=copy(statements),copy(context)
         if f.defer then f.defer=false;coroutine.yield('commit') end
         if f.rollback then return {success=false,code='unavailable',message='controlled rollback'} end

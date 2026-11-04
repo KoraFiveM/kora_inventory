@@ -12,7 +12,7 @@ end
 
 QBInventorySchema = {
     {
-        name = 'qbinventory_inventories',
+        name = 'kora_inventory_inventories',
         collate = COLLATE,
         columns = {
             { name = 'inventory_type', type = 'varchar(32)' },
@@ -27,10 +27,10 @@ QBInventorySchema = {
             updated(),
         },
         primary = { 'inventory_type', 'inventory_id' },
-        indexes = { { name = 'idx_qbinventory_updated', columns = { 'updated_at' } } },
+        indexes = { { name = 'idx_kora_inventory_updated', columns = { 'updated_at' } } },
     },
     {
-        name = 'qbinventory_shop_stock',
+        name = 'kora_inventory_shop_stock',
         collate = COLLATE,
         columns = {
             { name = 'shop_id', type = 'varchar(128)' },
@@ -42,7 +42,7 @@ QBInventorySchema = {
         primary = { 'shop_id', 'slot' },
     },
     {
-        name = 'qbinventory_audit',
+        name = 'kora_inventory_audit',
         collate = COLLATE,
         columns = {
             { name = 'id', type = 'bigint', unsigned = true, auto_increment = true },
@@ -55,12 +55,12 @@ QBInventorySchema = {
         },
         primary = { 'id' },
         indexes = {
-            { name = 'idx_qbinventory_audit_inventory', columns = { 'inventory_type', 'inventory_id', 'created_at' } },
-            { name = 'idx_qbinventory_audit_action', columns = { 'action', 'created_at' } },
+            { name = 'idx_kora_inventory_audit_inventory', columns = { 'inventory_type', 'inventory_id', 'created_at' } },
+            { name = 'idx_kora_inventory_audit_action', columns = { 'action', 'created_at' } },
         },
     },
     {
-        name = 'qbinventory_migration_state',
+        name = 'kora_inventory_migration_state',
         collate = COLLATE,
         columns = {
             { name = 'source_name', type = 'varchar(64)' },
@@ -75,7 +75,7 @@ QBInventorySchema = {
         primary = { 'source_name' },
     },
     {
-        name = 'qbinventory_migration_rows',
+        name = 'kora_inventory_migration_rows',
         collate = COLLATE,
         columns = {
             { name = 'source_name', type = 'varchar(64)' },
@@ -88,10 +88,10 @@ QBInventorySchema = {
             { name = 'imported_at', type = 'timestamp', default = NOW },
         },
         primary = { 'source_name', 'source_key' },
-        indexes = { { name = 'idx_qbinventory_migration_status', columns = { 'status', 'imported_at' } } },
+        indexes = { { name = 'idx_kora_inventory_migration_status', columns = { 'status', 'imported_at' } } },
     },
     {
-        name = 'qbinventory_quarantine',
+        name = 'kora_inventory_quarantine',
         collate = COLLATE,
         columns = {
             { name = 'id', type = 'bigint', unsigned = true, auto_increment = true },
@@ -102,10 +102,10 @@ QBInventorySchema = {
             created(),
         },
         primary = { 'id' },
-        indexes = { { name = 'idx_qbinventory_quarantine_source', columns = { 'source_name', 'source_key' } } },
+        indexes = { { name = 'idx_kora_inventory_quarantine_source', columns = { 'source_name', 'source_key' } } },
     },
     {
-        name = 'qbinventory_recovery_operations',
+        name = 'kora_inventory_recovery_operations',
         columns = {
             { name = 'provider', type = 'varchar(64)' },
             { name = 'operation_key', type = 'varchar(128)' },
@@ -120,7 +120,7 @@ QBInventorySchema = {
         primary = { 'provider', 'operation_key' },
     },
     {
-        name = 'qbinventory_player_exchanges',
+        name = 'kora_inventory_player_exchanges',
         columns = {
             { name = 'provider', type = 'varchar(64)' },
             { name = 'operation_key', type = 'varchar(128)' },

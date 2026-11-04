@@ -73,7 +73,7 @@ H.ok(not server:find('INSERT INTO `players`', 1, true) and not server:find('UPDA
 H.ok(persistence:find("inv.type == 'player'", 1, true), 'persistence excludes player inventories')
 H.ok(persistence:find("RegisterCommand('qbinventory-migrate'", 1, true), 'migration is an explicit operator command')
 H.ok(persistence:find('INFORMATION_SCHEMA', 1, true) and persistence:find("'unsupported legacy table'", 1, true), 'legacy import is defensive')
-H.ok(persistence:find('qbinventory_migration_rows', 1, true), 'migration tracks idempotency rows')
+H.ok(persistence:find('kora_inventory_migration_rows', 1, true), 'migration tracks idempotency rows')
 
 -- NUI is deliberately one-way presentation plumbing. The bridge is the only
 -- UI owner, makes a local hand-off, and client.lua still decides the limited

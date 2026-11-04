@@ -83,7 +83,7 @@ local function reconcile(provider, key, fingerprint)
         return nil, 'pending', 'An earlier exchange worker must settle before receipt reconciliation.'
     end
     local result, readError = Kora.sql.transactionChecked({ {
-        query = 'SELECT * FROM `qbinventory_player_exchanges` WHERE `provider`=? AND `operation_key`=? FOR UPDATE',
+        query = 'SELECT * FROM `kora_inventory_player_exchanges` WHERE `provider`=? AND `operation_key`=? FOR UPDATE',
         values = { provider, key },
     } })
     if not result or not result.success then return nil, 'pending', readError or 'Exchange receipt is unavailable.' end
@@ -180,7 +180,7 @@ local function execute(provider, source, key, terms, fingerprint)
     local receipt = { provider = provider, operationKey = key, citizenid = terms.citizenid,
         cash = terms.cash, dealerRep = terms.dealerRep, request = fingerprint, completedAt = os.time() }
     local result, commitError = Kora.sql.transactionChecked({
-        { query = [[INSERT INTO `qbinventory_player_exchanges`
+        { query = [[INSERT INTO `kora_inventory_player_exchanges`
             (`provider`,`operation_key`,`citizenid`,`request`,`player_values`,`receipt`) VALUES (?,?,?,?,?,?)]],
             values = { provider, key, terms.citizenid, fingerprint, json.encode(values), json.encode(receipt) }, expectedRows = 1 },
         { query = 'UPDATE `players` SET `inventory`=?,`money`=?,`metadata`=? WHERE `citizenid`=? AND `deleted_at` IS NULL',
