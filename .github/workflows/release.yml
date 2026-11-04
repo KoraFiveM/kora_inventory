@@ -1,0 +1,101 @@
+name: Release
+
+# Auto semver: every push to main bumps the version, commits it, tags vX.Y.Z
+# and publishes a GitHub release.
+#   BREAKING CHANGE in body, or "type!:" subject  -> major
+#   "feat" subject                                -> minor
+#   anything else                                 -> patch
+# Add [skip release] to a commit message to skip.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      !startsWith(github.event.head_commit.message, 'chore(release):') &&
+      !contains(github.event.head_commit.message, '[skip release]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute and apply version bump
+        id: bump
+        run: |
+          set -euo pipefail
+
+          if [ -f fxmanifest.lua ]; then
+            current=$(sed -nE "s/^version[[:space:]]+['\"]([^'\"]+)['\"].*/\1/p" fxmanifest.lua | head -1)
+          elif [ -f package.json ]; then
+            current=$(node -p "require('./package.json').version")
+          else
+            echo "No fxmanifest.lua or package.json"; exit 1
+          fi
+
+          last_tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+          if [ -n "$last_tag" ]; then
+            base="${last_tag#v}"
+            range="$last_tag..HEAD"
+          else
+            base="$current"
+            range="HEAD"
+          fi
+
+          subjects=$(git log --format=%s "$range")
+          bodies=$(git log --format=%b "$range")
+          bump=patch
+          if echo "$subjects" | grep -qiE '^[a-z]+(\([^)]*\))?!:' || echo "$bodies" | grep -qE '^BREAKING[ -]CHANGE'; then
+            bump=major
+          elif echo "$subjects" | grep -qiE '^feat(\([^)]*\))?:'; then
+            bump=minor
+          fi
+
+          IFS=. read -r major minor patch <<< "${base%%[-+]*}"
+          case "$bump" in
+            major) major=$((major+1)); minor=0; patch=0 ;;
+            minor) minor=$((minor+1)); patch=0 ;;
+            patch) patch=$((patch+1)) ;;
+          esac
+          next="$major.$minor.$patch"
+
+          if git rev-parse -q --verify "refs/tags/v$next" >/dev/null; then
+            echo "Tag v$next already exists"; exit 1
+          fi
+
+          if [ -f fxmanifest.lua ]; then
+            sed -i -E "s/^(version[[:space:]]+['\"])[^'\"]+(['\"])/\1$next\2/" fxmanifest.lua
+          fi
+          if [ -f package.json ]; then
+            node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$next';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+            if [ -f package-lock.json ]; then
+              node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package-lock.json','utf8'));p.version='$next';if(p.packages&&p.packages[''])p.packages[''].version='$next';fs.writeFileSync('package-lock.json',JSON.stringify(p,null,2)+'\n')"
+            fi
+          fi
+
+          echo "bump=$bump base=$base next=$next"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT: ${{ steps.bump.outputs.next }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "chore(release): v$NEXT [skip ci]"
+          git tag -a "v$NEXT" -m "v$NEXT"
+          git pull --rebase origin main
+          git push origin HEAD:main "v$NEXT"
+          gh release create "v$NEXT" --title "v$NEXT" --generate-notes
