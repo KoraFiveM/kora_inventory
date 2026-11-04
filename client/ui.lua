@@ -75,9 +75,9 @@ local function pushConfig()
         -- instead of holding the browser's fetch open.
         directTransport = directTransport(),
         -- Read on every push so a live config change applies on the next open.
-        scale = math.max(0.5, math.min(2.0, tonumber(ui.scale) or 1.0)),
+        scale = Kora.util.clamp(tonumber(ui.scale) or 1.0, 0.5, 2.0),
         images = ui.images,
-        inspectorDecimals = math.max(0, math.min(3, math.floor(tonumber((Config.Inspector or {}).decimals) or 1))),
+        inspectorDecimals = Kora.util.clamp(math.floor(tonumber((Config.Inspector or {}).decimals) or 1), 0, 3),
         -- Selectable inspector text + Copy button (item as JSON, incl. metadata).
         inspectorCopy = (Config.Inspector or {}).allowCopy ~= false,
     })
@@ -155,7 +155,7 @@ local function hotbarBottom()
     local key = Kora.cache.vehicle() and 'vehicleBottomOffset' or 'bottomOffset'
     local fallback = key == 'bottomOffset' and 90 or 130
     local value = tonumber(settings[key])
-    return math.floor(math.max(0, math.min(600, value or fallback)))
+    return math.floor(Kora.util.clamp(value or fallback, 0, 600))
 end
 
 -- The hotbar may be on screen while the player gets in or out; move it then.

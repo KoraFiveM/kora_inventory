@@ -740,22 +740,17 @@ local function addSecondary(inv, name, amount, slot, metadata, exactSlot)
         return false, 'over weight'
     end
     if item.unique and amount > 1 then
-        local placed = {}
-        for _ = 1, amount do
-            local free = inventory.firstFreeSlot(inv.items, inv.slots)
-            if not free then
-                for _, used in ipairs(placed) do
-                    inv.items[used] = nil
-                end
-                return false, 'no free slot'
-            end
+        local freeSlots = inventory.reserveFreeSlots(inv.items, inv.slots, amount)
+        if #freeSlots < amount then
+            return false, 'no free slot'
+        end
+        for _, free in ipairs(freeSlots) do
             local one = inventory.copy(item)
             one.amount = 1
             one.slot = free
             inv.items[free] = one
-            placed[#placed + 1] = free
         end
-        return true, placed[1]
+        return true, freeSlots[1]
     end
     local stack = slot and inventory.canStack(inv.items[slot], item) and slot
         or not exactSlot and inventory.stackSlot(inv.items, item)
@@ -835,15 +830,12 @@ local function addPlayer(src, name, amount, slot, metadata, reason, exactSlot)
         return false, 'over weight'
     end
     if item.unique and amount > 1 then
+        local freeSlots = inventory.reserveFreeSlots(items, config.playerSlots, amount)
+        if #freeSlots < amount then
+            return false, 'no free slot'
+        end
         local placed = {}
-        for _ = 1, amount do
-            local free = inventory.firstFreeSlot(items, config.playerSlots)
-            if not free then
-                for _, used in ipairs(placed) do
-                    playerSetPath(src, { 'items', used }, nil)
-                end
-                return false, 'no free slot'
-            end
+        for _, free in ipairs(freeSlots) do
             local one = inventory.copy(item)
             one.amount = 1
             one.slot = free
@@ -1486,6 +1478,14 @@ local function close(src, reason)
     TriggerClientEvent('qbinventory:client:sessionClosed', src, session.token, reason or 'closed')
     TriggerEvent('qbinventory:server:sessionClosed', src, session, reason or 'closed')
     return true
+end
+
+---Closes every open session whose secondary inventory is `invKey`, e.g. after
+---a stash's policy or block state changes underneath whoever has it open.
+local function closeSessionsFor(invKey, reason)
+    for src, session in pairs(sessions) do
+        if session.secondary == invKey then close(src, reason) end
+    end
 end
 
 ---Remove an exhausted ground drop and its client-side representation.
@@ -3166,9 +3166,7 @@ local function registerStashPolicy(id, options, callback)
         if not saved then return false, err end
         prepared._policyPersisted = true
         inventories[inv.key] = prepared
-        for src, session in pairs(sessions) do
-            if session.secondary == inv.key then close(src, 'stash policy updated') end
-        end
+        closeSessionsFor(inv.key, 'stash policy updated')
         return true, inv.key
     end)
 end
@@ -3181,7 +3179,7 @@ local function rebindStashPolicy(id, callback)
     -- Recovery may still own the durable source transition. Rebinding only the
     -- handler must never flush its pre-commit item snapshot over that result.
     inv.access, inv.accessRequired = callback, true
-    for src, session in pairs(sessions) do if session.secondary == inv.key then close(src, 'stash policy rebound') end end
+    closeSessionsFor(inv.key, 'stash policy rebound')
     return true, inv.key
 end
 
@@ -3189,7 +3187,7 @@ local function unregisterStashPolicy(id)
     local inv = inventories[key('stash', id)]
     if not inv or inv.policyOwner ~= (GetInvokingResource() or resourceName) then return false, 'stash policy is not owned by this resource' end
     inv.access, inv.accessRequired = nil, true
-    for src, session in pairs(sessions) do if session.secondary == inv.key then close(src, 'stash policy unavailable') end end
+    closeSessionsFor(inv.key, 'stash policy unavailable')
     return true
 end
 
@@ -3203,7 +3201,7 @@ local function setStashBlocked(id, blocked)
         local saved, err = inventory.persistence.save(prepared)
         if not saved then return false, err end
         inv.blocked = blocked
-        for src, session in pairs(sessions) do if session.secondary == inv.key then close(src, 'stash state changed') end end
+        closeSessionsFor(inv.key, 'stash state changed')
         return true
     end)
 end
@@ -4395,7 +4393,7 @@ AddEventHandler('onResourceStop', function(name)
     for _, inv in pairs(inventories) do
         if inv.policyOwner == name then
             inv.access, inv.accessRequired = nil, true
-            for src, session in pairs(sessions) do if session.secondary == inv.key then close(src, 'stash policy unavailable') end end
+            closeSessionsFor(inv.key, 'stash policy unavailable')
         end
     end
     if name == resourceName then

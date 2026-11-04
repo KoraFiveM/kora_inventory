@@ -7,7 +7,6 @@ local shop = assert(
     Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.ammunation,
     'qbinventory Ammu-Nation configuration is required'
 )
-local targetIds = {}
 
 local function openAmmunation()
     exports.kora_inventory:openInventory('shop', shop.id)
@@ -20,39 +19,26 @@ RegisterNetEvent('qbinventory:client:openAmmunation', function()
     openAmmunation()
 end)
 
-local function registerAmmunationTargets()
-    for _, targetId in ipairs(targetIds) do
-        exports.kora_target:removeZone(targetId)
-    end
-    targetIds = {}
+local targets = QbInventory.shopLocationTargets(shop, function()
+    return {
+        {
+            label = ('Browse %s'):format(shop.label),
+            icon = 'shopping-basket',
+            onSelect = openAmmunation,
+        },
+    }
+end)
 
-    for _, location in ipairs(shop.locations or {}) do
-        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(QbInventory.shopZoneSprite({
-            coords = { x = location.x, y = location.y, z = location.z },
-            radius = shop.interactionDistance,
-            options = {
-                {
-                    label = ('Browse %s'):format(shop.label),
-                    icon = 'shopping-basket',
-                    onSelect = openAmmunation,
-                },
-            },
-        }, location))
-    end
-end
-
-registerAmmunationTargets()
+targets.register()
 AddEventHandler('onClientResourceStart', function(resource)
     if resource == 'kora_target' then
-        registerAmmunationTargets()
+        targets.register()
     end
 end)
 
 AddEventHandler('onClientResourceStop', function(resource)
-    -- kora_target removes every zone it owns on stop. Forget the stale IDs so a
-    -- new kora_target instance cannot mistake a reused ID for one of ours.
     if resource == 'kora_target' then
-        targetIds = {}
+        targets.clear()
     end
 end)
 
@@ -141,16 +127,13 @@ AddEventHandler('onClientResourceStop', function(resource)
     end
 end)
 
-for _, location in ipairs(shop.locations or {}) do
-    if shop.blip and shop.blip.enabled then
-        local blip = QbInventory.createShopBlip(Config.qbinventory.shops.ammunation.blip.category, { x = location.x, y = location.y, z = location.z }, shop.blip)
-        if blip and not shop.blip.info then
-            Kora.blips.setInfo(blip, {
-                title = shop.label,
-                rows = {
-                    { kind = 'wrappedText', value = "Browse this store's available weapons and equipment." },
-                },
-            })
-        end
-    end
-end
+QbInventory.shopLocationBlips(shop, Config.qbinventory.shops.ammunation.blip.category,
+    function() return shop.blip end,
+    function()
+        return {
+            title = shop.label,
+            rows = {
+                { kind = 'wrappedText', value = "Browse this store's available weapons and equipment." },
+            },
+        }
+    end)

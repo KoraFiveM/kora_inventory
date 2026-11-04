@@ -274,7 +274,7 @@ local function toggle(src, item)
         -- an initial value only to reproduce that server state on a new draw;
         -- shot reports below can decrease it but never increase it.
         ammo = math.floor(tonumber(info.ammo) or 0),
-        tint = math.max(0, math.min(32, math.floor(tonumber(info.tint) or 0))),
+        tint = Kora.util.clamp(math.floor(tonumber(info.tint) or 0), 0, 32),
         -- This uses the same allow-list as the carried prop renderer. The
         -- client never receives raw metadata component names.
         components = renderableComponents(info),

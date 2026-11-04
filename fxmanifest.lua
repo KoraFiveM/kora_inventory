@@ -58,6 +58,7 @@ server_scripts {
     -- ammunition and durability from kora_inventory state rather than trusting
     -- the old client item payloads.
     'server/compat/qb_weapons.lua',
+    'server/shops/location_policy.lua',
     'server/shops/ammunation.lua',
     'server/shops/vendingmachine.lua',
     'server/shops/liquorstore.lua',

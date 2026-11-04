@@ -32,6 +32,18 @@ json = {
     decode = function(token) return QbInventory.copy(encoded[token]) end,
 }
 Kora = {
+    util = { deepClone = function(value)
+        local seen = {}
+        local function clone(v)
+            if type(v) ~= "table" then return v end
+            if seen[v] then return seen[v] end
+            local copy = {}
+            seen[v] = copy
+            for k, vv in pairs(v) do copy[clone(k)] = clone(vv) end
+            return copy
+        end
+        return clone(value)
+    end },
     resources = { serverRegistry = function() return { track = noop, untrack = noop } end },
     callback = { register = function(name, callback) callbacks[name] = callback end },
     distance = { player = function(source, point, distance) return math.abs(point.x - positions[source]) <= distance end },
