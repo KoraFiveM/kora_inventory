@@ -35,8 +35,8 @@ ensure kora_core
 ensure kora_inventory
 ```
 kora_inventory creates its own secondary-inventory tables
-(`qbinventory_inventories`, `qbinventory_shop_stock`, migration/audit tables)
-on first boot via kora_sql's migration runner — no manual schema import needed.
+(`qbinventory_inventories`, `qbinventory_shop_stock`, migration-state/audit tables)
+at startup from `server/schema.lua` — no manual schema import needed.
 
 If you're migrating off a real `qb-inventory`/`ox_inventory`, run one of these
 from the server console (or grant `command.qbinventory`) once kora_inventory has

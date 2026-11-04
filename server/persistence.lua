@@ -801,7 +801,7 @@ local function bootstrap()
     local reports, migrationErr = Kora.sql.ensureTables(QBInventorySchema)
     if migrationErr then
         state.lastError = migrationErr
-        log('1', ('schema migration failed: %s'):format(migrationErr))
+        log('1', ('schema setup failed: %s'):format(migrationErr))
         return
     end
     for _, report in ipairs(type(reports) == 'table' and reports or {}) do

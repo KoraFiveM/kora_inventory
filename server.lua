@@ -4318,7 +4318,7 @@ RegisterNetEvent('QBCore:Server:UseItem', function(item)
 end)
 
 -- Persistence is deliberately a secondary-store concern. Hydrating happens
--- only after its kora_sql migration succeeds; malformed rows remain quarantined
+-- only after its schema setup succeeds; malformed rows remain quarantined
 -- by that module instead of being silently loaded into live state.
 AddEventHandler('qbinventory:server:persistenceReady', function()
     local persistence = inventory.persistence
