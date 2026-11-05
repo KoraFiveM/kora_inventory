@@ -253,6 +253,10 @@ local function toggle(src, item)
     local action = holstering and 'holster' or 'draw'
     local duration = holstering and integer(carryConfig.holsterTime, 0) or drawDuration(slot)
     local info = item.info or item.metadata or {}
+    -- A throwable has no magazine: the item itself is the one round. Drawing
+    -- it at 0 ammo makes GTA abort the throw and auto-switch weapons.
+    local def = internal.itemDef(item.name)
+    local throwable = def ~= nil and def.weapontype == 'Throwable'
 
     pending[src] = {
         slot = slot,
@@ -273,7 +277,8 @@ local function toggle(src, item)
         -- Item metadata is the durable source of truth. The client receives
         -- an initial value only to reproduce that server state on a new draw;
         -- shot reports below can decrease it but never increase it.
-        ammo = math.floor(tonumber(info.ammo) or 0),
+        ammo = throwable and 1 or math.floor(tonumber(info.ammo) or 0),
+        throwable = throwable or nil,
         tint = math.max(0, math.min(32, math.floor(tonumber(info.tint) or 0))),
         -- This uses the same allow-list as the carried prop renderer. The
         -- client never receives raw metadata component names.
@@ -342,6 +347,27 @@ RegisterNetEvent('qbinventory:server:weaponUnequipped', function()
     equipped[src] = nil
     pending[src] = nil
     publish(src)
+end)
+
+---The client's drawn throwable left its hand with no ammo left -- it was
+---thrown. Payload-free like weaponUnequipped: it can only consume one of this
+---player's own items, from the slot this server confirmed as drawn.
+RegisterNetEvent('qbinventory:server:throwableThrown', function()
+    if GetInvokingResource() then
+        return
+    end
+    local src = source
+    local holding = equipped[src]
+    if not holding then
+        return
+    end
+    local def = internal.itemDef(holding.name)
+    if not def or def.weapontype ~= 'Throwable' then
+        return
+    end
+    -- The removal fires inventoryChanged, which clears `equipped` and puts
+    -- the carried list back in step.
+    inventory.api.removeItem(src, holding.name, 1, holding.slot, 'thrown')
 end)
 
 -- GTA owns the immediate shot count on the ped, but kora_inventory owns the

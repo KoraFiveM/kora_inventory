@@ -23,6 +23,14 @@ end
 local drawn
 local drawnSlot
 local drawnName
+local drawnThrowable = false
+-- A drawn throwable's last round has been spent and the throw is still
+-- playing out; see the weapon onChange handler below.
+local throwing = false
+-- Time the throw animation needs to release the grenade after attack is let go.
+local THROW_RELEASE_MS = 1000
+-- Longest a cooked grenade is waited on while attack is held.
+local THROW_HOLD_MAX_MS = 10000
 local toggling = false
 local trainingWeapon
 local modifiedWeapon
@@ -173,8 +181,9 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
         return
     end
     -- One draw at a time. Without this a player could start several bars and
-    -- have each of them confirm the same slot.
-    if toggling then
+    -- have each of them confirm the same slot. A throw in progress must
+    -- finish first, or its consume would be lost to the new draw.
+    if toggling or throwing then
         return
     end
 
@@ -230,6 +239,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
         drawn = hash
         drawnSlot = tonumber(request.slot)
         drawnName = request.name
+        drawnThrowable = request.throwable == true
     end
 
     if request.slot then
@@ -320,9 +330,38 @@ end)
 -- wheel, a disarm, death, a respawn. Tell the server so the prop goes back on
 -- their body instead of vanishing for everyone until their next use.
 Kora.cache.onChange('weapon', function(weapon)
-    if drawn and weapon ~= drawn then
-        reportUnequipped()
+    if not drawn or weapon == drawn or throwing then
+        return
     end
+    -- A drawn throwable that left the hand empty was thrown: the server
+    -- consumes the item. GTA spends the round and moves the selection off
+    -- the throwable as the pin is pulled, while the grenade is still in the
+    -- hand -- forcing a weapon or stripping the item now cancels the throw.
+    -- So wait for it to leave the hand before acting on it.
+    if drawnThrowable and (GetAmmoInPedWeapon(Kora.cache.ped(), drawn) or 0) <= 0 then
+        local thrown = drawn
+        throwing = true
+        CreateThread(function()
+            -- Holding attack keeps a cooked grenade in the hand.
+            local deadline = GetGameTimer() + THROW_HOLD_MAX_MS
+            while (IsControlPressed(0, 24) or IsDisabledControlPressed(0, 24)) and GetGameTimer() < deadline do
+                Wait(0)
+            end
+            Wait(THROW_RELEASE_MS)
+            throwing = false
+            -- Death or the item being removed meanwhile already cleared it.
+            if drawn ~= thrown then
+                return
+            end
+            -- Sent before weaponUnequipped so the server still sees the slot
+            -- as drawn.
+            TriggerServerEvent('qbinventory:server:throwableThrown')
+            SetCurrentPedWeapon(Kora.cache.ped(), joaat('weapon_unarmed'), true)
+            reportUnequipped()
+        end)
+        return
+    end
+    reportUnequipped()
 end)
 -- Safety net for the server event above: after every replicated inventory
 -- update, a drawn weapon must still be backed by its item in its slot.

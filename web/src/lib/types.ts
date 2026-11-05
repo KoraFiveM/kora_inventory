@@ -115,6 +115,8 @@ export interface UiConfig {
     inspectorDecimals?: number
     /** Inspector details are selectable and a Copy button copies the item as JSON (Config.Inspector.allowCopy). */
     inspectorCopy?: boolean
+    /** Slot border thickness in px (Config.Slots.borderWidth). */
+    slotBorderWidth?: number
     /** Milliseconds before an unanswered move is rolled back (Config.qbinventory.ui.moveTimeoutMs). */
     moveTimeoutMs?: number
     /** The bridge delivers verdicts as messages instead of holding the fetch (Config.qbinventory.ui.directTransport). */

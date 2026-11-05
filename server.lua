@@ -2014,6 +2014,22 @@ local function intentDrop(src, request)
     end)
 end
 
+-- Toast both players after a committed give (Config.qbinventory.giveNotify).
+local function notifyGive(src, target, name, amount)
+    if config.giveNotify == false or not Kora.notify or not Kora.lang then
+        return
+    end
+    local def = itemDef(name)
+    local vars = { amount = amount, item = def and def.label or tostring(name) }
+    local function text(key)
+        -- Substitute here too in case the locale helper leaves %{...} as-is.
+        return (tostring(Kora.lang(key, vars)):gsub('%%{(%w+)}', function(k) return tostring(vars[k] or '') end))
+    end
+    local title = Kora.lang('inventory.title')
+    Kora.notify.send(src, { title = title, message = text('inventory.gave_item'), type = 'success' })
+    Kora.notify.send(target, { title = title, message = text('inventory.received_item'), type = 'success' })
+end
+
 -- Giving is deliberately a separate intent from an inventory transfer.  The
 -- recipient is never made a browser-visible inventory: the client resolves a
 -- nearby ped locally, then the server verifies that player again immediately
@@ -2154,7 +2170,7 @@ local function intentGive(src, request)
             finishHooks(giveHandle, false)
             return false, removedErr
         end
-        local addedOK, addedErr = addPlayer(target, removed.name, amount, nil, removed.info, 'give')
+        local addedOK, addedErr, added = addPlayer(target, removed.name, amount, nil, removed.info, 'give')
         if not addedOK then
             finishHooks(giveHandle, false)
             local rollbackOK, rollbackErr = addPlayer(src, removed.name, amount, slot, removed.info, 'give-rollback')
@@ -2172,6 +2188,10 @@ local function intentGive(src, request)
         broadcast(recipientKey)
         finishHooks(giveHandle, true)
         recordAudit('give', src, { to = target, item = removed.name, amount = amount, slot = slot })
+        -- Same receipts AddItem/RemoveItem draw, plus a toast to each side.
+        showItemBox(src, removed.name, amount, 'remove', removed)
+        showItemBox(target, removed.name, amount, 'add', added or removed)
+        notifyGive(src, target, removed.name, amount)
         TriggerEvent('qbinventory:server:itemsMoved', src, {
             action = 'give',
             fromInventory = session.primary,
@@ -4240,6 +4260,9 @@ RegisterNetEvent('qbinventory:server:intent', function(request)
     local ok, result = handleIntent(source, request)
     if not ok then
         TriggerClientEvent('qbinventory:client:rejected', source, result)
+    elseif type(request) == 'table' and request.action == 'give' and config.closeOnGive ~= false then
+        -- The bundled UI's give goes through here; close its panel once the give committed.
+        close(source, 'give')
     end
 end)
 Kora.callback.register('qbinventory:server:open', function(src, invType, data)

@@ -24,6 +24,12 @@ Config.Inspector = {
     allowCopy = true,
 }
 
+-- Inventory slot border thickness in CSS pixels (1-4), also used for the green
+-- hotbar frame around slots 1-5. 1 is the old thin look.
+Config.Slots = {
+    borderWidth = 2,
+}
+
 -- On-screen hotbar (the overlay shown by the show-hotbar key). Distance in CSS
 -- pixels from the bottom edge of the screen to the bottom of the hotbar. The
 -- defaults sit above kora_hud's status circles and the minimap strip; on foot
@@ -152,6 +158,10 @@ Config.qbinventory = {
     defaultSlots = 50,
     defaultMaxWeight = 100000,
     interactionDistance = 3.0,
+    -- Close the giver's inventory panel after a successful give from the UI.
+    closeOnGive = true,
+    -- Show a "you gave / you received" notification to both players on a give.
+    giveNotify = true,
     -- Opening another player's inventory is denied by default. Supply a
     -- trusted server callback here (or register one at runtime) to opt into
     -- police/admin/consent rules; proximity alone is never authority.

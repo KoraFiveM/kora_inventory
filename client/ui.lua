@@ -80,6 +80,8 @@ local function pushConfig()
         inspectorDecimals = math.max(0, math.min(3, math.floor(tonumber((Config.Inspector or {}).decimals) or 1))),
         -- Selectable inspector text + Copy button (item as JSON, incl. metadata).
         inspectorCopy = (Config.Inspector or {}).allowCopy ~= false,
+        -- Slot border thickness in CSS px.
+        slotBorderWidth = math.max(1, math.min(4, tonumber((Config.Slots or {}).borderWidth) or 2)),
     })
 end
 
