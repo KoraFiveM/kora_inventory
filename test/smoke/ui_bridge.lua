@@ -284,6 +284,33 @@ answers('qbinventory:nui:close', nil, 'nil data')
 answers('qbinventory:nui:close', {}, 'empty table')
 answers('qbinventory:nui:close', { sessionId = 'D', token = 'D' }, 'valid close')
 
+-- /ui editor (kora_hud): the window layout is re-validated and only ours is taken.
+handlers['kora_hud:ui:apply']('kora_chat', 'inventory', { x = 0.4 })
+H.ok(not messages[#messages] or messages[#messages].action ~= 'qbinventory:nui:layout', 'another owner\'s apply is ignored')
+handlers['kora_hud:ui:apply']('kora_inventory', 'inventory', {
+    x = 4, y = -0.25, scale = 3, placed = true, settings = { playerSide = 'right', useForTransfer = 'yes' },
+})
+local layout = messages[#messages]
+H.equal(layout.action, 'qbinventory:nui:layout', 'the layout reaches the NUI')
+H.equal(layout.data.x, 1, 'offset is clamped')
+H.equal(layout.data.y, -0.25, 'in range offsets pass')
+H.equal(layout.data.scale, 1.25, 'scale is clamped to 75-125%')
+H.equal(layout.data.playerSide, 'right', 'the side setting passes')
+H.equal(layout.data.useForTransfer, false, 'a non-boolean toggle falls back to the config default')
+handlers['kora_hud:ui:apply']('kora_inventory', 'inventory', nil)
+H.equal(messages[#messages].data.scale, 1, 'a reset restores the default layout')
+H.equal(Config.qbinventory.ui.playerLayout, true, 'the /ui registration defaults on')
+H.equal(Config.qbinventory.ui.playerLayoutTransfer, false, 'stashes use the default layout by default')
+
+local closeIntents = {}
+TriggerEvent = function(name, payload) if name == 'qbinventory:client:submitIntent' then closeIntents[#closeIntents + 1] = payload end end
+handlers['qbinventory:ui:sessionOpened']({ token = 'E', primary = view('player:1', 1) })
+handlers['kora_hud:ui:editing'](true)
+H.equal(#closeIntents, 1, 'opening the /ui editor closes an open inventory')
+H.equal(closeIntents[1].intent, 'close', 'through the normal close intent')
+H.equal(closeIntents[1].token, 'E', 'for the active session')
+TriggerEvent = function() end
+
 -- No other resource file may register a NUI callback this test does not cover.
 local scan = io.popen("grep -rl RegisterNUICallback client client.lua server.lua shared.lua 2>/dev/null")
 for file in scan:lines() do

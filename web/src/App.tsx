@@ -1,6 +1,6 @@
 import { SplitDialog } from "./SplitDialog"
 import { Check, CircleAlert, ClipboardCopy, PackageOpen, Search, X } from "lucide-react"
-import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { DndProvider, useDrag, useDragDropManager, useDragLayer, useDrop } from "react-dnd"
 import { TouchBackend } from "react-dnd-touch-backend"
@@ -15,6 +15,12 @@ import { createIntentResults } from "@/lib/intentResults"
 import { createMoveQueue, isNoopMove, type MoveJob, type MoveQueue } from "@/lib/moveQueue"
 import { formatMetaValue } from "@/lib/format"
 import { copyText, itemCopyText } from "@/lib/clipboard"
+import { DEFAULT_PLAYER_LAYOUT, layoutOffsetPx, normalizePlayerLayout, onScreenNudge, type PlayerLayout } from "@/lib/playerLayout"
+
+/** Same factor main.tsx scales the root by. */
+function rootScale() {
+    return Math.min(2, Math.max(0.5, Math.min(window.innerWidth / 1920, window.innerHeight / 1080)))
+}
 
 const SLOT_DRAG_TYPE = "qbinventory/slot"
 
@@ -739,6 +745,38 @@ function InventoryApp() {
 
     // Read by styles.css for text and slot sizes; 1 leaves every size as authored.
     useEffect(() => { document.documentElement.style.setProperty("--ui-scale", String(uiConfig.scale)) }, [uiConfig.scale])
+    // Config.Slots.borderWidth (client/ui.lua pushes slotBorderWidth). This was
+    // in the served web/build but missing from web/src; restored here so a
+    // rebuild from source keeps the configured slot border.
+    useEffect(() => { document.documentElement.style.setProperty("--slot-border-width", `${typeof (uiConfig as UiConfig).slotBorderWidth === "number" ? (uiConfig as UiConfig).slotBorderWidth : 1}px`) }, [(uiConfig as UiConfig).slotBorderWidth])
+
+    // Per-player position/size/side from kora_hud's /ui editor (client/ui.lua
+    // relays it). Defaults render exactly the shipped layout.
+    const [playerLayout, setPlayerLayout] = useState<PlayerLayout>(DEFAULT_PLAYER_LAYOUT)
+    useNuiEvent<unknown>("qbinventory:nui:layout", (raw) => setPlayerLayout(normalizePlayerLayout(raw)))
+    const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight })
+    useEffect(() => {
+        const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight })
+        window.addEventListener("resize", onResize)
+        return () => window.removeEventListener("resize", onResize)
+    }, [])
+    const shellRef = useRef<HTMLElement>(null)
+    const [nudge, setNudge] = useState({ x: 0, y: 0 })
+    const transferView = Boolean(session?.secondary)
+    const offsetPx = layoutOffsetPx(playerLayout, transferView, { width: viewport.width / rootScale(), height: viewport.height / rootScale() })
+    // Keep the window on screen after a resolution/aspect change or a large
+    // scale: measured once per layout/resize/view change, never persisted.
+    useLayoutEffect(() => {
+        const shell = shellRef.current
+        if (!shell) return
+        const next = onScreenNudge(shell.getBoundingClientRect(), nudge, viewport, rootScale())
+        if (Math.abs(next.x - nudge.x) > 0.5 || Math.abs(next.y - nudge.y) > 0.5) setNudge(next)
+    }, [nudge, offsetPx.x, offsetPx.y, playerLayout.scale, transferView, viewport, Boolean(session)])
+    const shellStyle = {
+        "--layout-x": `${offsetPx.x + nudge.x}px`,
+        "--layout-y": `${offsetPx.y + nudge.y}px`,
+        "--layout-scale": String(playerLayout.scale),
+    } as React.CSSProperties
 
     const solo = Boolean(session && uiConfig.centreWhenSolo && !session.secondary)
     // Search belongs to the three-column transfer view. It is intentionally
@@ -764,7 +802,7 @@ function InventoryApp() {
     // Solo layout starts as the player's inventory alone. Its inspector is a
     // drawer, mounted only after selection, so an idle personal inventory does
     // not reserve a permanently empty actions column.
-    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><DragGuard open /><WorldDropZone session={session} busy={locked} onDropOut={dropOut} />{splitTarget && <SplitDialog label={splitTarget.item.label ?? splitTarget.item.name} stack={splitTarget.item.amount} onConfirm={confirmSplit} onCancel={() => setSplitTarget(undefined)} />}<main className={`inventory-shell${solo ? " inventory-shell-solo" : ""}`}>
+    return <UiConfigContext.Provider value={uiConfig}><ItemBoxStack boxes={itemBoxes} /><DragGuard open /><WorldDropZone session={session} busy={locked} onDropOut={dropOut} />{splitTarget && <SplitDialog label={splitTarget.item.label ?? splitTarget.item.name} stack={splitTarget.item.amount} onConfirm={confirmSplit} onCancel={() => setSplitTarget(undefined)} />}<main ref={shellRef} style={shellStyle} className={`inventory-shell${solo ? " inventory-shell-solo" : ""}${solo && offsetPx.x > 0 ? " inventory-shell-drawer-left" : ""}`}>
         <DragPreview session={session} />
         <div className="inventory-heading">
             <header className="inventory-topbar">
@@ -774,7 +812,7 @@ function InventoryApp() {
             </header>
             {error && <div className="notice" role="alert"><CircleAlert size={16} />{error}</div>}
         </div>
-        <div className={`inventory-layout${solo ? " inventory-layout-solo" : ""}`}>
+        <div className={`inventory-layout${solo ? " inventory-layout-solo" : ""}${!solo && playerLayout.playerSide === "right" ? " inventory-layout-swapped" : ""}`}>
             <section className="inventory-stage inventory-stage-player">
                 <InventoryPanel inventory={session.player} isPlayer selected={selected} busy={locked} canDropSlot={canDropSlot} onDrop={dropSlot} onDragEnd={noop} onSelect={selectSlot} onActivate={activateItem} onSplit={promptSplit} />
             </section>

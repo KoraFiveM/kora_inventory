@@ -85,6 +85,50 @@ local function pushConfig()
     })
 end
 
+-- Per-player window placement from kora_hud's /ui editor (position, size,
+-- which side the personal inventory sits on, and whether stashes/trunks use
+-- the custom position). Presentation only: nothing here reaches the server or
+-- inventory state. Without kora_hud, or with Config.qbinventory.ui.playerLayout
+-- = false, the window stays exactly as configured.
+local UI_ID = 'inventory'
+local function uiConfig()
+    return (Config.qbinventory or {}).ui or {}
+end
+
+local function defaultPlayerLayout()
+    return {
+        x = 0, y = 0, scale = 1, placed = false,
+        playerSide = 'left',
+        useForTransfer = uiConfig().playerLayoutTransfer == true,
+    }
+end
+local playerLayout = defaultPlayerLayout()
+
+local function clampNumber(value, min, max, fallback)
+    value = tonumber(value)
+    if not value or value ~= value then return fallback end
+    return math.max(min, math.min(max, value))
+end
+
+---Re-validated at this boundary like every other value that reaches the NUI.
+local function setPlayerLayout(layout)
+    local defaults = defaultPlayerLayout()
+    if type(layout) ~= 'table' then
+        playerLayout = defaults
+    else
+        local settings = type(layout.settings) == 'table' and layout.settings or {}
+        playerLayout = {
+            x = clampNumber(layout.x, -1, 1, 0),
+            y = clampNumber(layout.y, -1, 1, 0),
+            scale = clampNumber(layout.scale, 0.75, 1.25, 1),
+            placed = layout.placed == true,
+            playerSide = settings.playerSide == 'right' and 'right' or 'left',
+            useForTransfer = type(settings.useForTransfer) == 'boolean' and settings.useForTransfer or defaults.useForTransfer,
+        }
+    end
+    send('qbinventory:nui:layout', playerLayout)
+end
+
 local function closeSession(reason)
     if not activeSession then
         return
@@ -145,6 +189,7 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     activeSecondaryId = wire.secondary and wire.secondary.id
     pushTheme()
     pushConfig()
+    send('qbinventory:nui:layout', playerLayout)
     send('qbinventory:nui:sessionOpened', wire)
     SetNuiFocus(true, true)
     TriggerEvent('qbinventory:client:requestGiveAvailability')
@@ -464,10 +509,67 @@ RegisterNUICallback('qbinventory:nui:close', function(data, cb)
     cb({ ok = true })
 end)
 
+local function editorWanted()
+    return uiConfig().playerLayout ~= false
+        and type(GetResourceState) == 'function' and GetResourceState('kora_hud') == 'started'
+end
+
+-- The editor box is the personal inventory window at its default size,
+-- centred (~540x670 px of the shared 1920x1080 root). The transfer view is
+-- larger, but it is centred on the same point and scales from it too.
+local function registerWithEditor()
+    if not editorWanted() then return end
+    pcall(function()
+        exports['kora_hud']:registerUiElement({
+            id = UI_ID,
+            label = 'Inventory',
+            group = 'Inventory',
+            rect = { x = 0.359, y = 0.19, w = 0.282, h = 0.62 },
+            origin = 'center center',
+            movable = true,
+            scalable = true,
+            hideable = false,
+            scaleMin = 0.75,
+            scaleMax = 1.25,
+            settings = {
+                { key = 'playerSide', label = 'Personal inventory side (stash/trunk view)', type = 'select',
+                  default = 'left', options = { { value = 'left', label = 'Left' }, { value = 'right', label = 'Right' } } },
+                { key = 'useForTransfer', label = 'Use my position for stashes and trunks', type = 'toggle',
+                  default = uiConfig().playerLayoutTransfer == true,
+                  description = 'Off: stashes, trunks and gloveboxes open centred in the default two-panel layout.' },
+            },
+        })
+    end)
+end
+
+AddEventHandler('kora_hud:ui:apply', function(owner, id, layout)
+    if owner ~= GetCurrentResourceName() or id ~= UI_ID then return end
+    setPlayerLayout(layout)
+end)
+
+AddEventHandler('kora_hud:ui:ready', registerWithEditor)
+
+-- The /ui editor takes NUI focus; an open inventory closes through the normal
+-- close intent (the server ends the session) rather than sitting under it.
+AddEventHandler('kora_hud:ui:editing', function(active)
+    if active ~= true or not activeSession or type(activeToken) ~= 'string' then return end
+    TriggerEvent('qbinventory:client:submitIntent', {
+        sessionId = activeSession,
+        token = activeToken,
+        intent = 'close',
+        payload = {},
+    })
+end)
+
+AddEventHandler('onClientResourceStart', function(resource)
+    if resource == 'kora_hud' and type(SetTimeout) == 'function' then SetTimeout(250, registerWithEditor) end
+end)
+
 AddEventHandler('onResourceStart', function(resource)
     if resource == GetCurrentResourceName() then
         pushTheme()
         pushConfig()
+        registerWithEditor()
     end
 end)
 

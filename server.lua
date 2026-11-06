@@ -44,7 +44,19 @@ local function playerKey(src)
 end
 local function itemDef(name)
     local item = type(name) == 'string' and name:lower() or name
-    return exports.kora_core:getShared('items', item) or exports.kora_core:getShared('weapons', item)
+    local def = exports.kora_core:getShared('items', item) or exports.kora_core:getShared('weapons', item)
+    -- Throwables listed in config.stackableWeapons stack like ordinary items:
+    -- the registry record stays untouched, only this view loses `unique`.
+    local stackable = config.stackableWeapons
+    if def and def.unique and type(item) == 'string' and type(stackable) == 'table' and stackable[item] == true then
+        local view = {}
+        for field, value in pairs(def) do
+            view[field] = value
+        end
+        view.unique = false
+        return view
+    end
+    return def
 end
 local function playerData(src)
     return exports.kora_core:getPlayerData(src)

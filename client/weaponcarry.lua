@@ -80,6 +80,7 @@ local function reportUnequipped()
     drawn = nil
     drawnSlot = nil
     drawnName = nil
+    drawnThrowable = false
     resetShotCadence()
     TriggerServerEvent('qbinventory:server:weaponUnequipped')
 end
@@ -98,6 +99,7 @@ local function stripDrawn(name)
     clearDamageSettings()
     resetShotCadence()
     drawn, drawnSlot, drawnName = nil, nil, nil
+    drawnThrowable = false
 end
 
 -- The server saw the equipped item leave the inventory (dropped, given, moved
@@ -218,6 +220,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
         drawn = nil
         drawnSlot = nil
         drawnName = nil
+        drawnThrowable = false
     else
         local ammo = math.max(0, math.floor(tonumber(request.ammo) or 0))
         if not HasPedGotWeapon(ped, hash, false) then
@@ -396,6 +399,12 @@ end)
 -- ammo, so this cannot turn the native client weapon count into an item-mint.
 AddEventHandler('CEventGunShot', function(_, eventEntity)
     if not trainingWeapon and (not drawn or not drawnSlot) then
+        return
+    end
+    -- While a thrown grenade is being settled the slot still reads as the
+    -- throwable, but whatever GTA auto-selected is what fired. Do not bill
+    -- those shots to the throwable's slot.
+    if throwing and not trainingWeapon then
         return
     end
     local ped = PlayerPedId()

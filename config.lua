@@ -85,6 +85,13 @@ Config.ShopClerks = {
 Config.qbinventory = {
     playerSlots = 41,
     playerMaxWeight = 120000,
+    -- Weapons that stack in one slot instead of taking a slot each (no serial
+    -- is issued for them). Remove an entry or set it to false to make that
+    -- item unique again. Only affects items added after the change.
+    stackableWeapons = {
+        weapon_grenade = true,
+        weapon_molotov = true,
+    },
     -- Slots 1..hotbarSlots double as the hotbar. client/hotbar.lua binds the
     -- number keys to exactly this range, and weaponCarry's 'hotbar'
     -- visibility mode treats exactly this range as "openly carried", so the
@@ -236,6 +243,17 @@ Config.qbinventory = {
         -- players who find the default too small. 1.0 is the original size.
         -- Applied the next time the inventory opens.
         scale = 1.0,
+
+        -- Register the inventory window with kora_hud's /ui editor so each
+        -- player can move and resize it (75-125 %) and pick which side their
+        -- personal inventory sits on. Saved on the player's own machine. false
+        -- = every player gets the layout above. Needs kora_hud.
+        playerLayout = true,
+        -- Default for the player's "Use my position for stashes and trunks"
+        -- choice. false: stashes, trunks and gloveboxes open centred in the
+        -- default two-panel layout, and the custom position comes back for the
+        -- personal inventory. Size and side apply either way.
+        playerLayoutTransfer = false,
 
         -- Right-clicking a stack of 2 or more in your own or a stash inventory
         -- opens an in-page "split" dialog (amount, Split, Cancel; Escape or a

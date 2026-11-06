@@ -411,7 +411,11 @@ function weapons.prepareMetadata(name, metadata)
         components = {}
     end
     info.components = components
-    if type(info.serial) ~= 'string' or info.serial == '' or #info.serial > 96 then
+    if weapon.unique == false then
+        -- A stackable weapon (grenades) carries no per-instance serial; one
+        -- would make every item differ and block stacking.
+        info.serial = nil
+    elseif type(info.serial) ~= 'string' or info.serial == '' or #info.serial > 96 then
         info.serial = weapons.generateSerial(name)
     end
     return info

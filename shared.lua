@@ -64,19 +64,30 @@ function inventory.amount(value, fallback)
     return number > 0 and number or nil
 end
 
-function inventory.sameInfo(left, right)
-    left, right = left or {}, right or {}
+-- Nested tables (e.g. a weapon's empty `components`) match by content, not by
+-- identity; otherwise two separately built stackable items never merge.
+local function sameValue(left, right, depth)
+    if left == right then
+        return true
+    end
+    if type(left) ~= 'table' or type(right) ~= 'table' or depth > 8 then
+        return false
+    end
     for key, value in pairs(left) do
-        if right[key] ~= value then
+        if not sameValue(value, right[key], depth + 1) then
             return false
         end
     end
-    for key, value in pairs(right) do
-        if left[key] ~= value then
+    for key in pairs(right) do
+        if left[key] == nil then
             return false
         end
     end
     return true
+end
+
+function inventory.sameInfo(left, right)
+    return sameValue(left or {}, right or {}, 0)
 end
 
 ---Normalises one coordinate or an array of coordinates into an array.
