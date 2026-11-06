@@ -169,6 +169,10 @@ Config.qbinventory = {
     closeOnGive = true,
     -- Show a "you gave / you received" notification to both players on a give.
     giveNotify = true,
+    -- Show a "you bought Nx item for $X (cash/bank)" notification after a shop
+    -- purchase made from the inventory shop UI. The item box receipt is separate
+    -- (itemBoxes.showPurchases) and does not say what was charged.
+    purchaseNotify = true,
     -- Opening another player's inventory is denied by default. Supply a
     -- trusted server callback here (or register one at runtime) to opt into
     -- police/admin/consent rules; proximity alone is never authority.
@@ -383,6 +387,9 @@ Config.qbinventory = {
         -- working either way).
         enabled = true,
         gloveboxEnabled = true,
+        -- Server-side: the glovebox only opens (and stays usable) for a player
+        -- seated in that vehicle. false restores the old distance-only rule.
+        gloveboxRequireSeated = true,
         trunkEnabled = true,
         -- How close (metres) a player must stand to the boot position to open
         -- the trunk. The boot position is derived from the model dimensions.

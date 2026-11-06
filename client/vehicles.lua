@@ -11,6 +11,12 @@
 -- from the inventory key before it falls back to the player's own inventory.
 
 QbInventory = QbInventory or {}
+-- Locale text with an English fallback (shared.lua's QbInventory.text).
+local function localeText(key, fallback, vars)
+    local text = QbInventory and QbInventory.text
+    return text and text(key, fallback, vars) or fallback
+end
+
 local vehicleStorage = {}
 QbInventory.vehicleStorage = vehicleStorage
 
@@ -35,8 +41,12 @@ local function settings()
     return (Config.qbinventory and Config.qbinventory.vehicles) or {}
 end
 
-local function notify(message)
-    QB.notify.send({ title = 'Vehicle', message = message, type = 'error' })
+local function notify(key, fallback)
+    QB.notify.send({
+        title = localeText('vehicle_doors.title', 'Vehicle'),
+        message = localeText(key, fallback),
+        type = 'error',
+    })
 end
 
 local function listHas(list, wanted)
@@ -240,7 +250,7 @@ end)
 
 local function request(kind, vehicle)
     if not NetworkGetEntityIsNetworked(vehicle) then
-        notify('This vehicle has no storage you can open.')
+        notify('vehicle_doors.no_storage', 'This vehicle has no storage you can open.')
         return true
     end
     lastRequest = GetGameTimer()
@@ -265,7 +275,7 @@ function vehicleStorage.openTrunk(vehicle)
         return true
     end
     if cfg.respectLocks ~= false and isLocked(vehicle) then
-        notify('This vehicle is locked.')
+        notify('vehicle_doors.locked', 'This vehicle is locked.')
         return false
     end
     return request('trunk', vehicle)
@@ -300,7 +310,7 @@ function vehicleStorage.tryOpen()
         return false
     end
     if cfg.respectLocks ~= false and isLocked(vehicle) then
-        notify('This vehicle is locked.')
+        notify('vehicle_doors.locked', 'This vehicle is locked.')
         return false
     end
     return request('trunk', vehicle)

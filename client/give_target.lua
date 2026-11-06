@@ -23,6 +23,12 @@
 -- in-world ped, then restores focus on resolve/cancel.  Keeping focus control
 -- in client/ui.lua preserves kora_inventory's NUI ownership boundary.
 
+-- Locale text with an English fallback (shared.lua's QbInventory.text).
+local function localeText(key, fallback, vars)
+    local text = QbInventory and QbInventory.text
+    return text and text(key, fallback, vars) or fallback
+end
+
 local giveTarget = {}
 QbInventory = QbInventory or {}
 QbInventory.giveTarget = giveTarget
@@ -189,7 +195,7 @@ function giveTarget.request(requestId)
     local ok, registrationId = pcall(function()
         return exports.kora_target:addEntity(peds, {
             {
-                label = 'Give selected item',
+                label = localeText('inventory.give_selected', 'Give selected item'),
                 icon = 'HandHeart',
                 distance = giveDistance(),
                 canInteract = function(entity)

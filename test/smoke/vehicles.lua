@@ -78,6 +78,23 @@ Kora.lookup.get = function() error('No such export lookup_get in resource kora_l
 H.equal(assert(V.validate(7, 'glovebox', 101)).slots, 8, 'a failing lookup falls back to the default glovebox')
 V.validate(7, 'trunk', 101); V.validate(7, 'trunk', 101)
 print = realPrint
+Kora.lookup.get = realGet
+
+-- The glovebox is reached from a seat, never from outside the vehicle.
+local seatedIn = 0
+GetVehiclePedIsIn = function() return seatedIn end
+local refusedGlovebox, gloveboxWhy = V.validate(7, 'glovebox', 101)
+H.equal(refusedGlovebox, nil, 'a player on foot cannot open the glovebox')
+H.equal(gloveboxWhy, 'you must be inside the vehicle', 'with the seat reason')
+seatedIn = 101
+H.ok(V.validate(7, 'glovebox', 101), 'a seated player opens the glovebox')
+H.ok(V.validate(7, 'trunk', 101), 'the trunk does not need a seat')
+seatedIn = 0
+Config.qbinventory.vehicles.gloveboxRequireSeated = false
+H.ok(V.validate(7, 'glovebox', 101), 'gloveboxRequireSeated = false restores the distance-only rule')
+Config.qbinventory.vehicles.gloveboxRequireSeated = nil
+GetVehiclePedIsIn = nil
+Kora.lookup.get = function() error('No such export lookup_get in resource kora_lib') end
 H.equal(printed, 1, 'a failing lookup is logged once per model')
 Kora.lookup.get = realGet
 entities[101].class = 0

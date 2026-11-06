@@ -5,6 +5,12 @@
 -- truth: kora_inventory asks its server to resolve every target and the active
 -- session remains the only source of inventory views and mutations.
 
+-- Locale text with an English fallback (shared.lua's QbInventory.text).
+local function localeText(key, fallback, vars)
+    local text = QbInventory and QbInventory.text
+    return text and text(key, fallback, vars) or fallback
+end
+
 local inventoryApi = assert(QbInventory and QbInventory.clientApi, 'qbinventory client transport must load first')
 local selfOpening = false
 
@@ -53,8 +59,8 @@ local function openLegacyTarget(other)
     end
 
     local typeName, id
-    if name:sub(1, 6) == 'shop-' then
-        typeName, id = 'shop', name:sub(7)
+    if name:sub(1, 5) == 'shop-' then
+        typeName, id = 'shop', name:sub(6)
     elseif name:sub(1, 12) == 'otherplayer-' then
         typeName, id = 'player', name:sub(13)
         if not tonumber(id) then
@@ -286,7 +292,7 @@ end, false)
 
 Kora.keybind.add({
     name = 'openInv',
-    description = 'Open inventory (qbinventory)',
+    description = localeText('inventory.keybind_open', 'Open inventory'),
     defaultMapper = 'keyboard',
     defaultKey = 'TAB',
     onPressed = openInventoryCommand,

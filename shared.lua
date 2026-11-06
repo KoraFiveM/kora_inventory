@@ -59,6 +59,30 @@ function inventory.groundedZ(groundZ, minZ, offset)
     return groundZ - (minZ or 0.0) + (offset or 0.0)
 end
 
+---A requested slot as an integer within 1..slots, or false when it is not one
+---(a fraction, 0, or past the end would store an item no panel can show).
+function inventory.validSlot(value, slots)
+    local slot = tonumber(value)
+    if not slot or slot % 1 ~= 0 or slot < 1 or slot > (tonumber(slots) or 0) then
+        return false
+    end
+    return math.floor(slot)
+end
+
+---Locale text with an English fallback, for strings read at load time or by
+---files that may run before kora_lib's locales resolve.
+---@param key string
+---@param fallback string
+---@param vars table|nil
+---@return string
+function inventory.text(key, fallback, vars)
+    local ok, value = pcall(Kora.lang, key, vars)
+    if ok and type(value) == 'string' and value ~= key then
+        return value
+    end
+    return fallback
+end
+
 function inventory.amount(value, fallback)
     local number = math.floor(tonumber(value) or (fallback or 1))
     return number > 0 and number or nil

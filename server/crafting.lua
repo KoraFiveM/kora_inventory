@@ -793,6 +793,18 @@ function weapons.loadRounds(src, slot, ammoType, count)
             return false, 'ammunition does not fit this weapon'
         end
         local bullets = type(info.loadedBullets) == 'table' and copy(info.loadedBullets) or {}
+        if ballisticsConfig.enabled ~= true then
+            -- No per-round records: add to the plain count, never replace the
+            -- rounds already loaded (loadedBullets is always empty here).
+            local loaded = math.max(0, math.floor(tonumber(info.ammo) or 0))
+            local plainCap = math.floor(tonumber(weaponConfig.maxAmmo) or 10000)
+            local added = math.min(count, math.max(0, plainCap - loaded))
+            if added < 1 then
+                return false, 'weapon is full'
+            end
+            info.loadedBullets, info.ammo = nil, loaded + added
+            return true
+        end
         local cap = math.min(
             math.floor(tonumber(weaponConfig.maxAmmo) or 10000),
             math.max(0, math.floor(tonumber(ballisticsConfig.maxLoadedRounds) or 240))

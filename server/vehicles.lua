@@ -247,6 +247,12 @@ function vehicles.validate(src, kind, networkId, expectedPlate)
         return nil, 'vehicle does not exist'
     end
     local ped = GetPlayerPed(src)
+    -- The glovebox is reached from a seat. Without this a player on foot could
+    -- open the glovebox of any (even locked) vehicle within `distance`.
+    if kind == 'glovebox' and vehicleConfig.gloveboxRequireSeated ~= false
+        and type(GetVehiclePedIsIn) == 'function' and GetVehiclePedIsIn(ped, false) ~= entity then
+        return nil, 'you must be inside the vehicle'
+    end
     local playerCoords, vehicleCoords = GetEntityCoords(ped), GetEntityCoords(entity)
     local separation = coordsDistance(playerCoords, vehicleCoords)
     if not separation then

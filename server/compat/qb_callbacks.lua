@@ -81,6 +81,22 @@ local function incapacitated(src)
     return metadata.isdead == true or metadata.inlaststand == true or metadata.ishandcuffed == true
 end
 
+---The same refusals server.lua's own drop/give/buy apply: downed, cuffed,
+---and (for a slot) an item whose use handler is still running -- otherwise an
+---item could be dropped or given mid-use and kept along with its effect.
+local function refusal(src, slot)
+    if internal.isDowned and internal.isDowned(src) then
+        return 'you cannot use inventories while downed'
+    end
+    if internal.isCuffed and internal.isCuffed(src) then
+        return 'you cannot use inventories while cuffed'
+    end
+    if slot and internal.isSlotBusy and internal.isSlotBusy(src, slot) then
+        return 'item is currently being used'
+    end
+    return nil
+end
+
 ---The caller's own inventory, and only ever that one. Upstream's drop payload
 ---carries an `inventory` field; accepting any spelling other than the session
 ---primary would let a crafted payload name a stash the caller merely knows the
@@ -160,6 +176,10 @@ Kora.callback.register('qb-inventory:server:createDrop', function(src, item)
     if not slot then
         return reject(src, 'invalid item slot')
     end
+    local refused = refusal(src, slot)
+    if refused then
+        return reject(src, refused)
+    end
 
     return (
         internal.lock({ primary }, function()
@@ -219,6 +239,10 @@ Kora.callback.register('qb-inventory:server:attemptPurchase', function(src, data
     local slot = slotOf(data.item.slot)
     if not slot then
         return false
+    end
+    local refused = refusal(src)
+    if refused then
+        return reject(src, refused)
     end
 
     local shopId = data.shop
@@ -307,6 +331,10 @@ Kora.callback.register('qb-inventory:server:giveItem', function(src, target, ite
             local owned = chosen and inventory.items[chosen]
             if not owned then
                 return reject(src, 'invalid item slot')
+            end
+            local refused = refusal(src, chosen)
+            if refused then
+                return reject(src, refused)
             end
 
             local giving = count(amount, owned.amount)

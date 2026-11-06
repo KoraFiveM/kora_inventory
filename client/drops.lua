@@ -78,7 +78,8 @@ local function removeDrop(id)
     end
 
     drops[tostring(id)] = nil
-    exports.kora_target:removeZone(record.target)
+    -- kora_target may be stopped; the bag prop must still be removed.
+    pcall(function() exports.kora_target:removeZone(record.target) end)
     if record.entity then
         Kora.entities.remove(record.entity)
     end

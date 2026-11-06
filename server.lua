@@ -743,6 +743,12 @@ end
 local function addSecondary(inv, name, amount, slot, metadata, exactSlot)
     if inv.blocked then return false, 'inventory is locked' end
     if inv.durablePending then return false, 'inventory recovery is being reconciled' end
+    if slot then
+        slot = inventory.validSlot(slot, inv.slots)
+        if not slot then return false, 'invalid slot' end
+    else
+        slot = nil
+    end
     local item, err = buildItem(name, amount, slot, metadata)
     if not item then
         return false, err
@@ -823,6 +829,12 @@ local function removeSecondary(inv, slot, amount)
 end
 
 local function addPlayer(src, name, amount, slot, metadata, reason, exactSlot)
+    if slot then
+        slot = inventory.validSlot(slot, config.playerSlots)
+        if not slot then return false, 'invalid slot' end
+    else
+        slot = nil
+    end
     local items = playerItems(src)
     -- Every weapon added through the public inventory surface receives the
     -- canonical server metadata, not only weapons crafted in crafting.lua.
@@ -1602,6 +1614,13 @@ local function validSession(src, token, fromKey, toKey, expectedFrom, expectedTo
         notifyCuffedBlocked(src)
         return nil, nil, 'you cannot use inventories while cuffed'
     end
+    -- Downed after the inventory was opened: the client closes its panel, but
+    -- a lost close (or a modified client) must not keep moving/dropping/giving.
+    if isDowned(src) then
+        close(src, 'downed')
+        notifyDownedBlocked(src)
+        return nil, nil, 'you cannot use inventories while downed'
+    end
     if now() > session.expires then
         close(src, 'expired')
         return nil, nil, 'session expired'
@@ -1636,6 +1655,30 @@ local function validSession(src, token, fromKey, toKey, expectedFrom, expectedTo
         return nil, nil, 'stale target inventory'
     end
     return session, from, to
+end
+
+---Why `item` may not be placed into `inv` (a portable container into itself
+---or into another container), or nil when it may.
+local function containerRefusal(item, inv)
+    local containerApi = QbInventory.containers
+    if
+        not item
+        or not inv
+        or inv.type ~= 'container'
+        or not containerApi
+        or not containerApi.isPortableItem
+        or not containerApi.isPortableItem(item)
+    then
+        return nil
+    end
+    local info = item.info or item.metadata or {}
+    if info.containerId and tostring(info.containerId) == tostring(inv.id) then
+        return 'a container cannot be stored inside itself'
+    end
+    if not containerApi.allowNested(item) then
+        return 'portable containers cannot be stored in another container'
+    end
+    return nil
 end
 
 local function transfer(src, request)
@@ -1675,20 +1718,9 @@ local function transfer(src, request)
         notifyBusyBlocked(src)
         return false, BUSY_ERROR
     end
-    local containerApi = QbInventory.containers
-    if
-        to.type == 'container'
-        and containerApi
-        and containerApi.isPortableItem
-        and containerApi.isPortableItem(item)
-    then
-        local info = item.info or item.metadata or {}
-        if info.containerId and tostring(info.containerId) == tostring(to.id) then
-            return false, 'a container cannot be stored inside itself'
-        end
-        if not containerApi.allowNested(item) then
-            return false, 'portable containers cannot be stored in another container'
-        end
+    local nestRefusal = containerRefusal(item, to)
+    if nestRefusal then
+        return false, nestRefusal
     end
     -- Kora's own event payload (itemsMoved subscribers); the ox hook payload
     -- below is built separately.
@@ -1755,6 +1787,13 @@ local function transfer(src, request)
             if amount ~= currentItem.amount then
                 return false, 'cannot partially swap occupied slots'
             end
+            -- A swap also moves the target into the source inventory, so the
+            -- portable-container rule applies to that direction too (e.g. a
+            -- backpack swapped into its own open container).
+            local swapRefusal = containerRefusal(currentItem, currentTo) or containerRefusal(target, currentFrom)
+            if swapRefusal then
+                return false, swapRefusal
+            end
             if fromKey ~= toKey then
                 local fromWeight = inventory.totalWeight(currentFrom.items)
                     - inventory.itemWeight(currentItem)
@@ -1806,7 +1845,7 @@ local function transfer(src, request)
         if not removedOK then
             return false, removedErr
         end
-        local addedOK, addedErr = addTo(toKey, removed.name, amount, toSlot, payload.metadata, 'transfer', toSlot ~= nil)
+        local addedOK, addedErr = addTo(toKey, removed.name, amount, toSlot, removed.info, 'transfer', toSlot ~= nil)
         if not addedOK then
             addTo(fromKey, removed.name, amount, fromSlot, removed.info, 'transfer-rollback')
             return false, addedErr
@@ -1888,6 +1927,19 @@ end
 ---Nearest live ground drop within config.drops.mergeRadius of `coords` that
 ---can take `name` x `amount`, so several drops in one spot share one bag.
 ---Returns the inventory key, or nil when merging is off or nothing fits.
+---Next numeric drop id not already in use. With persistDrops on, restored
+---drops keep ids from the previous run while the counter restarts at 1, and
+---secondary() returns an existing record unchanged -- the new drop's items
+---would be lost.
+local function reserveDropId()
+    local id = nextDropId
+    while inventories[key('drop', id)] do
+        id = id + 1
+    end
+    nextDropId = id + 1
+    return id
+end
+
 local function findMergeDrop(src, coords, name, amount, metadata)
     local radius = tonumber(config.drops and config.drops.mergeRadius) or 0
     if radius <= 0 then return nil end
@@ -1992,8 +2044,7 @@ local function intentDrop(src, request)
         end
         -- ox: a new ground drop is a 'move' to 'newdrop' carrying the id the
         -- drop will get. The id is reserved here so the hook sees the real one.
-        local dropId = nextDropId
-        nextDropId = nextDropId + 1
+        local dropId = reserveDropId()
         local dropOK, dropErr, dropHandle = runHooks('swapItems', src, {
             action = 'move',
             fromInventory = src,
@@ -2040,6 +2091,40 @@ local function notifyGive(src, target, name, amount)
     local title = Kora.lang('inventory.title')
     Kora.notify.send(src, { title = title, message = text('inventory.gave_item'), type = 'success' })
     Kora.notify.send(target, { title = title, message = text('inventory.received_item'), type = 'success' })
+end
+
+-- Toast the buyer after a committed shop purchase (Config.qbinventory.purchaseNotify):
+-- what they bought, how many, and what was charged to which account.
+local function formatPrice(value)
+    value = tonumber(value) or 0
+    local text = value % 1 == 0 and ('%d'):format(value) or ('%.2f'):format(value)
+    local int, rest = text:match('^(%d+)(.*)$')
+    if not int then
+        return text
+    end
+    return int:reverse():gsub('(%d%d%d)', '%1,'):reverse():gsub('^,', '') .. rest
+end
+
+local function notifyPurchase(src, shop, name, amount, total)
+    if config.purchaseNotify == false or not Kora.notify or not Kora.lang then
+        return
+    end
+    local def = itemDef(name)
+    local account = shopAccount(shop)
+    local accountLabel = Kora.lang('inventory.account_' .. tostring(account))
+    if accountLabel == 'inventory.account_' .. tostring(account) then
+        accountLabel = tostring(account)
+    end
+    local vars = {
+        amount = amount,
+        item = def and def.label or tostring(name),
+        price = formatPrice(total),
+        account = accountLabel,
+    }
+    local key = (tonumber(total) or 0) > 0 and 'inventory.purchased_item' or 'inventory.purchased_item_free'
+    -- Substitute here too in case the locale helper leaves %{...} as-is.
+    local message = tostring(Kora.lang(key, vars)):gsub('%%{(%w+)}', function(k) return tostring(vars[k] or '') end)
+    Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = message, type = 'success' })
 end
 
 -- Giving is deliberately a separate intent from an inventory transfer.  The
@@ -2315,6 +2400,7 @@ local function intentBuy(src, request)
             serverData = inventory.copy(currentItem.serverData),
         })
         showItemBox(src, currentItem.name, count, 'purchase', addedItem)
+        notifyPurchase(src, currentShop, currentItem.name, count, total)
         TriggerEvent('qbinventory:server:itemPurchased', src, {
             shopId = currentShop.id,
             itemName = currentItem.name,
@@ -3021,8 +3107,7 @@ dropCreate = function(coords, items, bucket, reservedId)
     bucket = bucket or nil
     local id = reservedId
     if not id then
-        id = nextDropId
-        nextDropId = nextDropId + 1
+        id = reserveDropId()
     end
     local inv = secondary('drop', id, {
         label = 'Ground drop',
@@ -3795,6 +3880,9 @@ inventory.internal = {
     end,
     close = close,
     canAccess = canAccess,
+    isDowned = isDowned,
+    isCuffed = isCuffed,
+    isSlotBusy = isSlotBusy,
     sameDropBucket = sameDropBucket,
     hasUseable = hasUseable,
     setBuiltInUseable = setBuiltInUseable,
@@ -4240,6 +4328,10 @@ RegisterNetEvent('qbinventory:server:close', function(token)
     end
     if sessions[source] and sessions[source].token == token then
         close(source, 'requested')
+    elseif type(token) == 'string' then
+        -- No such session here (already closed, expired, or lost across a
+        -- restart): still answer, or the client keeps NUI focus on a dead panel.
+        TriggerClientEvent('qbinventory:client:sessionClosed', source, token, 'closed')
     end
 end)
 -- Every path answers: transfer never raises into the callback layer and always

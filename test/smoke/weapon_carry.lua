@@ -245,6 +245,18 @@ H.equal(lastClientEvent().payload.duration, cfg.holsterTime, 'a holster costs th
 netEvents['qbinventory:server:weaponToggled'](9)
 H.equal(carry.equippedWeapon(7), nil, 'a confirmed holster empties the hands')
 
+-- Two presses inside one round trip: the client plays only the first (it
+-- ignores a request while one runs), so its confirm must still be honoured.
+carry.toggle(7, playersItems[7][1])
+carry.toggle(7, playersItems[7][3])
+netEvents['qbinventory:server:weaponToggled'](1)
+H.equal(carry.equippedWeapon(7) and carry.equippedWeapon(7).slot, 1, 'the confirm of the draw the client played still equips it')
+netEvents['qbinventory:server:weaponToggled'](3)
+H.equal(carry.equippedWeapon(7).slot, 1, 'the superseded request was dropped with the commit')
+carry.toggle(7, playersItems[7][1])
+netEvents['qbinventory:server:weaponToggled'](1)
+H.equal(carry.equippedWeapon(7), nil, 'and it holsters normally')
+
 -- Losing the weapon by any other route (weapon wheel, disarm, death) is
 -- reported with no payload -- there is nothing there worth trusting.
 carry.toggle(7, playersItems[7][9])

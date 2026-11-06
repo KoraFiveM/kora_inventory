@@ -258,7 +258,13 @@ local function toggle(src, item)
     local def = internal.itemDef(item.name)
     local throwable = def ~= nil and def.weapontype == 'Throwable'
 
-    pending[src] = {
+    -- Keyed by slot: the client plays one toggle at a time and ignores any
+    -- request that arrives while one runs, so a second press (another slot)
+    -- inside the round trip must not replace the request the client is
+    -- actually playing -- its confirm would then be dropped, leaving a weapon
+    -- in hand that the server thinks is holstered (no ammo/wear tracking).
+    pending[src] = pending[src] or {}
+    pending[src][slot] = {
         slot = slot,
         name = item.name,
         action = action,
@@ -304,15 +310,13 @@ RegisterNetEvent('qbinventory:server:weaponToggled', function(slot)
         return
     end
     local src = source
-    local request = pending[src]
+    slot = math.floor(tonumber(slot) or 0)
+    local request = pending[src] and pending[src][slot]
     if not request then
         return
     end
     if GetGameTimer() > request.expires then
-        pending[src] = nil
-        return
-    end
-    if math.floor(tonumber(slot) or 0) ~= request.slot then
+        pending[src][slot] = nil
         return
     end
 
@@ -503,6 +507,19 @@ AddEventHandler('playerDropped', function()
     trainingOwnership.untrack(src)
     stopTraining(src)
     equipped[src], pending[src], lastShotAt[src] = nil, nil, nil
+end)
+
+-- Logout / character switch: the next character must not inherit the drawn
+-- weapon or the back props (the client strips its side on the same event).
+AddEventHandler('QBCore:Server:OnPlayerUnload', function(src)
+    src = tonumber(src) or source
+    trainingOwnership.untrack(src)
+    stopTraining(src)
+    equipped[src], pending[src], lastShotAt[src] = nil, nil, nil
+    local player = Player(src)
+    if player and player.state then
+        player.state:set(STATE_KEY, false, true)
+    end
 end)
 
 AddEventHandler('qbcore:server:playerLoaded', function(src)

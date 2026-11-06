@@ -322,7 +322,9 @@ end
 ---reporting failure with the inventory half emptied.
 local function removeFromSecondary(identifier, itemName, amount, slot, allowed)
     local wanted = lower(itemName)
-    amount = tonumber(amount)
+    -- Whole units only: a fraction drained the whole stacks first and then
+    -- failed on the remainder, leaving the stash half emptied.
+    amount = wholeNumber(amount)
     if not wanted or not amount or amount <= 0 then
         return false, 'invalid item or amount'
     end

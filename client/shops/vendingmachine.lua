@@ -12,16 +12,33 @@ local shop = assert(
     'qbinventory vending machine configuration is required'
 )
 
-exports.kora_target:addModel(shop.models, {
-    {
-        label = ('Browse %s'):format(shop.label),
-        icon = 'shopping-basket',
-        onSelect = function(entity)
-            local coords = GetEntityCoords(entity)
-            exports.kora_inventory:openInventory('shop', {
-                id = shop.id,
-                coords = { x = coords.x, y = coords.y, z = coords.z },
-            })
-        end,
-    },
-}, shop.interactionDistance)
+-- Registered again whenever kora_target (re)starts: its registrations do not
+-- survive a restart, and a call at load would throw if it were not running.
+local function registerVendingTargets()
+    if type(GetResourceState) == 'function' and GetResourceState('kora_target') ~= 'started' then
+        return
+    end
+    pcall(function()
+        exports.kora_target:addModel(shop.models, {
+            {
+                label = ('Browse %s'):format(shop.label),
+                icon = 'shopping-basket',
+                onSelect = function(entity)
+                    local coords = GetEntityCoords(entity)
+                    exports.kora_inventory:openInventory('shop', {
+                        id = shop.id,
+                        coords = { x = coords.x, y = coords.y, z = coords.z },
+                    })
+                end,
+            },
+        }, shop.interactionDistance)
+    end)
+end
+
+registerVendingTargets()
+
+AddEventHandler('onClientResourceStart', function(resource)
+    if resource == 'kora_target' then
+        registerVendingTargets()
+    end
+end)

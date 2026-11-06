@@ -980,7 +980,15 @@ function ox.CreateDropFromPlayer(playerId)
         if not currentKey or not current or not next(current.items or {}) then
             return false
         end
-        local drop = createDrop('Drop', copy(current.items), nil, current.slots, current.maxWeight, GetPlayerRoutingBucket(playerId))
+        -- At the player's feet: a drop without coords has no distance policy
+        -- (openable from anywhere) and no bag for anyone to find.
+        local ped = GetPlayerPed(playerId)
+        local at = ped and ped ~= 0 and GetEntityCoords(ped) or nil
+        local coords = at and { x = at.x, y = at.y, z = at.z } or nil
+        if not coords then
+            return false
+        end
+        local drop = createDrop('Drop', copy(current.items), coords, current.slots, current.maxWeight, GetPlayerRoutingBucket(playerId))
         if not drop then
             return false
         end
@@ -989,6 +997,14 @@ function ox.CreateDropFromPlayer(playerId)
             -- Never leave a drop holding a copy of an inventory we failed to empty.
             core.removeSecondary(drop.key)
             return false
+        end
+        -- Same announcement server.lua's own drops make, so the bag shows up.
+        local bucket = GetPlayerRoutingBucket(playerId)
+        for _, player in ipairs(GetPlayers()) do
+            local viewer = tonumber(player)
+            if viewer and GetPlayerRoutingBucket(viewer) == bucket then
+                TriggerClientEvent('qbinventory:client:dropCreated', viewer, drop.id, coords)
+            end
         end
         return true, drop.id
     end)
@@ -1085,13 +1101,20 @@ function ox.ConfiscateInventory(source)
         if not currentKey or not current then
             return
         end
-        local stash = core.createSecondary('confiscation', tostring(source), {
+        local stash, existed = core.createSecondary('confiscation', tostring(source), {
             label = 'Confiscated inventory',
             items = copy(current.items),
             slots = current.slots,
             maxWeight = current.maxWeight,
         })
         if not stash then
+            return
+        end
+        -- An earlier confiscation that was never returned: createSecondary hands
+        -- back that record and ignores `items`, so clearing now would destroy
+        -- the player's current items. Leave both untouched.
+        if existed then
+            print(('^3[kora_inventory]^7 ConfiscateInventory(%s) refused: a confiscation is already held.'):format(source))
             return
         end
         local cleared = core.setInventoryItems(currentKey, {})

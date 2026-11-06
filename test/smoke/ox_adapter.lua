@@ -43,6 +43,11 @@ local ITEMS = {
     weapon_pistol = { name = 'weapon_pistol', label = 'Pistol', weight = 100, type = 'weapon' },
 }
 GetPlayerRoutingBucket = function(src) return src == 1 and 55 or 0 end
+-- CreateDropFromPlayer places the drop at the player's ped and announces it.
+GetPlayerPed = GetPlayerPed or function(src) return 1000 + tonumber(src) end
+GetEntityCoords = GetEntityCoords or function() return { x = 1.0, y = 2.0, z = 3.0 } end
+GetPlayers = GetPlayers or function() return { '1' } end
+TriggerClientEvent = TriggerClientEvent or function() end
 
 local state, locks, lockOrder, writes, opened, created, removedKeys
 
@@ -329,6 +334,7 @@ H.equal(next(state['player:1'].items), nil, 'the player inventory is left EMPTY,
 local drop = state[key('drop', dropId)]
 H.ok(drop ~= nil, 'the drop inventory exists under its own key')
 H.equal(drop.bucket, 55, 'player-originated drops retain the server-resolved bucket')
+H.ok(type(drop.coords) == 'table' and drop.coords.x == 1.0, 'the drop is placed at the player, so its distance policy applies')
 H.equal(count(drop.items), 3, 'every player slot was copied into the drop')
 H.equal(created[1].locked, 'player:1', 'the drop is created while the player key is locked')
 H.equal(writes[#writes].key, 'player:1', 'the last write clears the player')

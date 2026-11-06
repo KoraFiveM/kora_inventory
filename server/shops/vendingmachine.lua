@@ -49,19 +49,28 @@ local function access(source, inventory, opts)
         if not isNearMachine(source, opts.coords) then
             return false, 'not at a vending machine'
         end
-        approvals[source] = GetGameTimer() + (Config.qbinventory.sessionTtl or 120000)
+        approvals[source] = {
+            expires = GetGameTimer() + (Config.qbinventory.sessionTtl or 120000),
+            coords = { x = opts.coords.x, y = opts.coords.y, z = opts.coords.z },
+        }
         return true
     end
 
-    local expiry = approvals[source]
-    if not expiry or GetGameTimer() > expiry then
+    local approval = approvals[source]
+    if not approval or GetGameTimer() > approval.expires then
+        return false, 'not at a vending machine'
+    end
+    -- The approval is for the machine that was opened: walking away from it
+    -- (or reopening the shop elsewhere inside the window) is refused.
+    if not Kora.distance.player(source, approval.coords, (tonumber(shop.interactionDistance) or 2.0) + 1.5) then
+        approvals[source] = nil
         return false, 'not at a vending machine'
     end
     -- Still being asked means the player is still using the machine; slide the
     -- window with the session lease (Config.qbinventory.sessionSliding) so a long
     -- purchase is not cut off by an approval that only counted from the open.
     if Config.qbinventory.sessionSliding ~= false then
-        approvals[source] = GetGameTimer() + (Config.qbinventory.sessionTtl or 120000)
+        approval.expires = GetGameTimer() + (Config.qbinventory.sessionTtl or 120000)
     end
     return true
 end

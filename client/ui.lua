@@ -1,6 +1,12 @@
 -- The bundled UI is intentionally presentation-only. kora_inventory owns session
 -- creation, all inventory state and every server request; this bridge just
 -- translates its local client events into this resource's NUI wire contract.
+-- Locale text with an English fallback (shared.lua's QbInventory.text).
+local function localeText(key, fallback, vars)
+    local text = QbInventory and QbInventory.text
+    return text and text(key, fallback, vars) or fallback
+end
+
 local activeSession
 local activeToken
 local activePlayerId
@@ -296,7 +302,7 @@ AddEventHandler('qbinventory:ui:rejected', function(payload)
     end
     lastNotice.reason, lastNotice.at = text, stamp
     Kora.notify.send({
-        title = 'Inventory',
+        title = localeText('inventory.title', 'Inventory'),
         message = tostring(reason or 'Action rejected'),
         type = 'error',
     })

@@ -435,9 +435,26 @@ AddEventHandler('CEventGunShot', function(_, eventEntity)
     end
 end)
 
+-- Logout / character switch: the drawn weapon (and its ammo) belongs to the
+-- character that is leaving; the server forgets it on the same event.
+RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
+    if drawn then
+        stripDrawn()
+    end
+    if trainingWeapon then
+        RemoveWeaponFromPed(Kora.cache.ped(), trainingWeapon)
+        trainingWeapon = nil
+    end
+end)
+
 AddEventHandler('onClientResourceStop', function(name)
     if name ~= GetCurrentResourceName() then
         return
+    end
+    -- The server forgets every equipped weapon when it stops; a weapon left in
+    -- hand would fire untracked rounds until the next draw.
+    if drawn then
+        stripDrawn()
     end
     clearDamageSettings()
     if trainingWeapon then

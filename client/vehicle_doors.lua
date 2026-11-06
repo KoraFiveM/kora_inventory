@@ -283,6 +283,10 @@ end)
 AddEventHandler('onClientResourceStop', function(name)
     if name == GetCurrentResourceName() then
         unregister()
+    elseif name == 'kora_target' then
+        -- Its ids die with it. Removing them from the next instance (whose ids
+        -- restart at 1) would delete another resource's registrations.
+        registered = {}
     end
 end)
 
