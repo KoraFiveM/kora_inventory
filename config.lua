@@ -592,6 +592,10 @@ Config.qbinventory = {
     -- for. Disabling it leaves the inventory model completely unchanged.
     weaponCarry = {
         enabled = true,
+        -- Carry pistol-class weapons on the hip (two slots) instead of the back.
+        pistolsOnHip = true,
+        -- Holster a drawn weapon (back onto the body) and block aiming/firing while a kora_emotemenu emote is active.
+        holsterOnEmote = true,
         -- Which of a player's weapons are rendered on their body:
         --   'all'    -- every carryable weapon in the inventory.
         --   'hotbar' -- only weapons in slots 1..hotbarSlots. A weapon stowed
@@ -655,10 +659,9 @@ Config.qbinventory = {
             LMG = 'back',
             Heavy = 'back',
             Melee = 'sling',
-            -- Keep sidearms visible with the rest of the carried weapons.
-            -- This also uses the back draw/holster animation and attachment
-            -- positions, so a pistol is not left at the hip.
-            Pistol = 'back',
+            -- Sidearms sit on the hip (see `pistolsOnHip`; false puts them
+            -- back on the spine with the long guns).
+            Pistol = 'hip',
         },
         -- Attachment positions per tier, taken in order. A weapon that finds
         -- no free position in its tier is simply not rendered, rather than
@@ -705,6 +708,10 @@ Config.qbinventory = {
         components = {},
     },
 }
+
+if Config.qbinventory.weaponCarry.pistolsOnHip == false then
+    Config.qbinventory.weaponCarry.tiers.Pistol = 'back'
+end
 
 -- Registers this resource-owned configuration with kora_lib without changing its public Config table.
 if Kora and Kora.config and Kora.config.adopt then

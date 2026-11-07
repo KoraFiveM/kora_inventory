@@ -26,7 +26,6 @@ dependency 'kora_target'
 
 shared_scripts {
     '@kora_lib/init.lua',
-    '@kora_sql/init.lua',
     'config.lua',
     'config/shops/ammunation.lua',
     'config/shops/vendingmachine.lua',
@@ -36,6 +35,7 @@ shared_scripts {
 }
 
 server_scripts {
+    '@kora_sql/init.lua',
     -- Owns secondary-inventory schema, persistence and non-destructive legacy
     -- import. It is deliberately loaded before the inventory authority.
     'server/schema.lua',
