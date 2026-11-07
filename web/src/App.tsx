@@ -806,7 +806,7 @@ function InventoryApp() {
         <DragPreview session={session} />
         <div className="inventory-heading">
             <header className="inventory-topbar">
-                <div className="brand"><span className="brand-mark"><PackageOpen size={18} /></span><span>INVENTORY</span><em><i />LIVE</em></div>
+                <div className="brand"><span className="brand-mark"><PackageOpen size={18} /></span><span>Inventory</span></div>
                 <label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter the selected item" /></label>
                 <div className="topbar-actions"><span className="session-state">{session.secondary ? "Transfer open" : "Personal inventory"}</span><button className="close" onClick={close} aria-label="Close inventory"><X size={18} /></button></div>
             </header>
