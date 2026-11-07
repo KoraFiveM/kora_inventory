@@ -6,7 +6,7 @@ name 'kora_inventory'
 -- Keep the legacy resource name resolvable for exports['qbinventory'] callers.
 provide 'qbinventory'
 author 'qbcore2'
-version '0.2.0'
+version '0.2.1'
 description 'Server-authoritative inventory with bundled NUI'
 
 -- The NUI is only a renderer. `server.lua` remains the sole inventory authority
@@ -58,6 +58,7 @@ server_scripts {
     -- ammunition and durability from kora_inventory state rather than trusting
     -- the old client item payloads.
     'server/compat/qb_weapons.lua',
+    'server/shops/location_policy.lua',
     'server/shops/ammunation.lua',
     'server/shops/vendingmachine.lua',
     'server/shops/liquorstore.lua',

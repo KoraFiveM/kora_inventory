@@ -40,6 +40,20 @@ GetPlayerPed = function(source) return source == 7 and 101 or 0 end
 DoesEntityExist = function(entity) return entity == 101 end
 GetPlayerRoutingBucket = function(source) return source == 7 and player.bucket or -1 end
 GetEntityCoords = function(entity) return entity == 101 and player.coords or nil end
+Kora = { util = { nearest = function(list, position, opts)
+    local best, bestDistance
+    for _, entry in pairs(list) do
+        if opts.bucketOf == nil or opts.bucketOf(entry) == opts.bucket then
+            local dx, dy, dz = position.x - entry.x, position.y - entry.y, position.z - entry.z
+            local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+            if (opts.radius == nil or distance <= opts.radius) and (bestDistance == nil or distance < bestDistance) then
+                best, bestDistance = entry, distance
+            end
+        end
+    end
+    return best, bestDistance
+end } }
+dofile('server/shops/location_policy.lua')
 
 local A = dofile('server/shops/ammunation.lua')
 H.equal(captured.id, 'ammunation', 'server registers the fixed shop id')

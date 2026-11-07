@@ -2,20 +2,8 @@ QbInventory = QbInventory or {}
 
 local inventory = QbInventory
 
-function inventory.copy(value, seen)
-    if type(value) ~= 'table' then
-        return value
-    end
-    seen = seen or {}
-    if seen[value] then
-        return seen[value]
-    end
-    local out = {}
-    seen[value] = out
-    for key, itemValue in pairs(value) do
-        out[inventory.copy(key, seen)] = inventory.copy(itemValue, seen)
-    end
-    return out
+function inventory.copy(value)
+    return Kora.util.deepClone(value)
 end
 
 ---Adds the world-icon fields to a kora_target zone for a shop counter.
@@ -50,6 +38,64 @@ function inventory.createShopBlip(optionName, coords, options)
     if ok then return blip end
     print(("^3[kora_inventory] %s: could not create the blip at all (%s).^7"):format(optionName, tostring(blip)))
     return nil
+end
+
+---Builds a register/clear pair for a location-gated shop's kora_target sphere
+---zones, so each of convenience.lua/liquorstore.lua/ammunation.lua doesn't
+---carry its own copy of the same remove-then-reregister bookkeeping.
+---`buildOptions(location)` returns the target option rows for one location;
+---whether/when to call `.register()` (e.g. gating on `shop.enabled`) is left
+---to the caller, since not every shop gates registration the same way.
+---@param shop table
+---@param buildOptions fun(location: table): table[]
+---@return { register: fun(), clear: fun() }
+function inventory.shopLocationTargets(shop, buildOptions)
+    local targetIds = {}
+    local targets = {}
+
+    function targets.register()
+        for _, targetId in ipairs(targetIds) do
+            exports.kora_target:removeZone(targetId)
+        end
+        targetIds = {}
+
+        for _, location in ipairs(shop.locations or {}) do
+            targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(inventory.shopZoneSprite({
+                coords = { x = location.x, y = location.y, z = location.z },
+                radius = shop.interactionDistance,
+                options = buildOptions(location),
+            }, location))
+        end
+    end
+
+    -- kora_target removes every zone it owns on stop. Forget the stale IDs so a
+    -- new kora_target instance cannot mistake a reused ID for one of ours.
+    function targets.clear()
+        targetIds = {}
+    end
+
+    return targets
+end
+
+---Registers one map blip per location for a location-gated shop, guarded by
+---`shop.blip.enabled`. Field construction is left to the caller: ammunation.lua
+---passes `shop.blip` wholesale while convenience.lua/liquorstore.lua rebuild a
+---subset keyed by location name, so this only shares the loop/gating shape.
+---@param shop table
+---@param optionName string Passed through to createShopBlip's own warning text.
+---@param buildOptions fun(location: table): table Kora.blips.create options for one location.
+---@param describe fun(location: table): table Kora.blips.setInfo payload; only used when shop.blip.info is unset.
+function inventory.shopLocationBlips(shop, optionName, buildOptions, describe)
+    if not (shop.blip and shop.blip.enabled) then
+        return
+    end
+
+    for _, location in ipairs(shop.locations or {}) do
+        local blip = inventory.createShopBlip(optionName, { x = location.x, y = location.y, z = location.z }, buildOptions(location))
+        if blip and not shop.blip.info then
+            Kora.blips.setInfo(blip, describe(location))
+        end
+    end
 end
 
 ---Z for a prop that must rest on the ground: a model's origin is usually its
@@ -212,6 +258,23 @@ function inventory.firstFreeSlot(items, slots)
             return slot
         end
     end
+end
+
+---Scans `items` once for up to `count` free slots in `1..slots`, instead of
+---making `count` separate `firstFreeSlot` passes while placing a multi-slot
+---stack of unique items. Returns an array of slot numbers, shorter than
+---`count` if there wasn't room for that many.
+function inventory.reserveFreeSlots(items, slots, count)
+    local free = {}
+    for slot = 1, slots do
+        if #free >= count then
+            break
+        end
+        if not items[slot] then
+            free[#free + 1] = slot
+        end
+    end
+    return free
 end
 
 function inventory.canStack(current, item)

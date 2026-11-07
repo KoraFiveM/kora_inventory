@@ -285,7 +285,7 @@ local function toggle(src, item)
         -- shot reports below can decrease it but never increase it.
         ammo = throwable and 1 or math.floor(tonumber(info.ammo) or 0),
         throwable = throwable or nil,
-        tint = math.max(0, math.min(32, math.floor(tonumber(info.tint) or 0))),
+        tint = Kora.util.clamp(math.floor(tonumber(info.tint) or 0), 0, 32),
         -- This uses the same allow-list as the carried prop renderer. The
         -- client never receives raw metadata component names.
         components = renderableComponents(info),

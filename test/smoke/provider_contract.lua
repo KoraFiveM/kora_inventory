@@ -66,6 +66,22 @@ for _, path in ipairs(pathsFrom('shared_scripts')) do
 end
 
 Kora = {
+    util = { deepClone = function(value)
+        local seen = {}
+        local function clone(v)
+            if type(v) ~= "table" then return v end
+            if seen[v] then return seen[v] end
+            local copy = {}
+            seen[v] = copy
+            for k, vv in pairs(v) do copy[clone(k)] = clone(vv) end
+            return copy
+        end
+        return clone(value)
+    end, clamp = function(value, min, max)
+        if value < min then return min end
+        if value > max then return max end
+        return value
+    end },
     compat = { provideExport = function(identity, name, fn)
         AddEventHandler(('__cfx_export_%s_%s'):format(identity, name), function(setCallback) setCallback(fn) end)
     end },

@@ -23,7 +23,7 @@ H.equal(images.localPath, 'nui://kora_inventory/images', 'artwork uses kora_inve
 H.equal(images.preferLocal, true, 'bundled artwork is preferred over remote fallbacks')
 
 H.equal(Config.qbinventory.ui.scale, 1.0, 'UI scale defaults to 1.0 so the layout is unchanged')
-H.ok(source:find('scale = math.max(0.5, math.min(2.0, tonumber(ui.scale) or 1.0))', 1, true),
+H.ok(source:find('scale = Kora.util.clamp(tonumber(ui.scale) or 1.0, 0.5, 2.0)', 1, true),
     'the scale is read live and clamped on every config push')
 
 H.equal(Config.qbinventory.ui.rightClickSplit, true, 'right-click split defaults on')
@@ -62,6 +62,11 @@ local inVehicle, cacheHandlers = false, {}
 Kora = {
     notify = { send = function() end },
     cache = { vehicle = function() return inVehicle and 1 or nil end, onChange = function(key, fn) cacheHandlers[key] = fn end },
+    util = { clamp = function(value, min, max)
+        if value < min then return min end
+        if value > max then return max end
+        return value
+    end },
 }
 dofile(arg[1] or 'client/ui.lua')
 

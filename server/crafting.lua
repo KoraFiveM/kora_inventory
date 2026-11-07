@@ -388,10 +388,11 @@ function weapons.prepareMetadata(name, metadata)
     if durability == nil then
         durability = tonumber(weaponConfig.defaultDurability) or 100
     end
-    info.durability = roundDurability(math.max(0, math.min(100, durability)))
+    info.durability = roundDurability(Kora.util.clamp(durability, 0, 100))
     info.quality = info.durability
     local ammo = math.floor(tonumber(info.ammo) or 0)
-    ammo = math.max(0, math.min(math.floor(tonumber(weaponConfig.maxAmmo) or 10000), ammo))
+    local ammoCap = math.max(0, math.floor(tonumber(weaponConfig.maxAmmo) or 10000))
+    ammo = Kora.util.clamp(ammo, 0, ammoCap)
     local weapon = internal.itemDef(name) or {}
     normaliseLoadedBullets(info, ammo, weapon.ammotype)
     if info.tint ~= nil then
@@ -399,7 +400,7 @@ function weapons.prepareMetadata(name, metadata)
         if tint == nil then
             return nil, 'invalid weapon tint'
         end
-        info.tint = math.max(0, math.min(32, math.floor(tint)))
+        info.tint = Kora.util.clamp(math.floor(tint), 0, 32)
     end
     local components, err = normaliseComponents(name, info.components)
     if not components then
@@ -723,14 +724,15 @@ function weapons.setState(src, slot, changes)
             if durability == nil then
                 return false, 'invalid weapon durability'
             end
-            info.durability = math.max(0, math.min(100, durability))
+            info.durability = Kora.util.clamp(durability, 0, 100)
         end
         if changes.ammo ~= nil then
             local ammo = tonumber(changes.ammo)
             if ammo == nil then
                 return false, 'invalid weapon ammo'
             end
-            info.ammo = math.max(0, math.min(math.floor(tonumber(weaponConfig.maxAmmo) or 10000), math.floor(ammo)))
+            local ammoCap = math.max(0, math.floor(tonumber(weaponConfig.maxAmmo) or 10000))
+            info.ammo = Kora.util.clamp(math.floor(ammo), 0, ammoCap)
         end
         if changes.components ~= nil then
             local components, componentErr = normaliseComponents(item.name, changes.components)
@@ -744,7 +746,7 @@ function weapons.setState(src, slot, changes)
             if tint == nil then
                 return false, 'invalid weapon tint'
             end
-            info.tint = math.max(0, math.min(32, math.floor(tint)))
+            info.tint = Kora.util.clamp(math.floor(tint), 0, 32)
         end
         return true
     end)
@@ -838,7 +840,7 @@ local function fireWeaponRound(src, slot, wear)
         if wear and wear > 0 then
             local durability = tonumber(info.durability) or tonumber(info.quality)
                 or tonumber(weaponConfig.defaultDurability) or 100
-            info.durability = roundDurability(math.max(0, math.min(100, durability) - wear))
+            info.durability = roundDurability(Kora.util.clamp(durability, 0, 100) - wear)
         end
         return true
     end)
