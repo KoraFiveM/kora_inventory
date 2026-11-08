@@ -196,13 +196,15 @@ h2 { margin-bottom: 0; font-size: calc(16px * var(--ui-scale, 1)); font-weight: 
 .item-box-loss > b { color: hsl(var(--muted-foreground)); }
 @keyframes item-box-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-.item-detail { padding: 14px; display: grid; align-content: start; gap: 10px; }
+/* One track that cannot grow past the card: a long value must wrap inside it, not widen it. */
+.item-detail { padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 10px; }
+.item-detail > * { min-width: 0; }
 .item-detail-drawer { position: absolute; box-sizing: border-box; top: 0; left: calc(100% + 14px); width: 270px; height: 100%; max-height: 100%; background: hsl(var(--popover)); box-shadow: var(--shadow-floating); animation: item-drawer-in 160ms ease-out both; }
 /* A window moved into the right half opens its drawer on the left instead. */
 .inventory-shell-drawer-left .item-detail-drawer { left: auto; right: calc(100% + 14px); }
 @keyframes item-drawer-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
 .detail-header { display: flex; align-items: center; justify-content: space-between; min-height: 22px; padding-bottom: 2px; color: hsl(var(--foreground)); font-size: calc(14px * var(--ui-scale, 1)); font-weight: 600; }
-.detail-header-actions { display: flex; align-items: center; gap: 6px; }
+.detail-header-actions { display: flex; align-items: center; flex: none; gap: 6px; }
 .detail-header em { padding: 0 2px; color: hsl(var(--muted-foreground)); font-size: calc(12px * var(--ui-scale, 1)); font-style: normal; font-weight: 400; white-space: nowrap; }
 .detail-close { display: grid; width: 24px; height: 24px; padding: 0; place-items: center; border: 0; border-radius: var(--radius-sm); color: hsl(var(--muted-foreground)); background: hsl(var(--surface-raised)); cursor: pointer; }
 .detail-close:hover { color: hsl(var(--foreground)); background: hsl(var(--surface-hover)); }
@@ -216,12 +218,13 @@ h2 { margin-bottom: 0; font-size: calc(16px * var(--ui-scale, 1)); font-weight: 
 .detail-copy:hover, .detail-copy-copied { color: hsl(var(--foreground)); background: hsl(var(--surface-hover)); }
 .detail-copy-failed { color: hsl(var(--destructive)); background: hsl(var(--destructive-soft)); }
 .item-detail-empty { grid-template-rows: auto minmax(0, 1fr); align-content: stretch; }
-.item-detail h1 { margin-bottom: 0; font-size: calc(18px * var(--ui-scale, 1)); font-weight: 600; line-height: 1.15; }
-.item-detail p:not(.eyebrow) { color: hsl(var(--muted-foreground)); font-size: calc(13px * var(--ui-scale, 1)); line-height: 1.45; }
+.item-detail h1 { margin-bottom: 0; font-size: calc(18px * var(--ui-scale, 1)); font-weight: 600; line-height: 1.15; overflow-wrap: anywhere; }
+.item-detail p:not(.eyebrow) { color: hsl(var(--muted-foreground)); font-size: calc(13px * var(--ui-scale, 1)); line-height: 1.45; overflow-wrap: anywhere; }
 .detail-art { width: 100%; min-height: 178px; aspect-ratio: 1 / .9; border-radius: var(--radius); font-size: calc(44px * var(--ui-scale, 1)); background: hsl(var(--surface-raised)); }
 .detail-art img { min-width: 0; min-height: 0; box-sizing: border-box; padding: 12px; }
-dl { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin: 3px 0; padding: 6px 0; color: hsl(var(--muted-foreground)); font-size: calc(12px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }
-dd { margin: 0; color: hsl(var(--foreground)); font-weight: 500; }
+dl { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 6px; margin: 3px 0; padding: 6px 0; color: hsl(var(--muted-foreground)); font-size: calc(12px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }
+dt, dd { min-width: 0; overflow-wrap: anywhere; }
+dd { margin: 0; color: hsl(var(--foreground)); font-weight: 500; text-align: right; }
 .amount-action { display: grid; gap: 6px; }
 .amount-picker { display: grid; grid-template-columns: 1fr 52px; align-items: center; gap: 8px; }
 .amount-slider { width: 100%; height: 16px; margin: 0; padding: 0; accent-color: hsl(var(--primary)); background: transparent; cursor: pointer; }
