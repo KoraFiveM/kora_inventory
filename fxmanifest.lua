@@ -6,7 +6,7 @@ name 'kora_inventory'
 -- Keep the legacy resource name resolvable for exports['qbinventory'] callers.
 provide 'qbinventory'
 author 'qbcore2'
-version '0.2.3'
+version '0.2.4'
 description 'Server-authoritative inventory with bundled NUI'
 
 -- The NUI is only a renderer. `server.lua` remains the sole inventory authority
