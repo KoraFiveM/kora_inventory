@@ -685,8 +685,11 @@ Config.qbinventory = {
                 { bone = 24817, pos = { x = -0.13, y = -0.15, z = 0.10 }, rot = { x = 5.0, y = 124.0, z = 0.0 } },
             },
             hip = {
-                { bone = 24817, pos = { x = -0.28, y = -0.14, z = 0.15 }, rot = { x = 0.0, y = 92.0, z = -13.0 } },
-                { bone = 24817, pos = { x = -0.27, y = -0.14, z = 0.15 }, rot = { x = 0.0, y = 92.0, z = 13.0 } },
+                -- First-pass tuning from an in-game screenshot: the pistol stuck
+                -- out sideways from the hip, so the lateral (z) offset is pulled
+                -- in. Adjust in game; this has not been verified visually.
+                { bone = 24817, pos = { x = -0.28, y = -0.14, z = 0.09 }, rot = { x = 0.0, y = 92.0, z = -13.0 } },
+                { bone = 24817, pos = { x = -0.27, y = -0.14, z = 0.09 }, rot = { x = 0.0, y = 92.0, z = 13.0 } },
             },
         },
         -- Per-item overrides, keyed by item name. `tier = false` stops an

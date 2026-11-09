@@ -64,6 +64,19 @@ describe("item inspector copy", () => {
         expect(inspector().classList.contains("item-detail-copyable")).toBe(false)
     })
 
+    it("renders a long metadata value in full and keeps the card's controls", async () => {
+        const handsetId = `78c4250bdd6f484629f3ef9103942b1a${"f".repeat(40)}`
+        const [item] = snapshot.player.items
+        await post("qbinventory:nui:sessionOpened", { ...snapshot, player: { ...snapshot.player, items: [{ ...item, displayMeta: [{ key: "handsetId", label: "Handset Id", value: handsetId }] }] } })
+        select()
+        expect(inspector().textContent).toContain(handsetId)
+        expect(copyButton()).not.toBeNull()
+        expect(inspector().querySelector(".detail-close")).not.toBeNull()
+        const css = readFileSync(`${process.cwd()}/src/styles.css`, "utf8")
+        expect(css).toMatch(/\.item-detail \{ padding: 14px; display: grid; grid-template-columns: minmax\(0, 1fr\);/)
+        expect(css).toMatch(/dt, dd \{ min-width: 0; overflow-wrap: anywhere; \}/)
+    })
+
     it("only the inspector opts back into text selection", () => {
         const css = readFileSync(`${process.cwd()}/src/styles.css`, "utf8")
         expect(css).toMatch(/html, body, #root, #root \* \{ -webkit-user-select: none; user-select: none; \}/)

@@ -170,6 +170,22 @@ cfg.enabled = false
 H.equal(#carry.buildCarryList(7), 0, 'a disabled carry system carries nothing at all')
 cfg.enabled = true
 
+-- duplicates: many copies of one weapon share a single prop on the body
+
+give(2, 'weapon_carbinerifle')
+give(4, 'weapon_carbinerifle')
+give(5, 'weapon_carbinerifle')
+cfg.visibility = 'all'
+local dupList = carry.buildCarryList(7)
+local rifles = 0
+for _, entry in ipairs(dupList) do
+    if entry.name == 'weapon_carbinerifle' then rifles = rifles + 1 end
+end
+H.equal(rifles, 1, 'several copies of one weapon render as a single prop on the back')
+H.equal(#dupList, 3, 'distinct weapons are still each carried alongside the deduplicated copies')
+for _, slot in ipairs({ 2, 4, 5 }) do playersItems[7][slot] = nil end
+give(4, 'water_bottle')
+
 -- draw pacing
 
 cfg.visibility = 'hotbar'
