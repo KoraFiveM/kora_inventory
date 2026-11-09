@@ -197,6 +197,7 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     pushConfig()
     send('qbinventory:nui:layout', playerLayout)
     send('qbinventory:nui:sessionOpened', wire)
+    if QbInventory and QbInventory.fftSync then QbInventory.fftSync() end
     SetNuiFocus(true, true)
     TriggerEvent('qbinventory:client:requestGiveAvailability')
 end)
@@ -584,3 +585,9 @@ AddEventHandler('onResourceStop', function(resource)
         closeSession('resource_stop')
     end
 end)
+
+-- FiveM manifests are static; ship the optional file, execute it only on opt-in.
+if GetConvar and GetConvar('fft_kora_hooks', 'false') == 'true' then
+    local source = assert(LoadResourceFile(GetCurrentResourceName(), 'fft_hooks.lua'), 'Missing fft_hooks.lua')
+    assert(load(source, '@kora_inventory/fft_hooks.lua', 't'))()
+end

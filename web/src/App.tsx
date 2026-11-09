@@ -239,6 +239,8 @@ function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHot
     return <button
         ref={setSlotRef}
         className={classes}
+        data-fft-kind={inventory.type === "shop" ? "shop-item" : inventory.type === "player" ? "player-slot" : undefined}
+        data-fft-item={item?.name}
         aria-label={item ? `${item.label ?? item.name}, slot ${index}` : `Empty slot ${index}`}
         aria-pressed={selected || undefined}
         aria-disabled={busy || undefined}
@@ -657,6 +659,29 @@ function InventoryApp() {
         if (sourceInventory && targetInventory) move(sourceInventory.id, source.slot, targetInventory.id, target.slot, amount)
     }, [canDropSlot, move, selected, selectedCount, session])
 
+    useEffect(() => {
+        const handleDragBuy = (event: Event) => {
+            const detail = (event as CustomEvent<{item: string; accepted: boolean; error: string}>).detail
+            const shop = session?.secondary
+            const item = Object.values(shop?.items ?? {}).find(entry => entry?.name === detail.item)
+            const target = session?.player
+            if (!shop || shop.type !== "shop" || !item || !target || locked) {
+                detail.error = 'Shop item or player inventory is unavailable'
+                return
+            }
+            const destination = Object.values(target.items).find(entry => entry?.name === item.name)?.slot ??
+                Array.from({ length: target.slots }, (_, index) => index + 1).find(slot => !Object.values(target.items).some(entry => entry?.slot === slot))
+            if (!destination) { detail.error = 'No destination slot available'; return }
+            const source = { inventoryId: shop.id, slot: item.slot }
+            const dest = { inventoryId: target.id, slot: destination }
+            if (!canDropSlot(source, dest)) { detail.error = 'Player slot cannot accept the shop item'; return }
+            dropSlot(source, dest)
+            detail.accepted = true
+        }
+        window.addEventListener('fft:dragBuy', handleDragBuy)
+        return () => window.removeEventListener('fft:dragBuy', handleDragBuy)
+    }, [session, locked, canDropSlot, dropSlot])
+
     // A single click inspects, and only inspects. Moving is drag-only (drag onto
     // a slot to move/stack, drag outside the window to drop), so a click on an
     // empty slot can no longer fling the previous selection into it.
@@ -825,8 +850,8 @@ function InventoryApp() {
                 <p>{filteredSelected.item.description ?? "No item description available."}</p>
                 <dl><dt>Amount</dt><dd>×{filteredSelected.item.amount}</dd><dt>Weight</dt><dd>{filteredSelected.item.weight ?? 0} g</dd>{filteredSelected.item.displayMeta?.map((meta, index) => <Fragment key={index}><dt>{meta.label}</dt><dd>{formatMetaValue(meta.value, uiConfig.inspectorDecimals)}</dd></Fragment>)}{filteredSelected.inventory.type === "shop" && <><dt>Price</dt><dd>${(filteredSelected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
                 {filteredSelected.inventory.type === "shop" ? <div className="amount-action">
-                    {selectedMax > 1 && <input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Quantity to buy, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} />}
-                    <button className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item, selectedCount)}>Buy {selectedCount} · ${((filteredSelected.item.price ?? 0) * selectedCount).toLocaleString()}</button>
+                    {selectedMax > 1 && <input data-fft-kind="quantity" className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Quantity to buy, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} />}
+                    <button data-fft-kind="buy" data-fft-item={filteredSelected.item.name} data-fft-quantity={selectedCount} className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item, selectedCount)}>Buy {selectedCount} · ${((filteredSelected.item.price ?? 0) * selectedCount).toLocaleString()}</button>
                 </div> : <>
                     {(filteredSelected.item.useable || filteredSelected.item.container) && <button className="primary-action" disabled={movePending} onClick={() => use(filteredSelected.inventory, filteredSelected.item)}>{filteredSelected.item.container ? `Open ${filteredSelected.item.label ?? "container"}` : "Use item"}</button>}
                     {selectedMax > 1 && <div className="amount-picker"><input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Amount to move, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} /><input className="amount-input" type="number" min={1} max={selectedMax} value={selectedCount} disabled={movePending} aria-label="Amount to move" onChange={(event) => setSelectedAmount(Number(event.target.value))} /></div>}

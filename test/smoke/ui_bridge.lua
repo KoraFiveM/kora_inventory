@@ -311,16 +311,39 @@ H.equal(closeIntents[1].intent, 'close', 'through the normal close intent')
 H.equal(closeIntents[1].token, 'E', 'for the active session')
 TriggerEvent = function() end
 
--- No other resource file may register a NUI callback this test does not cover.
-local scan = io.popen("grep -rl RegisterNUICallback client client.lua server.lua shared.lua 2>/dev/null")
+-- Hooks must not register callbacks or exports when the convar is disabled.
+H.equal(nui['fft:result'], nil, 'disabled FFT result callback is absent')
+H.equal(nui['fft:observed'], nil, 'disabled FFT observation callback is absent')
+local hookExports = {}
+exports = function(name, fn) hookExports[name] = fn end
+GetConvar = function(name, fallback) return name == 'fft_kora_hooks' and 'true' or fallback end
+LoadResourceFile = function(_, path)
+    local handle = assert(io.open(path, 'r'))
+    local code = handle:read('*a'); handle:close(); return code
+end
+GetResourceState = function() return 'started' end
+GetInvokingResource = function() return 'untrusted_resource' end
+LocalPlayer = {state={fftSession='active-test'}}
+-- Exercise the real conditional loader with hooks enabled.
+dofile(arg[1] or 'client/ui.lua')
+H.equal(hookExports.fftAction('dragBuy', 'soda', 1), false, 'wrong caller rejected')
+GetConvar = function(_, fallback) return fallback end
+H.equal(hookExports.fftVersion(), 1, 'FFT protocol version')
+answers('fft:result', nil, 'nil FFT reply')
+answers('fft:result', {}, 'unmatched FFT reply')
+answers('fft:result', {request='old', session='old', token='old', ok=true}, 'stale FFT reply')
+answers('fft:observed', nil, 'nil FFT observation')
+answers('fft:observed', {action='buy', item='soda'}, 'disabled FFT observation')
+-- New NUI entry points must have acknowledgment coverage here.
+local scan = io.popen("grep -rl RegisterNUICallback client client.lua server.lua shared.lua fft_hooks.lua 2>/dev/null")
 for file in scan:lines() do
-    H.equal(file, 'client/ui.lua', 'NUI callbacks are registered only in client/ui.lua (' .. file .. ')')
+    H.ok(file == 'client/ui.lua' or file == 'fft_hooks.lua', 'unexpected NUI callback owner: ' .. file)
 end
 scan:close()
 local registered = 0
 for name in pairs(nui) do
     registered = registered + 1
-    H.ok(name == 'qbinventory:nui:intent' or name == 'qbinventory:nui:close', 'unexpected NUI callback ' .. name .. ' needs an answers() test')
+    H.ok(name == 'qbinventory:nui:intent' or name == 'qbinventory:nui:close' or name == 'fft:result' or name == 'fft:observed', 'unexpected NUI callback ' .. name)
 end
-H.equal(registered, 2, 'both NUI callbacks are exercised')
+H.equal(registered, 4, 'gameplay and optional development callbacks are covered')
 H.finish()

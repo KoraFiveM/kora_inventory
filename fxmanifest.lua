@@ -121,6 +121,7 @@ client_scripts {
 ui_page 'web/build/index.html'
 
 files {
+    'fft_hooks.lua',
     'locales/*.json',
     'web/build/index.html',
     'web/build/assets/**/*',

@@ -78,3 +78,10 @@ Keep the plain-Lua smoke tests deterministic and do not require a running
 FXServer. Add a test whenever shared item/slot rules or public exports change.
 After changing `web/`, run `pnpm install --frozen-lockfile && pnpm typecheck &&
 pnpm build` in that folder and commit the regenerated `web/build/` artifacts.
+
+## FFT integration
+
+See FFT.md. Keep optional Lua exports and callbacks in fft_hooks.lua, loaded
+only when fft_kora_hooks is true. Use fft as the runner resource name. Preserve
+normal server authority and lease/session correlation. Test disabled hooks as
+well as malformed and stale replies; do not require FFT for ordinary startup.
