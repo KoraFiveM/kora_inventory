@@ -14,12 +14,14 @@ local shop = assert(
 
 -- Registered again whenever kora_target (re)starts: its registrations do not
 -- survive a restart, and a call at load would throw if it were not running.
+local registered = false
 local function registerVendingTargets()
+    if registered then return end
     if type(GetResourceState) == 'function' and GetResourceState('kora_target') ~= 'started' then
         return
     end
-    pcall(function()
-        exports.kora_target:addModel(shop.models, {
+    local ok, id = pcall(function()
+        return exports.kora_target:addModel(shop.models, {
             {
                 label = ('Browse %s'):format(shop.label),
                 icon = 'shopping-basket',
@@ -33,6 +35,11 @@ local function registerVendingTargets()
             },
         }, shop.interactionDistance)
     end)
+    if ok and id then
+        registered = true
+    else
+        print(('[kora_inventory] Failed to register vending targets: %s'):format(tostring(id)))
+    end
 end
 
 registerVendingTargets()
@@ -41,4 +48,8 @@ AddEventHandler('onClientResourceStart', function(resource)
     if resource == 'kora_target' then
         registerVendingTargets()
     end
+end)
+
+AddEventHandler('onClientResourceStop', function(resource)
+    if resource == 'kora_target' then registered = false end
 end)
