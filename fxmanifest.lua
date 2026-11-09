@@ -135,3 +135,6 @@ files {
     -- directory link keeps custom artwork shared with the native image path.
     'html/images/**/*'
 }
+
+-- kora_qa: Gherkin test scenarios (converted legacy tests), see [kora]/kora_qa/README.md
+qa_feature 'tests/*.feature'
