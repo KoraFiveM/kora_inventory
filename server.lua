@@ -3056,12 +3056,13 @@ end
 -- deliberate registration with prices and an access policy, never something a
 -- restock call should conjure into existence.
 ---@param identifier string|number
----@return table|nil items
+---@return table|false items false (not nil) for an unknown shop: an export's
+--- `nil, reason` loses the reason crossing the msgpack boundary.
 ---@return string|nil reason
 local function shopGet(identifier)
     local inv = getInventory(key('shop', identifier))
     if not inv then
-        return nil, 'shop not found'
+        return false, 'shop not found'
     end
     return inventory.copy(inv.stock or inv.items or {})
 end
