@@ -2513,6 +2513,11 @@ end
 ---@return string|nil reason
 local function addItem(src, name, amount, slot, info, reason)
     amount = inventory.amount(amount, 1)
+    -- inventory.amount answers nil for zero or negative amounts; adding one used
+    -- to store a stack without an amount, which broke every later add of it.
+    if not amount then
+        return false, 'invalid amount'
+    end
     if cashItemsActive and isCashItemName(name) then
         -- Compatibility still works, but monetary accounting and events stay
         -- in kora_core. Never let an arbitrary resource mutate the cash stack.
