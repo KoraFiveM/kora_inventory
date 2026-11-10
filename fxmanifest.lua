@@ -4,7 +4,7 @@ lua54 'yes'
 
 name 'kora_inventory'
 author 'qbcore2'
-version '0.2.4'
+version '0.2.5'
 description 'Server-authoritative inventory with bundled NUI'
 
 -- The NUI is only a renderer. `server.lua` remains the sole inventory authority
