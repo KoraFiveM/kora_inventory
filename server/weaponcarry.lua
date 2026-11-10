@@ -144,12 +144,18 @@ local function buildCarryList(src)
     table.sort(slots)
 
     local carried = {}
+    -- Duplicates of one weapon share a single prop: N copies in N slots would
+    -- otherwise be drawn N times on the body, stacked on top of each other.
+    -- The lowest slot wins, so the choice is deterministic across clients.
+    -- A copy in hand does not hide the others: the next copy is still carried.
+    local seen = {}
     for _, slot in ipairs(slots) do
         local item = items[slot]
         -- A weapon in hand is not also on the back.
         local inHand = holding and holding.slot == slot and holding.name == item.name
-        local rule = (not inHand) and type(item.name) == 'string' and carryRule(item.name) or nil
+        local rule = (not inHand) and type(item.name) == 'string' and not seen[item.name] and carryRule(item.name) or nil
         if rule then
+            seen[item.name] = true
             local info = item.info or item.metadata
             carried[#carried + 1] = {
                 name = item.name,
@@ -285,7 +291,7 @@ local function toggle(src, item)
         -- shot reports below can decrease it but never increase it.
         ammo = throwable and 1 or math.floor(tonumber(info.ammo) or 0),
         throwable = throwable or nil,
-        tint = math.max(0, math.min(32, math.floor(tonumber(info.tint) or 0))),
+        tint = Kora.util.clamp(math.floor(tonumber(info.tint) or 0), 0, 32),
         -- This uses the same allow-list as the carried prop renderer. The
         -- client never receives raw metadata component names.
         components = renderableComponents(info),

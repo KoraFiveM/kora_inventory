@@ -394,6 +394,43 @@ Kora.cache.onChange('isDead', function(isDead)
     end
 end)
 
+-- A running emote (kora_emotemenu replicates `kora_emotemenu:active` as the emote
+-- name, or false) owns the hands: a drawn weapon would hang off the prop pose
+-- and still aim and fire. Holster it -- the weaponUnequipped report puts the
+-- prop back on the player's body -- and keep aim/fire disabled until it ends.
+local EMOTE_KEY = 'kora_emotemenu:active'
+local EMOTE_BLOCKED_CONTROLS = { 24, 25, 37, 47, 68, 69, 70, 91, 92, 140, 141, 142, 257, 263, 264 }
+local emoteGuard = false
+
+local function holsterForEmote()
+    if not drawn or toggling then
+        return
+    end
+    SetCurrentPedWeapon(Kora.cache.ped(), joaat('weapon_unarmed'), true)
+    reportUnequipped()
+end
+
+Kora.state.onChange(EMOTE_KEY, nil, function(context)
+    if carryConfig.holsterOnEmote == false or not context.value or emoteGuard then
+        return
+    end
+    if context.bagName ~= ('player:%d'):format(Kora.cache.serverId() or -1) then
+        return
+    end
+    emoteGuard = true
+    CreateThread(function()
+        while LocalPlayer.state[EMOTE_KEY] do
+            holsterForEmote()
+            DisablePlayerFiring(PlayerId(), true)
+            for _, control in ipairs(EMOTE_BLOCKED_CONTROLS) do
+                DisableControlAction(0, control, true)
+            end
+            Wait(0)
+        end
+        emoteGuard = false
+    end)
+end)
+
 -- Persist only ammunition that has been consumed. The server checks both the
 -- slot and its own equipped record, and refuses any report that would raise
 -- ammo, so this cannot turn the native client weapon count into an item-mint.

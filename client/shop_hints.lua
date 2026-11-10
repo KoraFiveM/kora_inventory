@@ -76,7 +76,7 @@ local function run()
     local markerType = math.floor(tonumber(marker.type) or 20)
     local scale = marker.scale or { x = 0.3, y = 0.3, z = 0.3 }
     local rotation = FLIPPED_TYPES[markerType] and 180.0 or 0.0
-    local alpha = math.max(0, math.min(255, math.floor(tonumber(config.alpha) or 160)))
+    local alpha = Kora.util.clamp(math.floor(tonumber(config.alpha) or 160), 0, 255)
     local drawDistance = tonumber(config.drawDistance) or 10.0
     if drawDistance <= 0 then return end
     local bob, spin = marker.bob == true, marker.rotate == true

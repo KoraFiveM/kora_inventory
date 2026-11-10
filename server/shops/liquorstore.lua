@@ -6,50 +6,17 @@
 -- the server before every open and every session revalidation -- so triggering
 -- the client zone's action away from a counter is harmless.
 --
--- Structurally identical to server/shops/ammunation.lua on purpose. Two shops
--- with the same "must be standing at one of these counters" policy should not
--- have two different implementations of it that can drift apart; if a third
--- location-gated shop appears, this is the point to extract one helper rather
--- than to copy it again.
+-- The "must be standing at one of these counters" policy itself lives in
+-- server/shops/location_policy.lua, shared with ammunation.lua and
+-- convenience.lua.
 
 local shop = assert(
     Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.liquorstore,
     'kora_inventory liquor store configuration is required'
 )
 
-local function distanceSquared(a, b)
-    local dx, dy, dz = a.x - b.x, a.y - b.y, a.z - b.z
-    return dx * dx + dy * dy + dz * dz
-end
-
 local function isAtApprovedLocation(source)
-    local ped = GetPlayerPed(source)
-    if not ped or ped == 0 or not DoesEntityExist(ped) then
-        return false, 'player entity unavailable'
-    end
-
-    local playerBucket = GetPlayerRoutingBucket(source)
-    local playerCoords = GetEntityCoords(ped)
-    local maximumDistance = tonumber(shop.interactionDistance) or 2.25
-    local maximumDistanceSquared = maximumDistance * maximumDistance
-
-    for _, location in ipairs(shop.locations or {}) do
-        -- Every default entry has an explicit bucket. A missing/invalid bucket
-        -- is a configuration error and therefore fails closed instead of
-        -- widening the shop's opening surface.
-        if
-            type(location.bucket) == 'number'
-            and playerBucket == location.bucket
-            and type(location.x) == 'number'
-            and type(location.y) == 'number'
-            and type(location.z) == 'number'
-            and distanceSquared(playerCoords, location) <= maximumDistanceSquared
-        then
-            return true
-        end
-    end
-
-    return false, 'not at a liquor store counter'
+    return isAtApprovedShopLocation(shop, source, 'not at a liquor store counter')
 end
 
 local function access(source, inventory)

@@ -32,6 +32,11 @@ GetCurrentResourceName = function() return 'kora_inventory' end
 DoesEntityExist = function(e) return entities[e] ~= nil end
 TaskStartScenarioInPlace = function(e, s) scenarios[e] = s end
 Kora = {
+    util = { clamp = function(value, min, max)
+        if value < min then return min end
+        if value > max then return max end
+        return value
+    end },
     zones = { sphere = function(o) zones[#zones + 1] = o; o.remove = function() o.removed = true end; return o end },
     entities = {
         create = function(model, coords, opts)

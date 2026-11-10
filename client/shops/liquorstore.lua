@@ -7,7 +7,6 @@ local shop = assert(
     Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.liquorstore,
     'kora_inventory liquor store configuration is required'
 )
-local targetIds = {}
 
 local function openLiquorStore()
     exports.kora_inventory:openInventory('shop', shop.id)
@@ -20,45 +19,34 @@ RegisterNetEvent('kora_inventory:client:openLiquorStore', function()
     openLiquorStore()
 end)
 
-local function registerLiquorStoreTargets()
-    for _, targetId in ipairs(targetIds) do
-        exports.kora_target:removeZone(targetId)
-    end
-    targetIds = {}
+local targets = KoraInventory.shopLocationTargets(shop, function(location)
+    return {
+        {
+            label = ('Browse %s'):format(location.name),
+            icon = 'wine',
+            onSelect = openLiquorStore,
+            -- The clerk ped offers the same option while it is spawned.
+            canInteract = function() return not KoraInventory.shopClerkActive(location) end,
+        },
+    }
+end)
 
-    for _, location in ipairs(shop.locations or {}) do
-        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(KoraInventory.shopZoneSprite({
-            coords = { x = location.x, y = location.y, z = location.z },
-            radius = shop.interactionDistance,
-            options = {
-                {
-                    label = ('Browse %s'):format(location.name),
-                    icon = 'wine',
-                    onSelect = openLiquorStore,
-                    -- The clerk ped offers the same option while it is spawned.
-                    canInteract = function() return not KoraInventory.shopClerkActive(location) end,
-                },
-            },
-        }, location))
-    end
-end
-
-registerLiquorStoreTargets()
+targets.register()
 AddEventHandler('onClientResourceStart', function(resource)
     if resource == 'kora_target' then
-        registerLiquorStoreTargets()
+        targets.register()
     end
 end)
 
 AddEventHandler('onClientResourceStop', function(resource)
     if resource == 'kora_target' then
-        targetIds = {}
+        targets.clear()
     end
 end)
 
-for _, location in ipairs(shop.locations or {}) do
-    if shop.blip and shop.blip.enabled then
-        local blip = KoraInventory.createShopBlip(Config.kora_inventory.shops.liquorstore.blip.category, { x = location.x, y = location.y, z = location.z }, {
+KoraInventory.shopLocationBlips(shop, Config.kora_inventory.shops.liquorstore.blip.category,
+    function(location)
+        return {
             sprite = shop.blip.sprite,
             color = shop.blip.color,
             scale = shop.blip.scale,
@@ -66,14 +54,13 @@ for _, location in ipairs(shop.locations or {}) do
             category = shop.blip.category,
             name = location.name,
             info = shop.blip.info,
-        })
-        if blip and not shop.blip.info then
-            Kora.blips.setInfo(blip, {
-                title = location.name,
-                rows = {
-                    { kind = 'wrappedText', value = "Browse this store's available drinks and supplies." },
-                },
-            })
-        end
-    end
-end
+        }
+    end,
+    function(location)
+        return {
+            title = location.name,
+            rows = {
+                { kind = 'wrappedText', value = "Browse this store's available drinks and supplies." },
+            },
+        }
+    end)

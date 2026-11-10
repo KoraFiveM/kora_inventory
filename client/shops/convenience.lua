@@ -7,7 +7,6 @@ local shop = assert(
     Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.convenience,
     'kora_inventory convenience store configuration is required'
 )
-local targetIds = {}
 local enabled = shop.enabled ~= false
 
 local function openConvenienceStore()
@@ -21,28 +20,21 @@ RegisterNetEvent('kora_inventory:client:openConvenienceStore', function()
     openConvenienceStore()
 end)
 
+local targets = KoraInventory.shopLocationTargets(shop, function(location)
+    return {
+        {
+            label = ('Open shop (%s)'):format(location.name),
+            icon = 'basket-shopping',
+            onSelect = openConvenienceStore,
+            -- The clerk ped offers the same option while it is spawned.
+            canInteract = function() return not KoraInventory.shopClerkActive(location) end,
+        },
+    }
+end)
+
 local function registerConvenienceStoreTargets()
     if not enabled then return end
-    for _, targetId in ipairs(targetIds) do
-        exports.kora_target:removeZone(targetId)
-    end
-    targetIds = {}
-
-    for _, location in ipairs(shop.locations or {}) do
-        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(KoraInventory.shopZoneSprite({
-            coords = { x = location.x, y = location.y, z = location.z },
-            radius = shop.interactionDistance,
-            options = {
-                {
-                    label = ('Open shop (%s)'):format(location.name),
-                    icon = 'basket-shopping',
-                    onSelect = openConvenienceStore,
-                    -- The clerk ped offers the same option while it is spawned.
-                    canInteract = function() return not KoraInventory.shopClerkActive(location) end,
-                },
-            },
-        }, location))
-    end
+    targets.register()
 end
 
 registerConvenienceStoreTargets()
@@ -54,28 +46,29 @@ end)
 
 AddEventHandler('onClientResourceStop', function(resource)
     if resource == 'kora_target' then
-        targetIds = {}
+        targets.clear()
     end
 end)
 
-for _, location in ipairs(enabled and shop.locations or {}) do
-    if shop.blip and shop.blip.enabled then
-        local blip = KoraInventory.createShopBlip(Config.kora_inventory.shops.convenience.blip.category, { x = location.x, y = location.y, z = location.z }, {
-            sprite = shop.blip.sprite,
-            color = shop.blip.color,
-            scale = shop.blip.scale,
-            shortRange = shop.blip.shortRange,
-            category = shop.blip.category,
-            name = location.name,
-            info = shop.blip.info,
-        })
-        if blip and not shop.blip.info then
-            Kora.blips.setInfo(blip, {
+if enabled then
+    KoraInventory.shopLocationBlips(shop, Config.kora_inventory.shops.convenience.blip.category,
+        function(location)
+            return {
+                sprite = shop.blip.sprite,
+                color = shop.blip.color,
+                scale = shop.blip.scale,
+                shortRange = shop.blip.shortRange,
+                category = shop.blip.category,
+                name = location.name,
+                info = shop.blip.info,
+            }
+        end,
+        function(location)
+            return {
                 title = location.name,
                 rows = {
                     { kind = 'wrappedText', value = "Browse this store's snacks, drinks and supplies." },
                 },
-            })
-        end
-    end
+            }
+        end)
 end

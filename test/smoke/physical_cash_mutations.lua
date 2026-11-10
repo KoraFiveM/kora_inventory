@@ -27,6 +27,22 @@ AddEventHandler = function(name, callback) events[name] = callback end
 RegisterNetEvent = AddEventHandler
 TriggerEvent = function(name, ...) if events[name] then events[name](...) end end
 Kora = {
+    util = { deepClone = function(value)
+        local seen = {}
+        local function clone(v)
+            if type(v) ~= "table" then return v end
+            if seen[v] then return seen[v] end
+            local copy = {}
+            seen[v] = copy
+            for k, vv in pairs(v) do copy[clone(k)] = clone(vv) end
+            return copy
+        end
+        return clone(value)
+    end, clamp = function(value, min, max)
+        if value < min then return min end
+        if value > max then return max end
+        return value
+    end },
     resources = { serverRegistry = function() return { track = noop, untrack = noop } end },
     callback = { register = noop },
     distance = { player = function() return true end },

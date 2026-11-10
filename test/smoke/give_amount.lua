@@ -9,6 +9,18 @@ dofile('shared.lua')
 
 local callbacks = {}
 Kora = {
+    util = { deepClone = function(value)
+        local seen = {}
+        local function clone(v)
+            if type(v) ~= "table" then return v end
+            if seen[v] then return seen[v] end
+            local copy = {}
+            seen[v] = copy
+            for k, vv in pairs(v) do copy[clone(k)] = clone(vv) end
+            return copy
+        end
+        return clone(value)
+    end },
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function(name, fn) callbacks[name] = fn end },
     sql = {},

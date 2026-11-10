@@ -1,5 +1,11 @@
 local H = dofile('test/harness.lua')
 
+Kora = { util = { clamp = function(value, min, max)
+    if value < min then return min end
+    if value > max then return max end
+    return value
+end } }
+
 local registered = {}
 AddEventHandler = function() end
 GetCurrentResourceName = function() return 'kora_inventory' end

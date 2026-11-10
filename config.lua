@@ -592,6 +592,10 @@ Config.kora_inventory = {
     -- for. Disabling it leaves the inventory model completely unchanged.
     weaponCarry = {
         enabled = true,
+        -- Carry pistol-class weapons on the hip (two slots) instead of the back.
+        pistolsOnHip = true,
+        -- Holster a drawn weapon (back onto the body) and block aiming/firing while a kora_emotemenu emote is active.
+        holsterOnEmote = true,
         -- Which of a player's weapons are rendered on their body:
         --   'all'    -- every carryable weapon in the inventory.
         --   'hotbar' -- only weapons in slots 1..hotbarSlots. A weapon stowed
@@ -655,10 +659,9 @@ Config.kora_inventory = {
             LMG = 'back',
             Heavy = 'back',
             Melee = 'sling',
-            -- Keep sidearms visible with the rest of the carried weapons.
-            -- This also uses the back draw/holster animation and attachment
-            -- positions, so a pistol is not left at the hip.
-            Pistol = 'back',
+            -- Sidearms sit on the hip (see `pistolsOnHip`; false puts them
+            -- back on the spine with the long guns).
+            Pistol = 'hip',
         },
         -- Attachment positions per tier, taken in order. A weapon that finds
         -- no free position in its tier is simply not rendered, rather than
@@ -682,8 +685,11 @@ Config.kora_inventory = {
                 { bone = 24817, pos = { x = -0.13, y = -0.15, z = 0.10 }, rot = { x = 5.0, y = 124.0, z = 0.0 } },
             },
             hip = {
-                { bone = 24817, pos = { x = -0.28, y = -0.14, z = 0.15 }, rot = { x = 0.0, y = 92.0, z = -13.0 } },
-                { bone = 24817, pos = { x = -0.27, y = -0.14, z = 0.15 }, rot = { x = 0.0, y = 92.0, z = 13.0 } },
+                -- First-pass tuning from an in-game screenshot: the pistol stuck
+                -- out sideways from the hip, so the lateral (z) offset is pulled
+                -- in. Adjust in game; this has not been verified visually.
+                { bone = 24817, pos = { x = -0.28, y = -0.14, z = 0.09 }, rot = { x = 0.0, y = 92.0, z = -13.0 } },
+                { bone = 24817, pos = { x = -0.27, y = -0.14, z = 0.09 }, rot = { x = 0.0, y = 92.0, z = 13.0 } },
             },
         },
         -- Per-item overrides, keyed by item name. `tier = false` stops an
@@ -705,6 +711,10 @@ Config.kora_inventory = {
         components = {},
     },
 }
+
+if Config.kora_inventory.weaponCarry.pistolsOnHip == false then
+    Config.kora_inventory.weaponCarry.tiers.Pistol = 'back'
+end
 
 -- Registers this resource-owned configuration with kora_lib without changing its public Config table.
 if Kora and Kora.config and Kora.config.adopt then

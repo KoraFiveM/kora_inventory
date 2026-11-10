@@ -4,7 +4,18 @@ Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('shared.lua')
 
-Kora = { vehicle = {}, world = {}, lookup = {} }
+Kora = { vehicle = {}, world = {}, lookup = {}, util = { deepClone = function(value)
+    local seen = {}
+    local function clone(v)
+        if type(v) ~= 'table' then return v end
+        if seen[v] then return seen[v] end
+        local copy = {}
+        seen[v] = copy
+        for k, vv in pairs(v) do copy[clone(k)] = clone(vv) end
+        return copy
+    end
+    return clone(value)
+end } }
 function Kora.vehicle.normalizePlate(value, options)
     if type(value) ~= 'string' then return nil, 'invalid_type' end
     local plate = value:match('^%s*(.-)%s*$'):upper():gsub('%s+', ' ')

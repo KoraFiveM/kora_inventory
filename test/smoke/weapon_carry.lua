@@ -16,6 +16,22 @@ dofile('shared.lua')
 local netEvents, localEvents, clientEvents, bags = {}, {}, {}, {}
 
 Kora = {
+    util = { deepClone = function(value)
+        local seen = {}
+        local function clone(v)
+            if type(v) ~= "table" then return v end
+            if seen[v] then return seen[v] end
+            local copy = {}
+            seen[v] = copy
+            for k, vv in pairs(v) do copy[clone(k)] = clone(vv) end
+            return copy
+        end
+        return clone(value)
+    end, clamp = function(value, min, max)
+        if value < min then return min end
+        if value > max then return max end
+        return value
+    end },
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function() end },
     sql = {},
@@ -153,6 +169,22 @@ H.equal(allList[3].name, 'weapon_bat', 'the stowed weapon keeps its slot order')
 cfg.enabled = false
 H.equal(#carry.buildCarryList(7), 0, 'a disabled carry system carries nothing at all')
 cfg.enabled = true
+
+-- duplicates: many copies of one weapon share a single prop on the body
+
+give(2, 'weapon_carbinerifle')
+give(4, 'weapon_carbinerifle')
+give(5, 'weapon_carbinerifle')
+cfg.visibility = 'all'
+local dupList = carry.buildCarryList(7)
+local rifles = 0
+for _, entry in ipairs(dupList) do
+    if entry.name == 'weapon_carbinerifle' then rifles = rifles + 1 end
+end
+H.equal(rifles, 1, 'several copies of one weapon render as a single prop on the back')
+H.equal(#dupList, 3, 'distinct weapons are still each carried alongside the deduplicated copies')
+for _, slot in ipairs({ 2, 4, 5 }) do playersItems[7][slot] = nil end
+give(4, 'water_bottle')
 
 -- draw pacing
 

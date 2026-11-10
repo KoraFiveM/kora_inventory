@@ -31,7 +31,18 @@ GetGameTimer = function() return 12345 end
 GetPlayerPed = function(source) return source == 10 and 110 or source == 20 and 120 or 0 end
 GetPlayerRoutingBucket = function(source) return (source == 10 or source == 20) and 1 or 2 end
 GetEntityCoords = function() return { x = 0, y = 0, z = 0 } end
-Kora = { distance = { player = function() return true end } }
+Kora = { distance = { player = function() return true end }, util = { deepClone = function(value)
+    local seen = {}
+    local function clone(v)
+        if type(v) ~= 'table' then return v end
+        if seen[v] then return seen[v] end
+        local copy = {}
+        seen[v] = copy
+        for k, vv in pairs(v) do copy[clone(k)] = clone(vv) end
+        return copy
+    end
+    return clone(value)
+end } }
 
 KoraInventory = { copy = KoraInventory.copy, internal = {} }
 local I = KoraInventory.internal

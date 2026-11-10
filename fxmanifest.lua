@@ -4,7 +4,7 @@ lua54 'yes'
 
 name 'kora_inventory'
 author 'qbcore2'
-version '0.2.0'
+version '0.2.4'
 description 'Server-authoritative inventory with bundled NUI'
 
 -- The NUI is only a renderer. `server.lua` remains the sole inventory authority
@@ -24,7 +24,6 @@ dependency 'kora_target'
 
 shared_scripts {
     '@kora_lib/init.lua',
-    '@kora_sql/init.lua',
     'config.lua',
     'config/shops/ammunation.lua',
     'config/shops/vendingmachine.lua',
@@ -34,6 +33,7 @@ shared_scripts {
 }
 
 server_scripts {
+    '@kora_sql/init.lua',
     -- Owns secondary-inventory schema, persistence and non-destructive legacy
     -- import. It is deliberately loaded before the inventory authority.
     'server/schema.lua',
@@ -56,6 +56,7 @@ server_scripts {
     -- ammunition and durability from kora_inventory state rather than trusting
     -- the old client item payloads.
     'server/compat/qb_weapons.lua',
+    'server/shops/location_policy.lua',
     'server/shops/ammunation.lua',
     'server/shops/vendingmachine.lua',
     'server/shops/liquorstore.lua',
@@ -134,3 +135,6 @@ files {
     -- directory link keeps custom artwork shared with the native image path.
     'html/images/**/*'
 }
+
+-- kora_qa: Gherkin test scenarios (converted legacy tests), see [kora]/kora_qa/README.md
+qa_feature 'tests/*.feature'

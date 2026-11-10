@@ -31,12 +31,10 @@ html, body, #root, #root * { -webkit-user-select: none; user-select: none; }
   /* The outer frame must never acquire its own scrollbar; slot lists and the
      inspector handle any overflow within their respective panels. */
   overflow: hidden;
-  border: 1px solid hsl(var(--border-strong) / .82);
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at 0 0, hsl(var(--primary) / .11), transparent 29%),
-    linear-gradient(145deg, hsl(var(--surface-raised) / .98), hsl(var(--surface)) 32%, hsl(var(--background) / .98));
-  box-shadow: 0 32px 90px rgb(0 0 0 / 68%), inset 0 1px 0 rgb(255 255 255 / .035);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: hsl(var(--popover));
+  box-shadow: var(--shadow-modal);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
@@ -72,26 +70,24 @@ html, body, #root, #root * { -webkit-user-select: none; user-select: none; }
 }
 
 .inventory-topbar { display: grid; grid-template-columns: minmax(210px, 1fr) minmax(250px, 390px) auto; align-items: center; gap: 12px; min-height: 38px; padding: 1px 2px; }
-.brand { display: grid; grid-template-columns: 34px auto auto; align-items: center; justify-content: start; gap: 8px; font-size: calc(12px * var(--ui-scale, 1)); font-weight: 850; letter-spacing: .13em; }
-.brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid hsl(var(--brand-border)); border-radius: 10px; color: hsl(var(--primary)); background: linear-gradient(145deg, hsl(var(--brand-soft)), hsl(var(--background) / .45)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .06); }
-.brand em { display: inline-flex; align-items: center; gap: 4px; border: 1px solid hsl(var(--brand-border)); border-radius: 999px; padding: 3px 6px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); font-size: calc(8px * var(--ui-scale, 1)); font-style: normal; letter-spacing: .09em; }
-.brand em i { width: 4px; height: 4px; border-radius: 999px; background: currentColor; box-shadow: 0 0 8px currentColor; }
-.search { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid hsl(var(--border)); border-radius: 9px; background: hsl(var(--background) / .62); color: hsl(var(--muted-foreground)); transition: border-color 120ms ease, background-color 120ms ease; }
-.search:focus-within { border-color: hsl(var(--brand-border)); background: hsl(var(--background) / .9); box-shadow: 0 0 0 3px hsl(var(--brand-soft) / .42); }
-.search input { min-width: 0; height: 34px; border: 0; outline: 0; font-size: calc(11px * var(--ui-scale, 1)); color: hsl(var(--foreground)); background: transparent; }
+.brand { display: grid; grid-template-columns: 26px auto; align-items: center; justify-content: start; gap: 8px; font-size: calc(15px * var(--ui-scale, 1)); font-weight: 600; }
+.brand-mark { display: grid; width: 26px; height: 26px; place-items: center; color: hsl(var(--primary)); }
+.search { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 7px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: hsl(var(--surface-raised)); color: hsl(var(--muted-foreground)); transition: box-shadow 120ms ease; }
+.search:focus-within { box-shadow: 0 0 0 1.5px hsl(var(--primary)); }
+.search input { min-width: 0; height: 34px; border: 0; outline: 0; font-size: calc(13px * var(--ui-scale, 1)); color: hsl(var(--foreground)); background: transparent; }
 .search input::placeholder { color: hsl(var(--muted-foreground)); }
 .topbar-actions { display: flex; align-items: center; justify-content: end; gap: 8px; }
-.session-state { padding: 0 2px; color: hsl(var(--muted-foreground)); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 750; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
-.close, .quiet-action { border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(var(--muted)); cursor: pointer; }
+.session-state { padding: 0 2px; color: hsl(var(--muted-foreground)); font-size: calc(12px * var(--ui-scale, 1)); white-space: nowrap; }
+.close, .quiet-action { border: 0; border-radius: var(--radius-sm); background: hsl(var(--surface-raised)); color: hsl(var(--foreground)); cursor: pointer; }
 .close, .detail-close {
   box-sizing: border-box;
   padding: 0;
   line-height: 0;
 }
-.close { width: 34px; height: 34px; display: grid; place-items: center; background: hsl(var(--background) / .62); }
+.close { width: 34px; height: 34px; display: grid; place-items: center; }
 .close svg, .detail-close svg { display: block; flex: none; }
-.close:hover, .quiet-action:hover { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
-.notice { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid hsl(var(--destructive-border)); border-radius: 9px; color: hsl(var(--destructive)); background: hsl(var(--destructive-soft)); font-size: calc(11px * var(--ui-scale, 1)); }
+.close:hover, .quiet-action:hover { background: hsl(var(--surface-hover)); }
+.notice { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 7px; padding: 8px 10px; border-radius: var(--radius-sm); color: hsl(var(--destructive)); background: hsl(var(--destructive-soft)); font-size: calc(13px * var(--ui-scale, 1)); }
 
 .inventory-layout { min-height: 0; display: grid; grid-template-columns: minmax(310px, 1fr) minmax(250px, 290px) minmax(310px, 1fr); gap: 14px; }
 .inventory-layout-solo {
@@ -107,39 +103,38 @@ html, body, #root, #root * { -webkit-user-select: none; user-select: none; }
 .inventory-layout-swapped .inventory-stage-secondary { order: 1; }
 .inventory-stage > .inventory-panel { height: 100%;
 }
-.inventory-panel, .item-detail { min-height: 0; overflow: auto; border: 1px solid hsl(var(--border)); border-radius: 14px; background: linear-gradient(155deg, hsl(var(--surface-panel)), hsl(var(--background) / .72)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .025); }
+.inventory-panel, .item-detail { min-height: 0; overflow: auto; border: 0; border-radius: var(--radius); background: hsl(var(--card)); }
 .inventory-panel { padding: 13px; }
-.inventory-panel-player { position: relative; isolation: isolate; border-color: hsl(var(--border-strong) / .8); box-shadow: 0 18px 44px rgb(0 0 0 / .2); }
-.inventory-panel-player::before { content: ""; position: absolute; z-index: -1; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, hsl(var(--primary) / .1), transparent 34%); }
-.panel-header { display: grid; grid-template-columns: 1fr minmax(118px, 155px); align-items: center; gap: 12px; margin: 0 1px 13px; padding: 0 1px 12px; border-bottom: 1px solid hsl(var(--border) / .85); }
-.eyebrow { margin: 0 0 3px; color: hsl(var(--muted-foreground)); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+.inventory-panel-player { position: relative; isolation: isolate; }
+.panel-header { display: grid; grid-template-columns: 1fr minmax(118px, 155px); align-items: center; gap: 12px; margin: 0 1px 13px; padding: 0 1px; }
+.eyebrow { margin: 0 0 2px; color: hsl(var(--muted-foreground)); font-size: calc(12px * var(--ui-scale, 1)); font-weight: 500; }
+.eyebrow::first-letter { text-transform: uppercase; }
 h1, h2, p { margin-top: 0; }
 /* Headings follow kora_theme's configurable heading font, then its body font;
    the literal stack matches theme.css's default so nothing shifts when unset. */
 h1, h2, h3 { font-family: var(--font-heading, var(--font-sans, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif)); }
-h2 { margin-bottom: 0; font-size: calc(15px * var(--ui-scale, 1)); letter-spacing: -.015em; }
-.weight { display: grid; gap: 6px; color: hsl(var(--muted-foreground)); text-align: right; font-size: calc(9px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }
-.weight i, .durability { height: 4px; overflow: hidden; border-radius: 999px; background: hsl(var(--muted)); }
-.weight b, .durability i { display: block; height: 100%; border-radius: inherit; background: hsl(var(--primary)); }
-.slot-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; align-content: start; }
-.slot { position: relative; min-width: 0; min-height: 0; aspect-ratio: 1 / 1; padding: 4px; overflow: hidden; border: var(--slot-border-width, 1px) solid hsl(var(--border)); border-radius: 9px; color: hsl(var(--muted-foreground)); background: linear-gradient(145deg, hsl(var(--background)), hsl(var(--card))); cursor: grab; text-align: left; display: grid; grid-template-rows: calc(17px * var(--ui-scale, 1)) minmax(0, 1fr) auto; gap: 2px; touch-action: none; -webkit-user-select: none; user-select: none; transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease, box-shadow 120ms ease; --slot-ring: hsl(var(--foreground) / .09); box-shadow: inset 0 0 0 1px var(--slot-ring); }
-.slot:hover, .slot:focus-visible { outline: 0; border-color: hsl(var(--brand-border)); transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--slot-ring), 0 7px 15px rgb(0 0 0 / .22); }
-.inventory-shell .slot:focus-visible { border-color: hsl(var(--border)); transform: none; box-shadow: inset 0 0 0 1px var(--slot-ring); }
+h2 { margin-bottom: 0; font-size: calc(16px * var(--ui-scale, 1)); font-weight: 600; }
+.weight { display: grid; gap: 6px; color: hsl(var(--muted-foreground)); text-align: right; font-size: calc(12px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }
+.weight i, .durability { height: 4px; overflow: hidden; border-radius: 999px; background: hsl(var(--surface-hover)); }
+.weight b, .durability i { display: block; height: 100%; border-radius: inherit; background: hsl(var(--foreground) / .7); }
+.slot-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; align-content: start; }
+.slot { position: relative; min-width: 0; min-height: 0; aspect-ratio: 1 / 1; padding: 4px; overflow: hidden; border: var(--slot-border-width, 1px) solid hsl(var(--surface-raised)); border-radius: var(--radius-sm); color: hsl(var(--muted-foreground)); background: hsl(var(--surface-raised)); cursor: grab; text-align: left; display: grid; grid-template-rows: calc(17px * var(--ui-scale, 1)) minmax(0, 1fr) auto; gap: 2px; touch-action: none; -webkit-user-select: none; user-select: none; transition: border-color 120ms ease, background-color 120ms ease; }
+.slot:hover, .slot:focus-visible { outline: 0; border-color: hsl(var(--surface-hover)); background: hsl(var(--surface-hover)); }
+.inventory-shell .slot:focus-visible { border-color: hsl(var(--surface-raised)); background: hsl(var(--surface-raised)); }
 /* The hover lift moves the slot out from under a pointer resting near its lower
    edge, which drops :hover, which puts the slot back, which restores :hover --
    a flicker loop that makes drags hitch and miss their target. No lift inside
    the inventory; the border highlight alone marks the hovered slot. */
-.inventory-shell .slot:hover { transform: none; }
-.slot-selected { border-color: hsl(var(--primary)); background: hsl(var(--brand-soft)); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)), inset 0 0 0 2px hsl(var(--foreground) / .1), 0 7px 16px rgb(0 0 0 / .18); }
-.slot-move-target { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft) / .58); box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
+.inventory-shell .slot:hover { transform: none; border-color: hsl(var(--surface-hover)); background: hsl(var(--surface-hover)); }
+.slot-selected, .inventory-shell .slot-selected:hover { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft)); }
+.slot-move-target { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft) / .58); }
 .slot-selected.slot-move-target { border-color: hsl(var(--primary)); }
 .slot-drag-source { cursor: grabbing; opacity: .34; }
 /* Painted ahead of the server (Config.kora_inventory.ui.optimisticMoves) and not
    confirmed yet: dashed and dimmed in the theme's own tokens until the server's
    inventory replaces it, which is the only way this class ever goes away. */
-.slot-pending { border-style: dashed; border-color: hsl(var(--brand-border)); }
-.slot-pending .item-art, .slot-pending .item-footer, .slot-pending .item-amount { opacity: .62; animation: slot-pending-pulse 1.1s ease-in-out infinite alternate; }
-@keyframes slot-pending-pulse { from { opacity: .5; } to { opacity: .78; } }
+.slot-pending { border-color: hsl(var(--brand-border)); }
+.slot-pending .item-art, .slot-pending .item-footer, .slot-pending .item-amount { opacity: .62; }
 /* Hotbar range (slots 1..Config.kora_inventory.hotbarSlots) on the player's own
    inventory. Drawn as ONE continuous accent frame around the whole run rather
    than a box per slot: five separate outlines read as five special slots, and
@@ -150,105 +145,105 @@ h2 { margin-bottom: 0; font-size: calc(15px * var(--ui-scale, 1)); letter-spacin
 /* Same thickness as the slot border (Config.Slots.borderWidth). The diagonal
    pair on the end slots fills their rounded corners, where the straight edge
    shadows alone thin out to a hairline. */
-.slot-hotbar { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--primary)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--primary)), inset 0 0 0 1px var(--slot-ring); }
-.slot-hotbar-first { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--primary)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--primary)), inset var(--slot-border-width, 1px) 0 0 hsl(var(--primary)), inset var(--slot-border-width, 1px) var(--slot-border-width, 1px) 0 hsl(var(--primary)), inset var(--slot-border-width, 1px) calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--primary)), inset 0 0 0 1px var(--slot-ring); }
-.slot-hotbar-last { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--primary)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--primary)), inset calc(-1 * var(--slot-border-width, 1px)) 0 0 hsl(var(--primary)), inset calc(-1 * var(--slot-border-width, 1px)) var(--slot-border-width, 1px) 0 hsl(var(--primary)), inset calc(-1 * var(--slot-border-width, 1px)) calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--primary)), inset 0 0 0 1px var(--slot-ring); }
+.slot-hotbar { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset 0 0 0 1px var(--slot-ring); }
+.slot-hotbar-first { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset var(--slot-border-width, 1px) 0 0 hsl(var(--brand-border)), inset var(--slot-border-width, 1px) var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset var(--slot-border-width, 1px) calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset 0 0 0 1px var(--slot-ring); }
+.slot-hotbar-last { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset calc(-1 * var(--slot-border-width, 1px)) 0 0 hsl(var(--brand-border)), inset calc(-1 * var(--slot-border-width, 1px)) var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset calc(-1 * var(--slot-border-width, 1px)) calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset 0 0 0 1px var(--slot-ring); }
 /* A selected or targeted hotbar slot keeps its own state shadow: the state is
    transient and needs to win, and the accent frame is still visible on the
    slots either side of it. */
-.slot-hotbar.slot-selected, .slot-hotbar.slot-move-target, .slot-hotbar.slot-drop-invalid { box-shadow: inset 0 0 0 1px hsl(var(--brand-border)); }
-.slot-drop-invalid { border-color: hsl(var(--danger) / .75); box-shadow: inset 0 0 0 1px hsl(var(--danger) / .4); }
+.slot-hotbar.slot-selected, .slot-hotbar.slot-move-target, .slot-hotbar.slot-drop-invalid { box-shadow: none; }
+.slot-drop-invalid { border-color: hsl(var(--danger) / .75); background: hsl(var(--destructive-soft)); }
 /* Never the busy cursor: a pending move must not look like a frozen window. */
 .slot[aria-disabled="true"] { cursor: default; }
 .slot-filled { color: hsl(var(--foreground)); }
-.slot-number { position: absolute; z-index: 1; top: 4px; left: 5px; color: hsl(var(--muted-foreground)); font-size: calc(8px * var(--ui-scale, 1)); font-weight: 700; }
+.slot-number { position: absolute; z-index: 1; top: 4px; left: 5px; color: hsl(var(--muted-foreground)); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 500; font-variant-numeric: tabular-nums; }
 .item-art, .detail-art { display: grid; place-items: center; overflow: hidden; color: hsl(var(--primary)); font-weight: 800; background: hsl(var(--brand-soft)); }
 /* An <img> is natively draggable: grabbing a slot by its picture made CEF start
    (and instantly end) its own HTML drag, and DragGuard took that dragend /
    pointercancel for a release and cancelled the real slot drag. */
 .slot img { -webkit-user-drag: none; }
-.item-art img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; object-position: center; filter: drop-shadow(0 4px 8px rgb(0 0 0 / .35)); }
-.detail-art img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgb(0 0 0 / .35)); }
+.item-art img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; object-position: center; }
+.detail-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
 /* Separate header, artwork and footer rows prevent intrinsic image sizes
    from pushing artwork into the counters or label. */
-.item-art { grid-row: 2; min-width: 0; min-height: 0; width: 100%; height: 100%; box-sizing: border-box; padding: 2px 3px; border-radius: 5px; background: transparent; font-size: calc(20px * var(--ui-scale, 1)); }
+.item-art { grid-row: 2; min-width: 0; min-height: 0; width: 100%; height: 100%; box-sizing: border-box; padding: 2px 3px; border-radius: var(--radius-sm); background: transparent; font-size: calc(20px * var(--ui-scale, 1)); }
 .item-footer { grid-row: 3; min-width: 0; min-height: calc(10px * var(--ui-scale, 1)); display: grid; align-content: end; gap: 1px; padding-bottom: 1px; }
-.item-label { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow-wrap: anywhere; color: hsl(var(--foreground)); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 650; line-height: calc(10px * var(--ui-scale, 1)); text-shadow: 0 1px 3px rgb(0 0 0 / .8); }
-.slot-priced .item-label { -webkit-line-clamp: 2; }
-.item-amount { position: absolute; z-index: 1; top: 3px; right: 4px; border: 1px solid hsl(var(--border-strong)); border-radius: 5px; padding: 0 4px; background: hsl(var(--background) / .94); color: hsl(var(--foreground)); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 800; line-height: calc(15px * var(--ui-scale, 1)); letter-spacing: -.01em; }
-.item-price { justify-self: end; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid hsl(var(--brand-border) / .58); border-radius: 4px; padding: 0 3px; color: hsl(var(--primary)); background: hsl(var(--background) / .92); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 800; line-height: calc(10px * var(--ui-scale, 1)); text-shadow: 0 1px 2px rgb(0 0 0 / .65); }
+.item-label { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; color: hsl(var(--foreground)); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 500; line-height: calc(12px * var(--ui-scale, 1)); }
+.slot-priced .item-label { -webkit-line-clamp: 1; }
+.item-amount { position: absolute; z-index: 1; top: 3px; right: 4px; border-radius: var(--radius-sm); padding: 0 4px; background: hsl(var(--background) / .72); color: hsl(var(--foreground)); font-size: calc(12px * var(--ui-scale, 1)); font-weight: 600; line-height: calc(16px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }
+.item-price { justify-self: end; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: var(--radius-sm); padding: 0 3px; color: hsl(var(--primary)); background: hsl(var(--background) / .72); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 600; line-height: calc(13px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }
 .durability { position: absolute; z-index: 1; right: 5px; bottom: 0; left: 5px; }
 /* Only mounted mid-drag (App.tsx), and painted behind the shell so a slot
    under the cursor always wins. The gutter around the shell is the drop area. */
 .world-drop-zone { position: fixed; z-index: 0; inset: 0; pointer-events: auto; border: 2px dashed transparent; transition: background-color 120ms ease, border-color 120ms ease; }
 .world-drop-zone-armed { border-color: hsl(var(--brand-border)); background: hsl(var(--primary) / .12); }
-.world-drop-hint { position: fixed; z-index: 1200; bottom: 26px; left: 50%; transform: translateX(-50%); margin: 0; border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 5px 12px; color: hsl(var(--muted-foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); font-size: calc(10px * var(--ui-scale, 1)); font-weight: 700; letter-spacing: .04em; pointer-events: none; }
-.world-drop-hint-armed { border-color: hsl(var(--brand-border)); color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
+.world-drop-hint { position: fixed; z-index: 1200; bottom: 26px; left: 50%; transform: translateX(-50%); margin: 0; border-radius: var(--radius-sm); padding: 6px 12px; color: hsl(var(--muted-foreground)); background: hsl(var(--popover)); box-shadow: var(--shadow-floating); font-size: calc(13px * var(--ui-scale, 1)); pointer-events: none; }
+.world-drop-hint-armed { color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
 /* A real slot-shaped preview, centred on the cursor. `transform` is used here
    rather than the newer individual `translate` property because CEF builds
    can otherwise ignore the -50% offset. */
-.inventory-drag-preview { position: fixed; z-index: 1000; width: clamp(56px, 7vw, 86px); min-width: 0; min-height: 0; aspect-ratio: 1 / 1; transform: translate(-50%, -50%); border-color: hsl(var(--brand-border)); background: linear-gradient(145deg, hsl(var(--surface-raised)), hsl(var(--background))); box-shadow: 0 10px 28px rgb(0 0 0 / .48); pointer-events: none; }
+.inventory-drag-preview { position: fixed; z-index: 1000; width: clamp(56px, 7vw, 86px); min-width: 0; min-height: 0; aspect-ratio: 1 / 1; transform: translate(-50%, -50%); border-color: hsl(var(--brand-border)); background: hsl(var(--popover)); box-shadow: var(--shadow-floating); pointer-events: none; }
 .inventory-drag-preview .item-label { -webkit-line-clamp: 1; }
 .item-box-stack { position: fixed; z-index: 1100; right: 20px; bottom: 20px; display: grid; width: min(260px, calc(100vw - 32px)); gap: 6px; pointer-events: none; }
-.item-box { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 46px; overflow: hidden; border: 1px solid hsl(var(--border)); border-left: 3px solid hsl(var(--primary)); border-radius: 7px; padding: 5px 8px 5px 5px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); animation: item-box-in 150ms ease-out both; }
-.item-box-art { display: grid; place-items: center; width: 36px; height: 36px; overflow: hidden; border-radius: 5px; padding: 3px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); font-weight: 800; }
+.item-box { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 46px; overflow: hidden; border-radius: var(--radius); padding: 5px 10px 5px 5px; color: hsl(var(--foreground)); background: hsl(var(--popover)); box-shadow: var(--shadow-floating); animation: item-box-in 150ms ease-out both; }
+.item-box-art { display: grid; place-items: center; width: 36px; height: 36px; overflow: hidden; border-radius: var(--radius-sm); padding: 3px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); font-weight: 600; }
 .item-box-art img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; }
-.item-box p { margin: 0 0 2px; color: hsl(var(--muted-foreground)); font-size: calc(8px * var(--ui-scale, 1)); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-.item-box strong { display: block; overflow: hidden; font-size: calc(11px * var(--ui-scale, 1)); text-overflow: ellipsis; white-space: nowrap; }
-.item-box > b { color: hsl(var(--primary)); font-size: calc(11px * var(--ui-scale, 1)); }
+.item-box p { margin: 0 0 1px; color: hsl(var(--muted-foreground)); font-size: calc(12px * var(--ui-scale, 1)); }
+.item-box strong { display: block; overflow: hidden; font-size: calc(13px * var(--ui-scale, 1)); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.item-box > b { color: hsl(var(--foreground)); font-size: calc(13px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }
 /* Gains keep the brand accent; losses read as a muted debit so a removal is
    never mistaken for a pickup at a glance. */
-.item-box-loss { border-left-color: hsl(var(--muted-foreground)); }
-.item-box-loss > b, .item-box-loss .item-box-art { color: hsl(var(--muted-foreground)); }
-.item-box-loss .item-box-art { background: hsl(var(--muted)); }
+.item-box-loss > b { color: hsl(var(--muted-foreground)); }
 @keyframes item-box-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-.item-detail { padding: 14px; display: grid; align-content: start; gap: 10px; border-color: hsl(var(--border-strong) / .72); box-shadow: 0 18px 44px rgb(0 0 0 / .16); }
-.item-detail-drawer { position: absolute; box-sizing: border-box; top: 0; left: calc(100% + 14px); width: 270px; height: 100%; max-height: 100%; background: linear-gradient(155deg, hsl(var(--surface-raised)), hsl(var(--background) / .96)); animation: item-drawer-in 160ms ease-out both; }
+/* One track that cannot grow past the card: a long value must wrap inside it, not widen it. */
+.item-detail { padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 10px; }
+.item-detail > * { min-width: 0; }
+.item-detail-drawer { position: absolute; box-sizing: border-box; top: 0; left: calc(100% + 14px); width: 270px; height: 100%; max-height: 100%; background: hsl(var(--popover)); box-shadow: var(--shadow-floating); animation: item-drawer-in 160ms ease-out both; }
 /* A window moved into the right half opens its drawer on the left instead. */
 .inventory-shell-drawer-left .item-detail-drawer { left: auto; right: calc(100% + 14px); }
 @keyframes item-drawer-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
-.detail-header { display: flex; align-items: center; justify-content: space-between; min-height: 22px; padding-bottom: 10px; border-bottom: 1px solid hsl(var(--border) / .85); color: hsl(var(--foreground)); font-size: calc(10px * var(--ui-scale, 1)); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-.detail-header-actions { display: flex; align-items: center; gap: 6px; }
-.detail-header em { border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 3px 5px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .55); font-size: calc(7px * var(--ui-scale, 1)); font-style: normal; letter-spacing: .08em; white-space: nowrap; }
-.detail-close { display: grid; width: 22px; height: 22px; padding: 0; place-items: center; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .55); cursor: pointer; }
-.detail-close:hover { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.detail-header { display: flex; align-items: center; justify-content: space-between; min-height: 22px; padding-bottom: 2px; color: hsl(var(--foreground)); font-size: calc(14px * var(--ui-scale, 1)); font-weight: 600; }
+.detail-header-actions { display: flex; align-items: center; flex: none; gap: 6px; }
+.detail-header em { padding: 0 2px; color: hsl(var(--muted-foreground)); font-size: calc(12px * var(--ui-scale, 1)); font-style: normal; font-weight: 400; white-space: nowrap; }
+.detail-close { display: grid; width: 24px; height: 24px; padding: 0; place-items: center; border: 0; border-radius: var(--radius-sm); color: hsl(var(--muted-foreground)); background: hsl(var(--surface-raised)); cursor: pointer; }
+.detail-close:hover { color: hsl(var(--foreground)); background: hsl(var(--surface-hover)); }
 /* Config.Inspector.allowCopy: the inspector's text can be selected (the rest of
    the UI stays unselectable, see the top of this file) and copied with the
    header's Copy button. */
 #root .item-detail-copyable :is(h1, p, dl, dt, dd) { -webkit-user-select: text; user-select: text; cursor: text; }
 #root .item-detail-copyable ::selection { color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
-.detail-copy { display: inline-flex; align-items: center; gap: 4px; height: 22px; box-sizing: border-box; padding: 0 6px; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .55); font: inherit; font-size: calc(7px * var(--ui-scale, 1)); letter-spacing: .08em; cursor: pointer; }
+.detail-copy { display: inline-flex; align-items: center; gap: 4px; height: 24px; box-sizing: border-box; padding: 0 8px; border: 0; border-radius: var(--radius-sm); color: hsl(var(--muted-foreground)); background: hsl(var(--surface-raised)); font: inherit; font-size: calc(12px * var(--ui-scale, 1)); cursor: pointer; }
 .detail-copy svg { display: block; flex: none; }
-.detail-copy:hover, .detail-copy-copied { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
-.detail-copy-failed { border-color: hsl(var(--destructive-border)); color: hsl(var(--destructive)); background: hsl(var(--destructive-soft)); }
-.item-detail:not(.item-detail-empty) .detail-header em { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
-.item-detail-empty { grid-template-rows: auto minmax(0, 1fr); align-content: stretch; background: linear-gradient(160deg, hsl(var(--surface-panel)), hsl(var(--background) / .68)); }
-.item-detail h1 { margin-bottom: 0; font-size: calc(16px * var(--ui-scale, 1)); line-height: 1.08; }
-.item-detail p:not(.eyebrow) { color: hsl(var(--muted-foreground)); font-size: calc(11px * var(--ui-scale, 1)); line-height: 1.45; }
-.detail-art { width: 100%; min-height: 178px; aspect-ratio: 1 / .9; border: 1px solid hsl(var(--brand-border)); border-radius: 11px; font-size: calc(44px * var(--ui-scale, 1)); background: radial-gradient(circle at 50% 30%, hsl(var(--primary) / .18), transparent 63%), hsl(var(--background)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .04); }
+.detail-copy:hover, .detail-copy-copied { color: hsl(var(--foreground)); background: hsl(var(--surface-hover)); }
+.detail-copy-failed { color: hsl(var(--destructive)); background: hsl(var(--destructive-soft)); }
+.item-detail-empty { grid-template-rows: auto minmax(0, 1fr); align-content: stretch; }
+.item-detail h1 { margin-bottom: 0; font-size: calc(18px * var(--ui-scale, 1)); font-weight: 600; line-height: 1.15; overflow-wrap: anywhere; }
+.item-detail p:not(.eyebrow) { color: hsl(var(--muted-foreground)); font-size: calc(13px * var(--ui-scale, 1)); line-height: 1.45; overflow-wrap: anywhere; }
+.detail-art { width: 100%; min-height: 178px; aspect-ratio: 1 / .9; border-radius: var(--radius); font-size: calc(44px * var(--ui-scale, 1)); background: hsl(var(--surface-raised)); }
 .detail-art img { min-width: 0; min-height: 0; box-sizing: border-box; padding: 12px; }
-dl { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin: 3px 0; border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); padding: 9px 0; color: hsl(var(--muted-foreground)); font-size: calc(10px * var(--ui-scale, 1)); }
-dd { margin: 0; color: hsl(var(--foreground)); font-weight: 650; }
+dl { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 6px; margin: 3px 0; padding: 6px 0; color: hsl(var(--muted-foreground)); font-size: calc(12px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }
+dt, dd { min-width: 0; overflow-wrap: anywhere; }
+dd { margin: 0; color: hsl(var(--foreground)); font-weight: 500; text-align: right; }
 .amount-action { display: grid; gap: 6px; }
 .amount-picker { display: grid; grid-template-columns: 1fr 52px; align-items: center; gap: 8px; }
 .amount-slider { width: 100%; height: 16px; margin: 0; padding: 0; accent-color: hsl(var(--primary)); background: transparent; cursor: pointer; }
 .amount-slider:disabled { cursor: default; opacity: .55; }
-.amount-input { width: 100%; box-sizing: border-box; border: 1px solid hsl(var(--border)); border-radius: 6px; padding: 4px 5px; color: hsl(var(--foreground)); background: hsl(var(--background)); font: inherit; text-align: center; }
-.primary-action, .quiet-action { min-height: 32px; padding: 6px 9px; font-size: calc(11px * var(--ui-scale, 1)); font-weight: 750; cursor: pointer; transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease; }
-.primary-action { border: 1px solid hsl(var(--primary)); border-radius: 7px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); box-shadow: 0 6px 15px hsl(var(--primary) / .18); }
-.primary-action:hover { background: hsl(var(--brand-hover)); transform: translateY(-1px); }
+.amount-input { width: 100%; box-sizing: border-box; border: 0; border-radius: var(--radius-sm); padding: 5px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); font: inherit; text-align: center; }
+.primary-action, .quiet-action { min-height: 34px; padding: 6px 10px; font-size: calc(13px * var(--ui-scale, 1)); font-weight: 600; cursor: pointer; transition: background-color 120ms ease; }
+.primary-action { border: 0; border-radius: var(--radius-sm); color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
+.primary-action:hover { background: hsl(var(--brand-hover)); }
 .primary-action:disabled, .quiet-action:disabled { cursor: default; opacity: .55; }
 .empty-detail { max-width: 230px; margin: auto; color: hsl(var(--muted-foreground)); text-align: center; display: grid; justify-items: center; gap: 9px; }
-.empty-detail-icon { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid hsl(var(--brand-border)); border-radius: 15px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .06); }
+.empty-detail-icon { display: grid; place-items: center; color: hsl(var(--muted-foreground)); }
 .empty-detail-icon svg { width: 28px; height: 28px; }
 .empty-detail h1 { font-size: calc(17px * var(--ui-scale, 1)); }
-.secondary-empty { color: hsl(var(--muted-foreground)); text-align: center; display: grid; align-content: center; justify-items: center; gap: 7px; background: linear-gradient(160deg, hsl(var(--surface-panel)), hsl(var(--background) / .68)); }
-.secondary-empty svg { color: hsl(var(--primary)); }
-.secondary-empty p { max-width: 220px; margin-bottom: 0; font-size: calc(11px * var(--ui-scale, 1)); line-height: 1.4; }
-.shortcut-bar { display: grid; grid-template-columns: repeat(5, auto); justify-content: space-between; gap: 10px; min-height: 28px; border-top: 1px solid hsl(var(--border) / .76); padding: 10px 3px 1px; color: hsl(var(--muted-foreground)); font-size: calc(9px * var(--ui-scale, 1)); }
-kbd { border: 1px solid hsl(var(--border-strong)); border-radius: 4px; padding: 1px 4px; color: hsl(var(--foreground)); background: hsl(var(--background)); font-family: inherit; }
-.dev-launch { pointer-events: auto; display: grid; place-items: center; margin: 24px; border: 1px solid hsl(var(--brand-border)); border-radius: 7px; padding: 9px 12px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); cursor: pointer; }
+.secondary-empty { color: hsl(var(--muted-foreground)); text-align: center; display: grid; align-content: center; justify-items: center; gap: 7px; }
+.secondary-empty svg { color: hsl(var(--muted-foreground)); }
+.secondary-empty p { max-width: 220px; margin-bottom: 0; font-size: calc(13px * var(--ui-scale, 1)); line-height: 1.4; }
+.shortcut-bar { display: grid; grid-template-columns: repeat(5, auto); justify-content: space-between; gap: 10px; min-height: 28px; padding: 6px 3px 1px; color: hsl(var(--muted-foreground)); font-size: calc(12px * var(--ui-scale, 1)); }
+kbd { border: 0; border-radius: 4px; padding: 1px 5px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); font-family: var(--font-mono, ui-monospace, Consolas, monospace); font-size: .92em; }
+.dev-launch { pointer-events: auto; display: grid; place-items: center; margin: 24px; border: 0; border-radius: var(--radius-sm); padding: 9px 12px; color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); cursor: pointer; }
 
 /* The slot grid stays 5 columns wide at every width -- only the surrounding
    layout reflows. */
@@ -263,12 +258,11 @@ kbd { border: 1px solid hsl(var(--border-strong)); border-radius: 4px; padding: 
 @media (max-width: 700px) {
   /* On a narrow device the 70% presentation would make controls unusably
      small, so retain a near-full-screen touch layout. */
-  .inventory-shell { width: calc(100% - 20px); height: calc(100% - 20px); min-height: 0; max-height: calc(100% - 20px); margin: 0; top: 10px; left: 10px; transform: none; padding: 9px; border-radius: 13px; }
+  .inventory-shell { width: calc(100% - 20px); height: calc(100% - 20px); min-height: 0; max-height: calc(100% - 20px); margin: 0; top: 10px; left: 10px; transform: none; padding: 9px; border-radius: var(--radius); }
   .inventory-shell-solo { width: calc(100vw - 20px); height: calc(100vh - 20px); margin: 0; top: 10px; left: 10px; transform: none; overflow: hidden; }
   .inventory-topbar { grid-template-columns: 1fr auto; gap: 8px; }
-  .brand { grid-template-columns: 30px auto; gap: 7px; }
-  .brand-mark { width: 30px; height: 30px; border-radius: 9px; }
-  .brand em, .session-state { display: none; }
+  .brand { grid-template-columns: 26px auto; gap: 7px; }
+  .session-state { display: none; }
   .search { grid-column: 1 / -1; grid-row: 2; }
   .inventory-layout, .inventory-layout-solo { grid-template-columns: 1fr; width: 100%; }
   .inventory-layout-solo { overflow: auto; }
@@ -283,19 +277,19 @@ kbd { border: 1px solid hsl(var(--border-strong)); border-radius: 4px; padding: 
 .hotbar-hud { position: fixed; z-index: 1000; left: 50%; bottom: 20px; display: flex; gap: 6px; transform: translateX(-50%); pointer-events: none; transition: bottom 150ms ease-out; animation: hotbar-hud-in 150ms ease-out both; }
 /* Own keyframes: item-box-in animates `transform` and, with fill-mode both, would replace the translateX(-50%) centring and push the bar half a width to the right. */
 @keyframes hotbar-hud-in { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-.hotbar-slot { position: relative; display: grid; grid-template-rows: 1fr auto; place-items: center; width: calc(76px * var(--ui-scale, 1)); height: calc(76px * var(--ui-scale, 1)); overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: 7px; padding: 4px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); }
+.hotbar-slot { position: relative; display: grid; grid-template-rows: 1fr auto; place-items: center; width: calc(76px * var(--ui-scale, 1)); height: calc(76px * var(--ui-scale, 1)); overflow: hidden; border-radius: var(--radius-sm); padding: 4px; color: hsl(var(--foreground)); background: hsl(var(--popover)); box-shadow: var(--shadow-floating); }
 .hotbar-slot-empty { opacity: .55; }
-.hotbar-slot kbd { position: absolute; top: 3px; left: 5px; color: hsl(var(--primary)); font-size: calc(10px * var(--ui-scale, 1)); font-weight: 800; }
-.hotbar-art { display: grid; place-items: center; width: calc(40px * var(--ui-scale, 1)); height: calc(40px * var(--ui-scale, 1)); overflow: hidden; color: hsl(var(--primary)); font-weight: 800; }
+.hotbar-slot kbd { position: absolute; top: 3px; left: 5px; padding: 0; background: transparent; color: hsl(var(--muted-foreground)); font-size: calc(12px * var(--ui-scale, 1)); font-weight: 500; }
+.hotbar-art { display: grid; place-items: center; width: calc(40px * var(--ui-scale, 1)); height: calc(40px * var(--ui-scale, 1)); overflow: hidden; color: hsl(var(--foreground)); font-weight: 600; }
 .hotbar-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.hotbar-slot strong { max-width: 100%; overflow: hidden; font-size: calc(9px * var(--ui-scale, 1)); text-overflow: ellipsis; white-space: nowrap; }
-.hotbar-slot b { position: absolute; top: 3px; right: 5px; color: hsl(var(--primary)); font-size: calc(10px * var(--ui-scale, 1)); }
+.hotbar-slot strong { max-width: 100%; overflow: hidden; font-size: calc(11px * var(--ui-scale, 1)); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.hotbar-slot b { position: absolute; top: 3px; right: 5px; color: hsl(var(--foreground)); font-size: calc(12px * var(--ui-scale, 1)); font-weight: 600; }
 
 .split-backdrop { position: fixed; pointer-events: auto; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgb(0 0 0 / .5); }
-.split-dialog { display: grid; gap: 10px; min-width: 260px; padding: 16px; border: 1px solid hsl(var(--border)); border-radius: 10px; color: hsl(var(--foreground)); background: hsl(var(--background)); font-size: calc(12px * var(--ui-scale, 1)); }
-.split-dialog h3 { margin: 0; font-size: calc(12px * var(--ui-scale, 1)); letter-spacing: .08em; text-transform: uppercase; }
+.split-dialog { display: grid; gap: 10px; min-width: 260px; padding: 16px; border-radius: var(--radius); color: hsl(var(--foreground)); background: hsl(var(--popover)); box-shadow: var(--shadow-modal); font-size: calc(13px * var(--ui-scale, 1)); }
+.split-dialog h3 { margin: 0; font-size: calc(15px * var(--ui-scale, 1)); font-weight: 600; }
 .split-dialog label { display: grid; gap: 6px; }
-.split-dialog input { padding: 6px 8px; border: 1px solid hsl(var(--border)); border-radius: 6px; color: inherit; background: hsl(var(--muted)); font: inherit; }
+.split-dialog input { padding: 6px 8px; border: 0; border-radius: var(--radius-sm); color: inherit; background: hsl(var(--surface-raised)); font: inherit; }
 .split-error { margin: 0; color: hsl(var(--destructive, 0 80% 60%)); }
 .split-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .split-actions button { padding: 6px 12px; color: inherit; }

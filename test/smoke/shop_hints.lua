@@ -26,6 +26,11 @@ Kora = {
     lang = function(key) return key end,
     drawing = { text3d = function(_, text) texts[#texts + 1] = text end },
     zones = { sphere = function(opts) zones[#zones + 1] = opts; return { remove = function() end } end },
+    util = { clamp = function(value, min, max)
+        if value < min then return min end
+        if value > max then return max end
+        return value
+    end },
 }
 exports = { kora_theme = { getPrimaryColor = function() themeCalls = themeCalls + 1; return '#112233' end } }
 

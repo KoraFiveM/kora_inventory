@@ -38,6 +38,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/qb_callbacks.lua
 "${LUA:-lua}" test/smoke/use_item.lua
 "${LUA:-lua}" test/smoke/busy_use.lua
+"${LUA:-lua}" test/smoke/no_builtin_consumables.lua
 "${LUA:-lua}" test/smoke/audit_guards.lua
 "${LUA:-lua}" test/smoke/hotbar.lua
 "${LUA:-lua}" test/smoke/weapon_carry.lua

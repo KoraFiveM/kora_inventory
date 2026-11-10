@@ -1,5 +1,5 @@
--- Use-item handlers: weapon equip/holster toggle, and a generic data-driven
--- consumable effect handler (food/drink/alcohol/drugs). Registered here via
+-- Use-item handlers: weapon equip/holster toggle, ammo loading and parachute.
+-- Consumables live in kora_consumables. Registered here via
 -- kora_inventory's explicit server API (defined in server.lua and available by
 -- this file's manifest load position) rather than
 -- exports.kora_core:createUseable: kora_inventory's OWN useables table is what
@@ -53,60 +53,9 @@ exports.kora_core:onSharedChange('weapons', function(_, name, def)
     refreshWeaponUseable(name, def)
 end)
 
--- name -> { hunger?, thirst?, stress?, drunk?, high? } deltas, applied via
--- exports.kora_core:incrementMetaData (clamped 0-100). drunk/high are new
--- metadata keys -- no existing convention to clash with. Unlike hunger/
--- thirst (see kora_core/modules/needs), nothing decays them passively yet;
--- that's a natural follow-up if permanent drunk/high stacking is unwanted.
-local CONSUMABLE_EFFECTS = {
-    -- food
-    sandwich = { hunger = 35 },
-    bread = { hunger = 20 },
-    chocolate_bar = { hunger = 15, stress = -5 },
-    -- drink
-    water_bottle = { thirst = 40 },
-    soda = { thirst = 25, stress = -3 },
-    -- alcohol
-    beer = { thirst = 10, stress = -10, drunk = 15 },
-    whiskey = { thirst = 5, stress = -20, drunk = 30 },
-    -- drugs
-    weed = { stress = -25, high = 30 },
-}
-
-local function consumableUseable(src, item)
-    local effects = CONSUMABLE_EFFECTS[item.name]
-    if not effects then
-        return false
-    end
-
-    local removed, removeErr = api.removeItem(src, item.name, 1, item.slot, 'consumed')
-    if not removed then
-        return false, removeErr
-    end
-
-    if effects.hunger then
-        exports.kora_core:incrementMetaData(src, 'hunger', effects.hunger, 0, 100)
-    end
-    if effects.thirst then
-        exports.kora_core:incrementMetaData(src, 'thirst', effects.thirst, 0, 100)
-    end
-    if effects.stress then
-        exports.kora_core:incrementMetaData(src, 'stress', effects.stress, 0, 100)
-    end
-    if effects.drunk then
-        exports.kora_core:incrementMetaData(src, 'drunk', effects.drunk, 0, 100)
-    end
-    if effects.high then
-        exports.kora_core:incrementMetaData(src, 'high', effects.high, 0, 100)
-    end
-
-    TriggerClientEvent('kora_inventory:client:consumeEffect', src, item.name, effects)
-    return true
-end
-
-for name in pairs(CONSUMABLE_EFFECTS) do
-    api.createUseable(name, consumableUseable)
-end
+-- Food, drink, alcohol and smokes are NOT handled here. kora_consumables owns every
+-- consumable (progress bar, prop, status effects, removal on finish); this resource
+-- only registers weapon, ammo and parachute use.
 
 -- Loading a magazine into the weapon in the player's hands.
 --
