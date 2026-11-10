@@ -1,8 +1,8 @@
 -- kora_inventory server authority. Player item writes intentionally go through
--- qbcore:setPath, preserving its dirty-column persistence and delta replication.
+-- kora_core:setPath, preserving its dirty-column persistence and delta replication.
 
-local config = Config.qbinventory
-local inventory = QbInventory
+local config = Config.kora_inventory
+local inventory = KoraInventory
 local resourceName = GetCurrentResourceName()
 
 local inventories = {}
@@ -173,7 +173,7 @@ local function isCashItemName(name)
 end
 
 -- kora_core emits its inventory-change event synchronously from setPath. Mark
--- qbinventory-originated writes so the listener below does not produce partial
+-- kora_inventory-originated writes so the listener below does not produce partial
 -- live patches or double-bump a transaction's revision.
 local function playerSetPath(src, path, value)
     ownPlayerWrites[src] = (ownPlayerWrites[src] or 0) + 1
@@ -190,7 +190,7 @@ local function recordAudit(action, src, details)
     if #audit > config.auditLimit then
         table.remove(audit, 1)
     end
-    TriggerEvent('qbinventory:server:audit', action, src, details)
+    TriggerEvent('kora_inventory:server:audit', action, src, details)
 end
 
 local canonicalItemFields = {
@@ -290,7 +290,7 @@ local function showItemBox(src, name, amount, action, item)
         action = action,
         duration = math.max(750, math.floor(tonumber(policy.duration) or 2600)),
     }
-    TriggerClientEvent('qbinventory:client:itemBox', src, payload)
+    TriggerClientEvent('kora_inventory:client:itemBox', src, payload)
     -- The upstream name, for legacy client scripts. Argument order is
     -- upstream's (itemData, type, amount). `koraReceipt` tells kora_inventory's
     -- own client bridge not to render this copy a second time.
@@ -341,7 +341,7 @@ local function secondary(kind, id, opts)
         end
     end
     opts = opts or {}
-    -- Hydrate qbinventory-owned storage only after the persistence bootstrap
+    -- Hydrate kora_inventory-owned storage only after the persistence bootstrap
     -- has completed. Player inventories are intentionally never read here.
     local persistence = inventory.persistence
     if persistence and persistence.getStatus and persistence.getStatus().ready then
@@ -363,7 +363,7 @@ local function secondary(kind, id, opts)
             return restored, true
         elseif restoreErr then
             if opts._requirePersistence then return nil, false, restoreErr end
-            print(('^3[qbinventory]^7 could not restore %s: %s'):format(inventoryKey, tostring(restoreErr)))
+            print(('^3[kora_inventory]^7 could not restore %s: %s'):format(inventoryKey, tostring(restoreErr)))
         end
     end
     inv = {
@@ -503,7 +503,7 @@ local function mayInspectPlayer(src, target)
             inventory.copy(playerData(target) or {})
         )
         if not ok then
-            print(('^3[qbinventory]^7 player inspection policy failed: %s'):format(tostring(result)))
+            print(('^3[kora_inventory]^7 player inspection policy failed: %s'):format(tostring(result)))
             return false, 'player inspection policy failed'
         end
         if result == false then
@@ -694,7 +694,7 @@ local function broadcast(inventoryKey)
         if (session.primary == inventoryKey or session.secondary == inventoryKey)
             and sameDropBucket(src, getInventory(inventoryKey)) then
             update = update or patchView(inventoryKey)
-            TriggerClientEvent('qbinventory:client:sessionPatched', src, session.token, update)
+            TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, update)
             -- Legacy qb-inventory dependants listen for this to re-read their
             -- own PlayerData after a change. kora_inventory's own client bridge
             -- treats it as a refresh request, and third-party scripts that only
@@ -731,7 +731,7 @@ local function lock(keys, transaction)
         end
     end
     if not result[1] then
-        print(('^1[qbinventory]^7 transaction failed: %s'):format(result[2]))
+        print(('^1[kora_inventory]^7 transaction failed: %s'):format(result[2]))
         return false, 'transaction failed'
     end
     return table.unpack(result, 2, result.n)
@@ -943,7 +943,7 @@ end
 -- route that changes the actual cash stack.
 local function requireCashAuthority(account)
     if GetInvokingResource() ~= 'kora_core' then
-        return nil, 'physical cash is restricted to qbcore'
+        return nil, 'physical cash is restricted to kora_core'
     end
     local policy = cashPolicy()
     if not policy or policy.account ~= account then
@@ -978,7 +978,7 @@ local function physicalCashBalance(src, policy, items)
 end
 
 local function physicalCashCredit(src, policy, account, amount, reason)
-    local ok, addErr, added = addPlayer(src, policy.item, amount, nil, {}, 'qbcore-cash:' .. tostring(reason or 'add'))
+    local ok, addErr, added = addPlayer(src, policy.item, amount, nil, {}, 'kora_core-cash:' .. tostring(reason or 'add'))
     if not ok then
         return false, addErr
     end
@@ -1108,7 +1108,7 @@ local function physicalCashTransfer(fromSrc, toSrc, account, amount, reason)
         if not added then
             local rolledBack, rollbackErr = physicalCashCredit(fromSrc, policy, account, amount, 'transfer-rollback')
             if not rolledBack then
-                print(('^1[qbinventory]^7 physical cash rollback failed: %s'):format(tostring(rollbackErr)))
+                print(('^1[kora_inventory]^7 physical cash rollback failed: %s'):format(tostring(rollbackErr)))
             end
             return false, addErr
         end
@@ -1377,7 +1377,7 @@ function runHooks(name, src, payload)
         if match then
             payload.hookId = hook.id
             if filter.print then
-                print(('^3[qbinventory]^7 Triggering event hook "%s".'):format(hook.id))
+                print(('^3[kora_inventory]^7 Triggering event hook "%s".'):format(hook.id))
             end
             handle.ids[#handle.ids + 1] = hook.id
             if hook.callback then
@@ -1393,14 +1393,14 @@ function runHooks(name, src, payload)
                 end
                 local ok, result = pcall(hook.callback, view, src)
                 if not ok then
-                    print(('^3[qbinventory]^7 hook %s failed: %s'):format(hook.id, result))
+                    print(('^3[kora_inventory]^7 hook %s failed: %s'):format(hook.id, result))
                 elseif name == 'createItem' then
                     if type(result) == 'table' then
                         payload.metadata = result
                     end
                 elseif result == false or (type(result) == 'string' and hookLegacyKeys(hook)) then
                     if filter.print then
-                        print(('^3[qbinventory]^7 Event hook "%s" has rejected the action.'):format(hook.id))
+                        print(('^3[kora_inventory]^7 Event hook "%s" has rejected the action.'):format(hook.id))
                     end
                     local reason = type(result) == 'string' and result or 'action denied by hook'
                     schedulePostEvents(handle, false, payload)
@@ -1467,9 +1467,9 @@ local function refundPurchase(src, shop, total)
     if total <= 0 then
         return true
     end
-    local refunded = exports.kora_core:addMoney(src, shopAccount(shop), total, 'qbinventory-refund', true)
+    local refunded = exports.kora_core:addMoney(src, shopAccount(shop), total, 'kora_inventory-refund', true)
     if not refunded then
-        print(('^1[qbinventory]^7 purchase refund of %s failed for player %s'):format(tostring(total), tostring(src)))
+        print(('^1[kora_inventory]^7 purchase refund of %s failed for player %s'):format(tostring(total), tostring(src)))
     end
     return refunded and true or false
 end
@@ -1507,8 +1507,8 @@ local function close(src, reason)
         return false
     end
     sessions[src] = nil
-    TriggerClientEvent('qbinventory:client:sessionClosed', src, session.token, reason or 'closed')
-    TriggerEvent('qbinventory:server:sessionClosed', src, session, reason or 'closed')
+    TriggerClientEvent('kora_inventory:client:sessionClosed', src, session.token, reason or 'closed')
+    TriggerEvent('kora_inventory:server:sessionClosed', src, session, reason or 'closed')
     return true
 end
 
@@ -1528,7 +1528,7 @@ local function removeEmptyDrop(inv, src)
         inventory.persistence.delete(inv.type, inv.id)
     end
     inventories[inv.key] = nil
-    TriggerClientEvent('qbinventory:client:dropRemoved', -1, inv.id)
+    TriggerClientEvent('kora_inventory:client:dropRemoved', -1, inv.id)
     if src then
         close(src, 'drop empty')
     end
@@ -1580,8 +1580,8 @@ local function open(src, secondaryKey, opts)
     sessions[src] = { token = token, primary = primary, secondary = secondaryKey, expires = now() + config.sessionTtl }
     local payload =
         { token = token, primary = view(primary), secondary = view(secondaryKey), expires = sessions[src].expires }
-    TriggerClientEvent('qbinventory:client:sessionOpened', src, payload)
-    TriggerEvent('qbinventory:server:sessionOpened', src, payload)
+    TriggerClientEvent('kora_inventory:client:sessionOpened', src, payload)
+    TriggerEvent('kora_inventory:server:sessionOpened', src, payload)
     return true, payload
 end
 
@@ -1597,8 +1597,8 @@ local function openSelf(src)
     local token = ('%s:%d:%d'):format(src, now(), math.random(100000, 999999))
     sessions[src] = { token = token, primary = primary, secondary = nil, expires = now() + config.sessionTtl }
     local payload = { token = token, primary = view(primary), secondary = nil, expires = sessions[src].expires }
-    TriggerClientEvent('qbinventory:client:sessionOpened', src, payload)
-    TriggerEvent('qbinventory:server:sessionOpened', src, payload)
+    TriggerClientEvent('kora_inventory:client:sessionOpened', src, payload)
+    TriggerEvent('kora_inventory:server:sessionOpened', src, payload)
     return true, payload
 end
 
@@ -1660,7 +1660,7 @@ end
 ---Why `item` may not be placed into `inv` (a portable container into itself
 ---or into another container), or nil when it may.
 local function containerRefusal(item, inv)
-    local containerApi = QbInventory.containers
+    local containerApi = KoraInventory.containers
     if
         not item
         or not inv
@@ -1838,7 +1838,7 @@ local function transfer(src, request)
                 broadcast(toKey)
             end
             recordAudit('swap', src, { from = fromKey, to = toKey, source = sourceItem.name, target = targetItem.name })
-            TriggerEvent('qbinventory:server:itemsMoved', src, payload)
+            TriggerEvent('kora_inventory:server:itemsMoved', src, payload)
             return true, { fromRevision = revision(fromKey), toRevision = revision(toKey) }
         end
         local removedOK, removedErr, removed = removeFrom(fromKey, fromSlot, amount)
@@ -1859,7 +1859,7 @@ local function transfer(src, request)
             broadcast(toKey)
         end
         recordAudit('transfer', src, { from = fromKey, to = toKey, item = removed.name, amount = amount })
-        TriggerEvent('qbinventory:server:itemsMoved', src, payload)
+        TriggerEvent('kora_inventory:server:itemsMoved', src, payload)
         local result = { fromRevision = revision(fromKey), toRevision = revision(toKey) }
         removeEmptyDrop(currentFrom, src)
         return true, result
@@ -2077,7 +2077,7 @@ local function intentDrop(src, request)
     end)
 end
 
--- Toast both players after a committed give (Config.qbinventory.giveNotify).
+-- Toast both players after a committed give (Config.kora_inventory.giveNotify).
 local function notifyGive(src, target, name, amount)
     if config.giveNotify == false or not Kora.notify or not Kora.lang then
         return
@@ -2093,7 +2093,7 @@ local function notifyGive(src, target, name, amount)
     Kora.notify.send(target, { title = title, message = text('inventory.received_item'), type = 'success' })
 end
 
--- Toast the buyer after a committed shop purchase (Config.qbinventory.purchaseNotify):
+-- Toast the buyer after a committed shop purchase (Config.kora_inventory.purchaseNotify):
 -- what they bought, how many, and what was charged to which account.
 local function formatPrice(value)
     value = tonumber(value) or 0
@@ -2273,7 +2273,7 @@ local function intentGive(src, request)
             local rollbackOK, rollbackErr = addPlayer(src, removed.name, amount, slot, removed.info, 'give-rollback')
             if not rollbackOK then
                 print(
-                    ('^1[qbinventory]^7 give rollback failed for %s: %s'):format(session.primary, tostring(rollbackErr))
+                    ('^1[kora_inventory]^7 give rollback failed for %s: %s'):format(session.primary, tostring(rollbackErr))
                 )
             end
             return false, addedErr
@@ -2289,7 +2289,7 @@ local function intentGive(src, request)
         showItemBox(src, removed.name, amount, 'remove', removed)
         showItemBox(target, removed.name, amount, 'add', added or removed)
         notifyGive(src, target, removed.name, amount)
-        TriggerEvent('qbinventory:server:itemsMoved', src, {
+        TriggerEvent('kora_inventory:server:itemsMoved', src, {
             action = 'give',
             fromInventory = session.primary,
             toInventory = recipientKey,
@@ -2368,7 +2368,7 @@ local function intentBuy(src, request)
             return false, buyErr
         end
         if price > 0 then
-            local paid, payErr = exports.kora_core:removeMoney(src, shopAccount(currentShop), total, 'qbinventory-shop')
+            local paid, payErr = exports.kora_core:removeMoney(src, shopAccount(currentShop), total, 'kora_inventory-shop')
             if not paid then
                 finishHooks(buyHandle, false)
                 return false, payErr
@@ -2401,7 +2401,7 @@ local function intentBuy(src, request)
         })
         showItemBox(src, currentItem.name, count, 'purchase', addedItem)
         notifyPurchase(src, currentShop, currentItem.name, count, total)
-        TriggerEvent('qbinventory:server:itemPurchased', src, {
+        TriggerEvent('kora_inventory:server:itemPurchased', src, {
             shopId = currentShop.id,
             itemName = currentItem.name,
             count = count,
@@ -2431,9 +2431,9 @@ local function intentSync(src, request)
         return true
     end
     session.lastSync = stamp
-    TriggerClientEvent('qbinventory:client:sessionPatched', src, session.token, patchView(session.primary))
+    TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, patchView(session.primary))
     if session.secondary then
-        TriggerClientEvent('qbinventory:client:sessionPatched', src, session.token, patchView(session.secondary))
+        TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, patchView(session.secondary))
     end
     return true
 end
@@ -2516,7 +2516,7 @@ local function addItem(src, name, amount, slot, info, reason)
     if cashItemsActive and isCashItemName(name) then
         -- Compatibility still works, but monetary accounting and events stay
         -- in kora_core. Never let an arbitrary resource mutate the cash stack.
-        return exports.kora_core:addMoney(src, cashPolicy().account, amount, reason or 'qbinventory-add-cash')
+        return exports.kora_core:addMoney(src, cashPolicy().account, amount, reason or 'kora_inventory-add-cash')
     end
     return lock({ playerKey(src) }, function()
         local ok, err = canCarry(src, name, amount)
@@ -2550,7 +2550,7 @@ local function removeItem(src, name, amount, slot, reason)
         return false, 'invalid amount'
     end
     if cashItemsActive and isCashItemName(name) then
-        return exports.kora_core:removeMoney(src, cashPolicy().account, amount, reason or 'qbinventory-remove-cash')
+        return exports.kora_core:removeMoney(src, cashPolicy().account, amount, reason or 'kora_inventory-remove-cash')
     end
     return lock({ playerKey(src) }, function()
         local items = playerItems(src)
@@ -2930,7 +2930,7 @@ hasUseable = function(name)
     if useables[name] or builtInUseables[name] then
         return true
     end
-    local containers = QbInventory.containers
+    local containers = KoraInventory.containers
     return containers and containers.isPortableItem and containers.isPortableItem({ name = name }) or false
 end
 ---ox `consume` for a usingItem hook: how much of the stack a use consumes.
@@ -2971,7 +2971,7 @@ useItem = function(src, slotOrName)
         return false, err
     end
     finishHooks(useHandle, true)
-    local containers = QbInventory.containers
+    local containers = KoraInventory.containers
     if
         type(slotOrName) == 'number'
         and containers
@@ -2980,7 +2980,7 @@ useItem = function(src, slotOrName)
     then
         local ok, result = containers.openConfiguredItem(src, slotOrName)
         if ok then
-            TriggerEvent('qbinventory:server:openedContainer', src, item.name, item)
+            TriggerEvent('kora_inventory:server:openedContainer', src, item.name, item)
             return true
         end
         return false, result
@@ -3007,7 +3007,7 @@ useItem = function(src, slotOrName)
         if result == false then
             return false, 'item use was rejected'
         end
-        TriggerEvent('qbinventory:server:usedItem', src, item.name, item)
+        TriggerEvent('kora_inventory:server:usedItem', src, item.name, item)
         -- Opening a portable container above is deliberately excluded: it
         -- consumes nothing and returns before this point.
         showItemBox(src, item.name, 1, 'use', item)
@@ -3119,7 +3119,7 @@ dropCreate = function(coords, items, bucket, reservedId)
         temporary = true,
     })
     if bucket == nil or not config.requireSameBucket then
-        TriggerClientEvent('qbinventory:client:dropCreated', -1, id, coords)
+        TriggerClientEvent('kora_inventory:client:dropCreated', -1, id, coords)
     else
         for _, player in ipairs(GetPlayers()) do
             local src = tonumber(player)
@@ -3130,7 +3130,7 @@ dropCreate = function(coords, items, bucket, reservedId)
                 else
                     dropViewers[src] = bucket
                 end
-                TriggerClientEvent('qbinventory:client:dropCreated', src, id, coords)
+                TriggerClientEvent('kora_inventory:client:dropCreated', src, id, coords)
             end
         end
     end
@@ -3155,11 +3155,11 @@ local function dropList(src)
     return out
 end
 
-Kora.callback.register('qbinventory:server:drops', function(src)
+Kora.callback.register('kora_inventory:server:drops', function(src)
     local bucket = GetPlayerRoutingBucket(src)
     local list = dropList(src)
     if dropViewers[src] ~= nil and dropViewers[src] ~= bucket then
-        TriggerClientEvent('qbinventory:client:dropsUpdated', src, list)
+        TriggerClientEvent('kora_inventory:client:dropsUpdated', src, list)
     end
     dropViewers[src] = bucket
     return list
@@ -3512,7 +3512,7 @@ local function buyItem(src, shopId, slot, count)
             return false, buyErr
         end
         if price > 0 then
-            local paid, payErr = exports.kora_core:removeMoney(src, shopAccount(shop), total, 'qbinventory-shop')
+            local paid, payErr = exports.kora_core:removeMoney(src, shopAccount(shop), total, 'kora_inventory-shop')
             if not paid then
                 finishHooks(buyHandle, false)
                 return false, payErr
@@ -3540,7 +3540,7 @@ local function buyItem(src, shopId, slot, count)
             price = price * count,
             serverData = inventory.copy(item.serverData),
         })
-        TriggerEvent('qbinventory:server:itemPurchased', src, {
+        TriggerEvent('kora_inventory:server:itemPurchased', src, {
             shopId = shopId,
             itemName = item.name,
             count = count,
@@ -3782,7 +3782,7 @@ local function removeSecondaryInventory(reference)
         return false, 'inventory not found'
     end
     if inv.type == 'player' then
-        return false, 'player inventories are owned by qbcore'
+        return false, 'player inventories are owned by kora_core'
     end
     if inv._legacyDeletePending then return false, 'inventory busy' end
 
@@ -3938,7 +3938,7 @@ end
 local function deleteLegacyPoliceTrash(callback)
     assert(inventory.isCallable(callback), 'delete callback is required')
     if GetInvokingResource() ~= 'kora_sql' then
-        callback(nil, 'legacy inventory SQL bridge is restricted to qbsql')
+        callback(nil, 'legacy inventory SQL bridge is restricted to kora_sql')
         return
     end
     CreateThread(function()
@@ -4000,7 +4000,7 @@ local function deleteLegacyPoliceTrash(callback)
         local ok, affectedRows, err = xpcall(delete, debug.traceback)
         if not ok then affectedRows, err = nil, affectedRows end
         local replied, replyError = pcall(callback, affectedRows, err)
-        if not replied then print(('^3[qbinventory]^7 legacy SQL reply unavailable: %s'):format(tostring(replyError))) end
+        if not replied then print(('^3[kora_inventory]^7 legacy SQL reply unavailable: %s'):format(tostring(replyError))) end
     end)
 end
 
@@ -4047,7 +4047,7 @@ local function phoneItemTransaction(src, request)
     local lockKeys = { playerKey(src) }
     if request.shopId ~= nil then
         if op ~= 'resell' or type(request.shopId) ~= 'string' or #request.shopId > 128
-            or request.shopId:sub(1,8) ~= 'qbphone:' or type(request.salePrice) ~= 'number'
+            or request.shopId:sub(1,8) ~= 'kora_phone:' or type(request.salePrice) ~= 'number'
             or request.salePrice < 0 or request.salePrice > 100000000 or request.salePrice % 1 ~= 0 then
             return false, 'invalid phone resale shop'
         end
@@ -4162,13 +4162,13 @@ local function phoneItemTransaction(src, request)
         local beforeRevision = revision(playerKey(src))
         local beforeShopRevision = saleShopKey and revision(saleShopKey)
         if moneyAmount and moneyAmount > 0 then
-            local paid, err = exports.kora_core[moneyAction](exports.kora_core, src, 'bank', moneyAmount, 'qbphone-' .. op, true)
+            local paid, err = exports.kora_core[moneyAction](exports.kora_core, src, 'bank', moneyAmount, 'kora_phone-' .. op, true)
             if not paid then return false, err or 'bank service unavailable' end
         end
         local function refund()
             if moneyAmount and moneyAmount > 0 then
-                local refunded = exports.kora_core[refundAction](exports.kora_core, src, 'bank', moneyAmount, 'qbphone-service-rollback', true)
-                if not refunded then print('^1[qbinventory]^7 phone bank compensation failed for player ' .. src) end
+                local refunded = exports.kora_core[refundAction](exports.kora_core, src, 'bank', moneyAmount, 'kora_phone-service-rollback', true)
+                if not refunded then print('^1[kora_inventory]^7 phone bank compensation failed for player ' .. src) end
                 return refunded
             end
             return true
@@ -4292,7 +4292,7 @@ api.getInventory = api.GetInventory
 api.getFreeWeight = api.GetFreeWeight
 api.removeInspectionAccess = api.RemoveInspectionAccess
 
--- These are qbinventory-private bridge exports for kora_core only. They are not
+-- These are kora_inventory-private bridge exports for kora_core only. They are not
 -- advertised through qb-inventory/ox_inventory compatibility identities.
 local physicalCashApi = {
     physicalCashGet = physicalCashGet,
@@ -4313,16 +4313,16 @@ exports('getPersistenceStatus', getPersistenceStatus)
 exports('deleteLegacyPoliceTrash', deleteLegacyPoliceTrash)
 inventory.api = api
 
-RegisterNetEvent('qbinventory:server:open', function(invType, data)
+RegisterNetEvent('kora_inventory:server:open', function(invType, data)
     if GetInvokingResource() then
         return
     end
     local ok, result = openInventory(source, invType, data)
     if not ok then
-        TriggerClientEvent('qbinventory:client:rejected', source, result)
+        TriggerClientEvent('kora_inventory:client:rejected', source, result)
     end
 end)
-RegisterNetEvent('qbinventory:server:close', function(token)
+RegisterNetEvent('kora_inventory:server:close', function(token)
     if GetInvokingResource() then
         return
     end
@@ -4331,7 +4331,7 @@ RegisterNetEvent('qbinventory:server:close', function(token)
     elseif type(token) == 'string' then
         -- No such session here (already closed, expired, or lost across a
         -- restart): still answer, or the client keeps NUI focus on a dead panel.
-        TriggerClientEvent('qbinventory:client:sessionClosed', source, token, 'closed')
+        TriggerClientEvent('kora_inventory:client:sessionClosed', source, token, 'closed')
     end
 end)
 -- Every path answers: transfer never raises into the callback layer and always
@@ -4339,7 +4339,7 @@ end)
 local function replyingTransfer(src, request)
     local called, ok, result, extra = pcall(transfer, src, request)
     if not called then
-        print(('^1[qbinventory]^7 transfer failed: %s'):format(tostring(ok)))
+        print(('^1[kora_inventory]^7 transfer failed: %s'):format(tostring(ok)))
         return false, 'transfer failed'
     end
     if ok == nil then
@@ -4348,32 +4348,32 @@ local function replyingTransfer(src, request)
     return ok, result, extra
 end
 inventory.replyingTransfer = replyingTransfer
-RegisterNetEvent('qbinventory:server:transfer', function(request)
+RegisterNetEvent('kora_inventory:server:transfer', function(request)
     if GetInvokingResource() then
         return
     end
     local ok, result = replyingTransfer(source, request)
     if not ok then
-        TriggerClientEvent('qbinventory:client:rejected', source, result)
+        TriggerClientEvent('kora_inventory:client:rejected', source, result)
     end
 end)
-RegisterNetEvent('qbinventory:server:intent', function(request)
+RegisterNetEvent('kora_inventory:server:intent', function(request)
     if GetInvokingResource() then
         return
     end
     local ok, result = handleIntent(source, request)
     if not ok then
-        TriggerClientEvent('qbinventory:client:rejected', source, result)
+        TriggerClientEvent('kora_inventory:client:rejected', source, result)
     elseif type(request) == 'table' and request.action == 'give' and config.closeOnGive ~= false then
         -- The bundled UI's give goes through here; close its panel once the give committed.
         close(source, 'give')
     end
 end)
-Kora.callback.register('qbinventory:server:open', function(src, invType, data)
+Kora.callback.register('kora_inventory:server:open', function(src, invType, data)
     return openInventory(src, invType, data)
 end)
 -- Server-side time a request took, logged when it exceeds
--- Config.qbinventory.slowRequestMs (0 turns it off). The server answers a move
+-- Config.kora_inventory.slowRequestMs (0 turns it off). The server answers a move
 -- in a few milliseconds; if a tester still sees seconds, this line is how to
 -- tell the server's share of the wait from the network's and the client's.
 local function timedRequest(action, src, handler, request)
@@ -4382,19 +4382,19 @@ local function timedRequest(action, src, handler, request)
     local elapsed = GetGameTimer() - started
     local threshold = tonumber(config.slowRequestMs) or 0
     if threshold > 0 and elapsed >= threshold then
-        print(('^3[qbinventory]^7 slow %s request from player %s: %d ms server-side'):format(action, tostring(src), elapsed))
+        print(('^3[kora_inventory]^7 slow %s request from player %s: %d ms server-side'):format(action, tostring(src), elapsed))
     end
     return called, ok, result, extra
 end
 
-Kora.callback.register('qbinventory:server:transfer', function(src, request)
+Kora.callback.register('kora_inventory:server:transfer', function(src, request)
     local called, ok, result, extra = timedRequest('transfer', src, replyingTransfer, request)
     if not called then
         error(ok, 0)
     end
     return ok, result, extra
 end)
-Kora.callback.register('qbinventory:server:intent', function(src, request)
+Kora.callback.register('kora_inventory:server:intent', function(src, request)
     local called, ok, result, extra = timedRequest('intent', src, handleIntent, request)
     if not called then
         error(ok, 0)
@@ -4402,7 +4402,7 @@ Kora.callback.register('qbinventory:server:intent', function(src, request)
     return ok, result, extra
 end)
 
--- Direct request transport for the bundled UI (Config.qbinventory.ui.directTransport).
+-- Direct request transport for the bundled UI (Config.kora_inventory.ui.directTransport).
 -- One reliable event in, one out: the verdict is sent the moment the handler
 -- returns, after the patches it produced (same ordered channel, so the client
 -- applies the new inventories before it hears "ok"). It skips kora_lib's
@@ -4411,7 +4411,7 @@ end)
 -- could silently fall out of (a dropped token means no answer at all). The
 -- callbacks above stay registered for third-party renderers.
 local directHandlers = { transfer = replyingTransfer, intent = handleIntent }
-RegisterNetEvent('qbinventory:server:call', function(requestId, action, request)
+RegisterNetEvent('kora_inventory:server:call', function(requestId, action, request)
     if GetInvokingResource() then
         return
     end
@@ -4421,18 +4421,18 @@ RegisterNetEvent('qbinventory:server:call', function(requestId, action, request)
     end
     local handler = type(action) == 'string' and directHandlers[action] or nil
     if not handler then
-        TriggerClientEvent('qbinventory:client:callResult', src, requestId, false, 'unsupported request')
+        TriggerClientEvent('kora_inventory:client:callResult', src, requestId, false, 'unsupported request')
         return
     end
     local called, ok, result = timedRequest(action, src, handler, request)
     if not called then
-        print(('^1[qbinventory]^7 %s request failed: %s'):format(action, tostring(ok)))
+        print(('^1[kora_inventory]^7 %s request failed: %s'):format(action, tostring(ok)))
         ok, result = false, 'request failed'
     end
-    TriggerClientEvent('qbinventory:client:callResult', src, requestId, ok == true, result)
+    TriggerClientEvent('kora_inventory:client:callResult', src, requestId, ok == true, result)
 end)
 -- Legacy hotbar event: never trust the transmitted item record. The only
--- accepted slot is resolved again from qbcore-owned PlayerData before use.
+-- accepted slot is resolved again from kora_core-owned PlayerData before use.
 RegisterNetEvent('QBCore:Server:UseItem', function(item)
     if type(item) ~= 'table' then
         return
@@ -4447,7 +4447,7 @@ end)
 -- Persistence is deliberately a secondary-store concern. Hydrating happens
 -- only after its schema setup succeeds; malformed rows remain quarantined
 -- by that module instead of being silently loaded into live state.
-AddEventHandler('qbinventory:server:persistenceReady', function()
+AddEventHandler('kora_inventory:server:persistenceReady', function()
     local persistence = inventory.persistence
     if not persistence or not persistence.restoreAll then
         return
@@ -4455,7 +4455,7 @@ AddEventHandler('qbinventory:server:persistenceReady', function()
     local restored, rejected = persistence.restoreAll()
     if not restored then
         persistenceRestoreError = tostring(rejected or 'secondary inventory restore failed')
-        print(('^1[qbinventory]^7 secondary inventory restore failed: %s'):format(persistenceRestoreError))
+        print(('^1[kora_inventory]^7 secondary inventory restore failed: %s'):format(persistenceRestoreError))
         return
     end
     for _, inv in ipairs(restored) do
@@ -4491,18 +4491,18 @@ AddEventHandler('qbinventory:server:persistenceReady', function()
         inventories[inv.key] = inv
     end
     for _, bad in ipairs(rejected or {}) do
-        print(('^3[qbinventory]^7 ignored malformed persisted %s:%s (%s)'):format(bad.type, bad.id, bad.reason))
-        TriggerEvent('qbinventory:server:persistenceRejected', inventory.copy(bad))
+        print(('^3[kora_inventory]^7 ignored malformed persisted %s:%s (%s)'):format(bad.type, bad.id, bad.reason))
+        TriggerEvent('kora_inventory:server:persistenceRejected', inventory.copy(bad))
     end
     persistenceHydrated, persistenceRestoreError = true, nil
-    print(('^2[qbinventory]^7 restored %d secondary inventories.'):format(#restored))
-    TriggerEvent('qbinventory:server:ready', getPersistenceStatus())
+    print(('^2[kora_inventory]^7 restored %d secondary inventories.'):format(#restored))
+    TriggerEvent('kora_inventory:server:ready', getPersistenceStatus())
 end)
 
 -- Writes made by another server resource through kora_core's public mutation
--- funnel remain qbcore-owned. We only advance the session revision and push a
+-- funnel remain kora_core-owned. We only advance the session revision and push a
 -- replacement view, so an open shared panel cannot overwrite that change.
-AddEventHandler('qbcore:server:inventoryChanged', function(src)
+AddEventHandler('kora_core:server:inventoryChanged', function(src)
     if ownPlayerWrites[src] then
         return
     end
@@ -4557,12 +4557,12 @@ CreateThread(function()
     end
     local ok, err = exports.kora_core:registerPhysicalCash(policy.account)
     if not ok then
-        print(('^1[qbinventory]^7 physical cash was not enabled: %s'):format(tostring(err)))
+        print(('^1[kora_inventory]^7 physical cash was not enabled: %s'):format(tostring(err)))
         return
     end
     cashItemsActive = true
     print(
-        ('^2[qbinventory]^7 physical cash enabled for qbcore account %s as item %s.'):format(
+        ('^2[kora_inventory]^7 physical cash enabled for kora_core account %s as item %s.'):format(
             policy.account,
             policy.item
         )
@@ -4587,7 +4587,7 @@ CreateThread(function()
             local current = GetPlayerRoutingBucket(src)
             if current ~= bucket then
                 dropViewers[src] = current
-                TriggerClientEvent('qbinventory:client:dropsUpdated', src, dropList(src))
+                TriggerClientEvent('kora_inventory:client:dropsUpdated', src, dropList(src))
             end
         end
     end

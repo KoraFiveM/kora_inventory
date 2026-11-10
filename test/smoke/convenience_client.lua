@@ -1,11 +1,11 @@
 -- Repeated kora_target starts must replace, not duplicate, convenience-store options.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config/shops/convenience.lua')
 dofile('shared.lua')
 
-local shop = Config.qbinventory.shops.convenience
+local shop = Config.kora_inventory.shops.convenience
 shop.locations = {
     { name = "24/7", x = 10, y = 20, z = 30 },
     { name = '24/7', x = 40, y = 50, z = 60 },

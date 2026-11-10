@@ -9,7 +9,7 @@
 -- for an unknown item, and notify dropped `text` on the floor. Each is the
 -- kind of break a stock ox dependant hits silently rather than loudly.
 --
--- shared.lua is loaded for real rather than hand-mocked: QbInventory.sameInfo
+-- shared.lua is loaded for real rather than hand-mocked: KoraInventory.sameInfo
 -- and .totalWeight are load-bearing for the metadata and weight assertions,
 -- and a mock of those primitives drifting from the real ones is exactly how
 -- these bugs survived this long.
@@ -17,7 +17,7 @@ local H = dofile('test/harness.lua')
 
 -- environment
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('shared.lua')
 
@@ -77,7 +77,7 @@ exports = setmetatable({}, {
 
 -- client.lua's explicit in-resource API. The compat table must call this,
 -- never re-enter exports.kora_inventory:openInventory.
-QbInventory.clientApi = {
+KoraInventory.clientApi = {
     openInventory = function(invType, data) calls.open[#calls.open + 1] = { invType = invType, data = data } end,
     closeInventory = function() calls.closed = true end,
 }
@@ -206,7 +206,7 @@ H.equal(Ox.GetSlotIdWithItem('WATER'), 1, 'item names are matched case-insensiti
 H.equal(Ox.GetPlayerWeight(), 70, 'weight delegates to the shared totalWeight primitive')
 -- The hardcoded 120000 was a guess that happened to match config; read the
 -- real value so it cannot drift.
-H.equal(Ox.GetPlayerMaxWeight(), Config.qbinventory.playerMaxWeight,
+H.equal(Ox.GetPlayerMaxWeight(), Config.kora_inventory.playerMaxWeight,
     'max weight falls back to the configured player capacity, not a literal')
 session = { primary = { maxWeight = 42000 } }
 H.equal(Ox.GetPlayerMaxWeight(), 42000, 'an open session supplies the authoritative capacity')

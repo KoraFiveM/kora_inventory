@@ -6,7 +6,7 @@
 the architectural sense: `server.lua` is the sole authority and never calls
 NUI APIs. `client.lua` owns the server transport; `client/ui.lua` owns the
 NUI/focus bridge and may only forward restricted intent envelopes back to
-`qbinventory:client:submitIntent`. Do not let browser state mutate inventory
+`kora_inventory:client:submitIntent`. Do not let browser state mutate inventory
 data directly.
 
 ## Player data
@@ -45,7 +45,7 @@ server before calling the bounded API.
 
 Generic containers require an owner derived from `ownerSource`, a trusted
 access/group policy, or a fixed coordinate boundary. Portable containers bind a
-server-generated `info.containerId` to a real qbcore-owned player item through
+server-generated `info.containerId` to a real kora_core-owned player item through
 the mutation funnel. Configured portable item types (`containers.items`) are
 opened only through the existing validated `use` intent: resolve the real slot,
 item definition, and present-possession policy on the server; never accept a
@@ -56,19 +56,19 @@ and deterministic-lock checks. Metadata always comes from the source item.
 
 ## Visible weapon carry
 
-`server/weaponcarry.lua` builds the carried-weapon list from qbcore-owned
+`server/weaponcarry.lua` builds the carried-weapon list from kora_core-owned
 `PlayerData` and publishes it on the replicated player state bag
-`qbinventory:weaponCarry`. `client/weaponcarry.lua` only RENDERS that bag. Do
+`kora_inventory:weaponCarry`. `client/weaponcarry.lua` only RENDERS that bag. Do
 not add a client event, NUI callback or export that lets a client submit,
 extend or edit a carried list -- that would make the bag a channel for
 advertising items a player does not own, or hiding ones they do. Clear the bag
 with an explicit `false`, never a nil deletion.
 
 The one client->server message in this domain
-(`qbinventory:server:weaponToggled`) may only confirm a pending draw/holster
+(`kora_inventory:server:weaponToggled`) may only confirm a pending draw/holster
 this server itself issued, and is re-resolved against the real slot before it
 is believed. Keep it that way: no item record, name, duration or equipped
-state may be accepted from the client. `qbinventory:server:weaponUnequipped`
+state may be accepted from the client. `kora_inventory:server:weaponUnequipped`
 is payload-free on purpose -- it can only ever put a weapon back on its own
 player's body, never take one off.
 
@@ -81,7 +81,8 @@ pnpm build` in that folder and commit the regenerated `web/build/` artifacts.
 
 ## FFT integration
 
-See FFT.md. Keep optional Lua exports and callbacks in fft_hooks.lua, loaded
-only when fft_kora_hooks is true. Use fft as the runner resource name. Preserve
+See FFT.md. Keep every Lua FFT export, callback and helper in fft_hooks.lua (last
+client script in the manifest, self-gated on fft_kora_hooks); do not add FFT
+code or loaders to functional files. Use fft as the runner resource name. Preserve
 normal server authority and lease/session correlation. Test disabled hooks as
 well as malformed and stale replies; do not require FFT for ordinary startup.

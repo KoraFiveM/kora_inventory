@@ -6,9 +6,11 @@ Install the companion `fft` resource. Before starting inventory, configure:
 setr fft_kora_hooks true
 ```
 
-`client/ui.lua` conditionally loads `fft_hooks.lua` from the resource files.
-Disabled by default, this file owns the FFT exports, NUI reply callbacks and
-session synchronization. Changing the convar requires restarting inventory to
+`fxmanifest.lua` lists `fft_hooks.lua` as the last client script. The file
+returns immediately unless the convar is true, and no other Lua file references
+FFT. When enabled it owns the FFT exports, NUI reply callbacks and session
+synchronization. The browser half lives in `web/src/lib/fft.ts` and the
+`data-fft-*` attributes; it stays inert without an authorised session. Changing the convar requires restarting inventory to
 load or unload its hooks. Inventory does not depend on FFT at normal startup.
 
 The client `fftVersion()` export advertises protocol 1. `fftAction(action, item,

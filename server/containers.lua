@@ -2,9 +2,9 @@
 -- This file intentionally registers no network event: callers are trusted
 -- server resources and must never pass browser/client inventory payloads here.
 
-local inventoryApi = assert(QbInventory and QbInventory.internal, 'qbinventory server authority must load first')
+local inventoryApi = assert(KoraInventory and KoraInventory.internal, 'kora_inventory server authority must load first')
 local containerConfig =
-    assert(inventoryApi.config and inventoryApi.config.containers, 'Config.qbinventory.containers is required')
+    assert(inventoryApi.config and inventoryApi.config.containers, 'Config.kora_inventory.containers is required')
 
 local containers = {}
 local evidence = {}
@@ -97,7 +97,7 @@ local function policy(action, source, context)
     end
     local ok, allowed, reason = pcall(callback, source, action, inventoryApi.copy(context or {}))
     if not ok then
-        print(('^3[qbinventory]^7 evidence access policy failed: %s'):format(tostring(allowed)))
+        print(('^3[kora_inventory]^7 evidence access policy failed: %s'):format(tostring(allowed)))
         return false, 'evidence access policy failed'
     end
     if allowed ~= true then
@@ -275,7 +275,7 @@ function containers.bindItem(source, slot, options)
 end
 
 ---Open a container only when its binding is present on an item in the caller's
----current qbcore-owned inventory. Slot/item data comes from the server store.
+---current kora_core-owned inventory. Slot/item data comes from the server store.
 function containers.openItem(source, slot)
     source, slot = whole(source), whole(slot)
     if not source or not slot then
@@ -452,7 +452,7 @@ local function moveEvidence(action, source, target, evidenceId, slot, amount, ta
         inventoryApi.broadcast(toKey)
         if TriggerEvent then
             TriggerEvent(
-                'qbinventory:server:evidenceMoved',
+                'kora_inventory:server:evidenceMoved',
                 action,
                 source,
                 target,
@@ -474,8 +474,8 @@ function evidence.release(source, target, evidenceId, slot, amount, playerSlot)
     return moveEvidence('release', source, target, evidenceId, slot, amount, playerSlot)
 end
 
-QbInventory.containers = containers
-QbInventory.evidence = evidence
-QbInventory.confiscation = evidence
+KoraInventory.containers = containers
+KoraInventory.evidence = evidence
+KoraInventory.confiscation = evidence
 
 return { containers = containers, evidence = evidence }

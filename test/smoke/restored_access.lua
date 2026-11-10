@@ -26,10 +26,10 @@ json = {
     encode = function(value)
         nextJson = nextJson + 1
         local token = tostring(nextJson)
-        encoded[token] = QbInventory.copy(value)
+        encoded[token] = KoraInventory.copy(value)
         return token
     end,
-    decode = function(token) return QbInventory.copy(encoded[token]) end,
+    decode = function(token) return KoraInventory.copy(encoded[token]) end,
 }
 Kora = {
     resources = { serverRegistry = function() return { track = noop, untrack = noop } end },
@@ -112,9 +112,9 @@ stored('stash', 'callback-before', { owner = 'CID7', groups = { police = 1 }, ac
 
 dofile('server/persistence.lua')
 dofile('server.lua')
-local inventory, internal, persistence = QbInventory, QbInventory.internal, QbInventory.persistence
+local inventory, internal, persistence = KoraInventory, KoraInventory.internal, KoraInventory.persistence
 local deny = function() return false end
-local function genericOpen(key) return callbacks['qbinventory:server:open'](7, 'stash', { key = key }) end
+local function genericOpen(key) return callbacks['kora_inventory:server:open'](7, 'stash', { key = key }) end
 H.ok(inventory.api.RegisterShop('before', {
     label = 'Current label', slots = 4, maxWeight = 400, owner = 'CID7', groups = { police = 1 },
     coords = { x = 2, y = 0, z = 0 }, distance = 3, access = deny, prices = { wood = 3 }, currency = 'cash',
@@ -253,7 +253,7 @@ H.equal(internal.canAccess(8, internal.getInventory('stash:legacy-open')), true,
 H.ok(persistence.save(internal.getInventory('stash:legacy-open')))
 H.equal(saved['stash:legacy-open'].properties.accessRequired, false)
 
-Config.qbinventory.containers.evidence.access = function(source) return source == 7 end
+Config.kora_inventory.containers.evidence.access = function(source) return source == 7 end
 dofile('server/containers.lua')
 H.equal(genericOpen('evidence:case'), false, 'marked evidence cannot bypass its unbound domain policy')
 H.ok(inventory.evidence.open(7, 'case'), 'existing evidence flow reinstalls its callback')
@@ -269,13 +269,13 @@ stored('stash', 'late-constructor', { accessRequired = true })
 local late = internal.createSecondary('stash', 'late-constructor', { label = 'Late trusted constructor' })
 H.equal(late.accessRequired, true, 'constructor after readiness preserves a stored missing-callback requirement')
 H.equal(genericOpen(late.key), false)
-TriggerEvent('qbinventory:server:persistenceReady')
+TriggerEvent('kora_inventory:server:persistenceReady')
 H.equal(internal.getInventory(late.key).accessRequired, true, 'bulk hydration cannot interpret constructor options as callback removal')
 H.equal(genericOpen(late.key), false, 'missing callback stays denied after repeated hydration')
 H.ok(persistence.flush())
 H.equal(saved[late.key].properties.accessRequired, true, 'merged dirty snapshot preserves the missing-callback requirement')
 inventory.api.RegisterStash('late-constructor', 'Deliberately public', 9, 900, false)
-TriggerEvent('qbinventory:server:persistenceReady')
+TriggerEvent('kora_inventory:server:persistenceReady')
 H.equal(internal.getInventory(late.key).accessRequired, false, 'explicit callback removal remains authoritative over the marked stored row')
 H.equal(genericOpen(late.key), true)
 H.ok(persistence.flush())

@@ -4,8 +4,8 @@
 -- opens the session, so triggering this event away from a counter is harmless.
 
 local shop = assert(
-    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.liquorstore,
-    'qbinventory liquor store configuration is required'
+    Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.liquorstore,
+    'kora_inventory liquor store configuration is required'
 )
 local targetIds = {}
 
@@ -13,7 +13,7 @@ local function openLiquorStore()
     exports.kora_inventory:openInventory('shop', shop.id)
 end
 
-RegisterNetEvent('qbinventory:client:openLiquorStore', function()
+RegisterNetEvent('kora_inventory:client:openLiquorStore', function()
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -27,7 +27,7 @@ local function registerLiquorStoreTargets()
     targetIds = {}
 
     for _, location in ipairs(shop.locations or {}) do
-        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(QbInventory.shopZoneSprite({
+        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(KoraInventory.shopZoneSprite({
             coords = { x = location.x, y = location.y, z = location.z },
             radius = shop.interactionDistance,
             options = {
@@ -36,7 +36,7 @@ local function registerLiquorStoreTargets()
                     icon = 'wine',
                     onSelect = openLiquorStore,
                     -- The clerk ped offers the same option while it is spawned.
-                    canInteract = function() return not QbInventory.shopClerkActive(location) end,
+                    canInteract = function() return not KoraInventory.shopClerkActive(location) end,
                 },
             },
         }, location))
@@ -58,7 +58,7 @@ end)
 
 for _, location in ipairs(shop.locations or {}) do
     if shop.blip and shop.blip.enabled then
-        local blip = QbInventory.createShopBlip(Config.qbinventory.shops.liquorstore.blip.category, { x = location.x, y = location.y, z = location.z }, {
+        local blip = KoraInventory.createShopBlip(Config.kora_inventory.shops.liquorstore.blip.category, { x = location.x, y = location.y, z = location.z }, {
             sprite = shop.blip.sprite,
             color = shop.blip.color,
             scale = shop.blip.scale,

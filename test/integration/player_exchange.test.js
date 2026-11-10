@@ -11,7 +11,7 @@ const { SchemaManager } = require(path.join(root, '../kora_sql/server/js/schema'
 function exchangeSchema() {
     const dump = spawnSync('lua', ['-'], { cwd: root, encoding: 'utf8', input: `
         dofile('test/exchange_fixture.lua')(); dofile('server/schema.lua')
-        for _,spec in ipairs(QBInventorySchema) do
+        for _,spec in ipairs(KoraInventorySchema) do
             if spec.name=='kora_inventory_player_exchanges' then print('SPEC:'..json.encode(spec)) end
         end
     ` });
@@ -33,9 +33,9 @@ function emittedStatements() {
     assert.equal(capture.status, 0, capture.stderr);
     return JSON.parse(capture.stdout.split('CAPTURE:')[1].trim().replace(/\\\n/g, '\\n').replace(/\\0/g, '\\u0000'));
 }
-test('actual exchange SQL and qbsql checked transactions on disposable MariaDB', { skip: !process.env.QBINVENTORY_TEST_SOCKET }, async t => {
+test('actual exchange SQL and kora_sql checked transactions on disposable MariaDB', { skip: !process.env.KORA_INVENTORY_TEST_SOCKET }, async t => {
     const fixture = emittedStatements();
-    const pool = mysql.createPool({ socketPath: process.env.QBINVENTORY_TEST_SOCKET, user: 'root', database: 'exchange_test', multipleStatements: true, connectionLimit: 5 });
+    const pool = mysql.createPool({ socketPath: process.env.KORA_INVENTORY_TEST_SOCKET, user: 'root', database: 'exchange_test', multipleStatements: true, connectionLimit: 5 });
     const runner = new TransactionRunner({ write: pool });
     const rows = async query => (await pool.query(query))[0];
     const snapshot = async () => (await rows('SELECT inventory,money,metadata FROM players WHERE citizenid="CID1"'))[0];

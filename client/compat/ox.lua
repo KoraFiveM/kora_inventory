@@ -8,7 +8,7 @@
 -- has no backing subsystem here it stays a no-op and SAYS SO in a comment -- a
 -- stub that swallows its arguments while looking implemented is exactly how
 -- the inverted Search mode and the missing `strict` argument below survived.
-local inventoryApi = assert(QbInventory and QbInventory.clientApi, 'qbinventory client transport must load first')
+local inventoryApi = assert(KoraInventory and KoraInventory.clientApi, 'kora_inventory client transport must load first')
 
 local function playerData()
     return exports.kora_core:getPlayerData() or {}
@@ -30,7 +30,7 @@ local function sharedItems()
     local out = {}
     for _, def in ipairs(exports.kora_core:allShared('items') or {}) do
         if type(def) == 'table' and type(def.name) == 'string' then
-            out[def.name] = QbInventory.toOxItemDef(def)
+            out[def.name] = KoraInventory.toOxItemDef(def)
         end
     end
     return out
@@ -67,7 +67,7 @@ end
 -- Upstream matches metadata with table.contains (PARTIAL: every key of the
 -- QUERY must be equal on the item, extra item keys are ignored) and only
 -- switches to table.matches (exact, both directions) when `strict` is passed.
--- QbInventory.sameInfo is the exact form, so partial needs its own walk here.
+-- KoraInventory.sameInfo is the exact form, so partial needs its own walk here.
 -- This file had no `strict` parameter at all and always compared exactly, so
 -- every ox caller filtering on a single metadata key silently found nothing.
 local function metadataMatches(info, metadata, strict)
@@ -76,7 +76,7 @@ local function metadataMatches(info, metadata, strict)
     end
     info = info or {}
     if strict then
-        return QbInventory.sameInfo(info, metadata)
+        return KoraInventory.sameInfo(info, metadata)
     end
     for key, value in pairs(metadata) do
         if info[key] ~= value then
@@ -117,7 +117,7 @@ local function countOf(name, metadata, strict)
 end
 
 local function weight()
-    return QbInventory.totalWeight(items())
+    return KoraInventory.totalWeight(items())
 end
 
 local function maxWeight()
@@ -129,7 +129,7 @@ local function maxWeight()
     -- is a shared_script, so the authority's own default is readable here
     -- rather than guessed; the literal only covers a config.lua that failed to
     -- load, which would otherwise make this return nil to an ox caller.
-    local config = Config and Config.qbinventory or {}
+    local config = Config and Config.kora_inventory or {}
     return tonumber(config.playerMaxWeight) or 120000
 end
 
@@ -268,7 +268,7 @@ local ox = {
         })
     end,
     GetPlayerItems = function()
-        return QbInventory.copy(items())
+        return KoraInventory.copy(items())
     end,
     GetPlayerWeight = weight,
     GetPlayerMaxWeight = maxWeight,
@@ -307,19 +307,19 @@ local ox = {
     -- Lower-cased like every other lookup in this file: kora_core's shared items
     -- table is keyed lower-case, so `Items('WEAPON_PISTOL')` would otherwise
     -- miss while GetItemCount('WEAPON_PISTOL') resolves it fine.
-    -- Returns ox-format definitions (QbInventory.toOxItemDef); kora's registry
+    -- Returns ox-format definitions (KoraInventory.toOxItemDef); kora's registry
     -- record is only read, never modified.
     Items = function(name)
         if name then
             local def = itemDef(name)
-            return def and QbInventory.toOxItemDef(def, itemName(name)) or nil
+            return def and KoraInventory.toOxItemDef(def, itemName(name)) or nil
         end
         return sharedItems()
     end,
     ItemList = function(name)
         if name then
             local def = itemDef(name)
-            return def and QbInventory.toOxItemDef(def, itemName(name)) or nil
+            return def and KoraInventory.toOxItemDef(def, itemName(name)) or nil
         end
         return sharedItems()
     end,
@@ -340,8 +340,8 @@ local ox = {
     -- metadata keys, so there is nothing to forward this to. Deliberate no-op.
     displayMetadata = function() end,
     -- No backing subsystem. kora_inventory's item receipts are SERVER-authored and
-    -- gated server-side by Config.qbinventory.itemBoxes; the client only relays
-    -- 'qbinventory:client:itemBox' (client/ui.lua). There is no client-side
+    -- gated server-side by Config.kora_inventory.itemBoxes; the client only relays
+    -- 'kora_inventory:client:itemBox' (client/ui.lua). There is no client-side
     -- suppression switch to flip, and a local flag here would not stop the
     -- server deciding to emit. Deliberate no-op.
     suppressItemNotifications = function() end,
@@ -355,7 +355,7 @@ local ox = {
         -- rendered title-only and the text was silently lost. Both ox spellings
         -- are folded onto `message`. The caller's table is never mutated
         -- (upstream mutates it, which is its own small bug).
-        local payload = QbInventory.copy(data)
+        local payload = KoraInventory.copy(data)
         payload.message = payload.message or payload.description or payload.text
         payload.description, payload.text = nil, nil
         if payload.type == 'inform' then

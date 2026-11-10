@@ -68,7 +68,7 @@ export interface IntentPayload {
     token: string
     intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync"
     payload: Record<string, unknown>
-    /** Lets the Lua bridge answer the fetch at once and deliver the verdict as `qbinventory:nui:intentResult`. */
+    /** Lets the Lua bridge answer the fetch at once and deliver the verdict as `kora_inventory:nui:intentResult`. */
     requestId?: number
 }
 
@@ -79,7 +79,7 @@ export interface IntentResponse {
     pending?: boolean
 }
 
-/** Server-authored receipt sent only when Config.qbinventory.itemBoxes allows it. */
+/** Server-authored receipt sent only when Config.kora_inventory.itemBoxes allows it. */
 export interface ItemBoxReceipt {
     name: string
     label?: string
@@ -92,8 +92,8 @@ export interface ItemBoxReceipt {
 }
 
 /**
- * The presentation half of `Config.qbinventory`, pushed on
- * `qbinventory:nui:config`. Everything here is a rendering choice -- nothing in
+ * The presentation half of `Config.kora_inventory`, pushed on
+ * `kora_inventory:nui:config`. Everything here is a rendering choice -- nothing in
  * it is authority, and the server never reads it back.
  */
 export interface UiConfig {
@@ -103,13 +103,13 @@ export interface UiConfig {
     centreWhenSolo?: boolean
     /** Outline the hotbar slots in the accent colour. */
     showHotbar?: boolean
-    /** Size multiplier for text and slots (Config.qbinventory.ui.scale), 1 = default. */
+    /** Size multiplier for text and slots (Config.kora_inventory.ui.scale), 1 = default. */
     scale?: number
-    /** Right-clicking a stack opens the split dialog (Config.qbinventory.ui.rightClickSplit). */
+    /** Right-clicking a stack opens the split dialog (Config.kora_inventory.ui.rightClickSplit). */
     rightClickSplit?: boolean
-    /** Paint a move before the server answers and roll back if refused (Config.qbinventory.ui.optimisticMoves). */
+    /** Paint a move before the server answers and roll back if refused (Config.kora_inventory.ui.optimisticMoves). */
     optimisticMoves?: boolean
-    /** Queue drags made while a move is pending instead of refusing them (Config.qbinventory.ui.queueMoves). */
+    /** Queue drags made while a move is pending instead of refusing them (Config.kora_inventory.ui.queueMoves). */
     queueMoves?: boolean
     /** Decimals shown for fractional inspector values (Config.Inspector.decimals). */
     inspectorDecimals?: number
@@ -117,9 +117,9 @@ export interface UiConfig {
     inspectorCopy?: boolean
     /** Slot border thickness in px (Config.Slots.borderWidth). */
     slotBorderWidth?: number
-    /** Milliseconds before an unanswered move is rolled back (Config.qbinventory.ui.moveTimeoutMs). */
+    /** Milliseconds before an unanswered move is rolled back (Config.kora_inventory.ui.moveTimeoutMs). */
     moveTimeoutMs?: number
-    /** The bridge delivers verdicts as messages instead of holding the fetch (Config.qbinventory.ui.directTransport). */
+    /** The bridge delivers verdicts as messages instead of holding the fetch (Config.kora_inventory.ui.directTransport). */
     directTransport?: boolean
     images?: {
         /** e.g. `nui://kora_inventory/images` */

@@ -65,26 +65,26 @@ ingredient removal, all outputs, slots, and weight without running access
 callbacks/hooks or changing the inventory.
 
 `CraftItem(source, recipeId, trustedContext, amount?)` accepts a positive batch
-amount up to `Config.qbinventory.crafting.maxBatchAmount` (100 by default).
+amount up to `Config.kora_inventory.crafting.maxBatchAmount` (100 by default).
 Every ingredient and output is scaled, planned, and committed in the same
 locked transaction; the default amount remains one.
 
-Crafting locks the qbcore-owned player inventory, makes a detached plan,
+Crafting locks the kora_core-owned player inventory, makes a detached plan,
 validates all recipe ingredients/weight/slots, then commits through
-`qbcore:setPath` via kora_inventory's authority seam. A failed recipe changes no
+`kora_core:setPath` via kora_inventory's authority seam. A failed recipe changes no
 slots. Hooks can approve/reject a craft but cannot mutate its planned state.
 
 Weapon helpers are also server-only: `PrepareWeaponMetadata`, `GetWeaponState`,
 `SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`,
 `SetWeaponComponents`, `LoadWeaponRounds`, and `FireWeaponRound`. New weapon
 metadata receives a server serial, bounded durability and ammo, and only configured components in
-`Config.qbinventory.weapons.components` are accepted. Gameplay weapon-use code
+`Config.kora_inventory.weapons.components` are accepted. Gameplay weapon-use code
 must invoke durability/ammo changes from validated server actions; do not add a
 generic client event for these exports.
 
 New weapon serials are `<prefix>-<WEAPON>-<time>-<n>` from one generator
 (`weapons.generateSerial`). The prefix is `Config.SerialPrefix` (default `KORA`,
-A-Z0-9, max 12; the legacy `Config.qbinventory.weapons.serialPrefix` is still
+A-Z0-9, max 12; the legacy `Config.kora_inventory.weapons.serialPrefix` is still
 honoured when set to something other than `QB`). Existing serials are never
 rewritten. Stored durability is rounded to 2 decimals, and the item inspector
 rounds fractional values to `Config.Inspector.decimals` (default 1). With
@@ -101,7 +101,7 @@ vehicle, both in px from the bottom of the screen. Raise them to clear your HUD.
 
 A drawn weapon is always holstered and removed from the ped when its item leaves
 the inventory by any route (drop, give, stash/trunk/glovebox, server removal,
-sale): the server sends `qbinventory:client:weaponRemoved`, and the client also
+sale): the server sends `kora_inventory:client:weaponRemoved`, and the client also
 re-checks after every replicated inventory update.
 
 `Config.ShopHints` draws a small marker at fixed shop points within
@@ -131,7 +131,7 @@ location, `ped.model`/`ped.scenario` or `clerk = false`. With `enabled = false`
 the old counter zone is used unchanged (and the label only if
 `Config.ShopHints.showText`). Ammu-Nation keeps its `shopkeeper` peds. Peds are removed when the resource stops.
 
-When `Config.qbinventory.weapons.ballistics.enabled` is set (the default), a
+When `Config.kora_inventory.weapons.ballistics.enabled` is set (the default), a
 weapon's `info.loadedBullets` contains one generated record for every loaded
 round; a 12-round magazine therefore contributes exactly 12 entries. The
 client only reports that its native ped fired. The server resolves the equipped
@@ -140,7 +140,7 @@ round event for an evidence resource. Cartridge IDs are not firearm serials:
 the serial-to-casing link belongs in protected police storage and is revealed
 only after the investigation flow completes.
 
-`Config.qbinventory.weapons.durability` controls normal firing wear. With the
+`Config.kora_inventory.weapons.durability` controls normal firing wear. With the
 default `perShot = 0.10`, every ten accepted rounds remove one durability
 point. Set a per-weapon value in `multipliers` (for example, `1.25` for a
 rifle that wears 25% faster), add non-wearing weapons to `excluded`, or set
@@ -152,7 +152,7 @@ This foundation does not yet supply a crafting UI or station discovery.
 
 ### Visible weapon carry and draw pacing
 
-`Config.qbinventory.weaponCarry` turns weapons a player owns but is not
+`Config.kora_inventory.weaponCarry` turns weapons a player owns but is not
 holding into props on their body, and turns equipping one from an instant
 snap into a timed, animated draw. Set `enabled = false` to switch the whole
 feature off; nothing else about the inventory changes.
@@ -160,7 +160,7 @@ feature off; nothing else about the inventory changes.
 `visibility` picks what other players can see:
 
 - `'all'` -- every carryable weapon anywhere in the inventory is rendered.
-- `'hotbar'` (default) -- only weapons in slots `1..Config.qbinventory.hotbarSlots`
+- `'hotbar'` (default) -- only weapons in slots `1..Config.kora_inventory.hotbarSlots`
   are rendered. A weapon stowed past that range is genuinely concealed.
 
 `hotbarSlots` is a single top-level value precisely because two features ask
@@ -200,8 +200,8 @@ component *item name* to the GTA component it renders as; it is empty by
 default because kora_core's shared registry carries no component-to-native
 mapping and guessing one would attach the wrong part.
 
-The carried list is built on the server from qbcore-owned `PlayerData` and
-published on the replicated player state bag `qbinventory:weaponCarry`
+The carried list is built on the server from kora_core-owned `PlayerData` and
+published on the replicated player state bag `kora_inventory:weaponCarry`
 (cleared with an explicit `false`, never a nil deletion -- a nil write is a
 key deletion and does not replicate like a value change). Clients only
 *render* that bag. A client never submits, extends or edits its own carried
@@ -209,10 +209,10 @@ list, so this can never become a channel for advertising items a player does
 not own or hiding ones they do.
 
 The one thing a client may say is "the draw you asked me for finished"
-(`qbinventory:server:weaponToggled`), and that is matched against a pending
+(`kora_inventory:server:weaponToggled`), and that is matched against a pending
 request this server issued and re-resolved against the real slot before it is
 believed -- a client cannot confirm a weapon it does not have, in a slot it
-was not asked about. `qbinventory:server:weaponUnequipped` carries no payload
+was not asked about. `kora_inventory:server:weaponUnequipped` carries no payload
 at all and can only ever put a weapon *back* on its own player's body (weapon
 wheel, disarm, death), never take one off. Read-only server exports:
 
@@ -251,7 +251,7 @@ gameplay resource must validate its station/role/cost server-side and then use
 
 Opening another player's inventory is also denied by default: distance and
 routing-bucket checks are necessary but never sufficient. Configure the trusted
-`Config.qbinventory.playerInspection.access(source, target, sourceData,
+`Config.kora_inventory.playerInspection.access(source, target, sourceData,
 targetData)` callback, or register a server-only policy through
 `RegisterInspectionAccess`, and return `true` only for an authorised
 police/admin/consent flow. Policies are removed automatically with their
@@ -272,12 +272,12 @@ module verifies entity existence/type, player entity, routing bucket, server
 coordinates/range, native plate, vehicle class and configured capacity. Native
 plates are trimmed, uppercased, whitespace-normalised and restricted to the
 configured GTA plate alphabet before becoming a storage key. Configure slots
-and weight by class in `Config.qbinventory.vehicles.classes`; set a type to
+and weight by class in `Config.kora_inventory.vehicles.classes`; set a type to
 `false` to disable it for that class.
 
 For ownership/keys/faction policy, set `vehicles.ownerCheck` and/or
 `vehicles.accessCheck` to trusted server callbacks, or register scoped runtime
-checks with `QbInventory.vehicles.registerAccess(callback, options)`. Returning
+checks with `KoraInventory.vehicles.registerAccess(callback, options)`. Returning
 `false, reason` denies access. Hooks receive only a server-generated vehicle
 descriptor and can be cleaned with `cleanupResource(resourceName)`.
 
@@ -295,11 +295,11 @@ above; `client/compat.lua` tries it before the player's own inventory.
   the rear bumper, or the front for the rear/mid-engine models in
   `vehicles.frontBootModels` (adder, zentorno, ...). Classes in
   `vehicles.bootSkipClasses` (motorcycles, cycles, trains) are ignored.
-- A locked vehicle (kora_vehiclekeys `qbvehiclekeys:locked` state, else the
+- A locked vehicle (kora_vehiclekeys `kora_vehiclekeys:locked` state, else the
   native door lock) refuses the trunk with a "locked" notice; the server
   enforces this too unless `vehicles.respectLocks = false`.
 
-Options (all under `Config.qbinventory.vehicles`): `enabled`, `gloveboxEnabled`,
+Options (all under `Config.kora_inventory.vehicles`): `enabled`, `gloveboxEnabled`,
 `trunkEnabled`, `bootReach`, `trunkDistance`, `respectLocks`, `frontBootModels`,
 `bootSkipClasses`. Set `enabled = false` if another resource drives vehicle
 storage; `exports.kora_inventory:openInventory('trunk', netId)` still works.
@@ -317,7 +317,7 @@ opening is not animated.
 ### Trunk and hood toggles
 
 `client/vehicle_doors.lua` (needs kora_target, already a dependency) adds, under
-`Config.qbinventory.vehicles.doors`:
+`Config.kora_inventory.vehicles.doors`:
 
 - ALT menu: aiming at the trunk of a vehicle lists Open/Close trunk and Trunk
   storage; aiming at the hood lists Open/Close hood. The aimed point must lie in
@@ -342,7 +342,7 @@ callback or client network event: item records, container IDs, owner IDs,
 evidence IDs, target slots, and target players must be resolved by a trusted
 server resource before it calls this API.
 
-`QbInventory.containers.create(id, options)` makes a generic secondary
+`KoraInventory.containers.create(id, options)` makes a generic secondary
 `container:<id>`. IDs are strict, bounded server identifiers; a new container
 is rejected unless it has a citizen owner derived from `ownerSource`, a trusted
 access/group policy, or a fixed world coordinate. Initial items are checked by
@@ -350,13 +350,13 @@ the core's normal slot/item/weight validator. `open(source, id)` is for an
 existing container only and still passes the core access/distance checks.
 
 For a portable item container, trusted code calls
-`QbInventory.containers.bindItem(source, slot, options)`. The module reads the
-actual qbcore-owned slot, derives the caller's citizen ID, generates the
+`KoraInventory.containers.bindItem(source, slot, options)`. The module reads the
+actual kora_core-owned slot, derives the caller's citizen ID, generates the
 identifier server-side, and writes `info.containerId` through kora_core's mutation
 funnel. `openItem(source, slot)` then reads that same current server slot. It
 does not accept a browser/client item table, owner, or container identifier.
 
-`Config.qbinventory.containers.items` promotes named unique items into
+`Config.kora_inventory.containers.items` promotes named unique items into
 first-class portable containers. The shipped `backpack` definition is a 20-slot,
 60 kg container: using it from the player's own inventory binds a generated ID
 on first use and opens it thereafter. Its access policy proves current
@@ -366,27 +366,27 @@ Portable containers cannot be stored in another container by default (and can
 never be stored inside themselves); set `allowNested = true` only with an
 explicit server policy for recursive capacity.
 
-Evidence and confiscation share `QbInventory.evidence` (also exposed as
-`QbInventory.confiscation`):
+Evidence and confiscation share `KoraInventory.evidence` (also exposed as
+`KoraInventory.confiscation`):
 
 - `open(source, evidenceId)`
 - `seize(source, targetSource, evidenceId, sourceSlot, amount, evidenceSlot?)`
 - `release(source, targetSource, evidenceId, evidenceSlot, amount, playerSlot?)`
 
 Evidence is default-deny. Configure a trusted
-`Config.qbinventory.containers.evidence.access(source, action, context)` that
+`Config.kora_inventory.containers.evidence.access(source, action, context)` that
 returns `true` only for authorised server-side policy (job/ACE/restraint/case
 ownership). Seize/release resolve both player inventories on the server and
 check target entity existence, routing bucket, range, exact current slot and
 amount, capacity, and the policy again while holding deterministic inventory
 locks. Metadata is carried only from the server item record. A successful move
-emits `qbinventory:server:evidenceMoved` after both revisioned views have been
+emits `kora_inventory:server:evidenceMoved` after both revisioned views have been
 broadcast. Never forward raw client identifiers or item data into these calls.
 
 ### Integration boundary
 
 The bundled manifest loads this module after the authority. Do **not** add a
-generic `qbinventory:server:openContainer` or `seizeEvidence` net event; a resource
+generic `kora_inventory:server:openContainer` or `seizeEvidence` net event; a resource
 that wants a player-facing action must first translate its own validated
 server-side interaction into one of the functions above. This preserves the
 headless core boundary and avoids accepting a client-selected evidence case,
@@ -410,12 +410,12 @@ row with the same checksum is skipped; a changed legacy row is reported rather
 than overwriting a possibly-live kora_inventory record. Malformed JSON/item slots
 are retained in `kora_inventory_quarantine` for operator review.
 
-Run these from the server console (or grant `command.qbinventory`):
+Run these from the server console (or grant `command.kora_inventory`):
 
-- `qbinventory-migrate dry-run` — inspect import eligibility without writing.
-- `qbinventory-migrate run` — idempotently import eligible legacy data.
-- `qbinventory-migrate verify` — validate stored item JSON and print migration state.
-- `qbinventory-migrate retry` — revisit only previously failed/quarantined rows.
+- `kora_inventory-migrate dry-run` — inspect import eligibility without writing.
+- `kora_inventory-migrate run` — idempotently import eligible legacy data.
+- `kora_inventory-migrate verify` — validate stored item JSON and print migration state.
+- `kora_inventory-migrate retry` — revisit only previously failed/quarantined rows.
 
 The importer inspects, when present, `inventories`, `stashitems`, `trunkitems`,
 and `gloveboxitems`. It accepts common identifier/slot/weight column spellings
@@ -533,7 +533,7 @@ Using an ammo item loads the weapon the player currently has **drawn**.
 Which weapon that is, and how many rounds it gets, are both resolved on the
 server: the weapon comes from `server/weaponcarry.lua`'s own record of the draw
 it asked for (only ever set after the client confirmed a draw the server
-initiated, and re-validated against qbcore-owned `PlayerData` at that point),
+initiated, and re-validated against kora_core-owned `PlayerData` at that point),
 and the round count comes from the shared item definition's `rounds`. The
 client's use request contributes a slot and nothing else -- no weapon name,
 hash, ammo type or count crosses the wire inbound.
@@ -553,8 +553,8 @@ refused and consumes nothing.
 
 ## UI presentation config
 
-`Config.qbinventory.ui` is the only config that crosses into the browser,
-pushed on `qbinventory:nui:config` at resource start and on every session open.
+`Config.kora_inventory.ui` is the only config that crosses into the browser,
+pushed on `kora_inventory:nui:config` at resource start and on every session open.
 Nothing in it is authority and the inventory engine never reads it.
 
 | Key | Effect |
@@ -564,7 +564,7 @@ Nothing in it is authority and the inventory engine never reads it.
 | `rightClickSplit` | Right-click on a stack of 2+ opens the split dialog (default `true`); `false` makes right-click do nothing. |
 | `optimisticMoves` | Draw a drag-and-drop move (move, stack, swap, split) or a shop purchase immediately and undo it if the server refuses, fails or does not answer within `moveTimeoutMs` (default `true`). The painted item is dimmed with a dashed border (theme tokens only) until the server's inventory replaces it, and it never jumps back to the source slot while it waits; a refusal restores the source and shows the server's reason. `false` shows a move only after the server confirms it. The server validates every move and charges every purchase either way; the browser only predicts. |
 | `queueMoves` | With `optimisticMoves`, keep the inventory draggable while a move waits for the server: further drags are queued (up to 8) and sent in order; a refused or unanswered move undoes itself, the server is asked to re-send the real state, and the drags queued behind it still go out (default `true`). `false` blocks dragging until the server answers. The busy (wait) cursor is never shown either way. |
-| `directTransport` | Send the bundled UI's requests to the server as one direct net event (`qbinventory:server:call`) and receive the verdict as one (`qbinventory:client:callResult`), instead of through kora_lib's callback layer, and acknowledge the browser's fetch at once so it never sits pending behind a busy cursor (default `true`). The server runs the same handlers and checks either way; the kora_lib callbacks `qbinventory:server:transfer` / `qbinventory:server:intent` stay registered for third-party renderers. `false` restores the blocking kora_lib callback path. |
+| `directTransport` | Send the bundled UI's requests to the server as one direct net event (`kora_inventory:server:call`) and receive the verdict as one (`kora_inventory:client:callResult`), instead of through kora_lib's callback layer, and acknowledge the browser's fetch at once so it never sits pending behind a busy cursor (default `true`). The server runs the same handlers and checks either way; the kora_lib callbacks `kora_inventory:server:transfer` / `kora_inventory:server:intent` stay registered for third-party renderers. `false` restores the blocking kora_lib callback path. |
 | `moveTimeoutMs` | Milliseconds (500-60000, default `6000`) the UI waits for the server to answer a move before undoing it and re-syncing. With `directTransport` nothing blocks while it waits, so the default tolerates a lag spike; with it off the browser holds a busy cursor while a request is outstanding, so use about `1500`. A move the server confirmed no longer waits for its confirming patch longer than this. |
 | `moveTimeout` | Legacy form of `moveTimeoutMs`, in seconds. Not set by default; only read when `moveTimeoutMs` is absent from your config. |
 | `images` | Item artwork resolution -- see below. |
@@ -580,7 +580,7 @@ Every inventory request (move, purchase, drop, use) is validated and answered
 by the server in the same tick it arrives -- there is no `Wait`, progress bar or
 database write on that path (secondary inventories persist on the 5 s flush,
 player items through kora_core's own dirty-column save). With
-`Config.qbinventory.slowRequestMs` (default `250`, `0` = off) the server prints
+`Config.kora_inventory.slowRequestMs` (default `250`, `0` = off) the server prints
 `slow <action> request from player <id>: <n> ms server-side` for any request
 that takes at least that long, so a drag that still feels late can be traced:
 no such line means the time was spent on the network or in the client, not in
@@ -617,7 +617,7 @@ plain identifier or it is rejected outright rather than escaped.
 ## Ground drops
 
 Dropping an item creates a temporary `drop` inventory at the player's position
-and leaves a bag prop on the floor (`Config.qbinventory.drops`).
+and leaves a bag prop on the floor (`Config.kora_inventory.drops`).
 
 The prop is **presentation only**. It is a local, non-networked object created
 independently on each client; it carries no inventory identity, and interacting
@@ -628,7 +628,7 @@ it, or fabricating one client-side gains nothing.
 
 Player-created drops belong to the player's server-resolved routing bucket.
 Opening, transferring and receiving item updates recheck that bucket.
-`qbinventory:server:drops` and the legacy drop list return matching drop ids and
+`kora_inventory:server:drops` and the legacy drop list return matching drop ids and
 coordinates; **contents are never included**. Live creation reaches matching
 players. After a bucket change, the existing five-second session cleanup tick
 closes old drop sessions and refreshes the local bags and interaction targets.
@@ -644,10 +644,10 @@ Its optional third `bucket` argument restricts a drop; ox-compatible
 `openInventory(type, data)`, `closeInventory()`, and `submitIntent(intent)` are
 the client exports. Their server transport emits local presentation events:
 
-- `qbinventory:ui:sessionOpened({ token, primary, secondary, expires })`
-- `qbinventory:ui:sessionPatched({ token, patch })`
-- `qbinventory:ui:sessionClosed({ token, reason })`
-- `qbinventory:ui:rejected({ reason })`
+- `kora_inventory:ui:sessionOpened({ token, primary, secondary, expires })`
+- `kora_inventory:ui:sessionPatched({ token, patch })`
+- `kora_inventory:ui:sessionClosed({ token, reason })`
+- `kora_inventory:ui:rejected({ reason })`
 
 The client receives a short-lived token only after the server resolves and
 authorises the target inventory. Every transfer checks the token, both current
@@ -658,7 +658,7 @@ rejected rather than merged.
 
 ### Using items
 
-An item definition (kora_core's shared `items` registry) may set two qbinventory-
+An item definition (kora_core's shared `items` registry) may set two kora_inventory-
 native fields on top of the usual `useable`/`weight`/`unique`/etc, both derived
 and validated by `buildItem` exactly like those:
 
@@ -682,12 +682,12 @@ passthrough.
 `intentUse` (the server half of the NUI `use` action) reports
 `{ preventClose }` back to the caller on success, and `client.lua`'s
 `submitIntent` calls `closeInventory()` unless that came back `true`. The same
-gate (`QbInventory.useGate`, defined in `client.lua`) runs before both this NUI
+gate (`KoraInventory.useGate`, defined in `client.lua`) runs before both this NUI
 path and the hotbar keybinds below, so there is exactly one place that decides
 whether a use is allowed to proceed.
 
 Pressing `1`-`5` uses whatever item currently occupies inventory slots
-`1..Config.qbinventory.hotbarSlots`, even with the panel closed -- kora_inventory
+`1..Config.kora_inventory.hotbarSlots`, even with the panel closed -- kora_inventory
 has no separate hotbar/quickslot data model (see the
 `qb-inventory:client:hotbar` no-op just below), so the first N general
 inventory slots double as the hotbar, matching real qb-inventory/ox_inventory.
@@ -696,7 +696,7 @@ carried, which is why it is one config value rather than a constant in each. `cl
 `Kora.keybind`, does nothing while `IsNuiFocused()`/`IsPauseMenuActive()` (so it
 never fights the panel's own Use action), and reuses the existing legacy
 `QBCore:Server:UseItem` transport -- which already re-resolves the slot from
-qbcore-owned `PlayerData` and never trusts the transmitted item record --
+kora_core-owned `PlayerData` and never trusts the transmitted item record --
 instead of adding a second server-side use path.
 
 Double-clicking a slot in the bundled web UI (`web/src/App.tsx`) triggers the
@@ -734,7 +734,7 @@ the server.
 Shops are read-only in the generic transfer path. A shop item can only leave
 through the dedicated `buy` intent, which revalidates the open session, shop
 type, stock, both revisions, access/distance, and server-side payment before
-adding the server-resolved item to the qbcore-owned player inventory. A failed
+adding the server-resolved item to the kora_core-owned player inventory. A failed
 add after payment is refunded by the server.
 
 A cuffed player (`ishandcuffed` metadata, set by kora_police and mirrored to the
@@ -742,12 +742,12 @@ A cuffed player (`ishandcuffed` metadata, set by kora_police and mirrored to the
 slot, or move, drop or give anything: the server refuses `useItem`,
 `openInventory` and every session request, and closes a session that was open
 when the cuff went on. The client mirrors this (inventory command, hotbar keys,
-panel closes on cuff). `Config.qbinventory.blockWhenCuffed = false` turns it off.
+panel closes on cuff). `Config.kora_inventory.blockWhenCuffed = false` turns it off.
 
 ### Generic UI block
 
 A resource that needs the screen to itself (kora_emotemenu's Emote Maker
-freecam) sets the local player state bag named by `Config.qbinventory.uiBlockBag`
+freecam) sets the local player state bag named by `Config.kora_inventory.uiBlockBag`
 (default `koraUiBlocked`) to `true`, and back to `false`/`nil` when done.
 While it is true the inventory command, the hotbar and the compat open path
 refuse (as for a running progress bar), and an open inventory is closed by a
@@ -778,7 +778,7 @@ The bundled liquor shop follows the same contract. Each location declares its
 own storefront name (`Rob's Liquor`) while all of them use the
 canonical `Liquor` category and the same server-validated shop stock.
 
-The bundled convenience store (`Config.qbinventory.shops.convenience`, all 24/7
+The bundled convenience store (`Config.kora_inventory.shops.convenience`, all 24/7
 counters) is a separate shop with the same contract. Its "Open shop" target sits
 on the counter, next to kora_robberies registers. Set `enabled = false` to drop
 the shop, its targets and blips (default `true`). `blip.category` (default
@@ -830,7 +830,7 @@ reported coordinates against the source's own live server position (the same
 trust boundary real qb-inventory's `OpenShop` accepts -- see its
 `server/main.lua`) rather than inventing a stronger guarantee the platform
 can't back up. A verified open is cached per-source for
-`Config.qbinventory.sessionTtl` so kora_inventory's own in-session revalidation
+`Config.kora_inventory.sessionTtl` so kora_inventory's own in-session revalidation
 (`validSession`, which re-runs `access` on every transfer but has no fresh
 client data to offer) doesn't kick a player out mid-purchase; a bare open
 with no coordinates at all, or coordinates that don't place the source near a
@@ -847,7 +847,7 @@ departs from upstream naming elsewhere (e.g. `water_bottle` is labelled
 
 The NUI bridge is separated from the inventory transport: only `client/ui.lua`
 uses browser callbacks, focus, or `SendNUIMessage`; it hands a restricted
-envelope to the local `qbinventory:client:submitIntent` event. `client.lua`
+envelope to the local `kora_inventory:client:submitIntent` event. `client.lua`
 then attaches the current server-issued token and revisions before forwarding
 an allowed action. `server.lua` contains no NUI calls or callbacks.
 
@@ -861,7 +861,7 @@ never treated as authoritative.
 
 ## Durable player exchanges
 
-`ExecutePlayerExchange(source, operationKey, request)` is a native server-only export for trusted gameplay domains listed in `Config.qbinventory.exchangeCallers` (default: `kora_drugs`). The calling resource owns its key namespace. The request requires `citizenid` and accepts `take = {{ name, amount }}`, `give = {{ name, amount, info = {} }}`, nonnegative whole `cash`, signed whole `dealerRep`, and `reason`. Inputs are objects with named fields; omitted lists and amounts default empty/zero. Weapon outputs and direct physical-currency item legs are rejected; use `cash` for physical cash. Reputation updates `metadata.rep.dealer`, with negative results clamped to zero. The gameplay caller must authorize the interaction and choose all terms on the server; no client event exposes this API.
+`ExecutePlayerExchange(source, operationKey, request)` is a native server-only export for trusted gameplay domains listed in `Config.kora_inventory.exchangeCallers` (default: `kora_drugs`). The calling resource owns its key namespace. The request requires `citizenid` and accepts `take = {{ name, amount }}`, `give = {{ name, amount, info = {} }}`, nonnegative whole `cash`, signed whole `dealerRep`, and `reason`. Inputs are objects with named fields; omitted lists and amounts default empty/zero. Weapon outputs and direct physical-currency item legs are rejected; use `cash` for physical cash. Reputation updates `metadata.rep.dealer`, with negative results clamped to zero. The gameplay caller must authorize the interaction and choose all terms on the server; no client event exposes this API.
 
 The export plans against the current inventory, validates capacity, and uses kora_core's durable inventory/money/metadata fences. One SQL transaction writes the player values and a permanent, resource-scoped receipt. It returns the receipt on success or `(nil, code, message)` on failure. Reusing a key with identical canonical terms and recipient returns the original receipt; changing terms or recipient returns `conflict`. `GetPlayerExchange(operationKey)` retrieves and reconciles the calling resource's receipt, returning `not_found` only after the previous worker has settled and a locking read confirms no receipt. Unknown outcomes remain fenced; callers must retry the same key, not create a new reward key. Native recovery also reconciles pending operations after provider/core restarts, including offline recipients.
 
@@ -876,7 +876,7 @@ Run `python3 test/exchange_database.py` for the optional database check. It star
 - `exports.ox_inventory:Items()` / `Items(name)` / `ItemList` (server and
   client) return **ox-format** definitions (`name, label, weight, stack, close,
   description, consume, client = {image, ...}, server = {...}`) translated from
-  kora_core's registry by `QbInventory.toOxItemDef`. Kora's own fields stay on
+  kora_core's registry by `KoraInventory.toOxItemDef`. Kora's own fields stay on
   the table as extra keys; the registry itself is never modified. The returned
   tables are copies.
 - Hooks (`registerHook`) follow ox_inventory's hook module: string ids
@@ -904,7 +904,7 @@ stays locked for the whole bar) and only consumes the item once the parachute
 was actually equipped; a cancelled bar, or a player who already has one
 equipped, keeps the item.
 
-`Config.qbinventory.builtinUsables`:
+`Config.kora_inventory.builtinUsables`:
 
 - `parachute` (default `true`) - set `false` to leave the item to another
   resource.

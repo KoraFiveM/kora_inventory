@@ -35,7 +35,7 @@ for _,failure in ipairs({'missing','capacity','rollback','tax'}) do
     local f=prepare();local before=json.encode(f.data())
     local terms=f.terms({take={{name='water_bottle',amount=1}},cash=100,dealerRep=1})
     if failure=='missing' then terms.take[1].amount=4 end
-    if failure=='capacity' then Config.qbinventory.playerMaxWeight=0;terms.give={{name='markedbills',amount=1}} end
+    if failure=='capacity' then Config.kora_inventory.playerMaxWeight=0;terms.give={{name='markedbills',amount=1}} end
     if failure=='rollback' then f.rollback=true end
     if failure=='tax' then exports.kora_core.getTransactionTax=function() return 5 end end
     local result=f.execute('failure',terms);H.equal(result,nil,failure)
@@ -45,7 +45,7 @@ end
 
 -- Existing physical-cash authority remains item-backed with a zero ledger mirror.
 do
-    local f=prepare();Config.qbinventory.cash.asItem=true
+    local f=prepare();Config.kora_inventory.cash.asItem=true
     f.caller='kora_inventory';assert(Core.money.registerPhysicalCash('cash'));f.caller='kora_drugs'
     assert(f.execute('cash-item',f.terms({take={{name='water_bottle',amount=1}},cash=50})))
     H.equal(f.count('cash'),50);H.equal(f.data().money.cash,0)

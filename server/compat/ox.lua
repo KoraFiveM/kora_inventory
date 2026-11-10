@@ -6,10 +6,10 @@
 -- as a table also makes it safe to load alongside native kora_inventory callers.
 --
 -- Required trusted seam (provided by server.lua):
---   QbInventory.internal.resolveInventory(reference, preferredType)
---   QbInventory.internal.{lock,setInventoryItems,canAdd,addTo,removeFrom}
---   QbInventory.internal.{itemDef,bump,broadcast,totalWeight,config}
---   QbInventory.internal.{createSecondary,removeSecondary,rekeySecondary,open}
+--   KoraInventory.internal.resolveInventory(reference, preferredType)
+--   KoraInventory.internal.{lock,setInventoryItems,canAdd,addTo,removeFrom}
+--   KoraInventory.internal.{itemDef,bump,broadcast,totalWeight,config}
+--   KoraInventory.internal.{createSecondary,removeSecondary,rekeySecondary,open}
 -- Never call any of these from a client event. In particular, setInventoryItems
 -- preserves kora_core as the only writer of player PlayerData.items.
 --
@@ -19,11 +19,11 @@
 -- at the point of divergence -- an undocumented difference here is a silent
 -- misbehaviour in every third-party resource written against upstream.
 
-QbInventory = QbInventory or {}
-QbInventory.compat = QbInventory.compat or {}
+KoraInventory = KoraInventory or {}
+KoraInventory.compat = KoraInventory.compat or {}
 
-local inventory = QbInventory
-local core = assert(inventory.internal, 'qbinventory ox adapter loaded before server authority')
+local inventory = KoraInventory
+local core = assert(inventory.internal, 'kora_inventory ox adapter loaded before server authority')
 local ox = {}
 
 local function copy(value)
@@ -224,7 +224,7 @@ end
 -- Both SetSlotCount and SetMaxWeight return nothing upstream, so a rejection
 -- has nowhere to go. Print it rather than failing silently.
 local function warn(fmt, ...)
-    print(('^3[qbinventory:ox]^7 ' .. fmt):format(...))
+    print(('^3[kora_inventory:ox]^7 ' .. fmt):format(...))
 end
 
 local function changeInventoryDimensions(reference, field, value)
@@ -240,7 +240,7 @@ local function changeInventoryDimensions(reference, field, value)
         -- ACCEPTED DIVERGENCE: player dimensions are kora_core configuration, not a
         -- mutable secondary record. Pretending to accept this would create a
         -- non-persistent split-brain between PlayerData and the session view.
-        return warn('player_inventory_dimensions_are_configured_by_qbcore (%s on %s)', field, key)
+        return warn('player_inventory_dimensions_are_configured_by_kora_core (%s on %s)', field, key)
     end
     core.lock({ key }, function()
         local currentKey, current = resolve(key)
@@ -497,7 +497,7 @@ function ox.CanCarryWeight(reference, weight)
 end
 
 -- Mutating item exports. All mutations acquire a single deterministic lock
--- and use the authority's qbcore-aware write funnel / secondary persistence.
+-- and use the authority's kora_core-aware write funnel / secondary persistence.
 
 function ox.AddItem(reference, item, count, metadata, slot, callback)
     local name = itemName(item)
@@ -1003,7 +1003,7 @@ function ox.CreateDropFromPlayer(playerId)
         for _, player in ipairs(GetPlayers()) do
             local viewer = tonumber(player)
             if viewer and GetPlayerRoutingBucket(viewer) == bucket then
-                TriggerClientEvent('qbinventory:client:dropCreated', viewer, drop.id, coords)
+                TriggerClientEvent('kora_inventory:client:dropCreated', viewer, drop.id, coords)
             end
         end
         return true, drop.id

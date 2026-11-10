@@ -2,12 +2,12 @@
 -- A network id is an intent only: this module derives the plate, class,
 -- coordinates and final trunk/glovebox key from the live server entity.
 
-QbInventory = QbInventory or {}
-local inventory = QbInventory
+KoraInventory = KoraInventory or {}
+local inventory = KoraInventory
 local vehicles = {}
 inventory.vehicles = vehicles
 
-local vehicleConfig = (Config.qbinventory and Config.qbinventory.vehicles) or {}
+local vehicleConfig = (Config.kora_inventory and Config.kora_inventory.vehicles) or {}
 local accessHooks, nextHookId = {}, 1
 -- Lookup metadata uses GTA's vehicleClass names (including streamed addons).
 local vehicleClasses = {
@@ -36,7 +36,7 @@ local function accessDistance(kind)
         return tonumber(vehicleConfig.trunkDistance)
     end
     return tonumber(vehicleConfig.distance)
-        or tonumber(Config.qbinventory and Config.qbinventory.interactionDistance)
+        or tonumber(Config.kora_inventory and Config.kora_inventory.interactionDistance)
         or 3.0
 end
 
@@ -60,7 +60,7 @@ end
 local function invokeAccessCallback(callback, src, vehicle)
     local ok, allowed, reason = pcall(callback, src, inventory.copy(vehicle))
     if not ok then
-        print(('^3[qbinventory:vehicles]^7 vehicle access callback failed: %s'):format(tostring(allowed)))
+        print(('^3[kora_inventory:vehicles]^7 vehicle access callback failed: %s'):format(tostring(allowed)))
         return false, 'vehicle access check failed'
     end
     if allowed == false then
@@ -107,7 +107,7 @@ end
 ---not manage (parked traffic) fall back to the native door lock status.
 local function isLocked(entity)
     if type(Entity) == 'function' then
-        local ok, state = pcall(function() return Entity(entity).state['qbvehiclekeys:locked'] end)
+        local ok, state = pcall(function() return Entity(entity).state['kora_vehiclekeys:locked'] end)
         if ok and type(state) == 'boolean' then
             return state
         end

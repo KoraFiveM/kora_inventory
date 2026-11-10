@@ -21,7 +21,7 @@ local function flashTimecycle(name, ms)
     end)
 end
 
-RegisterNetEvent('qbinventory:client:consumeEffect', function(_, effects)
+RegisterNetEvent('kora_inventory:client:consumeEffect', function(_, effects)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -46,7 +46,7 @@ local BAG_COMPONENT = 5
 -- was there so it can be restored. Freemode peds only: other models have no
 -- matching bag drawable. Disabled with builtinUsables.parachuteBag.enabled = false.
 local function wearParachutePack(ped)
-    local bag = (Config.qbinventory.builtinUsables or {}).parachuteBag
+    local bag = (Config.kora_inventory.builtinUsables or {}).parachuteBag
     if type(bag) ~= 'table' or bag.enabled == false then
         return nil
     end
@@ -95,7 +95,7 @@ end
 -- Server callback: runs the equip progress bar and gives the parachute. The
 -- server waits on the answer (true = equipped), which keeps the item locked
 -- mid-use and lets it consume the item only on success.
-Kora.callback.register('qbinventory:client:useParachute', function(request)
+Kora.callback.register('kora_inventory:client:useParachute', function(request)
     local chute = joaat('gadget_parachute')
     local ped = Kora.cache.ped()
     if HasPedGotWeapon(ped, chute, false) then

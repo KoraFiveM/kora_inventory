@@ -14,13 +14,13 @@
 -- test/smoke/contract.lua asserts there is no client-authorised full-inventory
 -- replacement path, and that stays true.
 
-local inventory = assert(QbInventory, 'qbinventory authority missing')
+local inventory = assert(KoraInventory, 'kora_inventory authority missing')
 local internal =
-    assert(inventory and inventory.internal, 'qbinventory internal authority must load before qb event compatibility')
-local api = assert(inventory.api, 'qbinventory api must load before qb event compatibility')
+    assert(inventory and inventory.internal, 'kora_inventory internal authority must load before qb event compatibility')
+local api = assert(inventory.api, 'kora_inventory api must load before qb event compatibility')
 
 local function reject(src, reason)
-    TriggerClientEvent('qbinventory:client:rejected', src, reason)
+    TriggerClientEvent('kora_inventory:client:rejected', src, reason)
     return false, reason
 end
 
@@ -106,7 +106,7 @@ RegisterNetEvent('qb-inventory:server:useItem', function(item)
     end
     local src = source
     -- Only the slot is read. The item's name, weight and metadata are re-read
-    -- from qbcore-owned player data by useItem itself, so a forged payload
+    -- from kora_core-owned player data by useItem itself, so a forged payload
     -- cannot use an item the player does not hold.
     local slot = tonumber(type(item) == 'table' and item.slot or item)
     if not slot then
@@ -176,7 +176,7 @@ RegisterNetEvent('inventory:server:UseItem', legacyUse)
 
 -- Older qb-inventory (1.x) open event: `(type, id, other)`. `other` carried a
 -- client-chosen capacity or shop stock and is never read. The open is the same
--- validated path as `qbinventory:server:open`: only an inventory that already
+-- validated path as `kora_inventory:server:open`: only an inventory that already
 -- exists server-side can be opened, and its access policy, owner, groups,
 -- coordinates and routing bucket are enforced. A stash the server has not
 -- registered is refused, never created on a client's say-so; server scripts
@@ -228,4 +228,4 @@ RegisterNetEvent('qb-inventory:server:SetIsOpenState', function() end)
 RegisterNetEvent('inventory:server:SetIsOpenState', function() end)
 
 inventory.compat = inventory.compat or {}
-inventory.compat.qbEvents = { sessionKeyFor = sessionKeyFor }
+inventory.compat.koraEvents = { sessionKeyFor = sessionKeyFor }

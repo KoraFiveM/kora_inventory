@@ -3,14 +3,14 @@
 -- for the driver seat. A trunk storage entry sits beside the trunk toggle.
 --
 -- The trunk is the rear lid, or the front (bonnet) lid for the rear/mid-engine
--- models in Config.qbinventory.vehicles.frontBootModels; the hood is the other
+-- models in Config.kora_inventory.vehicles.frontBootModels; the hood is the other
 -- lid. Doors are opened after taking network control of the vehicle, so the
 -- door state is replicated and every player sees it. Everything is configured
--- in Config.qbinventory.vehicles.doors and read on every use.
+-- in Config.kora_inventory.vehicles.doors and read on every use.
 
-QbInventory = QbInventory or {}
+KoraInventory = KoraInventory or {}
 local vehicleDoors = {}
-QbInventory.vehicleDoors = vehicleDoors
+KoraInventory.vehicleDoors = vehicleDoors
 
 local BONNET_DOOR, BOOT_DOOR = 4, 5
 local OPEN_RATIO = 0.1
@@ -25,7 +25,7 @@ local registered = {} -- kora_target registration ids owned by this file
 local busy = false
 
 local function vehicleSettings()
-    return (Config.qbinventory and Config.qbinventory.vehicles) or {}
+    return (Config.kora_inventory and Config.kora_inventory.vehicles) or {}
 end
 
 local function settings()
@@ -67,7 +67,7 @@ local function notify(key, kind)
 end
 
 local function storage()
-    return QbInventory.vehicleStorage
+    return KoraInventory.vehicleStorage
 end
 
 ---Door index of the trunk or hood of this vehicle.

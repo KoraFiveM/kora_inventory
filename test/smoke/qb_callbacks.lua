@@ -61,7 +61,7 @@ end
 
 local nextDropId, canAdd, addSucceeds = 1, true, true
 
-QbInventory = {
+KoraInventory = {
     internal = {
         key = function(kind, id) return ('%s:%s'):format(kind, tostring(id)) end,
         playerKey = function(src) return 'player:' .. src end,
@@ -159,11 +159,11 @@ H.equal(createDrop(7, { fromSlot = 40 }), false, 'an empty slot is refused')
 H.equal(#removed, 0, 'none of the refused drops removed anything')
 
 -- No session at all means no drop, whatever the payload says.
-local realSessionOf = QbInventory.internal.sessionOf
-QbInventory.internal.sessionOf = function() return nil end
+local realSessionOf = KoraInventory.internal.sessionOf
+KoraInventory.internal.sessionOf = function() return nil end
 H.equal(createDrop(7, { fromSlot = 3, amount = 1 }), false, 'no open session means no drop')
 H.equal(#removed, 0, 'the sessionless drop removed nothing')
-QbInventory.internal.sessionOf = realSessionOf
+KoraInventory.internal.sessionOf = realSessionOf
 
 -- GetCurrentDrops
 local drops = handlers['qb-inventory:server:GetCurrentDrops'](7)
@@ -256,10 +256,10 @@ H.equal(giveItem(7, 9, 'water', 1, 3), false, 'a recipient who cannot carry it i
 canAdd = true
 H.equal(#removed, 0, 'still nothing removed by any refused give')
 
-QbInventory.internal.sessionOf = function() return nil end
+KoraInventory.internal.sessionOf = function() return nil end
 H.equal(giveItem(7, 9, 'water', 1, 3), false, 'no open session means no give')
 H.equal(#removed, 0, 'the sessionless give removed nothing')
-QbInventory.internal.sessionOf = realSessionOf
+KoraInventory.internal.sessionOf = realSessionOf
 
 -- A failed hand-off puts the item back in its original slot.
 addSucceeds = false

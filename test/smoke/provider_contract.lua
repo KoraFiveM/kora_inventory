@@ -58,7 +58,7 @@ end
 -- file `assert`s its own config block at load time, so a newly added shop this
 -- list had not been updated for failed the whole test with an assertion from
 -- inside that shop rather than anything about the provider contract.
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 for _, path in ipairs(pathsFrom('shared_scripts')) do
     -- '@resource/file.lua' entries are other resources (kora_lib, kora_sql); the Kora
     -- surface they provide is mocked below.
@@ -90,7 +90,7 @@ Kora.blips = setmetatable({}, { __index = function() return function() end end }
 Kora.theme = setmetatable({}, { __index = function() return function() end end })
 Kora.keybind = { add = function() return { remove = function() return true end } end }
 vector3 = function(x, y, z) return { x = x, y = y, z = z } end
-QBTheme = { refresh = function() end, apply = function() return {} end }
+KoraTheme = { refresh = function() end, apply = function() return {} end }
 
 GetCurrentResourceName = function() return 'kora_inventory' end
 GetInvokingResource = function() return nil end
@@ -163,8 +163,8 @@ local function assertContract(whichRealm, identity, names, label)
         :format(label, identity, whichRealm, missing[1] and (' -- missing: ' .. table.concat(missing, ', ')) or ''))
 end
 
-assertContract('server', 'qb-inventory', contract.qbInventory.server, 'qb server')
-assertContract('client', 'qb-inventory', contract.qbInventory.client, 'qb client')
+assertContract('server', 'qb-inventory', contract.koraInventory.server, 'qb server')
+assertContract('client', 'qb-inventory', contract.koraInventory.client, 'qb client')
 assertContract('server', 'ox_inventory', contract.oxInventory.server, 'ox server')
 assertContract('client', 'ox_inventory', contract.oxInventory.client, 'ox client')
 

@@ -5,6 +5,6 @@ function H.equal(actual, expected, message)
 end
 function H.ok(value, message) H.equal(not not value, true, message) end
 function H.finish()
-    io.write(('qbinventory smoke: %d passed, %d failed\n'):format(H.passed, H.failed))
+    io.write(('kora_inventory smoke: %d passed, %d failed\n'):format(H.passed, H.failed))
 end
 return H

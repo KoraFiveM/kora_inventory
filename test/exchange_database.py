@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run actual exchange SQL/qbsql transactions in an isolated socket-only MariaDB."""
+"""Run actual exchange SQL/kora_sql transactions in an isolated socket-only MariaDB."""
 import os
 from pathlib import Path
 import shutil
@@ -13,7 +13,7 @@ def main():
         if not shutil.which(command):
             raise SystemExit(f'Missing {command}; this optional test requires MariaDB, Lua and Node.')
     resource = Path(__file__).resolve().parents[1]
-    with tempfile.TemporaryDirectory(prefix='qbinventory-exchange-') as directory:
+    with tempfile.TemporaryDirectory(prefix='kora_inventory-exchange-') as directory:
         root = Path(directory)
         subprocess.run(['mariadb-install-db', '--no-defaults', f'--datadir={root}',
                         '--auth-root-authentication-method=normal', '--skip-test-db'],
@@ -36,7 +36,7 @@ def main():
                 raise RuntimeError('Disposable MariaDB did not become ready.')
             version = subprocess.run(mysql, input='SELECT VERSION()', text=True, capture_output=True, check=True).stdout.strip()
             subprocess.run(mysql, input='CREATE DATABASE exchange_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;', text=True, check=True)
-            env = dict(os.environ, QBINVENTORY_TEST_SOCKET=str(root / 'mysql.sock'))
+            env = dict(os.environ, KORA_INVENTORY_TEST_SOCKET=str(root / 'mysql.sock'))
             subprocess.run(['node', '--test', 'test/integration/player_exchange.test.js'], cwd=resource,
                            env=env, check=True, timeout=120)
             print(f'Exchange database: PASS ({version}); socket-only scratch database; no existing server accessed.')

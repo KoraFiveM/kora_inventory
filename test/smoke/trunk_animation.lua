@@ -5,17 +5,17 @@ local H = dofile('test/harness.lua')
 
 local f = { now = 1000, session = nil, dead = false, coords = { x = 0, y = -2.5, z = 0 }, log = {}, handlers = {}, threads = {}, door = 0.0, playing = false }
 local env = setmetatable({}, { __index = _G })
-env.Config = { qbinventory = { vehicles = {
+env.Config = { kora_inventory = { vehicles = {
     enabled = true, bootReach = 1.8, frontBootModels = {},
     trunkAnimation = { enabled = true, dict = 'mini@repair', clip = 'fixing_a_ped', flag = 49, openDoor = true },
 } } }
 env.LocalPlayer = { state = {} }
-env.QbInventory = { clientApi = {
+env.KoraInventory = { clientApi = {
     getCurrentSession = function() return f.session end,
     openInventory = function() end,
 } }
-env.QB = { cache = { vehicle = function() return false end, coords = function() return f.coords end }, notify = { send = function() end } }
-env.Kora = env.QB
+env.Kora = { cache = { vehicle = function() return false end, coords = function() return f.coords end }, notify = { send = function() end } }
+env.Kora = env.Kora
 env.GetGameTimer = function() return f.now end
 env.GetHashKey = function(n) return n end
 env.GetEntityModel = function() return 'm' end
@@ -48,7 +48,7 @@ local function pump(ms)
 end
 local function fire(name, ...) for _, fn in ipairs(f.handlers[name] or {}) do fn(...) end end
 assert(loadfile('client/vehicles.lua', 't', env))()
-local V = env.QbInventory.vehicleStorage
+local V = env.KoraInventory.vehicleStorage
 
 local function open(kind, key)
     f.log, f.threads, f.door, f.playing, f.dead = {}, {}, 0.0, false, false
@@ -65,7 +65,7 @@ local function open(kind, key)
     f.now = f.now + 5000
     V.tryOpen()
     f.session = { token = 't' }
-    fire('qbinventory:ui:sessionOpened', { token = 't', secondary = { key = key } })
+    fire('kora_inventory:ui:sessionOpened', { token = 't', secondary = { key = key } })
     pump()
 end
 
@@ -76,7 +76,7 @@ pump(); H.equal(f.playing, true, 'anim keeps playing while session is open')
 
 -- Normal close.
 f.session = nil
-fire('qbinventory:ui:sessionClosed', { token = 't' })
+fire('kora_inventory:ui:sessionClosed', { token = 't' })
 H.equal(f.playing, false, 'close stops the anim')
 H.equal(f.door, 0.0, 'close shuts the door we opened')
 
@@ -106,16 +106,16 @@ H.equal(f.door, 0.0, 'resource stop shuts the door')
 f.log, f.threads, f.playing = {}, {}, false
 f.door = 1.0
 f.session = nil; f.now = f.now + 5000; V.tryOpen(); f.session = { token = 't' }
-fire('qbinventory:ui:sessionOpened', { token = 't', secondary = { key = 'trunk:X' } }); pump()
-fire('qbinventory:ui:sessionClosed', { token = 't' })
+fire('kora_inventory:ui:sessionOpened', { token = 't', secondary = { key = 'trunk:X' } }); pump()
+fire('kora_inventory:ui:sessionClosed', { token = 't' })
 H.equal(f.door, 1.0, 'pre-opened door is not closed')
 H.equal(f.playing, false, 'anim stopped')
 
 -- Disabled: nothing happens.
-env.Config.qbinventory.vehicles.trunkAnimation.enabled = false
+env.Config.kora_inventory.vehicles.trunkAnimation.enabled = false
 open('trunk', 'trunk:ABC123')
 H.equal(#f.log, 0, 'disabled: no door or anim')
-env.Config.qbinventory.vehicles.trunkAnimation.enabled = true
+env.Config.kora_inventory.vehicles.trunkAnimation.enabled = true
 
 -- Non-trunk session (stash) never animates.
 open('stash', 'stash:foo')

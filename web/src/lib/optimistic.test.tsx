@@ -90,7 +90,7 @@ beforeEach(async () => {
     host = document.createElement("div"); document.body.appendChild(host)
     root = createRoot(host)
     await act(async () => { root.render(<App />) })
-    await post("qbinventory:nui:sessionOpened", snapshot)
+    await post("kora_inventory:nui:sessionOpened", snapshot)
 })
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.useRealTimers() })
 
@@ -111,9 +111,9 @@ describe("optimistic moves in the NUI", () => {
         expect(notice()).toContain("over weight")
     })
 
-    it("rolls back on a qbinventory:nui:rejected event", async () => {
+    it("rolls back on a kora_inventory:nui:rejected event", async () => {
         hold(); await splitOne()
-        await post("qbinventory:nui:rejected", { reason: "denied" })
+        await post("kora_inventory:nui:rejected", { reason: "denied" })
         expect(filled(2)).toBe(false)
         expect(slotText(1)).toContain("×3")
         expect(notice()).toContain("denied")
@@ -131,7 +131,7 @@ describe("optimistic moves in the NUI", () => {
     it("reconciles with the authoritative patch and does not roll back afterwards", async () => {
         hold(); await splitOne()
         // the server decided differently from the prediction
-        await post("qbinventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [leaf(1, 1), leaf(5, 2)]) })
+        await post("kora_inventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [leaf(1, 1), leaf(5, 2)]) })
         expect(filled(2)).toBe(false)
         expect(slotText(5)).toContain("×2")
         await act(async () => { answer({ ok: true }) })
@@ -143,7 +143,7 @@ describe("optimistic moves in the NUI", () => {
 
     it("an authoritative refresh wins over a late rejection", async () => {
         hold(); await splitOne()
-        await post("qbinventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [leaf(1, 1), leaf(5, 2)]) })
+        await post("kora_inventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [leaf(1, 1), leaf(5, 2)]) })
         await act(async () => { answer({ ok: false, error: "late" }) })
         expect(slotText(5)).toContain("×2")
         expect(filled(2)).toBe(false)
@@ -161,17 +161,17 @@ describe("optimistic moves in the NUI", () => {
     })
 
     it("flag off keeps the old behaviour: nothing moves until the server patches", async () => {
-        await post("qbinventory:nui:config", { optimisticMoves: false })
+        await post("kora_inventory:nui:config", { optimisticMoves: false })
         hold(); await splitOne()
         expect(sendIntent).toHaveBeenCalledTimes(1)
         expect(filled(2)).toBe(false)
         expect(slotText(1)).toContain("×3")
-        await post("qbinventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [leaf(1, 2), leaf(2, 1)]) })
+        await post("kora_inventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [leaf(1, 2), leaf(2, 1)]) })
         expect(slotText(2)).toContain("×1")
     })
 
     it("flag off: a rejection leaves the (unchanged) inventory as it was", async () => {
-        await post("qbinventory:nui:config", { optimisticMoves: false })
+        await post("kora_inventory:nui:config", { optimisticMoves: false })
         hold(); await splitOne()
         await act(async () => { answer({ ok: false, error: "nope" }) })
         expect(slotText(1)).toContain("×3")
@@ -258,7 +258,7 @@ describe("the inventory stays usable while a move waits for the server", () => {
         const buyOnce = async (n: number) => act(async () => { host.querySelector(`.inventory-stage-secondary button[aria-label$="slot ${n}"]`)!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true })) })
         const buys = () => sendIntent.mock.calls.filter((call) => (call[0] as { intent: string }).intent === "buy").length
 
-        beforeEach(async () => { await post("qbinventory:nui:sessionOpened", { ...snapshot, secondary: shop }) })
+        beforeEach(async () => { await post("kora_inventory:nui:sessionOpened", { ...snapshot, secondary: shop }) })
 
         it("settles on the plain true answer of a purchase, with no patch, so the next buy goes out", async () => {
             for (let i = 1; i <= 5; i++) { await buyOnce(1); expect(buys()).toBe(i) }
@@ -278,19 +278,19 @@ describe("the inventory stays usable while a move waits for the server", () => {
         })
     })
     it("queueMoves off locks the inventory until the server answers, without a wait cursor", async () => {
-        await post("qbinventory:nui:config", { queueMoves: false })
+        await post("kora_inventory:nui:config", { queueMoves: false })
         hold(); await splitOne()
         expect(disabledSlots()).toBeGreaterThan(0)
         act(() => { host.querySelector('button[aria-label^="Coca Leaf"]')!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })) })
         expect(host.querySelector("form")).toBeNull()
         expect(sendIntent).toHaveBeenCalledTimes(1)
         await act(async () => { answer({ ok: true }) })
-        await post("qbinventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [leaf(1, 2), leaf(2, 1)]) })
+        await post("kora_inventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [leaf(1, 2), leaf(2, 1)]) })
         expect(disabledSlots()).toBe(0)
     })
 
     it("honours the configured move timeout", async () => {
-        await post("qbinventory:nui:config", { moveTimeoutMs: 3000 })
+        await post("kora_inventory:nui:config", { moveTimeoutMs: 3000 })
         hold(); await splitOne()
         await act(async () => { vi.advanceTimersByTime(2999) })
         expect(filled(2)).toBe(true)

@@ -1,10 +1,10 @@
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/vendingmachine.lua')
 
-local shop = Config.qbinventory.shops.vendingmachine
+local shop = Config.kora_inventory.shops.vendingmachine
 H.equal(shop.id, 'vendingmachine', 'the vending machine shop has a fixed canonical identifier')
 H.ok(#shop.models >= 1, 'vending machines target at least one prop model')
 for _, model in ipairs(shop.models) do

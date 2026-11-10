@@ -7,8 +7,8 @@
 -- server.lua); a handler registered on kora_core's separate useables table is
 -- never consulted by kora_inventory's use flow.
 
-local api = assert(QbInventory and QbInventory.api, 'qbinventory server authority must load before useables')
-local internal = assert(QbInventory.internal, 'qbinventory internal API must load before useables')
+local api = assert(KoraInventory and KoraInventory.api, 'kora_inventory server authority must load before useables')
+local internal = assert(KoraInventory.internal, 'kora_inventory internal API must load before useables')
 
 -- Equip/holster toggle. The weapon item stays in the player's inventory the
 -- whole time it's equipped -- simplest, desync-free behaviour (matches vanilla
@@ -23,14 +23,14 @@ local internal = assert(QbInventory.internal, 'qbinventory internal API must loa
 -- carried-weapon prop it swaps with) belongs to server/weaponcarry.lua, which
 -- loads after this file -- so it is resolved per use, not captured here.
 local function weaponUseable(src, item)
-    local carry = QbInventory.weaponCarry
+    local carry = KoraInventory.weaponCarry
     if carry then
         return carry.toggle(src, item)
     end
     -- weaponcarry.lua is a sibling module, not a dependency: without it a
     -- weapon still equips, just instantly and with nothing shown on the back.
     TriggerClientEvent(
-        'qbinventory:client:toggleWeapon',
+        'kora_inventory:client:toggleWeapon',
         src,
         { name = item.name, slot = item.slot, action = 'toggle', duration = 0 }
     )
@@ -100,7 +100,7 @@ local function consumableUseable(src, item)
         exports.kora_core:incrementMetaData(src, 'high', effects.high, 0, 100)
     end
 
-    TriggerClientEvent('qbinventory:client:consumeEffect', src, item.name, effects)
+    TriggerClientEvent('kora_inventory:client:consumeEffect', src, item.name, effects)
     return true
 end
 
@@ -118,7 +118,7 @@ end
 -- Which weapon is being loaded is resolved on the SERVER, from
 -- weaponcarry's `equipped` record. That record is only ever set after the
 -- client confirms a draw the server itself asked for, and is re-validated
--- against qbcore-owned PlayerData at that point -- so the client contributes
+-- against kora_core-owned PlayerData at that point -- so the client contributes
 -- nothing here beyond "use the item in this slot". No weapon name, hash, ammo
 -- type or round count crosses the wire inbound.
 --
@@ -129,19 +129,19 @@ end
 -- feature -- and silently accepting the use while doing nothing would consume
 -- the magazine for no effect, which is worse than refusing it.
 local function ammoUseable(src, item)
-    local def = QbInventory.internal.itemDef(item.name)
+    local def = KoraInventory.internal.itemDef(item.name)
     local rounds = math.floor(tonumber(def and def.rounds) or 0)
     if not def or not def.ammoType or rounds <= 0 then
         return false, 'not usable ammunition'
     end
 
-    local carry = QbInventory.weaponCarry
+    local carry = KoraInventory.weaponCarry
     local holding = carry and carry.equippedWeapon(src)
     if not holding then
         return false, 'draw a weapon before loading ammunition'
     end
 
-    local weaponDef = QbInventory.internal.itemDef(holding.name)
+    local weaponDef = KoraInventory.internal.itemDef(holding.name)
     if not weaponDef or weaponDef.ammotype ~= def.ammoType then
         return false,
             ('%s does not take %s'):format(
@@ -153,12 +153,12 @@ local function ammoUseable(src, item)
     -- Persist each round before telling the client to add it. The client
     -- event is presentation-only; weapon metadata is the authoritative
     -- magazine and has one record per loaded round.
-    local state = QbInventory.weapons
-            and QbInventory.weapons.getState
-            and QbInventory.weapons.getState(src, holding.slot)
+    local state = KoraInventory.weapons
+            and KoraInventory.weapons.getState
+            and KoraInventory.weapons.getState(src, holding.slot)
         or {}
     local current = math.floor(tonumber(state and state.ammo) or 0)
-    local weaponConfig = Config.qbinventory.weapons or {}
+    local weaponConfig = Config.kora_inventory.weapons or {}
     local ceiling = math.floor(tonumber(weaponConfig.maxAmmo) or 0)
     local ballisticCap = math.floor(tonumber((weaponConfig.ballistics or {}).maxLoadedRounds) or ceiling)
     if ceiling > 0 and ballisticCap > 0 then
@@ -171,7 +171,7 @@ local function ammoUseable(src, item)
         return false, 'not enough room for that magazine'
     end
 
-    local loadRounds = QbInventory.weapons and QbInventory.weapons.loadRounds
+    local loadRounds = KoraInventory.weapons and KoraInventory.weapons.loadRounds
     if not loadRounds then
         return false, 'weapon ballistics state unavailable'
     end
@@ -187,7 +187,7 @@ local function ammoUseable(src, item)
         -- not be charged. `setAmmo` only touches the same server-resolved
         -- weapon slot, so this restores the pre-use value without consulting
         -- any client state.
-        local setAmmo = QbInventory.weapons and QbInventory.weapons.setAmmo
+        local setAmmo = KoraInventory.weapons and KoraInventory.weapons.setAmmo
         if setAmmo then
             setAmmo(src, holding.slot, current)
         end
@@ -197,7 +197,7 @@ local function ammoUseable(src, item)
     -- The weapon NAME comes from the server's own equipped record, so the
     -- client is told what to load rather than asked. The cap is config, and the
     -- client clamps against the weapon's own maximum on top of it.
-    TriggerClientEvent('qbinventory:client:addAmmo', src, {
+    TriggerClientEvent('kora_inventory:client:addAmmo', src, {
         weapon = holding.name,
         rounds = rounds,
         -- Send the absolute amount rather than a delta: if shots were fired
@@ -236,13 +236,13 @@ local PARACHUTE_ITEM = 'parachute'
 local PARACHUTE_FINISH_TOLERANCE = 500
 
 local function builtinConfig()
-    return Config.qbinventory.builtinUsables or {}
+    return Config.kora_inventory.builtinUsables or {}
 end
 
 local function parachuteUseable(src, item)
     local duration = math.max(0, math.floor(tonumber(builtinConfig().parachuteTime) or 2500))
     local startedAt = GetGameTimer()
-    local ok, equipped = pcall(Kora.callback.trigger, src, 'qbinventory:client:useParachute', {
+    local ok, equipped = pcall(Kora.callback.trigger, src, 'kora_inventory:client:useParachute', {
         time = duration,
         tint = tonumber(builtinConfig().parachuteTint),
     })

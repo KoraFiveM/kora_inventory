@@ -20,5 +20,5 @@ const sample: SessionSnapshot = {
 
 export function openDevHarness() {
     const post = <T,>(action: string, data: T) => window.postMessage({ action, data } satisfies NuiWireMessage<T>, "*")
-    post("qbinventory:nui:sessionOpened", sample)
+    post("kora_inventory:nui:sessionOpened", sample)
 }

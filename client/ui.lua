@@ -1,9 +1,9 @@
 -- The bundled UI is intentionally presentation-only. kora_inventory owns session
 -- creation, all inventory state and every server request; this bridge just
 -- translates its local client events into this resource's NUI wire contract.
--- Locale text with an English fallback (shared.lua's QbInventory.text).
+-- Locale text with an English fallback (shared.lua's KoraInventory.text).
 local function localeText(key, fallback, vars)
-    local text = QbInventory and QbInventory.text
+    local text = KoraInventory and KoraInventory.text
     return text and text(key, fallback, vars) or fallback
 end
 
@@ -30,10 +30,10 @@ local function send(action, data)
 end
 
 local function pushTheme()
-    QBTheme.refresh()
+    KoraTheme.refresh()
 end
 
--- The presentation half of Config.qbinventory, and the ONLY config that crosses
+-- The presentation half of Config.kora_inventory, and the ONLY config that crosses
 -- into the browser. Sent as a whole table rather than folded into the theme
 -- tokens (which are CSS custom properties, not structured data), and re-sent on
 -- every session open so a UI that reloaded mid-session is never left rendering
@@ -44,18 +44,18 @@ end
 -- client/hotbar.lua binds its keys from, so the outline and the keys cannot
 -- disagree.
 -- How long the UI, and this bridge, wait for the server to answer a request
--- before giving up on it (ms). Config.qbinventory.ui.moveTimeoutMs, or the
+-- before giving up on it (ms). Config.kora_inventory.ui.moveTimeoutMs, or the
 -- older moveTimeout in seconds when only that is configured. With the direct
 -- transport the browser's fetch is acknowledged at once, so a long deadline
 -- costs nothing (no busy cursor, no snap-back at a normal lag spike); the
 -- blocking fallback keeps the short one because its fetch stays pending.
 local function directTransport()
-    local ui = (Config.qbinventory or {}).ui or {}
+    local ui = (Config.kora_inventory or {}).ui or {}
     return ui.directTransport ~= false
 end
 
 local function moveTimeoutMs()
-    local ui = (Config.qbinventory or {}).ui or {}
+    local ui = (Config.kora_inventory or {}).ui or {}
     local ms = tonumber(ui.moveTimeoutMs)
     if not ms and tonumber(ui.moveTimeout) then
         ms = tonumber(ui.moveTimeout) * 1000
@@ -64,10 +64,10 @@ local function moveTimeoutMs()
 end
 
 local function pushConfig()
-    local ui = Config.qbinventory.ui or {}
+    local ui = Config.kora_inventory.ui or {}
 
-    send('qbinventory:nui:config', {
-        hotbarSlots = Config.qbinventory.hotbarSlots,
+    send('kora_inventory:nui:config', {
+        hotbarSlots = Config.kora_inventory.hotbarSlots,
         centreWhenSolo = ui.centreWhenSolo ~= false,
         showHotbar = ui.showHotbar ~= false,
         rightClickSplit = ui.rightClickSplit ~= false,
@@ -77,7 +77,7 @@ local function pushConfig()
         queueMoves = ui.queueMoves ~= false,
         -- How long the UI waits for the server before rolling a move back.
         moveTimeoutMs = moveTimeoutMs(),
-        -- The server's verdict arrives as `qbinventory:nui:intentResult`
+        -- The server's verdict arrives as `kora_inventory:nui:intentResult`
         -- instead of holding the browser's fetch open.
         directTransport = directTransport(),
         -- Read on every push so a live config change applies on the next open.
@@ -94,11 +94,11 @@ end
 -- Per-player window placement from kora_hud's /ui editor (position, size,
 -- which side the personal inventory sits on, and whether stashes/trunks use
 -- the custom position). Presentation only: nothing here reaches the server or
--- inventory state. Without kora_hud, or with Config.qbinventory.ui.playerLayout
+-- inventory state. Without kora_hud, or with Config.kora_inventory.ui.playerLayout
 -- = false, the window stays exactly as configured.
 local UI_ID = 'inventory'
 local function uiConfig()
-    return (Config.qbinventory or {}).ui or {}
+    return (Config.kora_inventory or {}).ui or {}
 end
 
 local function defaultPlayerLayout()
@@ -132,7 +132,7 @@ local function setPlayerLayout(layout)
             useForTransfer = type(settings.useForTransfer) == 'boolean' and settings.useForTransfer or defaults.useForTransfer,
         }
     end
-    send('qbinventory:nui:layout', playerLayout)
+    send('kora_inventory:nui:layout', playerLayout)
 end
 
 local function closeSession(reason)
@@ -140,7 +140,7 @@ local function closeSession(reason)
         return
     end
 
-    send('qbinventory:nui:sessionClosed', {
+    send('kora_inventory:nui:sessionClosed', {
         sessionId = activeSession,
         reason = reason or 'closed',
     })
@@ -168,10 +168,10 @@ local function normalizeView(view)
     return out
 end
 
--- These `qbinventory:ui:*` events are explicitly local presentation events.
--- kora_inventory's network transport retains `qbinventory:client:*`, preventing
+-- These `kora_inventory:ui:*` events are explicitly local presentation events.
+-- kora_inventory's network transport retains `kora_inventory:client:*`, preventing
 -- a UI listener from ever accidentally re-entering a network event handler.
-AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
+AddEventHandler('kora_inventory:ui:sessionOpened', function(payload)
     if type(payload) ~= 'table' or type(payload.token) ~= 'string' then
         return
     end
@@ -195,11 +195,10 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     activeSecondaryId = wire.secondary and wire.secondary.id
     pushTheme()
     pushConfig()
-    send('qbinventory:nui:layout', playerLayout)
-    send('qbinventory:nui:sessionOpened', wire)
-    if QbInventory and QbInventory.fftSync then QbInventory.fftSync() end
+    send('kora_inventory:nui:layout', playerLayout)
+    send('kora_inventory:nui:sessionOpened', wire)
     SetNuiFocus(true, true)
-    TriggerEvent('qbinventory:client:requestGiveAvailability')
+    TriggerEvent('kora_inventory:client:requestGiveAvailability')
 end)
 
 -- Distance from the screen bottom (px) for the on-screen hotbar, from
@@ -214,24 +213,24 @@ end
 
 -- The hotbar may be on screen while the player gets in or out; move it then.
 Kora.cache.onChange('vehicle', function()
-    send('qbinventory:nui:hotbarPosition', { bottom = hotbarBottom() })
+    send('kora_inventory:nui:hotbarPosition', { bottom = hotbarBottom() })
 end)
 
 -- Local presentation relay for client/hotbar.lua's show-hotbar key. Works
 -- without an open session, so theme and config are pushed first.
-AddEventHandler('qbinventory:ui:hotbarShow', function(payload)
+AddEventHandler('kora_inventory:ui:hotbarShow', function(payload)
     if type(payload) ~= 'table' or activeSession then
         return
     end
     pushTheme()
     pushConfig()
     payload.bottom = hotbarBottom()
-    send('qbinventory:nui:hotbar', payload)
+    send('kora_inventory:nui:hotbar', payload)
 end)
 
 -- Patches must carry the session id so delayed traffic cannot change a later
 -- session after close/reopen. kora_inventory remains authoritative on revisions.
-AddEventHandler('qbinventory:ui:sessionPatched', function(payload, legacyPatch)
+AddEventHandler('kora_inventory:ui:sessionPatched', function(payload, legacyPatch)
     local token, patch
     if type(payload) == 'string' then
         token, patch = payload, legacyPatch
@@ -273,10 +272,10 @@ AddEventHandler('qbinventory:ui:sessionPatched', function(payload, legacyPatch)
             return
         end
     end
-    send('qbinventory:nui:sessionPatched', wire)
+    send('kora_inventory:nui:sessionPatched', wire)
 end)
 
-AddEventHandler('qbinventory:ui:sessionClosed', function(payload, legacyReason)
+AddEventHandler('kora_inventory:ui:sessionClosed', function(payload, legacyReason)
     local token = type(payload) == 'table' and payload.token or payload
     if token ~= activeToken then
         return
@@ -291,7 +290,7 @@ local STALE_REASONS = { ['invalid session'] = true, ['stale session'] = true, ['
 local STALE_WINDOW, REPEAT_WINDOW = 3000, 1500
 local lastNotice = { reason = nil, at = 0 }
 
-AddEventHandler('qbinventory:ui:rejected', function(payload)
+AddEventHandler('kora_inventory:ui:rejected', function(payload)
     local reason = type(payload) == 'table' and payload.reason or payload
     local stamp = GetGameTimer()
     local text = tostring(reason or 'Action rejected')
@@ -337,7 +336,7 @@ end
 
 -- This is a local presentation relay for the server-authoritative receipt
 -- payload. It intentionally works without an open inventory session.
-RegisterNetEvent('qbinventory:client:itemBox', function(payload)
+RegisterNetEvent('kora_inventory:client:itemBox', function(payload)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -349,7 +348,7 @@ RegisterNetEvent('qbinventory:client:itemBox', function(payload)
         return
     end
     remember(seenReceipts.native, key)
-    send('qbinventory:nui:itemBox', payload)
+    send('kora_inventory:nui:itemBox', payload)
 end)
 
 local legacyActions = { add = 'showAdditions', remove = 'showRemovals', use = 'showUses' }
@@ -357,8 +356,8 @@ local legacyActions = { add = 'showAdditions', remove = 'showRemovals', use = 's
 -- Cosmetic only. A stock script triggers qb-inventory:client:ItemBox with an
 -- item record; nothing in it is believed beyond the item NAME, and label and
 -- artwork come from kora_core's registry. The server's itemBoxes policy applies.
-AddEventHandler('qbinventory:ui:legacyItemBox', function(itemData, action, amount)
-    local policy = Config.qbinventory.itemBoxes
+AddEventHandler('kora_inventory:ui:legacyItemBox', function(itemData, action, amount)
+    local policy = Config.kora_inventory.itemBoxes
     local policyField = legacyActions[action]
     if type(policy) ~= 'table' or policy.enabled ~= true or not policyField or policy[policyField] ~= true then
         return
@@ -377,7 +376,7 @@ AddEventHandler('qbinventory:ui:legacyItemBox', function(itemData, action, amoun
         return
     end
     remember(seenReceipts.legacy, key)
-    send('qbinventory:nui:itemBox', {
+    send('kora_inventory:nui:itemBox', {
         name = def.name or name,
         label = def.label or name,
         image = def.image,
@@ -391,7 +390,7 @@ end)
 -- The target resolver reports presentation state only.  While an in-world
 -- target selection is active, relinquish NUI focus so kora_target can receive
 -- gameplay input; restore it immediately on resolve or cancellation.
-AddEventHandler('qbinventory:ui:giveTargeting', function(payload)
+AddEventHandler('kora_inventory:ui:giveTargeting', function(payload)
     if not activeSession or type(payload) ~= 'table' then
         return
     end
@@ -400,19 +399,19 @@ end)
 
 -- Only a boolean crosses this presentation boundary.  Player identities and
 -- recipient server ids stay in client/give_target.lua and client.lua.
-AddEventHandler('qbinventory:ui:giveAvailability', function(payload)
+AddEventHandler('kora_inventory:ui:giveAvailability', function(payload)
     if not activeSession or type(payload) ~= 'table' then
         return
     end
-    send('qbinventory:nui:giveAvailability', { available = payload.available == true })
+    send('kora_inventory:nui:giveAvailability', { available = payload.available == true })
 end)
 
 -- kora_lib computes the tokens in Lua, so this bridge does not duplicate the
 -- design-system HSL math in TypeScript. kora_inventory can trigger this local
 -- event after a live theme change without involving inventory authority.
-AddEventHandler('qbinventory:client:theme', QBTheme.refresh)
+AddEventHandler('kora_inventory:client:theme', KoraTheme.refresh)
 
-RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
+RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
     if
         type(data) ~= 'table'
         or data.sessionId ~= activeSession
@@ -439,14 +438,14 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
                 return
             end
             delivered = true
-            send('qbinventory:nui:intentResult', { requestId = requestId, ok = ok == true, error = ok and nil or err })
+            send('kora_inventory:nui:intentResult', { requestId = requestId, ok = ok == true, error = ok and nil or err })
         end
         if data.intent ~= 'use' then
             SetTimeout(moveTimeoutMs(), function()
                 deliver(false, 'timeout')
             end)
         end
-        local called, ok, result = pcall(QbInventory.clientApi.submitIntent, {
+        local called, ok, result = pcall(KoraInventory.clientApi.submitIntent, {
             sessionId = data.sessionId,
             token = data.token,
             intent = data.intent,
@@ -458,7 +457,7 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
             -- already dropped its queue, so its old verdict is not reported.
             delivered = true
         elseif not called then
-            print(('^3[qbinventory]^7 intent failed: %s'):format(tostring(ok)))
+            print(('^3[kora_inventory]^7 intent failed: %s'):format(tostring(ok)))
             deliver(false, 'inventory request failed')
         else
             deliver(ok == true, type(result) == 'string' and result or 'action rejected')
@@ -489,7 +488,7 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
     -- Wait for kora_inventory's authoritative callback result, rather than
     -- acknowledging a merely-local hand-off as success. pcall'd so that an error
     -- in the transport still answers the browser.
-    local called, ok, result = pcall(QbInventory.clientApi.submitIntent, {
+    local called, ok, result = pcall(KoraInventory.clientApi.submitIntent, {
         sessionId = data.sessionId,
         token = data.token,
         intent = data.intent,
@@ -497,16 +496,16 @@ RegisterNUICallback('qbinventory:nui:intent', function(data, cb)
         announce = false,
     })
     if not called then
-        print(('^3[qbinventory]^7 intent failed: %s'):format(tostring(ok)))
+        print(('^3[kora_inventory]^7 intent failed: %s'):format(tostring(ok)))
         reply({ ok = false, error = 'inventory request failed' })
         return
     end
     reply({ ok = ok == true, error = ok and nil or result })
 end)
 
-RegisterNUICallback('qbinventory:nui:close', function(data, cb)
+RegisterNUICallback('kora_inventory:nui:close', function(data, cb)
     if type(data) == 'table' and data.sessionId == activeSession and type(data.token) == 'string' then
-        TriggerEvent('qbinventory:client:submitIntent', {
+        TriggerEvent('kora_inventory:client:submitIntent', {
             sessionId = data.sessionId,
             token = data.token,
             intent = 'close',
@@ -560,7 +559,7 @@ AddEventHandler('kora_hud:ui:ready', registerWithEditor)
 -- close intent (the server ends the session) rather than sitting under it.
 AddEventHandler('kora_hud:ui:editing', function(active)
     if active ~= true or not activeSession or type(activeToken) ~= 'string' then return end
-    TriggerEvent('qbinventory:client:submitIntent', {
+    TriggerEvent('kora_inventory:client:submitIntent', {
         sessionId = activeSession,
         token = activeToken,
         intent = 'close',
@@ -585,9 +584,3 @@ AddEventHandler('onResourceStop', function(resource)
         closeSession('resource_stop')
     end
 end)
-
--- FiveM manifests are static; ship the optional file, execute it only on opt-in.
-if GetConvar and GetConvar('fft_kora_hooks', 'false') == 'true' then
-    local source = assert(LoadResourceFile(GetCurrentResourceName(), 'fft_hooks.lua'), 'Missing fft_hooks.lua')
-    assert(load(source, '@kora_inventory/fft_hooks.lua', 't'))()
-end

@@ -1,4 +1,4 @@
--- Run from kora_inventory with sibling qbcore: lua5.4 test/smoke/confiscation.lua [server-source]
+-- Run from kora_inventory with sibling kora_core: lua5.4 test/smoke/confiscation.lua [server-source]
 -- Actual authority, compatibility providers, shared rules and kora_core player
 -- funnel. Only host transport/registration is mocked; no SQL or live server.
 local core = '../kora_core/'
@@ -20,7 +20,7 @@ end
 
 local env = {}
 for name, value in pairs(_G) do env[name] = value end
-env.Config, env.QbInventory = {}, nil
+env.Config, env.KoraInventory = {}, nil
 local net, callbacks, aliases, events, handlers = {}, {}, {}, {}, {}
 env.Kora = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
@@ -47,7 +47,7 @@ local function load(path) assert(loadfile(path, 't', env))() end
 load('config.lua'); load('config/shops/ammunation.lua'); load('shared.lua')
 load('server/persistence.lua'); load(arg[1] or 'server.lua')
 load('server/compat/qb.lua'); load('server/compat/ox.lua'); load('server/compat/providers.lua')
-local I = env.QbInventory
+local I = env.KoraInventory
 local confiscate = assert(aliases['ox_inventory:ConfiscateInventory'])
 local restore = assert(aliases['ox_inventory:ReturnInventory'])
 local function argc(...) return select('#', ...) end
@@ -61,7 +61,7 @@ original[1].quality = 83
 assert(Core.player.setPath(victim, { 'items' }, original))
 local expected = json.encode(Core.player.getPlayerData(victim, { 'items' }))
 H.equal(argc(confiscate(victim)), 0, 'ConfiscateInventory keeps its no-return contract')
-H.equal(next(Core.player.getPlayerData(victim, { 'items' })), nil, 'trusted confiscation clears qbcore-owned player items')
+H.equal(next(Core.player.getPlayerData(victim, { 'items' })), nil, 'trusted confiscation clears kora_core-owned player items')
 local _, confiscated = I.internal.resolveInventory('confiscation:' .. victim)
 H.ok(confiscated, 'confiscated storage exists')
 H.equal(json.encode(confiscated.items), expected, 'storage retains exact contents and metadata')
@@ -69,17 +69,17 @@ H.equal(I.persistence.shouldPersist(confiscated), false, 'existing volatile-stor
 
 for _, src in ipairs({ victim, other }) do
     for _, data in ipairs({ tostring(victim), { key = confiscated.key }, { id = tostring(victim) } }) do
-        local ok, err = callbacks['qbinventory:server:open'](src, 'confiscation', data)
+        local ok, err = callbacks['kora_inventory:server:open'](src, 'confiscation', data)
         H.equal(ok, false, 'generic callback cannot open confiscated storage for source ' .. src)
         H.equal(err, 'access denied', 'callback uses normal access-denial return')
         H.equal(I.internal.sessionOf(src), nil, 'denied open creates no lease')
         env.source = src
-        net['qbinventory:server:open']('confiscation', data)
-        H.equal(events[#events].name, 'qbinventory:client:rejected', 'generic event rejects private storage')
+        net['kora_inventory:server:open']('confiscation', data)
+        H.equal(events[#events].name, 'kora_inventory:client:rejected', 'generic event rejects private storage')
         H.equal(I.internal.sessionOf(src), nil, 'event rejection creates no lease')
     end
 end
-H.equal(callbacks['qbinventory:server:open'](other, 'stash', { key = confiscated.key, owner = other, access = true }), false,
+H.equal(callbacks['kora_inventory:server:open'](other, 'stash', { key = confiscated.key, owner = other, access = true }), false,
     'client type/policy fields cannot disguise the resolved confiscation record')
 H.equal(I.internal.open(other, confiscated.key), false, 'trusted ordinary open follows the same policy')
 H.equal(aliases['ox_inventory:forceOpenInventory'](other, 'confiscation', tostring(victim)), false, 'forceOpen alias retains authority gating')
@@ -99,10 +99,10 @@ H.equal(I.internal.canAccess(other, reused), false, 'existing permissive record 
 -- record private. This controlled policy-change fixture exercises transfer
 -- revalidation; it is not a claim about a live FiveM hot-reload mechanism.
 confiscated.type = 'stash'
-local ok, session = callbacks['qbinventory:server:open'](other, 'stash', { key = confiscated.key })
+local ok, session = callbacks['kora_inventory:server:open'](other, 'stash', { key = confiscated.key })
 H.equal(ok, true, 'controlled pre-policy lease exists')
 confiscated.type = 'confiscation'
-local returned, denied, denial = pcall(callbacks['qbinventory:server:transfer'], other, {
+local returned, denied, denial = pcall(callbacks['kora_inventory:server:transfer'], other, {
     token = session.token, fromInventory = session.secondary.key, toInventory = session.primary.key,
     fromSlot = 1, toSlot = 1, amount = 1,
     fromRevision = session.secondary.revision, toRevision = session.primary.revision,
@@ -122,8 +122,8 @@ I.persistence.restoreAll = function()
     restored.access = nil
     return { restored }, {}
 end
-for _, fn in ipairs(handlers['qbinventory:server:persistenceReady'] or {}) do fn() end
-H.equal(callbacks['qbinventory:server:open'](other, 'confiscation', tostring(victim)), false,
+for _, fn in ipairs(handlers['kora_inventory:server:persistenceReady'] or {}) do fn() end
+H.equal(callbacks['kora_inventory:server:open'](other, 'confiscation', tostring(victim)), false,
     'a bootstrap-restored typed record without a callback still denies access')
 H.equal(argc(restore(victim)), 0, 'ReturnInventory keeps its no-return contract')
 H.equal(json.encode(Core.player.getPlayerData(victim, { 'items' })), expected, 'trusted ReturnInventory restores exact original items')
@@ -142,7 +142,7 @@ local stash = I.internal.createSecondary('stash', 'session-rejection', {
 })
 for _, rejection in ipairs({ 'token', 'key', 'fromRevision', 'toRevision', 'expiry' }) do
     clock = 12345
-    local opened, lease = callbacks['qbinventory:server:open'](other, 'stash', stash.id)
+    local opened, lease = callbacks['kora_inventory:server:open'](other, 'stash', stash.id)
     H.equal(opened, true, 'rejection fixture opens a real lease')
     local request = { token = lease.token, fromInventory = stash.key, toInventory = lease.primary.key,
         fromSlot = 1, amount = 1, fromRevision = lease.secondary.revision, toRevision = lease.primary.revision }
@@ -151,8 +151,8 @@ for _, rejection in ipairs({ 'token', 'key', 'fromRevision', 'toRevision', 'expi
     elseif rejection == 'key' then request.fromInventory = 'stash:outside'; expectedReason = 'inventory not in session'
     elseif rejection == 'fromRevision' then request.fromRevision = request.fromRevision + 1; expectedReason = 'stale source inventory'
     elseif rejection == 'toRevision' then request.toRevision = request.toRevision + 1; expectedReason = 'stale target inventory'
-    else clock = clock + env.Config.qbinventory.sessionTtl + 1; expectedReason = 'session expired' end
-    local normal, accepted, reason = pcall(callbacks['qbinventory:server:transfer'], other, request)
+    else clock = clock + env.Config.kora_inventory.sessionTtl + 1; expectedReason = 'session expired' end
+    local normal, accepted, reason = pcall(callbacks['kora_inventory:server:transfer'], other, request)
     H.equal(normal, true, rejection .. ' returns normally')
     H.equal(accepted, false, rejection .. ' rejects')
     H.equal(reason, expectedReason, rejection .. ' keeps the reason')
@@ -161,8 +161,8 @@ for _, rejection in ipairs({ 'token', 'key', 'fromRevision', 'toRevision', 'expi
 end
 clock = 12345
 for _, action in ipairs({ 'use', 'drop', 'give' }) do
-    local _, lease = callbacks['qbinventory:server:open'](victim, 'player', victim)
-    local normal, accepted, reason = pcall(callbacks['qbinventory:server:intent'], victim, {
+    local _, lease = callbacks['kora_inventory:server:open'](victim, 'player', victim)
+    local normal, accepted, reason = pcall(callbacks['kora_inventory:server:intent'], victim, {
         token = lease.token, action = action, primaryRevision = lease.primary.revision + 1,
         payload = { slot = 1, amount = 1, target = other },
     })
@@ -172,8 +172,8 @@ for _, action in ipairs({ 'use', 'drop', 'give' }) do
     H.equal(json.encode(Core.player.getPlayerData(victim, { 'items' })), expected, action .. ' changes no items')
 end
 local shop = I.internal.createSecondary('shop', 'session-rejection', { stock = stash.items })
-local _, lease = callbacks['qbinventory:server:open'](victim, 'shop', shop.id)
-local normal, accepted, reason = pcall(callbacks['qbinventory:server:intent'], victim, {
+local _, lease = callbacks['kora_inventory:server:open'](victim, 'shop', shop.id)
+local normal, accepted, reason = pcall(callbacks['kora_inventory:server:intent'], victim, {
     token = lease.token, action = 'buy', primaryRevision = lease.primary.revision,
     secondaryRevision = lease.secondary.revision + 1, payload = { slot = 1, amount = 1 },
 })

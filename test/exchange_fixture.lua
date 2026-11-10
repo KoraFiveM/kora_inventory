@@ -95,7 +95,7 @@ return function(database)
         if f.ambiguous then return {success=false,code='indeterminate'} end
         return result
     end
-    Config.qbinventory=nil;QbInventory=nil
+    Config.kora_inventory=nil;KoraInventory=nil
     dofile('config.lua');dofile('shared.lua');dofile('server/persistence.lua');dofile('server.lua');dofile('server/exchange.lua')
     f.threads[1]()
     Core.registry.registerShared('items','markedbills',{name='markedbills',label='Marked bills',weight=1000,type='item',unique=true})
@@ -125,6 +125,6 @@ return function(database)
         local value={citizenid='CID1',take={},give={},cash=0,dealerRep=0,reason='delivery'}
         for key,v in pairs(extra or {}) do value[key]=v end;return value
     end
-    f.inventory=QbInventory
+    f.inventory=KoraInventory
     return f
 end

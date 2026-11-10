@@ -1,15 +1,17 @@
--- Optional development hooks; loaded only when fft_kora_hooks is enabled.
--- Development-only FFT bridge. All mutations still flow through the rendered NUI.
+-- Optional FFT development hooks (client). Listed last in fxmanifest.lua and
+-- inert unless `setr fft_kora_hooks true`. No other inventory file references
+-- FFT. All mutations still flow through the rendered NUI.
+if not GetConvar or GetConvar('fft_kora_hooks','false') ~= 'true' then return end
 local runner = 'fft'
-QbInventory = QbInventory or {}
 local pending, counter = {}, 0
+local sync
 local function session()
     if not GetConvar or GetConvar('fft_kora_hooks','false') ~= 'true' then return nil end
     if GetResourceState(runner) ~= 'started' then return nil end
     local id = LocalPlayer.state.fftSession
     return type(id)=='string' and id or nil
 end
-function QbInventory.fftAction(action,item,amount)
+local function fftAction(action,item,amount)
     local id=session()
     if GetInvokingResource()~=runner or not id then return false,'FFT hooks are disabled or session is not authorised' end
     if action~='dragBuy' and action~='selectItem' and action~='buyReady' and action~='quantity' and action~='buy' then return false,'Unsupported UI action' end
@@ -20,6 +22,8 @@ function QbInventory.fftAction(action,item,amount)
     local request=tostring(counter)
     local entry={session=id,token=inventory.token}
     pending[request]=entry
+    -- The page may have loaded after the session bag changed; restate it first.
+    sync(true)
     SendNUIMessage({action='fft:action',data={request=request,session=id,token=inventory.token,action=action,item=item,amount=amount}})
     local deadline=GetGameTimer()+2000
     while not entry.result and GetGameTimer()<deadline and session()==id do Wait(25) end
@@ -43,15 +47,14 @@ RegisterNUICallback('fft:observed',function(data,cb)
     cb({ok=true})
 end)
 local lastSession=false
-local function sync()
+sync=function(force)
     local id=session() or false
-    if id or lastSession then SendNUIMessage({action='fft:session',data={session=id}}) end
+    if force or id or lastSession then SendNUIMessage({action='fft:session',data={session=id}}) end
     lastSession=id
 end
-QbInventory.fftSync=sync
 if AddStateBagChangeHandler then AddStateBagChangeHandler('fftSession',nil,function(bag)
     if bag==('player:%s'):format(GetPlayerServerId(PlayerId())) then SetTimeout(0,sync) end
 end) end
 
 exports('fftVersion', function() return 1 end)
-exports('fftAction', function(...) return QbInventory.fftAction(...) end)
+exports('fftAction', fftAction)

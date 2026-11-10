@@ -1,5 +1,5 @@
 local H = dofile('test/harness.lua')
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config/shops/vendingmachine.lua')
 
 local handlers, active, calls, targetState = {}, {}, 0, 'started'

@@ -3,11 +3,11 @@ local H = dofile('test/harness.lua')
 local registered = {}
 exports = function(name, fn) registered[name] = fn end
 
-QbInventory = {
+KoraInventory = {
     copy = function(value)
         if type(value) ~= 'table' then return value end
         local out = {}
-        for k, v in pairs(value) do out[k] = QbInventory.copy(v) end
+        for k, v in pairs(value) do out[k] = KoraInventory.copy(v) end
         return out
     end,
     internal = {},
@@ -48,37 +48,37 @@ local function resolve(ref, preferred)
     return (preferred and (preferred .. ':' .. ref) or ref), nil
 end
 
-QbInventory.internal.resolveInventory = resolve
-QbInventory.internal.copy = QbInventory.copy
-QbInventory.internal.totalWeight = function(items)
+KoraInventory.internal.resolveInventory = resolve
+KoraInventory.internal.copy = KoraInventory.copy
+KoraInventory.internal.totalWeight = function(items)
     local total = 0
     for _, item in pairs(items or {}) do total = total + (item.weight or 0) * (item.amount or 0) end
     return total
 end
-QbInventory.internal.lock = function(_, fn) return fn() end
-QbInventory.internal.setInventoryItems = function(key, items)
-    state[key].items = QbInventory.copy(items)
+KoraInventory.internal.lock = function(_, fn) return fn() end
+KoraInventory.internal.setInventoryItems = function(key, items)
+    state[key].items = KoraInventory.copy(items)
     return true
 end
-QbInventory.internal.createSecondary = function(kind, id, data)
+KoraInventory.internal.createSecondary = function(kind, id, data)
     state[kind .. ':' .. id] = { key = kind .. ':' .. id, type = kind, id = id, label = data.label, slots = data.slots or 50,
-        maxWeight = data.maxWeight or 100000, items = QbInventory.copy(data.items or {}) }
+        maxWeight = data.maxWeight or 100000, items = KoraInventory.copy(data.items or {}) }
 end
-QbInventory.internal.removeSecondary = function(key) removed[key] = true; state[key] = nil; return true end
-QbInventory.internal.canAdd = function(identifier, name, amount)
+KoraInventory.internal.removeSecondary = function(key) removed[key] = true; state[key] = nil; return true end
+KoraInventory.internal.canAdd = function(identifier, name, amount)
     H.equal(identifier, 'locker', 'adapter preserves inventory identifier')
     H.equal(name, 'water', 'adapter normalises item name')
     H.equal(amount, 2, 'adapter preserves amount')
     return true
 end
-QbInventory.internal.createItemHook = function(_, _, _, _, info) return true, info end
-QbInventory.internal.bump = function() bumps = bumps + 1 end
-QbInventory.internal.broadcast = function() broadcasts = broadcasts + 1 end
+KoraInventory.internal.createItemHook = function(_, _, _, _, info) return true, info end
+KoraInventory.internal.bump = function() bumps = bumps + 1 end
+KoraInventory.internal.broadcast = function() broadcasts = broadcasts + 1 end
 -- Mirrors server.lua's addTo/removeFrom write funnel closely enough to prove
 -- AddToStash/RemoveFromStash route through it rather than mutating items
 -- directly: an explicit slot is honoured, a matching existing slot stacks,
 -- and a fresh placement takes the first free slot.
-QbInventory.internal.addTo = function(k, name, amount, slot, info)
+KoraInventory.internal.addTo = function(k, name, amount, slot, info)
     local items = state[k].items
     if slot then
         local existing = items[slot]
@@ -98,7 +98,7 @@ QbInventory.internal.addTo = function(k, name, amount, slot, info)
     end
     return false, 'no free slot'
 end
-QbInventory.internal.removeFrom = function(k, slot, amount)
+KoraInventory.internal.removeFrom = function(k, slot, amount)
     local items = state[k].items
     local existing = items[slot]
     if not existing or existing.amount < amount then return false, 'not enough of item' end
@@ -111,11 +111,11 @@ end
 -- `local native = I.api or {}` leaves every delegating entry calling a nil
 -- field, so half the compat surface was asserted vacuously.
 local calls = {}
-QbInventory.api = {
+KoraInventory.api = {
     GetInventory = function(src) return state['player:' .. src] and state['player:' .. src].items or {} end,
     SetInventory = function(src, items, reason)
         calls.setInventory = { src = src, items = items, reason = reason }
-        state['player:' .. src].items = QbInventory.copy(items)
+        state['player:' .. src].items = KoraInventory.copy(items)
         return true
     end,
     useItem = function(src, slotOrName) calls.useItem = { src = src, slotOrName = slotOrName }; return true end,
@@ -129,7 +129,7 @@ QbInventory.api = {
 }
 
 dofile('server/compat/qb.lua')
-registered = QbInventory.compat.qb
+registered = KoraInventory.compat.qb
 
 H.equal(#registered.GetSlotsByItem(state['player:7'].items, 'wAtEr'), 1, 'case-insensitive slot list')
 H.equal(registered.GetSlotsByItem(state['player:7'].items, 'water')[1], 1, 'slot list is numeric and sorted')
@@ -182,17 +182,17 @@ H.equal(calls.open.src, 7, 'OpenShop preserves source')
 H.equal(calls.open.a, 'ammunation', 'OpenShop forwards the actual shop identifier')
 H.equal(calls.open.b.type, 'shop', 'OpenShop requests the shop path')
 H.equal(calls.open.b.id, 'ammunation', 'OpenShop selects the registered shop')
-local originalOpen = QbInventory.api.OpenInventory
+local originalOpen = KoraInventory.api.OpenInventory
 local nativePayload = { token = 'shop-session' }
-QbInventory.api.OpenInventory = function() return true, nativePayload end
+KoraInventory.api.OpenInventory = function() return true, nativePayload end
 local shopOK, shopResult = registered.OpenShop(7, 'ammunation')
 H.equal(shopOK, true, 'OpenShop preserves success boolean')
 H.equal(shopResult, nativePayload, 'OpenShop preserves native payload identity')
-QbInventory.api.OpenInventory = function() return false, 'access denied' end
+KoraInventory.api.OpenInventory = function() return false, 'access denied' end
 shopOK, shopResult = registered.OpenShop(7, 'ammunation')
 H.equal(shopOK, false, 'OpenShop preserves failure boolean')
 H.equal(shopResult, 'access denied', 'OpenShop preserves native failure reason')
-QbInventory.api.OpenInventory = originalOpen
+KoraInventory.api.OpenInventory = originalOpen
 
 -- UseItem(itemName, source, itemData): the FIRST argument is the item name.
 registered.UseItem('bandage', 7, { slot = 3 })
@@ -204,13 +204,13 @@ registered.UseItem(7, { slot = 2 })
 H.equal(calls.useItem.slotOrName, 2, 'UseItem still accepts the older (source, item) form')
 
 -- CanAddItem returns upstream's exact reason vocabulary.
-QbInventory.internal.canAdd = function() return false, 'weight' end
+KoraInventory.internal.canAdd = function() return false, 'weight' end
 local ok, reason = registered.CanAddItem('locker', 'water', 1)
 H.equal(ok, false, 'CanAddItem reports failure')
 H.equal(reason, 'weight', 'CanAddItem reports the upstream weight reason')
-QbInventory.internal.canAdd = function() return false, 'slots' end
+KoraInventory.internal.canAdd = function() return false, 'slots' end
 H.equal(select(2, registered.CanAddItem('locker', 'water', 1)), 'slots', 'CanAddItem reports the upstream slots reason')
-QbInventory.internal.canAdd = function() return false, 'inventory' end
+KoraInventory.internal.canAdd = function() return false, 'inventory' end
 H.equal(select(2, registered.CanAddItem('nope', 'water', 1)), nil, 'an unresolvable inventory is a bare false, no reason')
 
 -- HasItem is reachable at all -- it was missing from the compat table entirely.

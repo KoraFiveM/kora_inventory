@@ -1,4 +1,4 @@
--- Run from qbinventory: lua test/smoke/drop_buckets.lua [inventory-resource]
+-- Run from kora_inventory: lua test/smoke/drop_buckets.lua [inventory-resource]
 -- Actual authority, adapters and Core writes; inert buckets, positions and transport.
 local root = '../'
 local resource = arg[1] or '.'
@@ -64,7 +64,7 @@ env.exports = setmetatable({ kora_core = coreExports }, { __call = function(_, n
 assert(loadfile(resource .. '/server.lua', 't', env))()
 assert(loadfile(resource .. '/server/compat/qb_callbacks.lua', 't', env))()
 assert(loadfile(resource .. '/server/compat/ox.lua', 't', env))()
-local inventory, internal = env.QbInventory, env.QbInventory.internal
+local inventory, internal = env.KoraInventory, env.KoraInventory.internal
 for _, src in ipairs({ 7, 8, 10 }) do
     env.CoreInternal.player.bySource[src] = {
         citizenid = 'CID' .. src,
@@ -75,9 +75,9 @@ local function seed(src, amount)
     check(inventory.api.AddItem(src, 'water_bottle', amount, 1, { origin = 'server', batch = src }), 'seed player items')
 end
 local function nativeDrop(src, amount)
-    local ok, lease = callbacks['qbinventory:server:open'](src, 'player', src)
+    local ok, lease = callbacks['kora_inventory:server:open'](src, 'player', src)
     check(ok and lease.primary.key == 'player:' .. src, 'actual self lease opens')
-    return callbacks['qbinventory:server:intent'](src, {
+    return callbacks['kora_inventory:server:intent'](src, {
         action = 'drop', token = lease.token, primaryRevision = lease.primary.revision,
         payload = { slot = 1, amount = amount, bucket = 22, coords = { x = 9999, y = 9999, z = 9999 } },
     })
@@ -110,15 +110,15 @@ local drop = assert(internal.getInventory('drop:' .. id))
 check(drop.bucket == 11 and drop.coords == positions[7], 'native drop uses server bucket/position')
 check(drop.items[1].amount == 4 and drop.items[1].info.origin == 'server', 'contents remain server-owned')
 check(env.Core.player.getPlayerData(7, { 'items', 1, 'amount' }) == 6, 'Core funnel removes the source quantity')
-check(eventSince(first, 'qbinventory:client:dropCreated', 7), 'matching player receives live create')
-check(not eventSince(first, 'qbinventory:client:dropCreated', -1)
-    and not eventSince(first, 'qbinventory:client:dropCreated', 8), 'scoped drop is not published to other buckets')
+check(eventSince(first, 'kora_inventory:client:dropCreated', 7), 'matching player receives live create')
+check(not eventSince(first, 'kora_inventory:client:dropCreated', -1)
+    and not eventSince(first, 'kora_inventory:client:dropCreated', 8), 'scoped drop is not published to other buckets')
 local access, reason = internal.canAccess(8, drop)
 check(access == false and reason == 'different routing bucket', 'foreign bucket fails shared access')
-check(not includes(callbacks['qbinventory:server:drops'](8), id), 'native list omits foreign drops')
-check(includes(callbacks['qbinventory:server:drops'](7), id), 'native list includes matching drops')
+check(not includes(callbacks['kora_inventory:server:drops'](8), id), 'native list omits foreign drops')
+check(includes(callbacks['kora_inventory:server:drops'](7), id), 'native list includes matching drops')
 local before = writes
-check(not callbacks['qbinventory:server:open'](8, 'drop', id), 'foreign open is refused')
+check(not callbacks['kora_inventory:server:open'](8, 'drop', id), 'foreign open is refused')
 check(not inventory.api.dropTake(8, id, 1, 1), 'foreign direct take is refused')
 check(writes == before and drop.items[1].amount == 4, 'refused paths change no inventory')
 check(inventory.api.dropTake(7, id, 1, 1), 'matching take still succeeds')
@@ -126,34 +126,34 @@ check(drop.items[1].amount == 3, 'matching take moves exactly one item')
 
 -- A viewer's current bucket, rather than the lease's original one, is decisive.
 buckets[8] = 11
-check(callbacks['qbinventory:server:open'](8, 'drop', id), 'new matching bucket can open')
+check(callbacks['kora_inventory:server:open'](8, 'drop', id), 'new matching bucket can open')
 local request = moveRequest(8, drop, 1)
 buckets[8] = 22
 before = writes
-check(not callbacks['qbinventory:server:transfer'](8, request), 'old lease cannot take after changing bucket')
+check(not callbacks['kora_inventory:server:transfer'](8, request), 'old lease cannot take after changing bucket')
 check(writes == before and drop.items[1].amount == 3, 'old-lease refusal changes no inventory')
 seed(8, 2)
 buckets[8] = 11
-local _, lease = callbacks['qbinventory:server:open'](8, 'drop', id)
+local _, lease = callbacks['kora_inventory:server:open'](8, 'drop', id)
 local deposit = { token = lease.token, fromInventory = 'player:8', toInventory = drop.key,
     fromSlot = 1, amount = 1, fromRevision = internal.getRevision('player:8'),
     toRevision = internal.getRevision(drop.key) }
 buckets[8] = 22
 before = writes
-check(not callbacks['qbinventory:server:transfer'](8, deposit), 'old lease cannot deposit after changing bucket')
+check(not callbacks['kora_inventory:server:transfer'](8, deposit), 'old lease cannot deposit after changing bucket')
 check(writes == before and drop.items[1].amount == 3
     and env.Core.player.getPlayerData(8, { 'items', 1, 'amount' }) == 2, 'deposit refusal preserves both inventories')
-check(callbacks['qbinventory:server:open'](7, 'drop', id), 'owner bucket viewer opens')
+check(callbacks['kora_inventory:server:open'](7, 'drop', id), 'owner bucket viewer opens')
 buckets[7] = 44
 first = #clientEvents
 buckets[8] = 11
 check(inventory.api.dropTake(8, id, 1, 1), 'other matching viewer takes normally')
-check(not eventSince(first, 'qbinventory:client:sessionPatched', 7, function(args)
+check(not eventSince(first, 'kora_inventory:client:sessionPatched', 7, function(args)
     return args[2].key == drop.key
 end), 'moved viewer receives no drop-content patches')
 
 -- The existing cleanup thread refreshes bags and closes a moved viewer's lease.
-callbacks['qbinventory:server:drops'](8)
+callbacks['kora_inventory:server:drops'](8)
 buckets[8] = 22
 local cleanup = coroutine.create(threads[#threads])
 local function tick()
@@ -164,14 +164,14 @@ tick()
 first = #clientEvents
 tick()
 check(internal.sessionOf(8) == nil, 'cleanup closes moved drop viewer')
-local refresh = eventSince(first, 'qbinventory:client:dropsUpdated', 8)
+local refresh = eventSince(first, 'kora_inventory:client:dropsUpdated', 8)
 check(refresh and not includes(refresh.args[1], id), 'bucket change sends filtered bag replacement')
-check(eventSince(first, 'qbinventory:client:dropsUpdated', 7), 'live-create recipient is tracked before hydration')
+check(eventSince(first, 'kora_inventory:client:dropsUpdated', 7), 'live-create recipient is tracked before hydration')
 first = #clientEvents
 tick()
 check(#clientEvents == first, 'unchanged buckets generate no refresh traffic')
 
-check(callbacks['qbinventory:server:open'](7, 'player', 7), 'legacy caller has a normal own lease')
+check(callbacks['kora_inventory:server:open'](7, 'player', 7), 'legacy caller has a normal own lease')
 local legacyId = callbacks['qb-inventory:server:createDrop'](7, { fromSlot = 1, amount = 1, instance = 22 })
 check(legacyId and internal.getInventory('drop:' .. legacyId).bucket == 44, 'legacy drop ignores forged instance')
 check(callbacks['qb-inventory:server:GetCurrentDrops'](8)[tostring(legacyId)] == nil, 'legacy list filters foreign drops')
@@ -195,7 +195,7 @@ check(internal.canAccess(8, custom), 'matching CustomDrop instance permits acces
 first = #clientEvents
 local globalId = inventory.api.dropCreate(positions[7], {})
 check(internal.canAccess(10, internal.getInventory('drop:' .. globalId)), 'two-argument trusted drops stay global')
-check(eventSince(first, 'qbinventory:client:dropCreated', -1), 'global trusted drop keeps global live event')
+check(eventSince(first, 'kora_inventory:client:dropCreated', -1), 'global trusted drop keeps global live event')
 local falseId = inventory.api.dropCreate(positions[7], {}, false)
 check(internal.getInventory('drop:' .. falseId).bucket == nil, 'false preserves unscoped trusted calls')
 local falseCustom = inventory.compat.ox.CustomDrop('loot', {}, positions[7], 5, 10000, false)
@@ -207,36 +207,36 @@ check(internal.canAccess(10, internal.getInventory('drop:' .. zeroId))
 -- A live bag before first hydration must be removed if that player already moved.
 first = #clientEvents
 buckets[10] = 99
-local list = callbacks['qbinventory:server:drops'](10)
-check(not includes(list, zeroId) and eventSince(first, 'qbinventory:client:dropsUpdated', 10),
+local list = callbacks['kora_inventory:server:drops'](10)
+check(not includes(list, zeroId) and eventSince(first, 'kora_inventory:client:dropsUpdated', 10),
     'hydration reconciles a bucket change since live creation')
-env.Config.qbinventory.requireSameBucket = false
-check(internal.canAccess(10, drop) and includes(callbacks['qbinventory:server:drops'](10), id), 'existing bucket opt-out is preserved')
+env.Config.kora_inventory.requireSameBucket = false
+check(internal.canAccess(10, drop) and includes(callbacks['kora_inventory:server:drops'](10), id), 'existing bucket opt-out is preserved')
 first = #clientEvents
 inventory.api.dropCreate(positions[7], {}, 11)
-check(eventSince(first, 'qbinventory:client:dropCreated', -1), 'bucket opt-out keeps global presentation')
+check(eventSince(first, 'kora_inventory:client:dropCreated', -1), 'bucket opt-out keeps global presentation')
 positions[10] = { x = 100, y = 100, z = 100 }
 check(not internal.canAccess(10, drop), 'bucket opt-out does not disable distance')
 env.source = 10
 handlers.playerDropped[#handlers.playerDropped]()
 first = #clientEvents
 tick()
-check(not eventSince(first, 'qbinventory:client:dropsUpdated', 10), 'disconnected viewer is no longer refreshed')
+check(not eventSince(first, 'kora_inventory:client:dropsUpdated', 10), 'disconnected viewer is no longer refreshed')
 
 -- Returning before cleanup must not retain bags seen during a brief visit.
-env.Config.qbinventory.requireSameBucket = true
+env.Config.kora_inventory.requireSameBucket = true
 buckets[7] = 44
-callbacks['qbinventory:server:drops'](7)
+callbacks['kora_inventory:server:drops'](7)
 buckets[7] = 77
 first = #clientEvents
 local briefVisit = inventory.api.dropCreate(positions[7], {}, 77)
-check(eventSince(first, 'qbinventory:client:dropCreated', 7), 'brief visit receives matching live bag')
+check(eventSince(first, 'kora_inventory:client:dropCreated', 7), 'brief visit receives matching live bag')
 local anotherVisit = inventory.api.dropCreate(positions[7], {}, 77)
 buckets[7] = 44
 local returnedBag = inventory.api.dropCreate(positions[7], {}, 44)
 first = #clientEvents
 tick()
-local replacement = eventSince(first, 'qbinventory:client:dropsUpdated', 7)
+local replacement = eventSince(first, 'kora_inventory:client:dropsUpdated', 7)
 check(replacement and not includes(replacement.args[1], briefVisit)
     and not includes(replacement.args[1], anotherVisit) and includes(replacement.args[1], returnedBag),
     'roundtrip cleanup removes brief-visit bags and retains current bags')
@@ -250,8 +250,8 @@ local hydrateVisit = inventory.api.dropCreate(positions[7], {}, 77)
 buckets[7] = 44
 inventory.api.dropCreate(positions[7], {}, 44)
 first = #clientEvents
-callbacks['qbinventory:server:drops'](7)
-replacement = eventSince(first, 'qbinventory:client:dropsUpdated', 7)
+callbacks['kora_inventory:server:drops'](7)
+replacement = eventSince(first, 'kora_inventory:client:dropsUpdated', 7)
 check(replacement and not includes(replacement.args[1], hydrateVisit), 'hydration preserves a pending roundtrip refresh')
 first = #clientEvents
 tick()

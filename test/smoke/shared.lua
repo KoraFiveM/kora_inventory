@@ -1,8 +1,8 @@
 local H = dofile('test/harness.lua')
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('shared.lua')
 
-local I = QbInventory
+local I = KoraInventory
 H.equal(I.amount('2'), 2, 'amount coerces integer')
 H.equal(I.amount(0), nil, 'zero is invalid')
 H.ok(I.sameInfo({ serial = 'a' }, { serial = 'a' }), 'matching metadata stacks')

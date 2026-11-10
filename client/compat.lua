@@ -5,13 +5,13 @@
 -- truth: kora_inventory asks its server to resolve every target and the active
 -- session remains the only source of inventory views and mutations.
 
--- Locale text with an English fallback (shared.lua's QbInventory.text).
+-- Locale text with an English fallback (shared.lua's KoraInventory.text).
 local function localeText(key, fallback, vars)
-    local text = QbInventory and QbInventory.text
+    local text = KoraInventory and KoraInventory.text
     return text and text(key, fallback, vars) or fallback
 end
 
-local inventoryApi = assert(QbInventory and QbInventory.clientApi, 'qbinventory client transport must load first')
+local inventoryApi = assert(KoraInventory and KoraInventory.clientApi, 'kora_inventory client transport must load first')
 local selfOpening = false
 
 local function setBusy(value)
@@ -33,8 +33,8 @@ local function openSelf()
     if selfOpening or LocalPlayer.state.inv_busy then
         return false
     end
-    if QbInventory.isBusy() then
-        QbInventory.notifyBusyBlocked()
+    if KoraInventory.isBusy() then
+        KoraInventory.notifyBusyBlocked()
         return false
     end
     selfOpening = true
@@ -89,7 +89,7 @@ end
 ---
 ---Under kora_inventory this is a deliberate no-op, and it must stay one. An open
 ---session is already kept current by the authoritative
----`qbinventory:client:sessionPatched` stream, and with no session open there is
+---`kora_inventory:client:sessionPatched` stream, and with no session open there is
 ---no UI to refresh -- so there is no state a re-open could recover.
 ---
 ---It matters that this does NOT re-open: the server emits the legacy
@@ -105,7 +105,7 @@ end
 
 -- A kora_inventory session is the single lifecycle authority for inv_busy. The
 -- UI bridge owns focus; this bridge only mirrors the compatibility state bag.
-AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
+AddEventHandler('kora_inventory:ui:sessionOpened', function(payload)
     if type(payload) ~= 'table' or type(payload.token) ~= 'string' then
         return
     end
@@ -113,7 +113,7 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     setBusy(true)
 end)
 
-AddEventHandler('qbinventory:ui:sessionClosed', function()
+AddEventHandler('kora_inventory:ui:sessionClosed', function()
     selfOpening = false
     setBusy(false)
 end)
@@ -122,11 +122,11 @@ end)
 -- the compatibility lock before that handler runs so its client-side effects
 -- can add or remove items. A rejected use leaves the session open, so restore
 -- the lock in that case.
-AddEventHandler('qbinventory:client:useStarted', function()
+AddEventHandler('kora_inventory:client:useStarted', function()
     setBusy(false)
 end)
 
-AddEventHandler('qbinventory:client:useRejected', function()
+AddEventHandler('kora_inventory:client:useRejected', function()
     if inventoryApi.getCurrentSession() then
         setBusy(true)
     end
@@ -157,7 +157,7 @@ local function legacyItemBox(itemData, action, amount)
     if type(itemData) == 'table' and itemData.koraReceipt then
         return
     end
-    TriggerEvent('qbinventory:ui:legacyItemBox', itemData, action, amount)
+    TriggerEvent('kora_inventory:ui:legacyItemBox', itemData, action, amount)
 end
 
 RegisterNetEvent('qb-inventory:client:ItemBox', legacyItemBox)
@@ -257,12 +257,12 @@ RegisterCommand('inventory', function()
     if IsPauseMenuActive() or IsNuiFocused() then
         return
     end
-    if QbInventory.isDowned() then
-        QbInventory.notifyDownedBlocked()
+    if KoraInventory.isDowned() then
+        KoraInventory.notifyDownedBlocked()
         return
     end
-    if QbInventory.isCuffed() then
-        QbInventory.notifyCuffedBlocked()
+    if KoraInventory.isCuffed() then
+        KoraInventory.notifyCuffedBlocked()
         return
     end
     -- TAB also drives kora_lib's zone and entity-placement creators;
@@ -273,7 +273,7 @@ RegisterCommand('inventory', function()
         return
     end
     -- Seated -> glovebox, at a vehicle's boot -> trunk (client/vehicles.lua).
-    if QbInventory.vehicleStorage and QbInventory.vehicleStorage.tryOpen() then
+    if KoraInventory.vehicleStorage and KoraInventory.vehicleStorage.tryOpen() then
         return
     end
     openSelf()

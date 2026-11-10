@@ -2,7 +2,7 @@
 --
 -- Unlike Ammu-Nation (server/shops/ammunation.lua), there is no fixed
 -- location list to check the source against -- a vending machine is any
--- `Config.qbinventory.shops.vendingmachine.models` prop a mapper placed
+-- `Config.kora_inventory.shops.vendingmachine.models` prop a mapper placed
 -- anywhere, and FXServer has no way to independently query a static map
 -- prop's position; only networked entities are server-visible. Real
 -- qb-inventory accepts exactly this trade-off (github.com/qbcore-fivem/
@@ -20,8 +20,8 @@
 -- continuing a purchase they already legitimately started.
 
 local shop = assert(
-    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.vendingmachine,
-    'qbinventory vending machine configuration is required'
+    Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.vendingmachine,
+    'kora_inventory vending machine configuration is required'
 )
 
 local approvals = {} -- source -> GetGameTimer() expiry
@@ -50,7 +50,7 @@ local function access(source, inventory, opts)
             return false, 'not at a vending machine'
         end
         approvals[source] = {
-            expires = GetGameTimer() + (Config.qbinventory.sessionTtl or 120000),
+            expires = GetGameTimer() + (Config.kora_inventory.sessionTtl or 120000),
             coords = { x = opts.coords.x, y = opts.coords.y, z = opts.coords.z },
         }
         return true
@@ -67,10 +67,10 @@ local function access(source, inventory, opts)
         return false, 'not at a vending machine'
     end
     -- Still being asked means the player is still using the machine; slide the
-    -- window with the session lease (Config.qbinventory.sessionSliding) so a long
+    -- window with the session lease (Config.kora_inventory.sessionSliding) so a long
     -- purchase is not cut off by an approval that only counted from the open.
-    if Config.qbinventory.sessionSliding ~= false then
-        approval.expires = GetGameTimer() + (Config.qbinventory.sessionTtl or 120000)
+    if Config.kora_inventory.sessionSliding ~= false then
+        approval.expires = GetGameTimer() + (Config.kora_inventory.sessionTtl or 120000)
     end
     return true
 end

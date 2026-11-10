@@ -6,9 +6,9 @@
 -- the toggle only reports that the animation the server asked for actually
 -- finished, and the server re-checks real possession before believing it.
 
-local config = Config.qbinventory
+local config = Config.kora_inventory
 local carryConfig = config.weaponCarry or {}
-local STATE_KEY = 'qbinventory:weaponCarry'
+local STATE_KEY = 'kora_inventory:weaponCarry'
 
 local function vec(point, fallbackZero)
     if type(point) ~= 'table' then
@@ -82,7 +82,7 @@ local function reportUnequipped()
     drawnName = nil
     drawnThrowable = false
     resetShotCadence()
-    TriggerServerEvent('qbinventory:server:weaponUnequipped')
+    TriggerServerEvent('kora_inventory:server:weaponUnequipped')
 end
 
 ---Take a drawn weapon out of the ped's hands and clear the carry state,
@@ -104,7 +104,7 @@ end
 
 -- The server saw the equipped item leave the inventory (dropped, given, moved
 -- into a container, removed or sold).
-RegisterNetEvent('qbinventory:client:weaponRemoved', function(name)
+RegisterNetEvent('kora_inventory:client:weaponRemoved', function(name)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -175,7 +175,7 @@ local function playToggle(action, duration, label, tier)
     }) == true
 end
 
-RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
+RegisterNetEvent('kora_inventory:client:toggleWeapon', function(request)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -246,7 +246,7 @@ RegisterNetEvent('qbinventory:client:toggleWeapon', function(request)
     end
 
     if request.slot then
-        TriggerServerEvent('qbinventory:server:weaponToggled', request.slot)
+        TriggerServerEvent('kora_inventory:server:weaponToggled', request.slot)
     end
 end)
 
@@ -259,7 +259,7 @@ end)
 -- momentarily without it. Giving it back with 0 rounds is a no-op when the ped
 -- already holds it and repairs the case where it does not, so the magazine the
 -- server has already consumed is never silently lost.
-RegisterNetEvent('qbinventory:client:addAmmo', function(request)
+RegisterNetEvent('kora_inventory:client:addAmmo', function(request)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -301,7 +301,7 @@ RegisterNetEvent('qbinventory:client:addAmmo', function(request)
     SetPedAmmo(ped, hash, target)
 end)
 
-RegisterNetEvent('qbinventory:client:startTrainingWeapon', function(name, rounds, damage)
+RegisterNetEvent('kora_inventory:client:startTrainingWeapon', function(name, rounds, damage)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -316,7 +316,7 @@ RegisterNetEvent('qbinventory:client:startTrainingWeapon', function(name, rounds
     applyDamageSettings(trainingWeapon, damage)
 end)
 
-RegisterNetEvent('qbinventory:client:stopTrainingWeapon', function()
+RegisterNetEvent('kora_inventory:client:stopTrainingWeapon', function()
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -358,7 +358,7 @@ Kora.cache.onChange('weapon', function(weapon)
             end
             -- Sent before weaponUnequipped so the server still sees the slot
             -- as drawn.
-            TriggerServerEvent('qbinventory:server:throwableThrown')
+            TriggerServerEvent('kora_inventory:server:throwableThrown')
             SetCurrentPedWeapon(Kora.cache.ped(), joaat('weapon_unarmed'), true)
             reportUnequipped()
         end)
@@ -423,12 +423,12 @@ AddEventHandler('CEventGunShot', function(_, eventEntity)
             return
         end
         lastShotAt, lastShotPed = now, ped
-        TriggerServerEvent('qbinventory:server:weaponFired')
+        TriggerServerEvent('kora_inventory:server:weaponFired')
     else
         -- Retain the older lower-only persistence path when a server owner
         -- deliberately turns forensic round tracking off.
         TriggerServerEvent(
-            'qbinventory:server:weaponAmmoConsumed',
+            'kora_inventory:server:weaponAmmoConsumed',
             drawnSlot,
             GetAmmoInPedWeapon(ped, drawn) or 0
         )

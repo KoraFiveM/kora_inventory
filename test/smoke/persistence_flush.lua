@@ -1,4 +1,4 @@
--- Run from qbinventory: lua5.4 test/smoke/persistence_flush.lua [persistence-source]
+-- Run from kora_inventory: lua5.4 test/smoke/persistence_flush.lua [persistence-source]
 -- Uses actual persistence/shared code and the kora_sql consumer adapter. Driver
 -- callbacks and the FiveM host are controlled; no database or service runs.
 local H = dofile('test/harness.lua')
@@ -8,7 +8,7 @@ local function setup()
     local f = { calls = {}, threads = {} }
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
-    env.Config, env.QbInventory, env.Kora = {}, nil, {}
+    env.Config, env.KoraInventory, env.Kora = {}, nil, {}
     env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.CreateThread = function(fn) f.threads[#f.threads + 1] = fn end
     env.RegisterCommand, env.AddEventHandler, env.TriggerEvent = function() end, function() end, function() end
@@ -34,11 +34,11 @@ local function setup()
         end
     end
     function driver.execute(_, statement, params, callback)
-        submit({ kind = 'execute', statement = statement, params = env.QbInventory.copy(params) }, callback)
+        submit({ kind = 'execute', statement = statement, params = env.KoraInventory.copy(params) }, callback)
     end
     function driver.upsert(_, tableName, key, rows, opts, callback)
         if type(opts) == 'function' then callback = opts end
-        submit({ kind = 'upsert', tableName = tableName, rows = env.QbInventory.copy(rows) }, callback)
+        submit({ kind = 'upsert', tableName = tableName, rows = env.KoraInventory.copy(rows) }, callback)
     end
     env.exports = { kora_sql = driver }
     env.promise = { new = function()
@@ -59,9 +59,9 @@ local function setup()
     load(arg[1] or 'server/persistence.lua')
     -- Run only real bootstrap, leaving the permanent periodic flusher dormant.
     assert(f.threads[1])()
-    f.env, f.persistence = env, env.QbInventory.persistence
+    f.env, f.persistence = env, env.KoraInventory.persistence
     H.equal(f.persistence.getStatus().ready, true, 'actual bootstrap enables persistence')
-    H.equal(f.ensured, env.QBInventorySchema, 'bootstrap declares the schema through kora_sql')
+    H.equal(f.ensured, env.KoraInventorySchema, 'bootstrap declares the schema through kora_sql')
     function f.start()
         local thread = coroutine.create(f.persistence.flush)
         local ok, err = coroutine.resume(thread)
@@ -205,8 +205,8 @@ end
 -- Opt-in persisted drops must retain their bucket after save/load.
 do
     local f = setup()
-    f.env.Config.qbinventory.persistence.persistDrops = true
-    f.env.Config.qbinventory.persistence.persistTemporary = true
+    f.env.Config.kora_inventory.persistence.persistDrops = true
+    f.env.Config.kora_inventory.persistence.persistTemporary = true
     local drop = record('drop', 'scoped', 1, 4)
     drop.bucket, drop.temporary = 11, true
     H.equal(f.persistence.markDirty(drop), true, 'scoped drop is queued under existing opt-in durability')
@@ -255,7 +255,7 @@ for _, savedFirst in ipairs({ false, true }) do
     env.exports = providers
     -- Controlled durable-row absence after DELETE's effect, before its response.
     providers.kora_sql.query = function(_, _, _, callback) callback({}) end
-    local internal, api = env.QbInventory.internal, env.QbInventory.compat.qb
+    local internal, api = env.KoraInventory.internal, env.KoraInventory.compat.qb
     H.equal(api.CreateInventory('recreated', { items = record('stash', 'recreated', 0, 2).items }), nil,
         'legacy creation keeps its no-value return')
     if savedFirst then H.equal(f.persistence.flush(), true, 'old inventory can already be saved') end

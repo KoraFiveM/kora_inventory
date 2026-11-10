@@ -4,8 +4,8 @@
 -- opens the session, so triggering this event away from a counter is harmless.
 
 local shop = assert(
-    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.convenience,
-    'qbinventory convenience store configuration is required'
+    Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.convenience,
+    'kora_inventory convenience store configuration is required'
 )
 local targetIds = {}
 local enabled = shop.enabled ~= false
@@ -14,7 +14,7 @@ local function openConvenienceStore()
     exports.kora_inventory:openInventory('shop', shop.id)
 end
 
-RegisterNetEvent('qbinventory:client:openConvenienceStore', function()
+RegisterNetEvent('kora_inventory:client:openConvenienceStore', function()
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -29,7 +29,7 @@ local function registerConvenienceStoreTargets()
     targetIds = {}
 
     for _, location in ipairs(shop.locations or {}) do
-        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(QbInventory.shopZoneSprite({
+        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(KoraInventory.shopZoneSprite({
             coords = { x = location.x, y = location.y, z = location.z },
             radius = shop.interactionDistance,
             options = {
@@ -38,7 +38,7 @@ local function registerConvenienceStoreTargets()
                     icon = 'basket-shopping',
                     onSelect = openConvenienceStore,
                     -- The clerk ped offers the same option while it is spawned.
-                    canInteract = function() return not QbInventory.shopClerkActive(location) end,
+                    canInteract = function() return not KoraInventory.shopClerkActive(location) end,
                 },
             },
         }, location))
@@ -60,7 +60,7 @@ end)
 
 for _, location in ipairs(enabled and shop.locations or {}) do
     if shop.blip and shop.blip.enabled then
-        local blip = QbInventory.createShopBlip(Config.qbinventory.shops.convenience.blip.category, { x = location.x, y = location.y, z = location.z }, {
+        local blip = KoraInventory.createShopBlip(Config.kora_inventory.shops.convenience.blip.category, { x = location.x, y = location.y, z = location.z }, {
             sprite = shop.blip.sprite,
             color = shop.blip.color,
             scale = shop.blip.scale,

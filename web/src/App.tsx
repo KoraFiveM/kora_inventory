@@ -22,14 +22,14 @@ function rootScale() {
     return Math.min(2, Math.max(0.5, Math.min(window.innerWidth / 1920, window.innerHeight / 1080)))
 }
 
-const SLOT_DRAG_TYPE = "qbinventory/slot"
+const SLOT_DRAG_TYPE = "kora_inventory/slot"
 
 // Drags that may wait behind an unanswered request before further ones are refused.
 const MAX_QUEUED_MOVES = 8
 
 /**
- * Presentation config from `Config.qbinventory.ui`, pushed on
- * `qbinventory:nui:config`.
+ * Presentation config from `Config.kora_inventory.ui`, pushed on
+ * `kora_inventory:nui:config`.
  *
  * The defaults here are what renders in the window between the UI mounting and
  * that message arriving (and in the dev harness, which sends no config at all),
@@ -503,7 +503,7 @@ function InventoryApp() {
     // Merged onto the defaults rather than replacing them, so a config table
     // that omits a key keeps the shipped behaviour for it instead of dropping to
     // `undefined` and rendering as "off".
-    useNuiEvent<UiConfig>("qbinventory:nui:config", (config) => {
+    useNuiEvent<UiConfig>("kora_inventory:nui:config", (config) => {
         if (!config || typeof config !== "object") return
         setUiConfig((current) => ({
             ...current,
@@ -522,21 +522,21 @@ function InventoryApp() {
             images: { ...current.images, ...(config.images ?? {}) },
         }))
     })
-    useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number }>("qbinventory:nui:hotbar", ({ slots, seconds, bottom }) => {
+    useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom }) => {
         if (!Array.isArray(slots) || !(Number(seconds) > 0)) return
         window.clearTimeout(hotbarTimeout.current)
         setHotbar({ id: Date.now(), slots, bottom: Number.isFinite(bottom) ? Number(bottom) : undefined })
         hotbarTimeout.current = window.setTimeout(() => setHotbar(null), Number(seconds) * 1000)
     })
-    useNuiEvent<{ bottom?: number }>("qbinventory:nui:hotbarPosition", ({ bottom }) => {
+    useNuiEvent<{ bottom?: number }>("kora_inventory:nui:hotbarPosition", ({ bottom }) => {
         if (!Number.isFinite(bottom)) return
         setHotbar((current) => current ? { ...current, bottom: Number(bottom) } : current)
     })
-    useNuiEvent<SessionSnapshot>("qbinventory:nui:sessionOpened", (snapshot) => {
+    useNuiEvent<SessionSnapshot>("kora_inventory:nui:sessionOpened", (snapshot) => {
         window.clearTimeout(hotbarTimeout.current); setHotbar(null)
         clearPendingMove(); updateSession(() => snapshot); setSelected(undefined); setGiveAvailable(false); setError(undefined)
     })
-    useNuiEvent<SessionPatch>("qbinventory:nui:sessionPatched", (patch) => {
+    useNuiEvent<SessionPatch>("kora_inventory:nui:sessionPatched", (patch) => {
         // The server's items win over any prediction for the inventories they cover.
         if (optimistic.current) for (const id of refreshedInventories(patch)) optimistic.current.delete(id)
         queue.patched(patch.snapshot
@@ -545,22 +545,22 @@ function InventoryApp() {
         updateSession((current) => current && current.sessionId === patch.sessionId ? applyPatch(current, patch) : current)
         setSelected(undefined)
     })
-    useNuiEvent<{ sessionId: string; reason?: string }>("qbinventory:nui:sessionClosed", ({ sessionId }) => {
+    useNuiEvent<{ sessionId: string; reason?: string }>("kora_inventory:nui:sessionClosed", ({ sessionId }) => {
         clearPendingMove()
         updateSession((current) => current?.sessionId === sessionId ? null : current)
     })
-    useNuiEvent<{ reason?: string }>("qbinventory:nui:rejected", ({ reason }) => {
+    useNuiEvent<{ reason?: string }>("kora_inventory:nui:rejected", ({ reason }) => {
         const message = reason ?? "Action rejected by inventory"
         // Settles the request in flight (once); with nothing in flight it is only a notice.
         if (queue.pending) queue.reject(message)
         else setError(message)
     })
-    useNuiEvent<{ requestId?: number; ok?: boolean; error?: string }>("qbinventory:nui:intentResult", ({ requestId, ok, error }) => {
+    useNuiEvent<{ requestId?: number; ok?: boolean; error?: string }>("kora_inventory:nui:intentResult", ({ requestId, ok, error }) => {
         if (typeof requestId !== "number") return
         results.current.deliver(requestId, ok === true ? { ok: true } : { ok: false, error: error === "timeout" ? "Inventory did not respond" : error })
     })
-    useNuiEvent<{ available?: boolean }>("qbinventory:nui:giveAvailability", ({ available }) => setGiveAvailable(available === true))
-    useNuiEvent<ItemBoxReceipt>("qbinventory:nui:itemBox", (receipt) => {
+    useNuiEvent<{ available?: boolean }>("kora_inventory:nui:giveAvailability", ({ available }) => setGiveAvailable(available === true))
+    useNuiEvent<ItemBoxReceipt>("kora_inventory:nui:itemBox", (receipt) => {
         if (!receipt || typeof receipt.name !== "string" || !Number.isFinite(receipt.amount) || receipt.amount < 1) return
         const id = nextItemBoxId.current++
         setItemBoxes((current) => [...current.slice(-3), { ...receipt, id }])
@@ -778,7 +778,7 @@ function InventoryApp() {
     // Per-player position/size/side from kora_hud's /ui editor (client/ui.lua
     // relays it). Defaults render exactly the shipped layout.
     const [playerLayout, setPlayerLayout] = useState<PlayerLayout>(DEFAULT_PLAYER_LAYOUT)
-    useNuiEvent<unknown>("qbinventory:nui:layout", (raw) => setPlayerLayout(normalizePlayerLayout(raw)))
+    useNuiEvent<unknown>("kora_inventory:nui:layout", (raw) => setPlayerLayout(normalizePlayerLayout(raw)))
     const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight })
     useEffect(() => {
         const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight })

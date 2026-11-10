@@ -4,9 +4,9 @@ local config = assert(io.open('config.lua', 'r')):read('*a')
 local server = assert(io.open('server.lua', 'r')):read('*a')
 local compactServer = server:gsub('%s+', ' ')
 
-H.ok(config:find('itemBoxes = {', 1, true), 'item receipt policy is part of qbinventory config')
+H.ok(config:find('itemBoxes = {', 1, true), 'item receipt policy is part of kora_inventory config')
 H.ok(config:find('enabled = true', config:find('itemBoxes = {', 1, true), true), 'item receipt policy has a server-owner switch')
-H.ok(server:find("TriggerClientEvent('qbinventory:client:itemBox', src", 1, true), 'receipts originate from qbinventory authority')
+H.ok(server:find("TriggerClientEvent('kora_inventory:client:itemBox', src", 1, true), 'receipts originate from kora_inventory authority')
 H.ok(server:find("showItemBox(src, name, amount, 'add', added)", 1, true), 'public AddItem automatically owns its receipt')
 H.ok(server:find("showItemBox(src, currentItem.name, count, 'purchase', addedItem)", 1, true), 'shop purchases automatically own their receipt')
 H.ok(server:find("showItemBox(src, name, amount, 'remove', removed)", 1, true), 'public RemoveItem automatically owns its receipt')
@@ -24,7 +24,7 @@ end
 H.ok(config:find('showUses = false', boxes, true), 'use receipts are opt-in by default')
 H.ok(server:find('local def = itemDef(name)', server:find('local function showItemBox', 1, true), true), 'receipt display data is resolved from canonical item definitions')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('shared.lua')
 Kora = {
@@ -41,7 +41,7 @@ RegisterNetEvent = function() end
 TriggerEvent = function() end
 local receipts, legacyReceipts = {}, {}
 TriggerClientEvent = function(event, _, payload)
-    if event == 'qbinventory:client:itemBox' then receipts[#receipts + 1] = payload end
+    if event == 'kora_inventory:client:itemBox' then receipts[#receipts + 1] = payload end
     if event == 'qb-inventory:client:ItemBox' then legacyReceipts[#legacyReceipts + 1] = payload end
 end
 local player = { name = 'Test', items = {} }
@@ -53,7 +53,7 @@ exports = setmetatable({ kora_core = {
     setPath = function(_, _, path, value) player.items[path[2]] = value; return true end,
 } }, { __call = function() end })
 dofile('server.lua')
-local api, internal = QbInventory.api, QbInventory.internal
+local api, internal = KoraInventory.api, KoraInventory.internal
 
 for _, info in ipairs({
     {},

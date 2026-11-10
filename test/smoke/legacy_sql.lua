@@ -13,7 +13,7 @@ local function setup(initial, boot)
     local f = { threads = {}, handlers = {}, exports = {}, rows = {}, calls = {}, time = 0, replies = {} }
     if initial then f.rows['stash:policetrash'] = record(initial) end
     local env = {}; for k, v in pairs(_G) do env[k] = v end
-    env.Config, env.QbInventory = {}, nil
+    env.Config, env.KoraInventory = {}, nil
     env.Kora = { resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end }, callback = { register = function() end } }
     env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.GetInvokingResource = function() return f.invoker or 'kora_sql' end
@@ -40,7 +40,7 @@ local function setup(initial, boot)
         if p.err then error(p.err, 0) end
         return p.value
     end }
-    local function copy(value) return env.QbInventory.copy(value) end
+    local function copy(value) return env.KoraInventory.copy(value) end
     local function submit(kind, work, callback)
         f.calls[#f.calls + 1] = kind
         local request = { kind = kind, work = work, callback = callback }
@@ -106,7 +106,7 @@ local function setup(initial, boot)
     } }, { __call = function(_, name, fn) f.exports[name] = fn end })
     local function load(path) assert(loadfile(path, 't', env))() end
     load('config.lua'); load('shared.lua'); load('../kora_sql/init.lua'); load('server/schema.lua'); load('server/persistence.lua'); load('server.lua')
-    f.env, f.persistence, f.internal = env, env.QbInventory.persistence, env.QbInventory.internal
+    f.env, f.persistence, f.internal = env, env.KoraInventory.persistence, env.KoraInventory.internal
     function f.resume(thread)
         local ok, value, err = coroutine.resume(thread); assert(ok, value); return value, err
     end
@@ -307,7 +307,7 @@ do
     local f = setup(nil, false); f.fail = 'restore'; f.resume(f.threads[1])
     H.equal(f.exports.getPersistenceStatus().lastError, 'controlled SQL failure')
     f.bridge(); H.equal(f.replies[1].error, 'controlled SQL failure')
-    local disabled = setup(); disabled.env.Config.qbinventory.persistence.enabled = false
+    local disabled = setup(); disabled.env.Config.kora_inventory.persistence.enabled = false
     disabled.bridge(); H.equal(disabled.replies[1].error, 'inventory persistence is disabled')
     local unauthorised = setup(); unauthorised.invoker = 'other_resource'; unauthorised.bridge()
     H.equal(unauthorised.replies[1].rows, nil)

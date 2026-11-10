@@ -2,7 +2,7 @@
 -- must not abort the blip loop.
 local H = dofile("test/harness.lua")
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile("shared.lua")
 
 local created, warnings = {}, {}
@@ -16,7 +16,7 @@ end } }
 local realPrint = print
 print = function(message) warnings[#warnings + 1] = message end
 
-local blip = QbInventory.createShopBlip("Config.x.blip.category", { x = 1, y = 2, z = 3 },
+local blip = KoraInventory.createShopBlip("Config.x.blip.category", { x = 1, y = 2, z = 3 },
     { category = "Convenience Store", name = "24/7" })
 print = realPrint
 

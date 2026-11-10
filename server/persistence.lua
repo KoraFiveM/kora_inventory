@@ -6,13 +6,13 @@
 -- shops). All writes are explicit and revisioned so callers can keep mutation
 -- locks in server.lua around their state transition.
 
-QbInventory = QbInventory or {}
-local inventory = QbInventory
+KoraInventory = KoraInventory or {}
+local inventory = KoraInventory
 local persistence = {}
 inventory.persistence = persistence
 
 local resource = GetCurrentResourceName()
-local persistenceConfig = (Config.qbinventory and Config.qbinventory.persistence) or {}
+local persistenceConfig = (Config.kora_inventory and Config.kora_inventory.persistence) or {}
 local state = { ready = false, migrating = false, lastError = nil, lastMigration = nil }
 local dirty = {}
 local writes, inflight = {}, {}
@@ -34,7 +34,7 @@ function persistence.committed(inv)
 end
 
 local function log(level, message)
-    print(('^%s[qbinventory:persistence]^7 %s'):format(level, message))
+    print(('^%s[kora_inventory:persistence]^7 %s'):format(level, message))
 end
 
 local function fnv1a(str)
@@ -87,7 +87,7 @@ local function cleanType(kind)
     return isSecondaryType(kind) and kind or 'stash'
 end
 
--- Accept the slot-keyed JSON used by qb-inventory/qbcore and tolerate the
+-- Accept the slot-keyed JSON used by qb-inventory/kora_core and tolerate the
 -- `count` spelling used by ox-style records. Never invent or discard metadata.
 function persistence.normaliseItems(value)
     local raw, err = decode(value)
@@ -295,7 +295,7 @@ end
 
 function persistence.delete(kind, id)
     if kind == 'player' then
-        return false, 'player inventories are owned by qbcore'
+        return false, 'player inventories are owned by kora_core'
     end
     if not state.ready then
         return false, state.lastError or 'persistence is not ready'
@@ -371,7 +371,7 @@ end
 
 function persistence.load(kind, id)
     if kind == 'player' then
-        return nil, 'player inventories are owned by qbcore'
+        return nil, 'player inventories are owned by kora_core'
     end
     local rows, err = dbQuery(
         [[SELECT `inventory_type`,`inventory_id`,`label`,`slots`,`max_weight`,`revision`,`items`,`properties`
@@ -614,7 +614,7 @@ end
 
 local function emitProgress(report, source, phase, row)
     TriggerEvent(
-        'qbinventory:server:migrationProgress',
+        'kora_inventory:server:migrationProgress',
         inventory.copy(report),
         source,
         phase,
@@ -678,8 +678,8 @@ local function importLegacyRowUnlocked(source, defaultType, row, opts, report)
         type = kind,
         id = id,
         label = id,
-        slots = tonumber(row.legacy_slots) or Config.qbinventory.defaultSlots,
-        maxWeight = tonumber(row.legacy_max_weight) or Config.qbinventory.defaultMaxWeight,
+        slots = tonumber(row.legacy_slots) or Config.kora_inventory.defaultSlots,
+        maxWeight = tonumber(row.legacy_max_weight) or Config.kora_inventory.defaultMaxWeight,
         revision = 0,
         items = items,
         legacy = { source = source, key = sourceKey },
@@ -794,11 +794,11 @@ local function bootstrap()
     end
     local sqlReady, readyErr = Kora.sql.ready(60000)
     if not sqlReady then
-        state.lastError = readyErr or 'qbsql did not become ready'
+        state.lastError = readyErr or 'kora_sql did not become ready'
         log('1', state.lastError)
         return
     end
-    local reports, migrationErr = Kora.sql.ensureTables(QBInventorySchema)
+    local reports, migrationErr = Kora.sql.ensureTables(KoraInventorySchema)
     if migrationErr then
         state.lastError = migrationErr
         log('1', ('schema setup failed: %s'):format(migrationErr))
@@ -811,12 +811,12 @@ local function bootstrap()
     end
     state.ready = true
     log('2', 'secondary-inventory schema ready.')
-    TriggerEvent('qbinventory:server:persistenceReady', reports)
+    TriggerEvent('kora_inventory:server:persistenceReady', reports)
 end
 
-RegisterCommand('qbinventory-migrate', function(source, args)
-    if source ~= 0 and not IsPlayerAceAllowed(source, 'command.qbinventory') then
-        return TriggerClientEvent('chat:addMessage', source, { args = { 'qbinventory', 'Permission denied.' } })
+RegisterCommand('kora_inventory-migrate', function(source, args)
+    if source ~= 0 and not IsPlayerAceAllowed(source, 'command.kora_inventory') then
+        return TriggerClientEvent('chat:addMessage', source, { args = { 'kora_inventory', 'Permission denied.' } })
     end
     local action = (args[1] or 'help'):lower()
     CreateThread(function()
@@ -864,7 +864,7 @@ RegisterCommand('qbinventory-migrate', function(source, args)
                     or tostring(err)
             )
         else
-            log('3', 'usage: qbinventory-migrate dry-run|run|retry|verify')
+            log('3', 'usage: kora_inventory-migrate dry-run|run|retry|verify')
         end
     end)
 end, true)

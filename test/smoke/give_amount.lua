@@ -2,7 +2,7 @@
 -- strictly, and checks recipient weight/slots for that whole amount.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
@@ -74,8 +74,8 @@ exports = setmetatable({}, {
 dofile('server/persistence.lua')
 dofile('server.lua')
 
-local internal = QbInventory.internal
-local intent = callbacks['qbinventory:server:intent']
+local internal = KoraInventory.internal
+local intent = callbacks['kora_inventory:server:intent']
 
 local function reset(giverItems, recipientItems)
     playersItems[7], playersItems[9] = giverItems, recipientItems or {}

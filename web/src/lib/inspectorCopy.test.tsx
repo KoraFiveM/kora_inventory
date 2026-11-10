@@ -38,7 +38,7 @@ beforeEach(async () => {
     host = document.createElement("div"); document.body.appendChild(host)
     root = createRoot(host)
     await act(async () => { root.render(<App />) })
-    await post("qbinventory:nui:sessionOpened", snapshot)
+    await post("kora_inventory:nui:sessionOpened", snapshot)
 })
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.restoreAllMocks() })
 
@@ -58,7 +58,7 @@ describe("item inspector copy", () => {
     })
 
     it("Config.Inspector.allowCopy = false hides the button and keeps the text unselectable", async () => {
-        await post("qbinventory:nui:config", { inspectorCopy: false })
+        await post("kora_inventory:nui:config", { inspectorCopy: false })
         select()
         expect(copyButton()).toBeNull()
         expect(inspector().classList.contains("item-detail-copyable")).toBe(false)

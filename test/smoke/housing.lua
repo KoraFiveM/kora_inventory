@@ -8,7 +8,7 @@ local function setup(database, skipRestore)
         [1] = { citizenid = 'CID1', items = {} }, [2] = { citizenid = 'CID2', items = {} },
     } }
     local env = {}; for key, value in pairs(_G) do env[key] = value end
-    env.json, env.Config, env.QbInventory = json, {}, nil
+    env.json, env.Config, env.KoraInventory = json, {}, nil
     env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.GetInvokingResource = function() return f.caller or 'housing' end
     env.GetGameTimer = function() return 100 end
@@ -47,7 +47,7 @@ local function setup(database, skipRestore)
     function core.finishPlayerColumnOperation(_, token, values)
         local cid = assert(f.tokens[token]).cid
         for src, data in pairs(f.players) do
-            if data.citizenid == cid then data.items = copy(values[cid].inventory); env.TriggerEvent('qbcore:server:inventoryChanged', src) end
+            if data.citizenid == cid then data.items = copy(values[cid].inventory); env.TriggerEvent('kora_core:server:inventoryChanged', src) end
         end
         f.tokens[token] = nil
         return true
@@ -108,7 +108,7 @@ local function setup(database, skipRestore)
         local first = statements[1].values
         local row = f.db.operations[first[1] .. ':' .. first[2]]
         if #statements == 1 then return { success = true, results = { row and { copy(row) } or {} } } end
-        H.equal(context.key, 'qbinventory:housing:' .. first[2])
+        H.equal(context.key, 'kora_inventory:housing:' .. first[2])
         H.equal(context.citizenids[1], 'CID1')
         H.equal(context.fingerprint, json.encode({ 'housing', first[2], first[3], first[4] }))
         f.lastContext, f.lastStatements = copy(context), copy(statements)
@@ -119,9 +119,9 @@ local function setup(database, skipRestore)
         return { success = true, results = {} }
     end
     local function load(path) assert(loadfile(path, 't', env))() end
-    load('config.lua'); load('shared.lua'); env.Config.qbinventory.cash.asItem = false
+    load('config.lua'); load('shared.lua'); env.Config.kora_inventory.cash.asItem = false
     load('server/persistence.lua'); load('server.lua'); load('server/recovery.lua')
-    f.env, f.inventory = env, env.QbInventory
+    f.env, f.inventory = env, env.KoraInventory
     f.threads[1]()
     function f.policy(allowed)
         f.allowed = allowed
@@ -151,7 +151,7 @@ do
     f.allowed, f.policyError = true, true
     H.equal(f.provided.stashOpen(1, 'lease-1'), false, 'policy exception denies')
     f.policyError = false
-    f.env.QbInventory.persistence.flush()
+    f.env.KoraInventory.persistence.flush()
     local properties = json.decode(f.db.inventories['stash:lease-1'].properties)
     H.equal(properties.policyOwner, 'housing'); H.equal(properties.accessRequired, true)
     f.events.onResourceStop('housing')
@@ -246,7 +246,7 @@ end
 
 do
     local f = setup(); assert(f.policy(true)); f.items(3)
-    f.env.Config.qbinventory.playerSlots = 1
+    f.env.Config.kora_inventory.playerSlots = 1
     f.players[1].items = { [1] = { name = 'wood', amount = 1, slot = 1, info = {} } }
     H.equal(f.provided.ClaimStash(1, 'lease-1', 'capacity'), false)
     H.equal(f.provided.GetStashItems('lease-1')[1].amount, 3)

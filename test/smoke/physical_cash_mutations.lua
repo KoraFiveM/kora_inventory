@@ -58,7 +58,7 @@ exports = setmetatable({}, {
                     if name == 'setPath' then
                         writes = writes + 1
                         if field[2] then data[source].items[field[2]] = value else data[source].items = value end
-                        TriggerEvent('qbcore:server:inventoryChanged', source)
+                        TriggerEvent('kora_core:server:inventoryChanged', source)
                         return true
                     end
                 end
@@ -74,7 +74,7 @@ dofile('server/compat/qb.lua')
 -- This is kora_inventory's own compatibility module; no ox_lib code is loaded.
 dofile('server/compat/ox.lua')
 
-local inventory, internal = QbInventory, QbInventory.internal
+local inventory, internal = KoraInventory, KoraInventory.internal
 data[7].items = {
     [1] = internal.buildItem('cash', 100, 1, { origin = { account = 'cash' } }),
     [2] = internal.buildItem('wood', 2, 2, {}),
@@ -82,7 +82,7 @@ data[7].items = {
     [4] = internal.buildItem('backpack', 1, 4, {}),
 }
 H.ok(inventory.api.SetInventory(7, inventory.copy(data[7].items)), 'cash-off public replacement remains supported')
-Config.qbinventory.cash.asItem = true
+Config.kora_inventory.cash.asItem = true
 threads[1]() -- Cash registration only; capture the periodic session worker.
 
 local revision = internal.getRevision('player:7')
@@ -204,7 +204,7 @@ local invalidItems = inventory.copy(data[7].items)
 invalidItems[2].name = 'unknown'
 H.equal(internal.setInventoryItems('player:7', invalidItems), false, 'existing item-definition validation remains enforced')
 local overweight = inventory.copy(data[7].items)
-overweight[2].amount = Config.qbinventory.playerMaxWeight + 1
+overweight[2].amount = Config.kora_inventory.playerMaxWeight + 1
 H.equal(internal.setInventoryItems('player:7', overweight), false, 'existing weight validation remains enforced')
 local secondary = internal.createSecondary('stash', 'cash-regression', { slots = 5, maxWeight = 100 })
 H.ok(internal.setInventoryItems(secondary.key, { [1] = internal.buildItem('wood', 2, 1, {}) }), 'secondary inventory funnel remains supported')

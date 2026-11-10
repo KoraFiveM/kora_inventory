@@ -4,40 +4,40 @@
 -- bridge can ask whether a recipient is available and start selection, but it
 -- must never receive a player list, a player name, a ped handle, or a server
 -- id.  A trusted client transport receives the resolved server id over the
--- local `qbinventory:client:giveTargetResolved` event and submits the bounded
+-- local `kora_inventory:client:giveTargetResolved` event and submits the bounded
 -- intent to kora_inventory's server authority, which still validates range,
 -- bucket, session, source slot and amount immediately before transfer.
 --
 -- Integration contract (implemented by client.lua/client/ui.lua):
---   TriggerEvent('qbinventory:client:requestGiveAvailability')
---     -> qbinventory:ui:giveAvailability { available = boolean }
---   TriggerEvent('qbinventory:client:requestGiveTarget', requestId)
---     -> qbinventory:client:giveTargetResolved {
+--   TriggerEvent('kora_inventory:client:requestGiveAvailability')
+--     -> kora_inventory:ui:giveAvailability { available = boolean }
+--   TriggerEvent('kora_inventory:client:requestGiveTarget', requestId)
+--     -> kora_inventory:client:giveTargetResolved {
 --          requestId = requestId, target = serverId
 --        }
 --        or { requestId = requestId, cancelled = true, reason = string }
---   TriggerEvent('qbinventory:client:cancelGiveTarget', reason?)
+--   TriggerEvent('kora_inventory:client:cancelGiveTarget', reason?)
 --
--- `qbinventory:ui:giveTargeting` contains only `{ active = boolean }`.  The
+-- `kora_inventory:ui:giveTargeting` contains only `{ active = boolean }`.  The
 -- UI bridge uses it to relinquish NUI focus while kora_target is selecting an
 -- in-world ped, then restores focus on resolve/cancel.  Keeping focus control
 -- in client/ui.lua preserves kora_inventory's NUI ownership boundary.
 
--- Locale text with an English fallback (shared.lua's QbInventory.text).
+-- Locale text with an English fallback (shared.lua's KoraInventory.text).
 local function localeText(key, fallback, vars)
-    local text = QbInventory and QbInventory.text
+    local text = KoraInventory and KoraInventory.text
     return text and text(key, fallback, vars) or fallback
 end
 
 local giveTarget = {}
-QbInventory = QbInventory or {}
-QbInventory.giveTarget = giveTarget
+KoraInventory = KoraInventory or {}
+KoraInventory.giveTarget = giveTarget
 
 local active
 local availabilityGeneration, lastAvailability = 0, nil
 
 local function giveDistance()
-    local config = Config and Config.qbinventory or {}
+    local config = Config and Config.kora_inventory or {}
     return tonumber(config.giveDistance) or tonumber(config.interactionDistance) or 3.0
 end
 
@@ -95,7 +95,7 @@ end
 local function emitAvailability()
     local available = availability()
     lastAvailability = available
-    TriggerEvent('qbinventory:ui:giveAvailability', { available = available })
+    TriggerEvent('kora_inventory:ui:giveAvailability', { available = available })
 end
 
 local function clearTargetRegistration()
@@ -120,8 +120,8 @@ local function finish(result)
 
     clearTargetRegistration()
     active = nil
-    TriggerEvent('qbinventory:ui:giveTargeting', { active = false })
-    TriggerEvent('qbinventory:client:giveTargetResolved', result)
+    TriggerEvent('kora_inventory:ui:giveTargeting', { active = false })
+    TriggerEvent('kora_inventory:client:giveTargetResolved', result)
 end
 
 ---Cancel an outstanding multi-player target selection.  This produces no
@@ -158,7 +158,7 @@ function giveTarget.request(requestId)
 
     local recipients = nearbyPlayers()
     if #recipients == 0 then
-        TriggerEvent('qbinventory:client:giveTargetResolved', {
+        TriggerEvent('kora_inventory:client:giveTargetResolved', {
             requestId = requestId,
             cancelled = true,
             reason = 'no nearby player',
@@ -168,7 +168,7 @@ function giveTarget.request(requestId)
     end
 
     if #recipients == 1 then
-        TriggerEvent('qbinventory:client:giveTargetResolved', {
+        TriggerEvent('kora_inventory:client:giveTargetResolved', {
             requestId = requestId,
             target = recipients[1].serverId,
         })
@@ -177,7 +177,7 @@ function giveTarget.request(requestId)
     end
 
     if GetResourceState('kora_target') ~= 'started' then
-        TriggerEvent('qbinventory:client:giveTargetResolved', {
+        TriggerEvent('kora_inventory:client:giveTargetResolved', {
             requestId = requestId,
             cancelled = true,
             reason = 'targeting unavailable',
@@ -221,7 +221,7 @@ function giveTarget.request(requestId)
 
     if not ok or type(registrationId) ~= 'number' then
         active = nil
-        TriggerEvent('qbinventory:client:giveTargetResolved', {
+        TriggerEvent('kora_inventory:client:giveTargetResolved', {
             requestId = requestId,
             cancelled = true,
             reason = 'targeting unavailable',
@@ -230,7 +230,7 @@ function giveTarget.request(requestId)
     end
 
     active.registrationId = registrationId
-    TriggerEvent('qbinventory:ui:giveTargeting', { active = true })
+    TriggerEvent('kora_inventory:ui:giveTargeting', { active = true })
 
     -- A temporary registration must not leak if the player changes their mind
     -- or the target key is never used.  This is a UI selection timeout only;
@@ -245,10 +245,10 @@ function giveTarget.request(requestId)
     return true
 end
 
-AddEventHandler('qbinventory:client:requestGiveAvailability', emitAvailability)
-AddEventHandler('qbinventory:client:requestGiveTarget', giveTarget.request)
-AddEventHandler('qbinventory:client:cancelGiveTarget', giveTarget.cancel)
-AddEventHandler('qbinventory:ui:sessionOpened', function()
+AddEventHandler('kora_inventory:client:requestGiveAvailability', emitAvailability)
+AddEventHandler('kora_inventory:client:requestGiveTarget', giveTarget.request)
+AddEventHandler('kora_inventory:client:cancelGiveTarget', giveTarget.cancel)
+AddEventHandler('kora_inventory:ui:sessionOpened', function()
     availabilityGeneration = availabilityGeneration + 1
     local generation = availabilityGeneration
     lastAvailability = nil
@@ -257,13 +257,13 @@ AddEventHandler('qbinventory:ui:sessionOpened', function()
             local available = availability()
             if available ~= lastAvailability then
                 lastAvailability = available
-                TriggerEvent('qbinventory:ui:giveAvailability', { available = available })
+                TriggerEvent('kora_inventory:ui:giveAvailability', { available = available })
             end
             Wait(750)
         end
     end)
 end)
-AddEventHandler('qbinventory:ui:sessionClosed', function()
+AddEventHandler('kora_inventory:ui:sessionClosed', function()
     giveTarget.cancel('inventory closed')
     availabilityGeneration = availabilityGeneration + 1
     lastAvailability = nil

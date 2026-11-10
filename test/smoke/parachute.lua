@@ -4,7 +4,7 @@
 -- when the client reports the parachute was equipped.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 
 local useables, removals, calls = {}, {}, {}
@@ -12,7 +12,7 @@ local owned = { name = 'parachute', slot = 5 }
 local answer = true
 local NOW = 1000
 
-QbInventory = {
+KoraInventory = {
     internal = { setBuiltInUseable = function(name, fn) useables[name] = fn end },
     api = {
         createUseable = function() end,
@@ -27,7 +27,7 @@ Kora = {
     callback = {
         trigger = function(src, name, payload)
             calls[#calls + 1] = { src = src, name = name, payload = payload }
-            NOW = NOW + (Config.qbinventory.builtinUsables.parachuteTime or 0)
+            NOW = NOW + (Config.kora_inventory.builtinUsables.parachuteTime or 0)
             if answer == 'error' then error('timeout') end
             return answer
         end,
@@ -43,13 +43,13 @@ end
 
 load()
 H.ok(useables.parachute, 'the parachute item has a built-in use handler')
-H.equal(Config.qbinventory.builtinUsables.parachuteTime, 2500, 'the progress bar defaults to 2500 ms')
-H.equal(Config.qbinventory.builtinUsables.parachuteBag.enabled, true, 'the visible pack is on by default')
-H.equal(Config.qbinventory.builtinUsables.parachuteBag.male.drawable, 8, 'with the stock freemode parachute bag')
+H.equal(Config.kora_inventory.builtinUsables.parachuteTime, 2500, 'the progress bar defaults to 2500 ms')
+H.equal(Config.kora_inventory.builtinUsables.parachuteBag.enabled, true, 'the visible pack is on by default')
+H.equal(Config.kora_inventory.builtinUsables.parachuteBag.male.drawable, 8, 'with the stock freemode parachute bag')
 
 local ok = useables.parachute(7, { name = 'parachute', slot = 5 })
 H.equal(ok, true, 'using it succeeds when the client equips it')
-H.equal(calls[1].name, 'qbinventory:client:useParachute', 'the client is asked to run the bar and equip it')
+H.equal(calls[1].name, 'kora_inventory:client:useParachute', 'the client is asked to run the bar and equip it')
 H.equal(calls[1].payload.time, 2500, 'with the configured duration')
 H.equal(#removals, 1, 'exactly one parachute is consumed after the client confirms')
 H.equal(removals[1].slot, 5, 'from the slot that was used')
@@ -73,7 +73,7 @@ owned = { name = 'water_bottle', slot = 5 }
 H.equal(useables.parachute(7, { name = 'parachute', slot = 5 }), false, 'the slot must still hold a parachute')
 H.equal(#removals, 1, 'and consumes nothing')
 
-Config.qbinventory.builtinUsables.parachute = false
+Config.kora_inventory.builtinUsables.parachute = false
 load()
 H.equal(useables.parachute, nil, 'builtinUsables.parachute = false leaves the item to other resources')
 

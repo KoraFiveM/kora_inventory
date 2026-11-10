@@ -8,7 +8,7 @@ TriggerEvent = function() end
 
 Config = {
     SerialPrefix = 'KORA',
-    qbinventory = {
+    kora_inventory = {
         crafting = {},
         weapons = {
             defaultDurability = 100,
@@ -58,7 +58,7 @@ local function totalWeight(items)
     return total
 end
 
-QbInventory = {
+KoraInventory = {
     copy = copy,
     sameInfo = function(a, b)
         a, b = a or {}, b or {}
@@ -72,9 +72,9 @@ QbInventory = {
 -- third copy of them: these mocks had already drifted (they redeclared copy
 -- and sameInfo), so a primitive added to shared.lua was invisible here until
 -- it blew up at call time. shared.lua is pure Lua with no FXServer deps, and
--- `QbInventory = QbInventory or {}` preserves the mock's `internal` table.
+-- `KoraInventory = KoraInventory or {}` preserves the mock's `internal` table.
 dofile('shared.lua')
-local I = QbInventory.internal
+local I = KoraInventory.internal
 I.copy = copy
 I.playerKey = function(src) return 'player:' .. src end
 I.itemDef = function(name) return definitions[type(name) == 'string' and name:lower() or name] end
@@ -164,11 +164,11 @@ H.equal(weapons.serialPrefix(), 'ABCDEFGHIJKL', 'serial prefix is sanitised to A
 Config.SerialPrefix = ''
 H.equal(weapons.serialPrefix(), 'KORA', 'empty serial prefix falls back to KORA')
 Config.SerialPrefix = 'KORA'
-Config.qbinventory.weapons.serialPrefix = 'old-alias'
+Config.kora_inventory.weapons.serialPrefix = 'old-alias'
 H.equal(weapons.serialPrefix(), 'OLDALIAS', 'legacy weapons.serialPrefix still applies while Config.SerialPrefix is the default')
 Config.SerialPrefix = 'MINE'
 H.equal(weapons.serialPrefix(), 'MINE', 'Config.SerialPrefix wins over the legacy alias')
-Config.SerialPrefix, Config.qbinventory.weapons.serialPrefix = 'KORA', 'QB'
+Config.SerialPrefix, Config.kora_inventory.weapons.serialPrefix = 'KORA', 'QB'
 H.equal(weapons.serialPrefix(), 'KORA', 'the old shipped QB value is not honoured')
 local kept = assert(weapons.prepareMetadata('weapon_pistol', { serial = 'QB-OLD-1-000001' }))
 H.equal(kept.serial, 'QB-OLD-1-000001', 'existing serials are never rewritten')

@@ -8,10 +8,10 @@
 -- registration time; never copy those presentation/authority fields here.
 
 Config = Config or {}
-Config.qbinventory = Config.qbinventory or {}
-Config.qbinventory.shops = Config.qbinventory.shops or {}
+Config.kora_inventory = Config.kora_inventory or {}
+Config.kora_inventory.shops = Config.kora_inventory.shops or {}
 
-Config.qbinventory.shops.ammunation = {
+Config.kora_inventory.shops.ammunation = {
     id = 'ammunation',
     label = 'Ammu-Nation',
     slots = 32,

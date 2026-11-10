@@ -1,11 +1,11 @@
 -- Repeated kora_target starts must replace, not duplicate, liquor-store options.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config/shops/liquorstore.lua')
 dofile('shared.lua')
 
-local shop = Config.qbinventory.shops.liquorstore
+local shop = Config.kora_inventory.shops.liquorstore
 shop.locations = {
     { name = "Rob's Liquor", x = 10, y = 20, z = 30 },
     { name = '24/7', x = 40, y = 50, z = 60 },

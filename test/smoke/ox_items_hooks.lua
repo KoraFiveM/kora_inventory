@@ -5,15 +5,15 @@
 local H = dofile('test/harness.lua')
 
 NOTIFIED = {}
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
 
-local QBCallbacks = {}
+local KoraCallbacks = {}
 Kora = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
-    callback = { register = function(name, fn) QBCallbacks[name] = fn end },
+    callback = { register = function(name, fn) KoraCallbacks[name] = fn end },
     sql = {},
     notify = { send = function(_, payload) NOTIFIED[#NOTIFIED + 1] = payload end },
     lang = function(key) return key end,
@@ -103,7 +103,7 @@ dofile('server/persistence.lua')
 dofile('server.lua')
 dofile('server/compat/ox.lua')
 
-local Q = QbInventory
+local Q = KoraInventory
 local ox = Q.compat.ox
 
 -- Items(): ox shape, kora registry untouched

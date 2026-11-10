@@ -17,7 +17,7 @@
 -- mismatch survived it.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
@@ -65,7 +65,7 @@ exports = setmetatable({}, {
 dofile('server/persistence.lua')
 dofile('server.lua')
 
-local internal = QbInventory.internal
+local internal = KoraInventory.internal
 
 -- A stash standing in for every secondary type: they all reach removeFrom by
 -- the same route.

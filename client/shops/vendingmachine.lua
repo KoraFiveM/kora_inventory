@@ -8,8 +8,8 @@
 -- server still re-derives the player's actual position independently.
 
 local shop = assert(
-    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.vendingmachine,
-    'qbinventory vending machine configuration is required'
+    Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.vendingmachine,
+    'kora_inventory vending machine configuration is required'
 )
 
 -- Registered again whenever kora_target (re)starts: its registrations do not

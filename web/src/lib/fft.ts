@@ -44,8 +44,8 @@ export function executeAction(data: Action) {
 }
 window.addEventListener('message', ({ data: message }) => {
     if (message.action === 'fft:session') session = typeof message.data?.session === 'string' ? message.data.session : false
-    if (message.action === 'qbinventory:nui:sessionOpened') token = message.data?.token
-    if (message.action === 'qbinventory:nui:sessionClosed') token = undefined
+    if (message.action === 'kora_inventory:nui:sessionOpened') token = message.data?.token
+    if (message.action === 'kora_inventory:nui:sessionClosed') token = undefined
     if (message.action !== 'fft:action') return
     const data = message.data as Action
     try { executeAction(data); void post('fft:result', { ...data, ok: true }) }

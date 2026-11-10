@@ -1,6 +1,6 @@
 /**
  * Per-player window layout from kora_hud's /ui editor, relayed by
- * client/ui.lua as `qbinventory:nui:layout`. Offsets are viewport fractions
+ * client/ui.lua as `kora_inventory:nui:layout`. Offsets are viewport fractions
  * (resolution independent); scale grows the window from its centre.
  */
 export interface PlayerLayout {

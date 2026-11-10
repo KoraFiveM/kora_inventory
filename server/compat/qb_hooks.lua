@@ -16,9 +16,9 @@
 -- are pcall'd. The payloads are detached copies, so a hook can veto an action
 -- but cannot reach live inventory state.
 
-local inventory = assert(QbInventory, 'qbinventory authority missing')
-local internal = assert(inventory.internal, 'qbinventory internal authority must load before qb hook compatibility')
-local api = assert(inventory.api, 'qbinventory api must load before qb hook compatibility')
+local inventory = assert(KoraInventory, 'kora_inventory authority missing')
+local internal = assert(inventory.internal, 'kora_inventory internal authority must load before qb hook compatibility')
+local api = assert(inventory.api, 'kora_inventory api must load before qb hook compatibility')
 
 local EVENT_NAMES = {
     'ItemMoved',
@@ -114,14 +114,14 @@ function translators.swapItems(payload)
         if not payload.qbItem then
             return nil
         end
-        if not payload.qbCoords then
+        if not payload.koraCoords then
             local ped = GetPlayerPed(src)
-            payload.qbCoords = ped and GetEntityCoords(ped) or nil
+            payload.koraCoords = ped and GetEntityCoords(ped) or nil
         end
         return 'ItemDropped', payload.qbItem.type, {
             source = src,
             sourceInventory = snapshot(payload.fromKey),
-            coords = payload.qbCoords,
+            coords = payload.koraCoords,
             item = payload.qbItem,
             amount = payload.count,
         }
@@ -310,7 +310,7 @@ local function add(field, eventName, callback)
         return nil
     end
     if not event then
-        print(('^3[qbinventory]^7 qb-inventory hook: invalid event %s'):format(tostring(eventName)))
+        print(('^3[kora_inventory]^7 qb-inventory hook: invalid event %s'):format(tostring(eventName)))
         return nil
     end
     if not inventory.isCallable(callback) then
@@ -349,7 +349,7 @@ AddEventHandler('onResourceStop', function(resource)
 end)
 
 inventory.compat = inventory.compat or {}
-inventory.compat.qbHooks = { trigger = trigger, notify = notify, active = active }
+inventory.compat.koraHooks = { trigger = trigger, notify = notify, active = active }
 
 local qb = assert(inventory.compat.qb, 'qb compatibility must load before qb hook compatibility')
 qb.AddHook = function(eventName, callback)

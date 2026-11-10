@@ -7,10 +7,10 @@
 -- from a client contribute at most a slot; their weapon name, serial, quality,
 -- attachments and ammo count are never authority.
 
-local inventory = assert(QbInventory, 'qbinventory authority missing')
-local internal = assert(inventory.internal, 'qbinventory internal authority missing')
-local api = assert(inventory.api, 'qbinventory api missing')
-local weapons = assert(inventory.weapons, 'qbinventory weapon state missing')
+local inventory = assert(KoraInventory, 'kora_inventory authority missing')
+local internal = assert(inventory.internal, 'kora_inventory internal authority missing')
+local api = assert(inventory.api, 'kora_inventory api missing')
+local weapons = assert(inventory.weapons, 'kora_inventory weapon state missing')
 
 local function slotOf(value)
     local slot = math.floor(tonumber(type(value) == 'table' and value.slot or value) or 0)
@@ -81,7 +81,7 @@ Kora.callback.register('qb-weapons:server:RemoveAttachment', function()
     return false
 end)
 
-RegisterNetEvent('qbinventory:server:legacyWeaponUse', function(value)
+RegisterNetEvent('kora_inventory:server:legacyWeaponUse', function(value)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -92,7 +92,7 @@ RegisterNetEvent('qbinventory:server:legacyWeaponUse', function(value)
     end
 end)
 
-RegisterNetEvent('qbinventory:server:legacyWeaponHolster', function()
+RegisterNetEvent('kora_inventory:server:legacyWeaponHolster', function()
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -179,4 +179,4 @@ RegisterNetEvent('qb-weapons:server:TakeBackWeapon', function()
 end)
 
 inventory.compat = inventory.compat or {}
-inventory.compat.qbWeapons = { itemAt = itemAt, equippedAt = equippedAt, weaponAmmo = weaponAmmo }
+inventory.compat.koraWeapons = { itemAt = itemAt, equippedAt = equippedAt, weaponAmmo = weaponAmmo }

@@ -4,8 +4,8 @@
 -- opens the session, so triggering this event away from a counter is harmless.
 
 local shop = assert(
-    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.ammunation,
-    'qbinventory Ammu-Nation configuration is required'
+    Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.ammunation,
+    'kora_inventory Ammu-Nation configuration is required'
 )
 local targetIds = {}
 
@@ -13,7 +13,7 @@ local function openAmmunation()
     exports.kora_inventory:openInventory('shop', shop.id)
 end
 
-RegisterNetEvent('qbinventory:client:openAmmunation', function()
+RegisterNetEvent('kora_inventory:client:openAmmunation', function()
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -27,7 +27,7 @@ local function registerAmmunationTargets()
     targetIds = {}
 
     for _, location in ipairs(shop.locations or {}) do
-        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(QbInventory.shopZoneSprite({
+        targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(KoraInventory.shopZoneSprite({
             coords = { x = location.x, y = location.y, z = location.z },
             radius = shop.interactionDistance,
             options = {
@@ -56,7 +56,7 @@ AddEventHandler('onClientResourceStop', function(resource)
     end
 end)
 
--- Shopkeeper peds (Config.qbinventory.shops.ammunation.shopkeeper). Purely
+-- Shopkeeper peds (Config.kora_inventory.shops.ammunation.shopkeeper). Purely
 -- presentation: they are scoped local entities that exist only while the
 -- player is near, and the server never trusts them.
 local shopkeepers = {}
@@ -143,7 +143,7 @@ end)
 
 for _, location in ipairs(shop.locations or {}) do
     if shop.blip and shop.blip.enabled then
-        local blip = QbInventory.createShopBlip(Config.qbinventory.shops.ammunation.blip.category, { x = location.x, y = location.y, z = location.z }, shop.blip)
+        local blip = KoraInventory.createShopBlip(Config.kora_inventory.shops.ammunation.blip.category, { x = location.x, y = location.y, z = location.z }, shop.blip)
         if blip and not shop.blip.info then
             Kora.blips.setInfo(blip, {
                 title = shop.label,

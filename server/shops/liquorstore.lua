@@ -13,8 +13,8 @@
 -- than to copy it again.
 
 local shop = assert(
-    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.liquorstore,
-    'qbinventory liquor store configuration is required'
+    Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.liquorstore,
+    'kora_inventory liquor store configuration is required'
 )
 
 local function distanceSquared(a, b)

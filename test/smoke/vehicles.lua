@@ -1,6 +1,6 @@
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('shared.lua')
 
@@ -68,9 +68,9 @@ entities[101].class = 'MOTORCYCLE'
 H.equal(V.validate(7, 'trunk', 101), nil, 'model class still enforces disabled storage')
 entities[101].class = 'unknown'
 H.equal(assert(V.validate(7, 'trunk', 101)).slots, 50, 'unknown model classes use the default capacity row')
-Config.qbinventory.vehicles.unknownClassFallback = false
+Config.kora_inventory.vehicles.unknownClassFallback = false
 H.equal(V.validate(7, 'trunk', 101), nil, 'unknownClassFallback = false refuses unknown classes')
-Config.qbinventory.vehicles.unknownClassFallback = true
+Config.kora_inventory.vehicles.unknownClassFallback = true
 local realGet, printed = Kora.lookup.get, 0
 local realPrint = print
 print = function() printed = printed + 1 end
@@ -90,9 +90,9 @@ seatedIn = 101
 H.ok(V.validate(7, 'glovebox', 101), 'a seated player opens the glovebox')
 H.ok(V.validate(7, 'trunk', 101), 'the trunk does not need a seat')
 seatedIn = 0
-Config.qbinventory.vehicles.gloveboxRequireSeated = false
+Config.kora_inventory.vehicles.gloveboxRequireSeated = false
 H.ok(V.validate(7, 'glovebox', 101), 'gloveboxRequireSeated = false restores the distance-only rule')
-Config.qbinventory.vehicles.gloveboxRequireSeated = nil
+Config.kora_inventory.vehicles.gloveboxRequireSeated = nil
 GetVehiclePedIsIn = nil
 Kora.lookup.get = function() error('No such export lookup_get in resource kora_lib') end
 H.equal(printed, 1, 'a failing lookup is logged once per model')
