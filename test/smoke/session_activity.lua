@@ -18,7 +18,7 @@ assert(Core.player.login(player, cid, CoreInternal.player.freshData(cid, 'licens
 
 local env = {}
 for name, value in pairs(_G) do env[name] = value end
-env.Config, env.QbInventory = {}, nil
+env.Config, env.KoraInventory = {}, nil
 local callbacks, events = {}, {}
 -- The framework table is spelled differently across the rename; the code under
 -- test only needs it to exist.
@@ -29,7 +29,7 @@ local framework = {
     sql = {},
     distance = { player = function() return true end },
 }
-env.Kora, env.QB = framework, framework
+env.Kora, env.Kora = framework, framework
 env.GetCurrentResourceName = function() return 'kora_inventory' end
 env.GetInvokingResource = function() return nil end
 env.CreateThread, env.RegisterCommand = function() end, function() end
@@ -50,22 +50,22 @@ env.exports = resourceExports
 local function load(path) assert(loadfile(path, 't', env))() end
 load('config.lua'); load('config/shops/ammunation.lua'); load('shared.lua')
 load('server/persistence.lua'); load(arg[1] or 'server.lua')
-local I = env.QbInventory
-local ttl = env.Config.qbinventory.sessionTtl
-H.equal(env.Config.qbinventory.sessionSliding, true, 'a session in use is renewed by default')
+local I = env.KoraInventory
+local ttl = env.Config.kora_inventory.sessionTtl
+H.equal(env.Config.kora_inventory.sessionSliding, true, 'a session in use is renewed by default')
 
 local stash = I.internal.createSecondary('stash', 'activity', {
     items = { [1] = assert(I.internal.buildItem('water_bottle', 40, 1, {})) },
 })
 local function open()
     clock = 1000
-    local opened, lease = callbacks['qbinventory:server:open'](player, 'stash', stash.id)
+    local opened, lease = callbacks['kora_inventory:server:open'](player, 'stash', stash.id)
     H.equal(opened, true, 'the session opens')
     return lease
 end
 -- One drag: take a single bottle out of the stash, with the revisions the last answer reported.
 local function drag(lease, revisions)
-    local ok, result = callbacks['qbinventory:server:transfer'](player, {
+    local ok, result = callbacks['kora_inventory:server:transfer'](player, {
         token = lease.token, fromInventory = stash.key, toInventory = lease.primary.key, fromSlot = 1, amount = 1,
         fromRevision = revisions.from, toRevision = revisions.to,
     })
@@ -98,13 +98,13 @@ do
     H.equal(ok, false, 'stale revision is refused')
     H.equal(reason, 'stale source inventory', 'with the stale reason')
     clock = clock + 100000
-    local synced = callbacks['qbinventory:server:intent'](player, { token = lease.token, action = 'sync' })
+    local synced = callbacks['kora_inventory:server:intent'](player, { token = lease.token, action = 'sync' })
     H.equal(synced, true, 'the session survived because the refused request renewed it')
 end
 
 -- The hard-limit behaviour is still available.
 do
-    env.Config.qbinventory.sessionSliding = false
+    env.Config.kora_inventory.sessionSliding = false
     local lease = open()
     local revisions = { from = lease.secondary.revision, to = lease.primary.revision }
     clock = clock + 90000
@@ -113,19 +113,19 @@ do
     local ok, reason = drag(lease, revisions)
     H.equal(ok, false, 'with sliding off the lease ends ' .. ttl / 1000 .. 's after opening even in use')
     H.equal(reason, 'session expired', 'with the expiry reason')
-    env.Config.qbinventory.sessionSliding = true
+    env.Config.kora_inventory.sessionSliding = true
 end
 
 -- Resync: the browser asks for the real state after a failed or unanswered move.
 do
     local lease = open()
     for i = #events, 1, -1 do events[i] = nil end
-    local ok, result = callbacks['qbinventory:server:intent'](player, { token = lease.token, action = 'sync' })
+    local ok, result = callbacks['kora_inventory:server:intent'](player, { token = lease.token, action = 'sync' })
     H.equal(ok, true, 'sync is accepted')
     H.equal(result, nil, 'with nothing but success to report')
     local patched = {}
     for _, event in ipairs(events) do
-        if event.name == 'qbinventory:client:sessionPatched' then
+        if event.name == 'kora_inventory:client:sessionPatched' then
             H.equal(event.source, player, 'patches go to the asking player only')
             H.equal(event.args[1], lease.token, 'tagged with the session token')
             patched[event.args[2].key] = event.args[2].revision
@@ -134,19 +134,19 @@ do
     H.equal(patched[lease.primary.key] ~= nil, true, 'the player inventory is re-sent')
     H.equal(patched[stash.key] ~= nil, true, 'and the secondary inventory')
     local before = #events
-    callbacks['qbinventory:server:intent'](player, { token = lease.token, action = 'sync' })
+    callbacks['kora_inventory:server:intent'](player, { token = lease.token, action = 'sync' })
     H.equal(#events, before, 'a repeat inside the throttle window re-sends nothing but still succeeds')
     clock = clock + 500
-    callbacks['qbinventory:server:intent'](player, { token = lease.token, action = 'sync' })
+    callbacks['kora_inventory:server:intent'](player, { token = lease.token, action = 'sync' })
     H.equal(#events > before, true, 'a later request is served again')
 
-    local bad, reason = callbacks['qbinventory:server:intent'](player, { token = 'wrong', action = 'sync' })
+    local bad, reason = callbacks['kora_inventory:server:intent'](player, { token = 'wrong', action = 'sync' })
     H.equal(bad, false, 'a wrong token is refused')
     H.equal(type(reason), 'string', 'with a reason, not silence')
-    local none, why = callbacks['qbinventory:server:intent'](99, { token = lease.token, action = 'sync' })
+    local none, why = callbacks['kora_inventory:server:intent'](99, { token = lease.token, action = 'sync' })
     H.equal(none, false, 'a player with no session is refused')
     H.equal(why, 'invalid session', 'politely')
-    local mixed, text = callbacks['qbinventory:server:intent'](player, { token = lease.token, action = 'nonsense' })
+    local mixed, text = callbacks['kora_inventory:server:intent'](player, { token = lease.token, action = 'nonsense' })
     H.equal(mixed, false, 'an unknown action is refused')
     H.equal(text, 'unsupported intent', 'with a reason')
 end

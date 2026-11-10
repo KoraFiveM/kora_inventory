@@ -1,10 +1,10 @@
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 
-local shop = Config.qbinventory.shops.ammunation
+local shop = Config.kora_inventory.shops.ammunation
 H.equal(shop.id, 'ammunation', 'Ammu-Nation has a fixed canonical identifier')
 H.ok(#shop.locations >= 1, 'Ammu-Nation has approved locations')
 H.equal(shop.blip.category, 'Weapons', 'Ammu-Nation uses the canonical weapon-store category')

@@ -73,7 +73,7 @@ assert(loadfile(resource .. '/server.lua', 't', env))()
 assert(loadfile(resource .. '/server/compat/qb.lua', 't', env))()
 assert(loadfile(resource .. '/server/compat/qb_hooks.lua', 't', env))()
 assert(loadfile(resource .. '/server/compat/qb_events.lua', 't', env))()
-local inventory, internal = env.QbInventory, env.QbInventory.internal
+local inventory, internal = env.KoraInventory, env.KoraInventory.internal
 for _, src in ipairs({ 7, 8, 10 }) do
     env.CoreInternal.player.bySource[src] = {
         citizenid = 'CID' .. src,
@@ -184,13 +184,13 @@ check(api.useItem(7, 6) == true, 'uncancelled use proceeds')
 flush()
 check(#usedListener >= 1, 'ItemUsed listener runs after use')
 
-local session = select(2, callbacks['qbinventory:server:open'](7, 'stash', 'box'))
-local okOpen = callbacks['qbinventory:server:open'](7, 'stash', 'box')
+local session = select(2, callbacks['kora_inventory:server:open'](7, 'stash', 'box'))
+local okOpen = callbacks['kora_inventory:server:open'](7, 'stash', 'box')
 check(okOpen, 'open stash')
 local l = internal.sessionOf(7)
 local function move(fromKey, toKey, fromSlot, toSlot, amount)
     l = internal.sessionOf(7)
-    return callbacks['qbinventory:server:transfer'](7, { token = l.token, fromInventory = fromKey, toInventory = toKey,
+    return callbacks['kora_inventory:server:transfer'](7, { token = l.token, fromInventory = fromKey, toInventory = toKey,
         fromSlot = fromSlot, toSlot = toSlot, amount = amount,
         fromRevision = internal.getRevision(fromKey), toRevision = internal.getRevision(toKey) })
 end
@@ -238,7 +238,7 @@ local function fire(name, src, ...)
     for _, cb in ipairs(ev[name] or {}) do cb(...) end
 end
 invoker = nil
-local function lastReject() local e = clientEvents[#clientEvents]; return e and e.name == 'qbinventory:client:rejected' and e.args[1] end
+local function lastReject() local e = clientEvents[#clientEvents]; return e and e.name == 'kora_inventory:client:rejected' and e.args[1] end
 check(#(ev['inventory:server:OpenInventory'] or {}) == 1 and #(ev['qb-inventory:server:OpenInventory'] or {}) == 1, 'legacy open events registered')
 fire('inventory:server:OpenInventory', 7, 'stash', 'box', { maxweight = 999999999, slots = 999 })
 check(internal.sessionOf(7).secondary == 'stash:box', 'legacy open of a registered stash opens it')
@@ -274,4 +274,4 @@ end
 fire('qb-inventory:server:UseItem', 7, 'player', { slot = 9999 })
 check(#used == usedBefore + (useSlot and 1 or 0), 'legacy UseItem for an empty slot does nothing')
 
-io.write(('qbinventory smoke: %d passed, 0 failed\n'):format(checks))
+io.write(('kora_inventory smoke: %d passed, 0 failed\n'):format(checks))

@@ -13,15 +13,15 @@
 -- client/shop_clerks.lua); Senora Fwy and Grapeseed have no ped spot yet and
 -- are served by the counter target only. Per-shop overrides: `clerk = { model, scenario }`.
 --
--- Config.qbinventory.shops.convenience.enabled = false removes the shop, its
+-- Config.kora_inventory.shops.convenience.enabled = false removes the shop, its
 -- targets and its blips (default true). Stock rows must be real items in
 -- the kora_core shared registry; labels and weights come from the registry.
 
 Config = Config or {}
-Config.qbinventory = Config.qbinventory or {}
-Config.qbinventory.shops = Config.qbinventory.shops or {}
+Config.kora_inventory = Config.kora_inventory or {}
+Config.kora_inventory.shops = Config.kora_inventory.shops or {}
 
-Config.qbinventory.shops.convenience = {
+Config.kora_inventory.shops.convenience = {
     id = "convenience",
     label = "24/7",
     enabled = true,

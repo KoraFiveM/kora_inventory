@@ -1,11 +1,11 @@
--- Run from qbinventory: lua test/smoke/drops_client.lua [client-source]
+-- Run from kora_inventory: lua test/smoke/drops_client.lua [client-source]
 -- Actual client code; model/callback waits and all host effects are controlled.
 local H = dofile('test/harness.lua')
 local function setup()
     local f = { events = {}, threads = {}, zones = {}, entities = {}, removedZones = {}, removedEntities = {}, opened = {} }
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
-    env.Config = { qbinventory = { drops = { placeOnGround = false } } }
+    env.Config = { kora_inventory = { drops = { placeOnGround = false } } }
     env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.GetInvokingResource = function() return f.invoker end
     env.NetworkIsSessionStarted = function() return true end
@@ -39,7 +39,7 @@ local function setup()
             end,
         },
         callback = { trigger = function(name)
-            H.equal(name, 'qbinventory:server:drops')
+            H.equal(name, 'kora_inventory:server:drops')
             return coroutine.yield('hydrate')
         end },
     }
@@ -48,7 +48,7 @@ local function setup()
         local ok, result = coroutine.resume(co, value); assert(ok, result); return result
     end
     function f.emit(name, ...)
-        local callback = assert(f.events['qbinventory:client:' .. name], 'missing ' .. name .. ' handler')
+        local callback = assert(f.events['kora_inventory:client:' .. name], 'missing ' .. name .. ' handler')
         local args = { ... }
         local co = coroutine.create(function() callback(table.unpack(args)) end)
         f.resume(co)

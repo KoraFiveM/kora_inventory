@@ -7,7 +7,7 @@
 -- client's use request contributes only a slot.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 
 -- stubs
@@ -27,7 +27,7 @@ local useableKinds = {}
 local removals = {}
 local removeResult = true
 
-QbInventory = {
+KoraInventory = {
     internal = {
         itemDef = function(name) return ITEMS[name] end,
         setBuiltInUseable = function(name, fn, kind)
@@ -119,7 +119,7 @@ local function reset()
 end
 
 reset()
-QbInventory.weaponCarry = { equippedWeapon = function() return nil end }
+KoraInventory.weaponCarry = { equippedWeapon = function() return nil end }
 local ok, err = useables.pistol_ammo(7, { name = 'pistol_ammo', slot = 4 })
 H.equal(ok, false, 'loading with no weapon drawn is refused')
 H.equal(err, 'draw a weapon before loading ammunition', 'and says what to do about it')
@@ -127,20 +127,20 @@ H.equal(#removals, 0, 'a refused load consumes no magazine')
 H.equal(#pushed, 0, 'and asks no client to do anything')
 
 reset()
-QbInventory.weaponCarry = { equippedWeapon = function() return { slot = 1, name = 'weapon_bat' } end }
+KoraInventory.weaponCarry = { equippedWeapon = function() return { slot = 1, name = 'weapon_bat' } end }
 ok, err = useables.pistol_ammo(7, { name = 'pistol_ammo', slot = 4 })
 H.equal(ok, false, 'a weapon that takes no ammunition at all is refused')
 H.equal(#removals, 0, 'and keeps the magazine')
 
 reset()
-QbInventory.weaponCarry = { equippedWeapon = function() return { slot = 1, name = 'weapon_pistol' } end }
+KoraInventory.weaponCarry = { equippedWeapon = function() return { slot = 1, name = 'weapon_pistol' } end }
 ok, err = useables.rifle_ammo(7, { name = 'rifle_ammo', slot = 4 })
 H.equal(ok, false, 'a mismatched ammo type is refused')
 H.ok(type(err) == 'string' and err:find('Pistol'), 'naming the weapon that refused it')
 H.equal(#removals, 0, 'and keeps the magazine')
 
 reset()
-QbInventory.weaponCarry = nil
+KoraInventory.weaponCarry = nil
 ok, err = useables.pistol_ammo(7, { name = 'pistol_ammo', slot = 4 })
 H.equal(ok, false, 'with weaponcarry absent there is no equipped record to trust, so it refuses')
 H.equal(#removals, 0, 'rather than consuming a magazine for no effect')
@@ -148,7 +148,7 @@ H.equal(#removals, 0, 'rather than consuming a magazine for no effect')
 -- the happy path
 
 reset()
-QbInventory.weaponCarry = { equippedWeapon = function() return { slot = 1, name = 'weapon_pistol' } end }
+KoraInventory.weaponCarry = { equippedWeapon = function() return { slot = 1, name = 'weapon_pistol' } end }
 ok, err = useables.pistol_ammo(7, { name = 'pistol_ammo', slot = 4 })
 H.equal(ok, true, 'a matching magazine loads')
 H.equal(#removals, 1, 'exactly one magazine is consumed')
@@ -157,13 +157,13 @@ H.equal(removals[1].amount, 1, 'one at a time, whatever the stack size')
 H.equal(removals[1].slot, 4, 'from the slot the client named')
 
 H.equal(#pushed, 1, 'one client instruction')
-H.equal(pushed[1].event, 'qbinventory:client:addAmmo', 'on the ammo channel')
+H.equal(pushed[1].event, 'kora_inventory:client:addAmmo', 'on the ammo channel')
 H.equal(pushed[1].src, 7, 'to that player only')
 H.equal(pushed[1].payload.weapon, 'weapon_pistol',
     'naming the weapon from the SERVER equipped record, never from the request')
 H.equal(pushed[1].payload.rounds, 12, 'with the round count from the shared item definition')
 H.equal(pushed[1].payload.maxAmmo,
-    math.min(Config.qbinventory.weapons.maxAmmo, Config.qbinventory.weapons.ballistics.maxLoadedRounds),
+    math.min(Config.kora_inventory.weapons.maxAmmo, Config.kora_inventory.weapons.ballistics.maxLoadedRounds),
     'and the configured weapon/ballistics ceiling')
 
 -- A failed removal must not still tell the client to load rounds -- that would

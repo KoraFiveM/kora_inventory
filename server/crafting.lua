@@ -5,14 +5,14 @@
 -- checks, but a browser or client must never submit a recipe result, item
 -- metadata, serial, durability or component list directly.
 
-QbInventory = QbInventory or {}
-local inventory = QbInventory
-local internal = assert(inventory.internal, 'qbinventory authority must load before crafting')
+KoraInventory = KoraInventory or {}
+local inventory = KoraInventory
+local internal = assert(inventory.internal, 'kora_inventory authority must load before crafting')
 local crafting, weapons = {}, {}
 inventory.crafting, inventory.weapons = crafting, weapons
 
-local craftingConfig = (Config.qbinventory and Config.qbinventory.crafting) or {}
-local weaponConfig = (Config.qbinventory and Config.qbinventory.weapons) or {}
+local craftingConfig = (Config.kora_inventory and Config.kora_inventory.crafting) or {}
+local weaponConfig = (Config.kora_inventory and Config.kora_inventory.weapons) or {}
 local ballisticsConfig = weaponConfig.ballistics or {}
 local recipes, recipeOwners, hooks, nextHookId = {}, {}, {}, 1
 local maxBatchAmount = math.max(1, math.floor(tonumber(craftingConfig.maxBatchAmount) or 100))
@@ -57,7 +57,7 @@ end
 local function invoke(callback, ...)
     local result = table.pack(pcall(callback, ...))
     if not result[1] then
-        print(('^3[qbinventory:crafting]^7 callback failed: %s'):format(tostring(result[2])))
+        print(('^3[kora_inventory:crafting]^7 callback failed: %s'):format(tostring(result[2])))
         return false, 'crafting policy failed'
     end
     if result[2] == false then
@@ -291,7 +291,7 @@ local function cleanSerialPrefix(value)
 end
 
 ---Prefix for newly generated weapon serials: Config.SerialPrefix, or the
----legacy Config.qbinventory.weapons.serialPrefix when that is set to something
+---legacy Config.kora_inventory.weapons.serialPrefix when that is set to something
 ---other than its old shipped default ('QB') and Config.SerialPrefix is left at
 ---the default. Sanitised to A-Z0-9, at most 12 characters. Existing serials are
 ---never rewritten.
@@ -544,7 +544,7 @@ function crafting.canCraftItems(src, ingredients, outputs)
     for _, ingredient in ipairs(needed) do ingredient.metadata = {} end
 
     return internal.lock({ internal.playerKey(src) }, function()
-        local cash = type(Config.qbinventory.cash) == 'table' and Config.qbinventory.cash or nil
+        local cash = type(Config.kora_inventory.cash) == 'table' and Config.kora_inventory.cash or nil
         local cashItem = cash and type(cash.item) == 'string' and cash.item:lower()
         local cashAccount = cash and type(cash.account) == 'string' and cash.account:lower()
         if cash and cash.asItem == true and cashItem and cashAccount and exports.kora_core:isPhysicalCash(cashAccount) then
@@ -675,7 +675,7 @@ function crafting.craft(src, recipeId, context, amount)
             scaledOutputs[#scaledOutputs + 1] = scaledEntry(output, parsedAmount)
         end
         local result = #scaledOutputs == 1 and scaledOutputs[1] or scaledOutputs
-        TriggerEvent('qbinventory:server:crafted', src, recipe.id, result)
+        TriggerEvent('kora_inventory:server:crafted', src, recipe.id, result)
         return true, result
     end)
 end
@@ -707,7 +707,7 @@ local function replaceWeaponState(src, slot, mutate)
         if not committed then
             return false, commitErr
         end
-        TriggerEvent('qbinventory:server:weaponStateChanged', src, slot, copy(prepared))
+        TriggerEvent('kora_inventory:server:weaponStateChanged', src, slot, copy(prepared))
         return true, copy(prepared)
     end)
 end

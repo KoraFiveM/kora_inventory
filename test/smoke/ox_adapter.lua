@@ -7,7 +7,7 @@
 -- parameters, CreateDropFromPlayer duplicating items and five exports
 -- defaulting `strict` the wrong way -- every one of those greps stayed green.
 --
--- So: mock the QbInventory.internal seam the way server.lua actually behaves,
+-- So: mock the KoraInventory.internal seam the way server.lua actually behaves,
 -- load the REAL shared.lua for copy/totalWeight/sameInfo (a hand-rolled mock of
 -- those primitives is the same drift one layer down), then call the adapter and
 -- assert what comes back.
@@ -30,7 +30,7 @@ print = function(...)
     warnings[#warnings + 1] = table.concat(parts, ' ')
 end
 
-QbInventory = nil
+KoraInventory = nil
 Kora = { util = { deepClone = function(value)
     local seen = {}
     local function clone(v)
@@ -44,7 +44,7 @@ Kora = { util = { deepClone = function(value)
     return clone(value)
 end } }
 dofile('shared.lua') -- real copy/amount/sameInfo/totalWeight/itemWeight primitives
-local I = QbInventory
+local I = KoraInventory
 
 local ITEMS = {
     water = { name = 'water', label = 'Water', weight = 10 },
@@ -562,9 +562,9 @@ H.ok(state['player:1'].items[3] ~= nil, 'GetInventoryItems is detached too')
 
 reset()
 Ox.SetSlotCount(1, 9)
-H.equal(state['player:1'].slots, 5, 'player slot counts stay owned by qbcore')
+H.equal(state['player:1'].slots, 5, 'player slot counts stay owned by kora_core')
 Ox.SetMaxWeight(1, 9999)
-H.equal(state['player:1'].maxWeight, 1000, 'player max weight stays owned by qbcore')
+H.equal(state['player:1'].maxWeight, 1000, 'player max weight stays owned by kora_core')
 H.equal(#warnings, 2, 'each refused player-dimension change is reported, not silently dropped')
 
 reset()

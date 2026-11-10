@@ -13,18 +13,18 @@ local nextGiveRequestId = 0
 -- bar returns here without ever reaching the server.
 ---@param item table|nil
 ---@return boolean completed
-function QbInventory.useGate(item)
+function KoraInventory.useGate(item)
     local useTime = item and tonumber(item.useTime) or 0
     if useTime <= 0 then
         return true
     end
     -- This bar belongs to the use being submitted from the open panel, so the
     -- busy gate must not close that panel underneath it.
-    QbInventory.useGateActive = true
+    KoraInventory.useGateActive = true
     local ok, completed = pcall(function()
         return Kora.progressbar.start({ label = item.label or item.name, duration = useTime, canCancel = true })
     end)
-    QbInventory.useGateActive = false
+    KoraInventory.useGateActive = false
     return ok and completed == true
 end
 
@@ -39,21 +39,21 @@ local function watchBusy()
     CreateThread(function()
         while session do
             Wait(250)
-            if session and QbInventory.isBusy() then
+            if session and KoraInventory.isBusy() then
                 -- A bar started by a use submitted from this very panel (the
                 -- consumable handler's own bar) is not the player being busy with
                 -- something else: close quietly, no "can't do that" notice.
-                if not QbInventory.useInFlight then
-                    QbInventory.notifyBusyBlocked()
+                if not KoraInventory.useInFlight then
+                    KoraInventory.notifyBusyBlocked()
                 end
-                TriggerServerEvent('qbinventory:server:close', session.token)
+                TriggerServerEvent('kora_inventory:server:close', session.token)
             end
         end
         busyWatching = false
     end)
 end
 
-RegisterNetEvent('qbinventory:client:sessionOpened', function(payload)
+RegisterNetEvent('kora_inventory:client:sessionOpened', function(payload)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -64,7 +64,7 @@ RegisterNetEvent('qbinventory:client:sessionOpened', function(payload)
     watchBusy()
     -- Presentation events deliberately use a separate namespace. Triggering the
     -- network handler's own event name would recursively invoke this handler.
-    TriggerEvent('qbinventory:ui:sessionOpened', {
+    TriggerEvent('kora_inventory:ui:sessionOpened', {
         token = payload.token,
         primary = payload.primary,
         secondary = payload.secondary,
@@ -72,7 +72,7 @@ RegisterNetEvent('qbinventory:client:sessionOpened', function(payload)
     })
 end)
 
-RegisterNetEvent('qbinventory:client:sessionPatched', function(token, patch)
+RegisterNetEvent('kora_inventory:client:sessionPatched', function(token, patch)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -86,10 +86,10 @@ RegisterNetEvent('qbinventory:client:sessionPatched', function(token, patch)
     if patch.inventory and session.secondary and patch.key == session.secondary.key then
         session.secondary = patch.inventory
     end
-    TriggerEvent('qbinventory:ui:sessionPatched', { token = token, patch = patch })
+    TriggerEvent('kora_inventory:ui:sessionPatched', { token = token, patch = patch })
 end)
 
-RegisterNetEvent('qbinventory:client:sessionClosed', function(token, reason)
+RegisterNetEvent('kora_inventory:client:sessionClosed', function(token, reason)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -99,21 +99,21 @@ RegisterNetEvent('qbinventory:client:sessionClosed', function(token, reason)
     local closed = session
     session = nil
     pendingGive = nil
-    TriggerEvent('qbinventory:ui:sessionClosed', { token = token, reason = reason })
+    TriggerEvent('kora_inventory:ui:sessionClosed', { token = token, reason = reason })
 end)
 
-RegisterNetEvent('qbinventory:client:rejected', function(reason)
+RegisterNetEvent('kora_inventory:client:rejected', function(reason)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
-    TriggerEvent('qbinventory:ui:rejected', { reason = reason })
+    TriggerEvent('kora_inventory:ui:rejected', { reason = reason })
 end)
 
 ---True while kora_ambulance has the local player downed or dead. UX gate only;
 ---server.lua enforces the same rule authoritatively.
 ---@return boolean
-function QbInventory.isDowned()
-    if Config.qbinventory.blockWhenDowned == false then
+function KoraInventory.isDowned()
+    if Config.kora_inventory.blockWhenDowned == false then
         return false
     end
     local data = exports.kora_core:getPlayerData()
@@ -125,8 +125,8 @@ end
 ---or the `ishandcuffed` metadata kora_core replicates. UX gate only; server.lua
 ---enforces the same rule authoritatively.
 ---@return boolean
-function QbInventory.isCuffed()
-    if Config.qbinventory.blockWhenCuffed == false then
+function KoraInventory.isCuffed()
+    if Config.kora_inventory.blockWhenCuffed == false then
         return false
     end
     if LocalPlayer.state.koraCuffed == true then
@@ -139,9 +139,9 @@ end
 
 local lastCuffedNotify = 0
 ---Notify that an action was blocked while cuffed, rate limited.
-function QbInventory.notifyCuffedBlocked()
+function KoraInventory.notifyCuffedBlocked()
     local now = GetGameTimer()
-    if now - lastCuffedNotify < (tonumber(Config.qbinventory.downedNotifyCooldown) or 3000) then
+    if now - lastCuffedNotify < (tonumber(Config.kora_inventory.downedNotifyCooldown) or 3000) then
         return
     end
     lastCuffedNotify = now
@@ -150,20 +150,20 @@ end
 
 local lastDownedNotify = 0
 ---Notify that an action was blocked while downed, rate limited.
-function QbInventory.notifyDownedBlocked()
+function KoraInventory.notifyDownedBlocked()
     local now = GetGameTimer()
-    if now - lastDownedNotify < (tonumber(Config.qbinventory.downedNotifyCooldown) or 3000) then
+    if now - lastDownedNotify < (tonumber(Config.kora_inventory.downedNotifyCooldown) or 3000) then
         return
     end
     lastDownedNotify = now
     Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_downed'), type = 'error' })
 end
 
----Name of the generic UI-block state bag (Config.qbinventory.uiBlockBag), or nil
+---Name of the generic UI-block state bag (Config.kora_inventory.uiBlockBag), or nil
 ---when the feature is turned off.
 ---@return string|nil
 local function uiBlockBagName()
-    local name = Config.qbinventory.uiBlockBag
+    local name = Config.kora_inventory.uiBlockBag
     if type(name) == 'string' and name ~= '' then
         return name
     end
@@ -173,20 +173,20 @@ end
 ---True while another resource (e.g. kora_emotemenu's Emote Maker freecam) has
 ---set the local player's UI-block bag. Not affected by blockWhileBusy.
 ---@return boolean
-function QbInventory.isUiBlocked()
+function KoraInventory.isUiBlocked()
     local name = uiBlockBagName()
     return name ~= nil and LocalPlayer.state[name] == true
 end
 
 ---True while a kora_lib progress bar is running (other than the use gate's
----own bar) and Config.qbinventory.blockWhileBusy is on. UX gate only; the
+---own bar) and Config.kora_inventory.blockWhileBusy is on. UX gate only; the
 ---server refuses to drop/give/move a slot being used regardless.
 ---@return boolean
-function QbInventory.isBusy()
-    if QbInventory.isUiBlocked() then
+function KoraInventory.isBusy()
+    if KoraInventory.isUiBlocked() then
         return true
     end
-    if Config.qbinventory.blockWhileBusy == false or QbInventory.useGateActive then
+    if Config.kora_inventory.blockWhileBusy == false or KoraInventory.useGateActive then
         return false
     end
     return Kora.progressbar.isActive() == true
@@ -194,9 +194,9 @@ end
 
 local lastBusyNotify = 0
 ---Notify that an action was blocked while busy, rate limited.
-function QbInventory.notifyBusyBlocked()
+function KoraInventory.notifyBusyBlocked()
     local now = GetGameTimer()
-    if now - lastBusyNotify < (tonumber(Config.qbinventory.downedNotifyCooldown) or 3000) then
+    if now - lastBusyNotify < (tonumber(Config.kora_inventory.downedNotifyCooldown) or 3000) then
         return
     end
     lastBusyNotify = now
@@ -208,21 +208,21 @@ end
 ---@param invType string
 ---@param data any
 local function openInventory(invType, data)
-    if QbInventory.isBusy() then
-        QbInventory.notifyBusyBlocked()
+    if KoraInventory.isBusy() then
+        KoraInventory.notifyBusyBlocked()
         return
     end
-    TriggerServerEvent('qbinventory:server:open', invType, data)
+    TriggerServerEvent('kora_inventory:server:open', invType, data)
 end
 
 ---@return nil
 local function closeInventory()
     if session then
-        TriggerServerEvent('qbinventory:server:close', session.token)
+        TriggerServerEvent('kora_inventory:server:close', session.token)
     end
 end
 
--- Direct request transport (Config.qbinventory.ui.directTransport, default on).
+-- Direct request transport (Config.kora_inventory.ui.directTransport, default on).
 -- The bundled UI's move/buy/drop/use requests go to the server as one plain
 -- net event and come back as one, instead of through kora_lib's callback layer
 -- (token handshake, an export that awaits a promise, and a cross-resource hop
@@ -234,11 +234,11 @@ local pendingCalls = {}
 local DIRECT_DEADLINE = 30000
 
 local function directTransport()
-    local ui = (Config.qbinventory or {}).ui or {}
+    local ui = (Config.kora_inventory or {}).ui or {}
     return ui.directTransport ~= false
 end
 
-RegisterNetEvent('qbinventory:client:callResult', function(requestId, ok, result)
+RegisterNetEvent('kora_inventory:client:callResult', function(requestId, ok, result)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -269,7 +269,7 @@ local function callServer(action, callbackName, request)
             answer:resolve({ ok = false, result = 'timeout' })
         end
     end)
-    TriggerServerEvent('qbinventory:server:call', requestId, action, request)
+    TriggerServerEvent('kora_inventory:server:call', requestId, action, request)
     local reply = Citizen.Await(answer)
     return reply.ok, reply.result
 end
@@ -291,7 +291,7 @@ local function submitIntent(intent)
     local announce = intent.announce ~= false
     local function reject(reason)
         if announce then
-            TriggerEvent('qbinventory:ui:rejected', { reason = reason })
+            TriggerEvent('kora_inventory:ui:rejected', { reason = reason })
         end
     end
     local requestToken = session.token
@@ -315,7 +315,7 @@ local function submitIntent(intent)
         end
         local slot = math.floor(tonumber(payload.slot) or 0)
         local item = session.primary.items and session.primary.items[slot]
-        local amount = QbInventory.amount(payload.amount, 1)
+        local amount = KoraInventory.amount(payload.amount, 1)
         if not item or not amount or amount > item.amount then
             reject('invalid item amount')
             return false, 'invalid item amount'
@@ -328,7 +328,7 @@ local function submitIntent(intent)
             primaryRevision = session.primary.revision,
             secondaryRevision = session.secondary and session.secondary.revision,
         }
-        TriggerEvent('qbinventory:client:requestGiveTarget', pendingGive.id)
+        TriggerEvent('kora_inventory:client:requestGiveTarget', pendingGive.id)
         return true
     end
     if action == 'use' or action == 'drop' or action == 'buy' or action == 'sync' then
@@ -338,9 +338,9 @@ local function submitIntent(intent)
         if action == 'use' then
             -- Set for the whole use (gate bar, server handler and its own
             -- bar) so the busy poll above can tell it from foreign activity.
-            QbInventory.useInFlight = true
-            if not QbInventory.useGate(item) then
-                QbInventory.useInFlight = false
+            KoraInventory.useInFlight = true
+            if not KoraInventory.useGate(item) then
+                KoraInventory.useInFlight = false
                 -- Cancelled (or never started) progress bar: treat exactly
                 -- like a rejected use attempt, without ever contacting the
                 -- server, so the effect can never apply for a bar the player
@@ -348,7 +348,7 @@ local function submitIntent(intent)
                 return false, 'cancelled'
             end
             if clearedBusy then
-                TriggerEvent('qbinventory:client:useStarted')
+                TriggerEvent('kora_inventory:client:useStarted')
             end
         end
         -- Buys are sent one at a time. A second buy made while one is in
@@ -363,7 +363,7 @@ local function submitIntent(intent)
             end
             buyInFlight = promise.new()
         end
-        local called, ok, result = pcall(callServer, 'intent', 'qbinventory:server:intent', {
+        local called, ok, result = pcall(callServer, 'intent', 'kora_inventory:server:intent', {
             token = session.token,
             action = action,
             payload = payload,
@@ -383,19 +383,19 @@ local function submitIntent(intent)
         -- is about a session the player has already left: report nothing.
         if not session or session.token ~= requestToken then
             if action == 'use' then
-                QbInventory.useInFlight = false
+                KoraInventory.useInFlight = false
             end
             return false, 'stale session'
         end
         if action == 'use' then
-            QbInventory.useInFlight = false
+            KoraInventory.useInFlight = false
         end
         if not ok then
             -- A callback that errored or timed out has no reason; never hand the
             -- browser a blank one.
             reject(result or 'inventory request failed')
             if clearedBusy then
-                TriggerEvent('qbinventory:client:useRejected')
+                TriggerEvent('kora_inventory:client:useRejected')
             end
         elseif action == 'use' and (type(result) ~= 'table' or result.preventClose ~= true) then
             -- Default behaviour: close the panel after a completed use
@@ -414,7 +414,7 @@ local function submitIntent(intent)
     local to = payload.toInventory or (payload.toSecondary and secondaryKey or session.primary.key)
     local fromView = from == session.primary.key and session.primary or session.secondary
     local toView = to == session.primary.key and session.primary or session.secondary
-    local called, ok, result = pcall(callServer, 'transfer', 'qbinventory:server:transfer', {
+    local called, ok, result = pcall(callServer, 'transfer', 'kora_inventory:server:transfer', {
         token = session.token,
         fromInventory = from,
         toInventory = to,
@@ -439,7 +439,7 @@ end
 -- Recipient ids are deliberately resolved only between local client modules.
 -- The browser never receives a nearby-player list, a name, a ped, or a server
 -- id; it can only request the give action for a selected own-inventory slot.
-AddEventHandler('qbinventory:client:giveTargetResolved', function(result)
+AddEventHandler('kora_inventory:client:giveTargetResolved', function(result)
     if type(result) ~= 'table' or not pendingGive or result.requestId ~= pendingGive.id then
         return
     end
@@ -447,14 +447,14 @@ AddEventHandler('qbinventory:client:giveTargetResolved', function(result)
     pendingGive = nil
     if result.cancelled or type(result.target) ~= 'number' then
         if result.reason and result.reason ~= 'cancelled' then
-            TriggerEvent('qbinventory:ui:rejected', { reason = result.reason })
+            TriggerEvent('kora_inventory:ui:rejected', { reason = result.reason })
         end
         return
     end
     if not session then
         return
     end
-    TriggerServerEvent('qbinventory:server:intent', {
+    TriggerServerEvent('kora_inventory:server:intent', {
         token = session.token,
         action = 'give',
         payload = { slot = request.slot, amount = request.amount, target = result.target },
@@ -466,13 +466,13 @@ end)
 -- Local public API for renderer resources. It is intentionally an in-VM event,
 -- not a server mutation endpoint: submitIntent still routes to the validated
 -- server transport above.
-AddEventHandler('qbinventory:client:submitIntent', function(intent)
+AddEventHandler('kora_inventory:client:submitIntent', function(intent)
     submitIntent(intent)
 end)
 
 ---@return table|nil session
 local function getCurrentSession()
-    return session and QbInventory.copy(session) or nil
+    return session and KoraInventory.copy(session) or nil
 end
 
 ---qb-inventory's client HasItem(items, amount). A string needs `amount`
@@ -508,7 +508,7 @@ local function hasItem(names, amount)
     return checked
 end
 
-QbInventory.clientApi = {
+KoraInventory.clientApi = {
     openInventory = openInventory,
     closeInventory = closeInventory,
     submitIntent = submitIntent,
@@ -545,9 +545,9 @@ end)
 -- these metadata keys; kora_core replicates them).
 for _, key in ipairs({ 'isdead', 'inlaststand' }) do
     exports.kora_core:onPlayerDataChange({ 'metadata', key }, function(_, value)
-        if value == true and session and QbInventory.isDowned() then
+        if value == true and session and KoraInventory.isDowned() then
             closeInventory()
-            QbInventory.notifyDownedBlocked()
+            KoraInventory.notifyDownedBlocked()
         end
     end)
 end
@@ -567,8 +567,8 @@ end
 
 -- Same for being cuffed (kora_police sets `ishandcuffed`; kora_core replicates it).
 exports.kora_core:onPlayerDataChange({ 'metadata', 'ishandcuffed' }, function(_, value)
-    if value == true and session and QbInventory.isCuffed() then
+    if value == true and session and KoraInventory.isCuffed() then
         closeInventory()
-        QbInventory.notifyCuffedBlocked()
+        KoraInventory.notifyCuffedBlocked()
     end
 end)

@@ -14,7 +14,7 @@ GetInvokingResource = function() return invokingResource end
 Kora = { callback = { register = function(name, fn) callbacks[name] = fn end } }
 source = 7
 
-QbInventory = {
+KoraInventory = {
     internal = {
         playerKey = function(src) return 'player:' .. src end,
         resolveInventory = function(key)
@@ -67,13 +67,13 @@ H.equal(worn[1].amount, 2, 'durability amount is a decrement')
 events['qb-weapons:server:SetWeaponQuality']({ slot = 1 }, 100)
 H.equal(#worn, 1, 'legacy arbitrary quality setter is a no-op')
 
-events['qbinventory:server:legacyWeaponUse'](1)
+events['kora_inventory:server:legacyWeaponUse'](1)
 H.equal(uses[1].slot, 1, 'legacy use resolves a real weapon slot')
-events['qbinventory:server:legacyWeaponUse'](2)
+events['kora_inventory:server:legacyWeaponUse'](2)
 H.equal(#uses, 1, 'legacy use cannot invoke an arbitrary item')
 events['qb-weapons:server:removeWeaponAmmoItem']({ slot = 2, name = 'forged' })
 H.equal(uses[2].slot, 2, 'legacy ammo removal resolves the real magazine slot')
-events['qbinventory:server:legacyWeaponHolster']()
+events['kora_inventory:server:legacyWeaponHolster']()
 H.equal(uses[3].holster, 1, 'legacy check weapon requests a server-resolved holster')
 
 H.finish()

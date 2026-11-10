@@ -9,10 +9,10 @@
 -- player who never sees a bag can still open the drop, and a player who sees a
 -- fabricated one opens nothing.
 --
--- Before this, `qbinventory:client:dropCreated` had no listener at all: a
+-- Before this, `kora_inventory:client:dropCreated` had no listener at all: a
 -- dropped item became an inventory at a coordinate with nothing to walk up to.
 
-local dropConfig = (Config.qbinventory and Config.qbinventory.drops) or {}
+local dropConfig = (Config.kora_inventory and Config.kora_inventory.drops) or {}
 
 -- id -> { entity = number|nil, target = integer }
 local drops = {}
@@ -61,14 +61,14 @@ local function settleOnGround(entity, coords)
             return
         end
         local placed = GetEntityCoords(entity)
-        SetEntityCoordsNoOffset(entity, placed.x, placed.y, QbInventory.groundedZ(placed.z, 0.0, offset), false, false, false)
+        SetEntityCoordsNoOffset(entity, placed.x, placed.y, KoraInventory.groundedZ(placed.z, 0.0, offset), false, false, false)
         return
     end
 
     -- No surface found by the native: lift the model's lowest point onto the
     -- ground Z that onGround() already resolved.
     local minDimension = GetModelDimensions(GetEntityModel(entity))
-    SetEntityCoordsNoOffset(entity, coords.x, coords.y, QbInventory.groundedZ(coords.z, minDimension.z, offset), false, false, false)
+    SetEntityCoordsNoOffset(entity, coords.x, coords.y, KoraInventory.groundedZ(coords.z, minDimension.z, offset), false, false, false)
 end
 
 local function removeDrop(id)
@@ -159,7 +159,7 @@ local function syncDrops(list)
     end
 end
 
-RegisterNetEvent('qbinventory:client:dropsUpdated', function(list)
+RegisterNetEvent('kora_inventory:client:dropsUpdated', function(list)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -170,14 +170,14 @@ RegisterNetEvent('qbinventory:client:dropsUpdated', function(list)
     syncDrops(list)
 end)
 
-RegisterNetEvent('qbinventory:client:dropCreated', function(id, coords)
+RegisterNetEvent('kora_inventory:client:dropCreated', function(id, coords)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
     addDrop(id, coords)
 end)
 
-RegisterNetEvent('qbinventory:client:dropRemoved', function(id)
+RegisterNetEvent('kora_inventory:client:dropRemoved', function(id)
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
@@ -202,7 +202,7 @@ local function hydrate()
     end
 
     local generation = dropGeneration
-    local list = Kora.callback.trigger('qbinventory:server:drops')
+    local list = Kora.callback.trigger('kora_inventory:server:drops')
     if type(list) ~= 'table' or generation ~= dropGeneration then
         return
     end

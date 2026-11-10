@@ -2,11 +2,11 @@
 -- policy is the counter/bucket check -- not the shop id the client sent.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/liquorstore.lua')
 
-local shop = Config.qbinventory.shops.liquorstore
+local shop = Config.kora_inventory.shops.liquorstore
 H.equal(shop.id, 'liquorstore', 'the liquor store has a fixed canonical identifier')
 H.ok(#shop.locations >= 1, 'the liquor store has approved locations')
 
@@ -14,10 +14,10 @@ H.ok(#shop.locations >= 1, 'the liquor store has approved locations')
 -- Inventing an id here would present a slot with no label, no weight and no
 -- price authority -- an unbuyable row that looks like a shop bug rather than a
 -- config one.
-QBCoreSeed = nil
+KoraCoreSeed = nil
 dofile('../kora_core/shared/items.lua')
 local known = {}
-for _, def in ipairs(QBCoreSeed.items) do known[def.name] = true end
+for _, def in ipairs(KoraCoreSeed.items) do known[def.name] = true end
 
 for _, row in ipairs(shop.inventory) do
     H.ok(known[row.name], ('stock row %s exists in the shared item registry'):format(tostring(row.name)))

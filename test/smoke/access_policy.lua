@@ -33,7 +33,7 @@ H.ok(server:find('return mayInspectPlayer(src, inv.source)', 1, true), 'player a
 H.ok(server:find("local ownedStashTemplates = {}", 1, true), 'owned stash registrations are templates')
 H.ok(compactServer:find("if owner == true then ownedStashTemplates[tostring(id)] = opts", 1, true), 'owner=true stores only a template')
 H.ok(server:find("type(data.citizenid) ~= 'string' or data.citizenid == ''", 1, true), 'owned stash requires a server player identity')
-H.ok(server:find('opts.owner = data.citizenid', 1, true), 'owned stash owner derives from qbcore player data')
+H.ok(server:find('opts.owner = data.citizenid', 1, true), 'owned stash owner derives from kora_core player data')
 H.ok(server:find("('%s:%s'):format(tostring(identifier), data.citizenid)", 1, true), 'owned stash key includes the derived citizen id')
 H.ok(server:find("inv.owner ~= src and inv.owner ~= data.citizenid", 1, true), 'secondary owner check accepts only the authenticated owner')
 H.ok(server:find("ownedStash(src, identifier, ownedStashTemplates[tostring(identifier)])", 1, true), 'network open resolves registered owned stash server-side')

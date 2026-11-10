@@ -4,7 +4,7 @@
 -- handler: each returns an (ok, result) pair instead of nothing or an error.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
@@ -67,7 +67,7 @@ exports = setmetatable({}, {
 dofile('server/persistence.lua')
 dofile('server.lua')
 
-local internal = QbInventory.internal
+local internal = KoraInventory.internal
 internal.createSecondary('stash', 'reply-test', { label = 'Stash', slots = 10, maxWeight = 1000000 })
 local stashKey = internal.key('stash', 'reply-test')
 local src = 1
@@ -75,7 +75,7 @@ local opened, session = internal.open(src, stashKey)
 H.ok(opened, 'sanity: a session on the stash opened')
 H.ok(internal.addTo(stashKey, 'radio', 1, 1, {}, 'seed'), 'seeded a radio')
 
-local transfer = callbacks['qbinventory:server:transfer']
+local transfer = callbacks['kora_inventory:server:transfer']
 local function call(request)
     request.token = request.token or session.token
     local packed = table.pack(transfer(src, request))
@@ -113,7 +113,7 @@ for label, request in pairs(failures) do
 end
 
 -- An error raised inside the handler still replies { false, reason }.
-local safe = QbInventory.replyingTransfer
+local safe = KoraInventory.replyingTransfer
 H.ok(type(safe) == 'function', 'the guarded transfer is exposed')
 local verdict, reason = safe(src, setmetatable({}, { __index = function() error('boom') end }))
 H.equal(verdict, false, 'an error inside transfer still replies')

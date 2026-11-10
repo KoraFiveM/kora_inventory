@@ -3,8 +3,6 @@ game 'gta5'
 lua54 'yes'
 
 name 'kora_inventory'
--- Keep the legacy resource name resolvable for exports['qbinventory'] callers.
-provide 'qbinventory'
 author 'qbcore2'
 version '0.2.4'
 description 'Server-authoritative inventory with bundled NUI'
@@ -86,7 +84,7 @@ client_scripts {
     'client.lua',
     -- Resolves nearby recipients locally; it never exposes them to the NUI.
     'client/give_target.lua',
-    -- Slot 1-5 hotbar keybinds. Loads after client.lua for QbInventory.useGate
+    -- Slot 1-5 hotbar keybinds. Loads after client.lua for KoraInventory.useGate
     -- and the legacy QBCore:Server:UseItem transport it reuses.
     'client/hotbar.lua',
     -- Ground-drop props. Presentation only; see the file header.
@@ -116,7 +114,9 @@ client_scripts {
     'client/weaponcarry.lua',
     -- Legacy qb-weapons client events, translated into the server-owned
     -- kora_inventory weapon lifecycle above.
-    'client/compat/qb_weapons.lua'
+    'client/compat/qb_weapons.lua',
+    -- Optional FFT hooks: returns immediately unless fft_kora_hooks is true.
+    'fft_hooks.lua'
 }
 
 ui_page 'web/build/index.html'

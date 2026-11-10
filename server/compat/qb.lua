@@ -1,13 +1,13 @@
 -- qb-inventory server export compatibility.
 --
 -- This module is deliberately transport-free.  It runs after server.lua and
--- talks only to QbInventory.internal, so player item writes continue through
+-- talks only to KoraInventory.internal, so player item writes continue through
 -- kora_core's PlayerData mutation funnel and secondary changes keep their
 -- kora_inventory revision/broadcast guarantees.
 
-local inventory = QbInventory
+local inventory = KoraInventory
 local internal =
-    assert(inventory and inventory.internal, 'qbinventory internal authority must load before qb compatibility')
+    assert(inventory and inventory.internal, 'kora_inventory internal authority must load before qb compatibility')
 
 local function lower(value)
     return type(value) == 'string' and value:lower() or nil
@@ -243,8 +243,8 @@ end
 local stashOnly = { stash = true }
 local storageTypes = { stash = true, trunk = true, glovebox = true, drop = true, temporary = true }
 
-local function qbHooks()
-    return inventory.compat and inventory.compat.qbHooks
+local function koraHooks()
+    return inventory.compat and inventory.compat.koraHooks
 end
 
 local function hookData(inv, identifier, item, slot, amount, reason, resource, side)
@@ -290,12 +290,12 @@ local function addToSecondary(identifier, itemName, amount, slot, info, reason, 
         end
         local metadata = info
         if
-            QbInventory.weapons
-            and QbInventory.weapons.isWeapon
-            and QbInventory.weapons.prepareMetadata
-            and QbInventory.weapons.isWeapon(wanted)
+            KoraInventory.weapons
+            and KoraInventory.weapons.isWeapon
+            and KoraInventory.weapons.prepareMetadata
+            and KoraInventory.weapons.isWeapon(wanted)
         then
-            local prepared, prepareErr = QbInventory.weapons.prepareMetadata(wanted, internal.copy(info or {}))
+            local prepared, prepareErr = KoraInventory.weapons.prepareMetadata(wanted, internal.copy(info or {}))
             if not prepared then
                 return false, prepareErr
             end
@@ -420,7 +420,7 @@ local function addItem(identifier, itemName, amount, slot, info, reason, isInter
         end
     end
 
-    local hooks = qbHooks()
+    local hooks = koraHooks()
     local resource = GetInvokingResource and GetInvokingResource() or nil
     local data
     if not isInternalMove and hooks and hooks.active('ItemAdded') then
@@ -477,7 +477,7 @@ local function removeItem(identifier, itemName, amount, slot, reason, isInternal
         end
     end
 
-    local hooks = qbHooks()
+    local hooks = koraHooks()
     local resource = GetInvokingResource and GetInvokingResource() or nil
     local data
     if not isInternalMove and hooks and hooks.active('ItemRemoved') then
@@ -548,7 +548,7 @@ api.LoadInventory = function(source, citizenid)
 end
 
 ---Upstream: SaveInventory(source, offline). Keep player persistence inside
----qbcore's authority; an offline snapshot may only replace its inventory field.
+---kora_core's authority; an offline snapshot may only replace its inventory field.
 ---Success has no return value, while durable failures remain observable.
 api.SaveInventory = function(source, offline)
     local called, saved, err = pcall(function()

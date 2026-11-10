@@ -34,7 +34,7 @@ beforeEach(async () => {
     host = document.createElement("div"); document.body.appendChild(host)
     root = createRoot(host)
     await act(async () => { root.render(<App />) })
-    await post("qbinventory:nui:sessionOpened", snapshot)
+    await post("kora_inventory:nui:sessionOpened", snapshot)
 })
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.restoreAllMocks() })
 
@@ -84,15 +84,15 @@ describe("right-click split", () => {
 
     it("a server patch dismisses the dialog and the inventory stays usable", async () => {
         rightClick()
-        await post("qbinventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: snapshot.player })
+        await post("kora_inventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: snapshot.player })
         expect(dialog()).toBeNull()
-        await post("qbinventory:nui:rejected", { reason: "nope" })
+        await post("kora_inventory:nui:rejected", { reason: "nope" })
         rightClick()
         expect(dialog()).not.toBeNull()
     })
 
     it("does nothing when rightClickSplit is disabled", async () => {
-        await post("qbinventory:nui:config", { rightClickSplit: false })
+        await post("kora_inventory:nui:config", { rightClickSplit: false })
         rightClick()
         expect(dialog()).toBeNull()
     })

@@ -7,9 +7,9 @@
 -- This file is the only place that draws the "[ALT] Shop" text. It is off by
 -- default (Config.ShopHints.showText) and, when enabled, is still dropped at any
 -- counter served by a ped - 24/7, liquor or Ammu-Nation - unless
--- Config.ShopClerks.showLabel (see QbInventory.shopHasClerk).
+-- Config.ShopClerks.showLabel (see KoraInventory.shopHasClerk).
 --
--- Points come from each shop's `locations` in Config.qbinventory.shops, so any
+-- Points come from each shop's `locations` in Config.kora_inventory.shops, so any
 -- shop type with a fixed location list is covered without code changes. A shop
 -- opts out with `hint = false` (or `enabled = false`). Vending machines are model
 -- targets with no fixed points, so they get no marker.
@@ -48,10 +48,10 @@ local function collectPoints()
     local markerAtPeds = config.markerAtPeds == true
     local showText = config.showText == true
     local zOffset = tonumber(config.marker and config.marker.zOffset) or 0.0
-    for _, shop in pairs((Config.qbinventory and Config.qbinventory.shops) or {}) do
+    for _, shop in pairs((Config.kora_inventory and Config.kora_inventory.shops) or {}) do
         if type(shop) == 'table' and shop.enabled ~= false and shop.hint ~= false then
             for _, location in ipairs(shop.locations or {}) do
-                local hasPed = QbInventory and QbInventory.shopHasClerk and QbInventory.shopHasClerk(shop, location)
+                local hasPed = KoraInventory and KoraInventory.shopHasClerk and KoraInventory.shopHasClerk(shop, location)
                 local noMarker = hasPed and not markerAtPeds
                 local noText = not showText or (hasPed and not clerkLabel)
                 if not (noMarker and noText) then

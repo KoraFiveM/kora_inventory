@@ -38,7 +38,7 @@ beforeEach(async () => {
     host = document.createElement("div"); document.body.appendChild(host)
     root = createRoot(host)
     await act(async () => { root.render(<App />) })
-    await post("qbinventory:nui:sessionOpened", snapshot)
+    await post("kora_inventory:nui:sessionOpened", snapshot)
 })
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.restoreAllMocks() })
 
@@ -58,7 +58,7 @@ describe("item inspector copy", () => {
     })
 
     it("Config.Inspector.allowCopy = false hides the button and keeps the text unselectable", async () => {
-        await post("qbinventory:nui:config", { inspectorCopy: false })
+        await post("kora_inventory:nui:config", { inspectorCopy: false })
         select()
         expect(copyButton()).toBeNull()
         expect(inspector().classList.contains("item-detail-copyable")).toBe(false)
@@ -67,7 +67,7 @@ describe("item inspector copy", () => {
     it("renders a long metadata value in full and keeps the card's controls", async () => {
         const handsetId = `78c4250bdd6f484629f3ef9103942b1a${"f".repeat(40)}`
         const [item] = snapshot.player.items
-        await post("qbinventory:nui:sessionOpened", { ...snapshot, player: { ...snapshot.player, items: [{ ...item, displayMeta: [{ key: "handsetId", label: "Handset Id", value: handsetId }] }] } })
+        await post("kora_inventory:nui:sessionOpened", { ...snapshot, player: { ...snapshot.player, items: [{ ...item, displayMeta: [{ key: "handsetId", label: "Handset Id", value: handsetId }] }] } })
         select()
         expect(inspector().textContent).toContain(handsetId)
         expect(copyButton()).not.toBeNull()

@@ -6,7 +6,7 @@
 -- A location gets a clerk when it has a `ped` spot ({ x, y, z, heading }, z =
 -- floor height) and Config.ShopClerks.enabled is on. Ammu-Nation has its own
 -- shopkeeper system (shop.shopkeeper, client/shops/ammunation.lua) and is skipped
--- here, but QbInventory.shopHasClerk still reports its shopkeepers so the
+-- here, but KoraInventory.shopHasClerk still reports its shopkeepers so the
 -- floating label is dropped there too.
 --
 -- Cost: one Kora.zones sphere per clerk (Config.ShopClerks.radius). The ped
@@ -15,7 +15,7 @@
 -- resource stops (Kora.entities tracks the peds, the kora_target entity
 -- registrations are removed here).
 
-QbInventory = QbInventory or {}
+KoraInventory = KoraInventory or {}
 
 local active = {} -- location table -> { entity, targetId }
 local clerks = {} -- one record per clerk { zone, spot, shop, location, inside, spawning }
@@ -60,7 +60,7 @@ end
 -- True when this location is served by a ped, of any shop type: a general-shop
 -- clerk (this file) or an Ammu-Nation shopkeeper. shop_hints uses it to drop the
 -- floating label (Config.ShopClerks.showLabel) at ped-served counters.
-function QbInventory.shopHasClerk(shop, location)
+function KoraInventory.shopHasClerk(shop, location)
     if type(shop) ~= 'table' or type(location) ~= 'table' or shop.enabled == false then return false end
     if shop.shopkeeper ~= nil then return hasShopkeeper(shop, location) end
     return resolveClerk(shop, location) ~= nil
@@ -68,7 +68,7 @@ end
 
 -- True while the clerk ped for this location is actually spawned. The counter
 -- zone uses it so the 'Open shop' option is not offered twice.
-function QbInventory.shopClerkActive(location)
+function KoraInventory.shopClerkActive(location)
     local state = active[location]
     return state ~= nil and state.targetId ~= nil
 end
@@ -121,7 +121,7 @@ local function spawnClerk(record)
 end
 
 local function registerClerks()
-    for _, shop in pairs((Config.qbinventory and Config.qbinventory.shops) or {}) do
+    for _, shop in pairs((Config.kora_inventory and Config.kora_inventory.shops) or {}) do
         for _, location in ipairs(type(shop) == 'table' and shop.locations or {}) do
             local settings = resolveClerk(shop, location)
             if settings then

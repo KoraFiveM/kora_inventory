@@ -14,10 +14,10 @@
 -- heard of would present unbuyable slots with no label and no weight.
 
 Config = Config or {}
-Config.qbinventory = Config.qbinventory or {}
-Config.qbinventory.shops = Config.qbinventory.shops or {}
+Config.kora_inventory = Config.kora_inventory or {}
+Config.kora_inventory.shops = Config.kora_inventory.shops or {}
 
-Config.qbinventory.shops.liquorstore = {
+Config.kora_inventory.shops.liquorstore = {
     id = 'liquorstore',
     label = 'Liquor',
     slots = 16,

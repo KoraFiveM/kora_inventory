@@ -74,7 +74,7 @@ env.exports = setmetatable({ kora_core = coreExports }, { __call = function(_, n
 assert(loadfile(resource .. '/server.lua', 't', env))()
 assert(loadfile(resource .. '/server/compat/qb_callbacks.lua', 't', env))()
 assert(loadfile(resource .. '/server/compat/ox.lua', 't', env))()
-local inventory, internal = env.QbInventory, env.QbInventory.internal
+local inventory, internal = env.KoraInventory, env.KoraInventory.internal
 for _, src in ipairs({ 7, 8, 10 }) do
     env.CoreInternal.player.bySource[src] = {
         citizenid = 'CID' .. src,
@@ -90,7 +90,7 @@ end
 buckets[8] = 11
 local api = inventory.api
 local function lease(src, kind, id)
-    local ok, l = callbacks['qbinventory:server:open'](src, kind, id)
+    local ok, l = callbacks['kora_inventory:server:open'](src, kind, id)
     check(ok, 'open ' .. kind)
     return l
 end
@@ -130,7 +130,7 @@ api.registerHook('swapItems', record('swap'))
 local l = lease(7, 'stash', 'box')
 local function move(fromKey, toKey, fromSlot, toSlot, amount)
     l = internal.sessionOf(7)
-    return callbacks['qbinventory:server:transfer'](7, { token = l.token, fromInventory = fromKey, toInventory = toKey,
+    return callbacks['kora_inventory:server:transfer'](7, { token = l.token, fromInventory = fromKey, toInventory = toKey,
         fromSlot = fromSlot, toSlot = toSlot, amount = amount,
         fromRevision = internal.getRevision(fromKey), toRevision = internal.getRevision(toKey) })
 end
@@ -216,7 +216,7 @@ invoker = 'ox_script'
 calls = {}
 api.registerHook('swapItems', record('drop'))
 local sl = lease(7, 'player', 7)
-local dropped, dropId = callbacks['qbinventory:server:intent'](7, { action = 'drop', token = sl.token,
+local dropped, dropId = callbacks['kora_inventory:server:intent'](7, { action = 'drop', token = sl.token,
     primaryRevision = sl.primary.revision, payload = { slot = 1, amount = 2 } })
 check(dropped, 'drop succeeds')
 p = calls[1].payload
@@ -226,14 +226,14 @@ check(p.fromInventory == 7 and p.fromSlot.name == 'water_bottle', 'drop fromSlot
 api.removeHooks()
 -- a second drop at the same spot merges into the first bag instead of creating another
 sl = lease(7, 'player', 7)
-local merged, mergedId = callbacks['qbinventory:server:intent'](7, { action = 'drop', token = sl.token,
+local merged, mergedId = callbacks['kora_inventory:server:intent'](7, { action = 'drop', token = sl.token,
     primaryRevision = sl.primary.revision, payload = { slot = 1, amount = 1 } })
 check(merged and mergedId == dropId, 'a nearby drop merges into the existing ground drop')
 api.registerHook('swapItems', function(payload) return payload.toType ~= 'drop' and true or false end)
 sl = lease(7, 'player', 7)
 local count = #api.GetInventory(7)
 local waterBefore = api.GetItemCount(7, 'water_bottle')
-local denied = callbacks['qbinventory:server:intent'](7, { action = 'drop', token = sl.token,
+local denied = callbacks['kora_inventory:server:intent'](7, { action = 'drop', token = sl.token,
     primaryRevision = internal.getRevision('player:7'), payload = { slot = 1, amount = 1 } })
 -- the earlier drop is within mergeRadius, so this one is a move into that drop; hooks still see and can cancel it
 check(not denied and #api.GetInventory(7) == count and api.GetItemCount(7, 'water_bottle') == waterBefore, 'a cancelled drop removes nothing')
@@ -244,7 +244,7 @@ calls = {}
 api.registerHook('swapItems', record('give'))
 positions[8] = positions[7]
 sl = lease(7, 'player', 7)
-local gave = callbacks['qbinventory:server:intent'](7, { action = 'give', token = sl.token,
+local gave = callbacks['kora_inventory:server:intent'](7, { action = 'give', token = sl.token,
     primaryRevision = internal.getRevision('player:7'), payload = { slot = 1, amount = 1, target = 8 } })
 check(gave, 'give succeeds')
 p = calls[1].payload
@@ -254,7 +254,7 @@ api.removeHooks()
 api.registerHook('swapItems', function(payload) return payload.action ~= 'give' end)
 sl = lease(7, 'player', 7)
 local had = api.GetItemCount(8, 'water_bottle')
-gave = callbacks['qbinventory:server:intent'](7, { action = 'give', token = sl.token,
+gave = callbacks['kora_inventory:server:intent'](7, { action = 'give', token = sl.token,
     primaryRevision = internal.getRevision('player:7'), payload = { slot = 1, amount = 1, target = 8 } })
 check(not gave and api.GetItemCount(8, 'water_bottle') == had, 'a hook can cancel a give')
 api.removeHooks()
@@ -267,7 +267,7 @@ p = calls[1].payload
 check(p.source == 7 and p.inventoryId == 'box' and p.inventoryType == 'stash', 'openInventory has source and ox id')
 api.removeHooks()
 api.registerHook('openInventory', function() return false end)
-check(not callbacks['qbinventory:server:open'](7, 'stash', 'box'), 'openInventory false cancels')
+check(not callbacks['kora_inventory:server:open'](7, 'stash', 'box'), 'openInventory false cancels')
 api.removeHooks()
 
 check(api.registerShop('gunshop', { label = 'Guns', slots = 5, currency = 'money',
@@ -283,7 +283,7 @@ api.removeHooks()
 -- buyItem: after payment succeeds, rolled back on cancel
 local function buy(amount)
     local sh = lease(7, 'shop', 'gunshop')
-    return callbacks['qbinventory:server:intent'](7, { action = 'buy', token = sh.token,
+    return callbacks['kora_inventory:server:intent'](7, { action = 'buy', token = sh.token,
         primaryRevision = sh.primary.revision, secondaryRevision = sh.secondary.revision,
         payload = { slot = 1, amount = amount } })
 end
@@ -342,4 +342,4 @@ check(api.AddItem(7, 'water_bottle', 1), 'false does not cancel createItem')
 check(calls[1].resource == 'ox_script' and calls[1].inventoryId == 7 and calls[1].item.name == 'water_bottle', 'createItem fields')
 api.removeHooks()
 
-print(('qbinventory smoke: %d passed, 0 failed'):format(checks))
+print(('kora_inventory smoke: %d passed, 0 failed'):format(checks))

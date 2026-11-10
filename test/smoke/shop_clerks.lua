@@ -3,13 +3,13 @@
 -- and the floating label dropped only where a clerk stands.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = { shops = {} } }
+Config = { kora_inventory = { shops = {} } }
 dofile('config.lua')
 dofile('config/shops/convenience.lua')
 dofile('config/shops/liquorstore.lua')
 dofile('config/shops/ammunation.lua')
-local convenience = Config.qbinventory.shops.convenience
-local liquor = Config.qbinventory.shops.liquorstore
+local convenience = Config.kora_inventory.shops.convenience
+local liquor = Config.kora_inventory.shops.liquorstore
 
 H.equal(Config.ShopClerks.enabled, true, 'clerks default on')
 H.equal(Config.ShopClerks.showLabel, false, 'label defaults off where a clerk exists')
@@ -51,7 +51,7 @@ exports = { kora_target = {
     addEntity = function(_, e, options, dist) targets[e] = { options = options, dist = dist }; return 100 + e end,
     removeEntity = function(_, e, id) removedTargets[#removedTargets + 1] = { e, id }; targets[e] = nil end,
 }, kora_inventory = { openInventory = function(_, kind, id) targets.opened = { kind, id } end } }
-QbInventory = {}
+KoraInventory = {}
 dofile('client/shop_clerks.lua')
 
 H.equal(#zones, 16, 'one lazy zone per clerk, none for Ammu-Nation or ped-less counters')
@@ -68,7 +68,7 @@ H.equal(scenarios[e], 'WORLD_HUMAN_CLIPBOARD', 'clerk plays the scenario')
 H.equal(targets[e].dist, 3.0, 'target distance from config')
 targets[e].options[1].onSelect()
 H.equal(targets.opened[2], convenience.id, 'the ped option opens its shop')
-H.ok(QbInventory.shopClerkActive(convenience.locations[1]), 'counter zone yields while the clerk is up')
+H.ok(KoraInventory.shopClerkActive(convenience.locations[1]), 'counter zone yields while the clerk is up')
 zone.onEnter()
 local count = 0 for _ in pairs(entities) do count = count + 1 end
 H.equal(count, 1, 'a second enter does not duplicate the clerk')
@@ -76,7 +76,7 @@ H.equal(count, 1, 'a second enter does not duplicate the clerk')
 zone.onExit()
 H.equal(next(entities), nil, 'leaving the zone deletes the clerk')
 H.equal(#removedTargets, 1, 'the target registration is removed with it')
-H.equal(QbInventory.shopClerkActive(convenience.locations[1]), false, 'counter zone is the fallback again')
+H.equal(KoraInventory.shopClerkActive(convenience.locations[1]), false, 'counter zone is the fallback again')
 
 -- Resource stop cleans up every live clerk and zone.
 zone.onEnter(); zones[1].onEnter(); zones[2].onEnter()
@@ -85,34 +85,34 @@ H.equal(next(entities), nil, 'resource stop deletes all clerks')
 H.ok(zone.removed and zones[2].removed, 'resource stop removes the zones')
 
 -- Opt-outs.
-H.equal(QbInventory.shopHasClerk(convenience, convenience.locations[1]), true, 'clerk configured')
-H.equal(QbInventory.shopHasClerk(convenience, convenience.locations[9]), false, 'no spot, no clerk')
-local ammunation = Config.qbinventory.shops.ammunation
-H.equal(QbInventory.shopHasClerk(ammunation, ammunation.locations[1]), true,
+H.equal(KoraInventory.shopHasClerk(convenience, convenience.locations[1]), true, 'clerk configured')
+H.equal(KoraInventory.shopHasClerk(convenience, convenience.locations[9]), false, 'no spot, no clerk')
+local ammunation = Config.kora_inventory.shops.ammunation
+H.equal(KoraInventory.shopHasClerk(ammunation, ammunation.locations[1]), true,
     'Ammu-Nation shopkeepers count as a ped (no label), though they are not clerks')
-H.equal(QbInventory.shopHasClerk(ammunation, ammunation.locations[5]), true,
+H.equal(KoraInventory.shopHasClerk(ammunation, ammunation.locations[5]), true,
     'Legion Square counts too: kora_mdt supplies the clerk while it runs')
 ammunation.locations[1].shopkeeper = false
-H.equal(QbInventory.shopHasClerk(ammunation, ammunation.locations[1]), false, 'location.shopkeeper = false')
+H.equal(KoraInventory.shopHasClerk(ammunation, ammunation.locations[1]), false, 'location.shopkeeper = false')
 ammunation.locations[1].shopkeeper = nil
 local savedPed = ammunation.locations[1].ped
 ammunation.locations[1].ped = nil
-H.equal(QbInventory.shopHasClerk(ammunation, ammunation.locations[1]), false, 'no ped spot, no shopkeeper')
+H.equal(KoraInventory.shopHasClerk(ammunation, ammunation.locations[1]), false, 'no ped spot, no shopkeeper')
 ammunation.locations[1].ped = savedPed
 ammunation.shopkeeper.enabled = false
-H.equal(QbInventory.shopHasClerk(ammunation, ammunation.locations[1]), false, 'shopkeeper.enabled = false')
+H.equal(KoraInventory.shopHasClerk(ammunation, ammunation.locations[1]), false, 'shopkeeper.enabled = false')
 ammunation.shopkeeper.enabled = true
 for i, location in ipairs(ammunation.locations) do
-    H.equal(QbInventory.shopHasClerk(ammunation, location), true, 'every Ammu-Nation store has a ped (' .. i .. ')')
+    H.equal(KoraInventory.shopHasClerk(ammunation, location), true, 'every Ammu-Nation store has a ped (' .. i .. ')')
 end
 liquor.clerk = false
-H.equal(QbInventory.shopHasClerk(liquor, liquor.locations[1]), false, 'shop.clerk = false')
+H.equal(KoraInventory.shopHasClerk(liquor, liquor.locations[1]), false, 'shop.clerk = false')
 liquor.clerk = nil
 liquor.locations[1].clerk = false
-H.equal(QbInventory.shopHasClerk(liquor, liquor.locations[1]), false, 'location.clerk = false')
+H.equal(KoraInventory.shopHasClerk(liquor, liquor.locations[1]), false, 'location.clerk = false')
 liquor.locations[1].clerk = nil
 Config.ShopClerks.enabled = false
-H.equal(QbInventory.shopHasClerk(liquor, liquor.locations[1]), false, 'global toggle off restores the old path')
+H.equal(KoraInventory.shopHasClerk(liquor, liquor.locations[1]), false, 'global toggle off restores the old path')
 
 -- shop_hints: no marker and no text at counters served by a ped (clerk or
 -- Ammu-Nation shopkeeper) unless Config.ShopHints.markerAtPeds /
@@ -131,7 +131,7 @@ DrawMarker = function(_, x, y) markers[#markers + 1] = { x = x, y = y } end
 GetGameTimer = function() return 0 end
 exports.kora_theme = { getPrimaryColor = function() return '#112233' end }
 local function loadHints(shops)
-    Config.qbinventory.shops = shops
+    Config.kora_inventory.shops = shops
     hintZones, threads = {}, {}
     dofile('client/shop_hints.lua')
 end
@@ -150,7 +150,7 @@ end
 local function pedCounters(shop)
     local served, free = {}, 0
     for _, location in ipairs(shop.locations) do
-        if QbInventory.shopHasClerk(shop, location) then
+        if KoraInventory.shopHasClerk(shop, location) then
             served[location.x .. ',' .. location.y] = true
         else
             free = free + 1

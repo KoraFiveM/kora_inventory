@@ -10,7 +10,7 @@ local function updated()
     return { name = 'updated_at', type = 'timestamp', default = NOW, on_update = 'CURRENT_TIMESTAMP' }
 end
 
-QBInventorySchema = {
+KoraInventorySchema = {
     {
         name = 'kora_inventory_inventories',
         collate = COLLATE,

@@ -24,19 +24,19 @@
 -- (RemoveItem/AddItem/dropCreate/BuyItem), so kora_core keeps ownership of player
 -- items and the revision bump, live broadcast and audit entry stay intact.
 
-local inventory = assert(QbInventory, 'qbinventory authority missing')
+local inventory = assert(KoraInventory, 'kora_inventory authority missing')
 local internal = assert(
     inventory and inventory.internal,
-    'qbinventory internal authority must load before qb callback compatibility'
+    'kora_inventory internal authority must load before qb callback compatibility'
 )
-local api = assert(inventory.api, 'qbinventory api must load before qb callback compatibility')
+local api = assert(inventory.api, 'kora_inventory api must load before qb callback compatibility')
 local config = internal.config or {}
 
 ---Upstream's contract is a bare `cb(true/false)`, so the reason travels to the
 ---client on the same rejection channel qb_events.lua uses rather than as a
 ---second return value the caller's one-argument callback would drop anyway.
 local function reject(src, reason)
-    TriggerClientEvent('qbinventory:client:rejected', src, reason)
+    TriggerClientEvent('kora_inventory:client:rejected', src, reason)
     return false
 end
 
@@ -279,7 +279,7 @@ end)
 -- always comes from the source item).
 --
 -- Divergence: upstream's hardcoded 5.0 give distance is replaced by
--- Config.qbinventory.interactionDistance (3.0 by default), which is what
+-- Config.kora_inventory.interactionDistance (3.0 by default), which is what
 -- kora_inventory's own give intent enforces; the routing bucket is checked too,
 -- which upstream does not do at all.
 Kora.callback.register('qb-inventory:server:giveItem', function(src, target, item, amount, slot, _info)
@@ -355,7 +355,7 @@ Kora.callback.register('qb-inventory:server:giveItem', function(src, target, ite
                 -- Same rollback contract as server.lua's give intent: put it back in
                 -- the original slot, and be loud if even that fails.
                 if not api.AddItem(src, owned.name, giving, chosen, info, 'give-rollback') then
-                    print(('^1[qbinventory]^7 qb give rollback failed for %s: %s'):format(primary, owned.name))
+                    print(('^1[kora_inventory]^7 qb give rollback failed for %s: %s'):format(primary, owned.name))
                 end
                 return reject(src, 'recipient could not receive item')
             end
@@ -365,4 +365,4 @@ Kora.callback.register('qb-inventory:server:giveItem', function(src, target, ite
 end)
 
 inventory.compat = inventory.compat or {}
-inventory.compat.qbCallbacks = { drops = bridgeDrops }
+inventory.compat.koraCallbacks = { drops = bridgeDrops }

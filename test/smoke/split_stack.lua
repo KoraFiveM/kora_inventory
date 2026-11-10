@@ -4,7 +4,7 @@
 -- split amount straight back (10 stayed 10, nothing appeared in the new slot).
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
@@ -68,7 +68,7 @@ exports = setmetatable({}, {
 dofile('server/persistence.lua')
 dofile('server.lua')
 
-local internal = QbInventory.internal
+local internal = KoraInventory.internal
 internal.createSecondary('stash', 'split-test', { label = 'Stash', slots = 10, maxWeight = 1000000 })
 local stashKey = internal.key('stash', 'split-test')
 local src = 1
@@ -87,7 +87,7 @@ local function total()
 end
 
 local function move(fromSlot, toSlot, amount)
-    return callbacks['qbinventory:server:transfer'](src, {
+    return callbacks['kora_inventory:server:transfer'](src, {
         token = session.token, fromInventory = stashKey, toInventory = stashKey,
         fromSlot = fromSlot, toSlot = toSlot, amount = amount,
     })

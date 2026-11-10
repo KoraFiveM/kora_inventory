@@ -3,7 +3,7 @@
 -- which is a deliberate no-op because "the hotbar is part of kora_inventory's
 -- own UI and is driven from its session, not from a caller-supplied item
 -- list". Since no reserved hotbar range exists anywhere in the item/slot data
--- model (server.lua indexes player items 1..Config.qbinventory.playerSlots
+-- model (server.lua indexes player items 1..Config.kora_inventory.playerSlots
 -- with no special first-N meaning), this picks the same interpretation real
 -- qb-inventory/ox_inventory hotbars use: the first N general inventory slots
 -- double as the hotbar, rather than inventing a new reserved slot range.
@@ -13,13 +13,13 @@
 -- 'hotbar' visibility mode shows exactly these slots on a player's body and
 -- charges extra to draw from outside them. Two constants would silently
 -- disagree about which slots the player can actually see.
--- Locale text with an English fallback (shared.lua's QbInventory.text).
+-- Locale text with an English fallback (shared.lua's KoraInventory.text).
 local function localeText(key, fallback, vars)
-    local text = QbInventory and QbInventory.text
+    local text = KoraInventory and KoraInventory.text
     return text and text(key, fallback, vars) or fallback
 end
 
-local HOTBAR_SLOTS = math.max(0, math.floor(tonumber(Config.qbinventory.hotbarSlots) or 5))
+local HOTBAR_SLOTS = math.max(0, math.floor(tonumber(Config.kora_inventory.hotbarSlots) or 5))
 
 local function useHotbarSlot(slot)
     -- Keys 1-5 also type into chat/search boxes and the pause menu. Only fire
@@ -31,13 +31,13 @@ local function useHotbarSlot(slot)
         return
     end
 
-    if QbInventory.isBusy() then
-        QbInventory.notifyBusyBlocked()
+    if KoraInventory.isBusy() then
+        KoraInventory.notifyBusyBlocked()
         return
     end
 
-    if QbInventory.isCuffed() then
-        QbInventory.notifyCuffedBlocked()
+    if KoraInventory.isCuffed() then
+        KoraInventory.notifyCuffedBlocked()
         return
     end
 
@@ -47,34 +47,34 @@ local function useHotbarSlot(slot)
         return
     end
 
-    if QbInventory.isDowned() then
+    if KoraInventory.isDowned() then
         local allowed = false
-        for _, name in ipairs(Config.qbinventory.downedAllowedItems or {}) do
+        for _, name in ipairs(Config.kora_inventory.downedAllowedItems or {}) do
             allowed = allowed or (type(name) == 'string' and name:lower() == tostring(item.name):lower())
         end
         if not allowed then
-            QbInventory.notifyDownedBlocked()
+            KoraInventory.notifyDownedBlocked()
             return
         end
     end
 
     -- Same progress-bar gate as the NUI 'use' path in client.lua, shared
-    -- through QbInventory so a cancelled bar never reaches the server here
+    -- through KoraInventory so a cancelled bar never reaches the server here
     -- either.
-    if not QbInventory.useGate(item) then
+    if not KoraInventory.useGate(item) then
         return
     end
 
     -- Reuse the existing legacy hotbar transport instead of adding a second
     -- server-side use path: server.lua's `QBCore:Server:UseItem` handler
-    -- already re-resolves the slot from qbcore-owned PlayerData and never
+    -- already re-resolves the slot from kora_core-owned PlayerData and never
     -- trusts the transmitted item record (only `owned.name == item.name` is
     -- compared before it calls the same useItem() the NUI 'use' intent does).
     TriggerServerEvent('QBCore:Server:UseItem', { slot = slot, name = item.name })
 end
 
 for slot = 1, HOTBAR_SLOTS do
-    local command = ('qbinventory:hotbar%d'):format(slot)
+    local command = ('kora_inventory:hotbar%d'):format(slot)
     Kora.keybind.add({
         name = command,
         description = localeText('inventory.keybind_hotbar', ('Use hotbar item %d'):format(slot), { slot = slot }),
@@ -90,12 +90,12 @@ end
 -- a short-lived overlay rather than a permanent HUD bar, so it costs nothing
 -- while hidden: the NUI hides it again after the configured seconds.
 Kora.keybind.add({
-    name = 'qbinventory:hotbarshow',
+    name = 'kora_inventory:hotbarshow',
     description = localeText('inventory.keybind_hotbar_show', 'Show hotbar'),
     defaultMapper = 'keyboard',
     defaultKey = 'U',
     onPressed = function()
-        local seconds = tonumber((Config.qbinventory.ui or {}).hotbarSeconds) or 0
+        local seconds = tonumber((Config.kora_inventory.ui or {}).hotbarSeconds) or 0
         if seconds <= 0 or HOTBAR_SLOTS == 0 or IsPauseMenuActive() or IsNuiFocused() then
             return
         end
@@ -121,6 +121,6 @@ Kora.keybind.add({
             } or { slot = slot }
         end
 
-        TriggerEvent('qbinventory:ui:hotbarShow', { slots = slots, seconds = seconds })
+        TriggerEvent('kora_inventory:ui:hotbarShow', { slots = slots, seconds = seconds })
     end,
 })

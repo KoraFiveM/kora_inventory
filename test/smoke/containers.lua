@@ -1,6 +1,6 @@
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('shared.lua')
 
@@ -44,10 +44,10 @@ Kora = { distance = { player = function() return true end }, util = { deepClone 
     return clone(value)
 end } }
 
-QbInventory = { copy = QbInventory.copy, internal = {} }
-local I = QbInventory.internal
-I.config = Config.qbinventory
-I.copy = QbInventory.copy
+KoraInventory = { copy = KoraInventory.copy, internal = {} }
+local I = KoraInventory.internal
+I.config = Config.kora_inventory
+I.copy = KoraInventory.copy
 I.resolveInventory = function(reference)
     if type(reference) == 'number' then reference = 'player:' .. reference end
     return reference, state[reference]
@@ -116,7 +116,7 @@ H.equal(backpackInventory.access(10, backpackInventory), false, 'former holder l
 H.equal(backpackInventory.access(20, backpackInventory), true, 'new holder gains access only with the exact bound item')
 
 H.equal(Evidence.open(10, 'case-1'), false, 'evidence remains default deny without trusted policy')
-Config.qbinventory.containers.evidence.access = function(source, action, context)
+Config.kora_inventory.containers.evidence.access = function(source, action, context)
     return source == 10 and (action == 'open' or action == 'seize' or action == 'release') and context.evidenceId == 'case-1'
 end
 H.equal(Evidence.open(10, 'case-1'), true, 'configured server policy opens evidence')

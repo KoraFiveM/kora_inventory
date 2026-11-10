@@ -8,12 +8,12 @@
 local H = dofile('test/harness.lua')
 
 NOTIFIED = {}
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
 
-local QBCallbacks = {}
+local KoraCallbacks = {}
 Kora = {
     util = { deepClone = function(value)
         local seen = {}
@@ -28,7 +28,7 @@ Kora = {
         return clone(value)
     end },
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
-    callback = { register = function(name, fn) QBCallbacks[name] = fn end },
+    callback = { register = function(name, fn) KoraCallbacks[name] = fn end },
     sql = {},
     notify = { send = function(_, payload) NOTIFIED[#NOTIFIED + 1] = payload end },
     lang = function(key) return key end,
@@ -105,7 +105,7 @@ exports = setmetatable({}, {
 dofile('server/persistence.lua')
 dofile('server.lua')
 
-local buildItem = QbInventory.internal.buildItem
+local buildItem = KoraInventory.internal.buildItem
 playersItems[7] = {
     [1] = buildItem("bandage", 2, 1, {}),
     [2] = buildItem("map", 1, 2, {}),
@@ -113,27 +113,27 @@ playersItems[7] = {
 local function reset()
     playersItems[7] = { [1] = buildItem("bandage", 2, 1, {}), [2] = buildItem("map", 1, 2, {}) }
 end
-local opened, payload = QbInventory.internal.openSelf(7)
+local opened, payload = KoraInventory.internal.openSelf(7)
 H.ok(opened, "inventory opens")
-local intent = QBCallbacks["qbinventory:server:intent"]
+local intent = KoraCallbacks["kora_inventory:server:intent"]
 local function req(action, p)
     return { token = payload.token, action = action, payload = p, primaryRevision = payload.primary.revision }
 end
 
 local results
-QbInventory.api.createUseable("bandage", function(src)
+KoraInventory.api.createUseable("bandage", function(src)
     results = {
         drop = { intent(src, req("drop", { slot = 1, amount = 1 })) },
         give = { intent(src, req("give", { slot = 1, amount = 1, target = 8 })) },
-        reuse = { QbInventory.api.useItem(src, 1) },
+        reuse = { KoraInventory.api.useItem(src, 1) },
     }
     -- The handler itself consumes the item through the API: never blocked.
-    results.remove = QbInventory.api.removeItem(src, "bandage", 1, 1)
+    results.remove = KoraInventory.api.removeItem(src, "bandage", 1, 1)
     return true
 end)
-QbInventory.api.createUseable("map", function() return true end)
+KoraInventory.api.createUseable("map", function() return true end)
 
-local ok = QbInventory.api.useItem(7, 1)
+local ok = KoraInventory.api.useItem(7, 1)
 H.ok(ok, "the use completes")
 H.equal(results.drop[1], false, "dropping the slot mid-use is refused")
 H.equal(results.drop[2], "item is currently being used", "the drop refusal says why")
@@ -143,9 +143,9 @@ H.ok(results.remove, "the handler can still consume its own item via removeItem"
 H.ok(#NOTIFIED >= 1, "the player is notified")
 
 -- Cleared once the handler returned: the (remaining) slot is free again.
-local tr = QBCallbacks["qbinventory:server:transfer"]
+local tr = KoraCallbacks["kora_inventory:server:transfer"]
 local function move(from, to)
-    local _, fresh = QbInventory.internal.openSelf(7)
+    local _, fresh = KoraInventory.internal.openSelf(7)
     payload = fresh
     return tr(7, { token = payload.token, fromInventory = payload.primary.key or payload.primary.id, toInventory = payload.primary.key or payload.primary.id,
         fromSlot = from, toSlot = to, amount = 1, fromRevision = payload.primary.revision, toRevision = payload.primary.revision })
@@ -155,43 +155,43 @@ local _, why = move(1, 5)
 H.ok(why ~= "item is currently being used", "slot is not busy after the use finished")
 
 -- A handler that errors still clears the lock.
-QbInventory.api.createUseable("map", function() error("boom") end)
+KoraInventory.api.createUseable("map", function() error("boom") end)
 reset()
-QbInventory.api.useItem(7, 2)
+KoraInventory.api.useItem(7, 2)
 H.ok(not (select(2, move(2, 6)) == "item is currently being used"), "an erroring handler clears the busy lock")
 
 -- Mid-use transfer (from and onto the busy slot) is refused.
 local transferResults
-QbInventory.api.createUseable("map", function()
+KoraInventory.api.createUseable("map", function()
     transferResults = { { move(2, 6) }, { move(1, 2) } }
     return true
 end)
 reset()
-QbInventory.api.useItem(7, 2)
+KoraInventory.api.useItem(7, 2)
 H.equal(transferResults[1][2], "item is currently being used", "moving the busy slot is refused")
 H.equal(transferResults[2][2], "item is currently being used", "moving onto the busy slot is refused")
 
 -- Config off restores the old behaviour.
-Config.qbinventory.blockWhileBusy = false
+Config.kora_inventory.blockWhileBusy = false
 local offResults
-QbInventory.api.createUseable("map", function()
+KoraInventory.api.createUseable("map", function()
     offResults = { move(2, 6) }
     return true
 end)
 reset()
-QbInventory.api.useItem(7, 2)
+KoraInventory.api.useItem(7, 2)
 H.ok(offResults[2] ~= "item is currently being used", "blockWhileBusy = false disables the guard")
-Config.qbinventory.blockWhileBusy = true
+Config.kora_inventory.blockWhileBusy = true
 
 -- Timeout safety: a stuck entry expires.
 local stuck
-QbInventory.api.createUseable("map", function()
+KoraInventory.api.createUseable("map", function()
     NOW = NOW + 31000
     stuck = { move(2, 6) }
     return true
 end)
 reset()
-QbInventory.api.useItem(7, 2)
+KoraInventory.api.useItem(7, 2)
 H.ok(stuck[2] ~= "item is currently being used", "a busy entry expires after busyTimeout")
 
 H.finish()

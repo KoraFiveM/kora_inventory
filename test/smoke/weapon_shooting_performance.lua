@@ -50,7 +50,7 @@ local data = CoreInternal.player.freshData('SHOOTING-TEST', 'license:shooting', 
     { firstname = 'Test', lastname = 'Player' })
 data.money.cash = 0
 H.ok(Core.player.login(1, data.citizenid, data))
-local inventory, internal = QbInventory, QbInventory.internal
+local inventory, internal = KoraInventory, KoraInventory.internal
 local items = {}
 for slot = 1, 20 do items[slot] = internal.buildItem('water_bottle', 1, slot, { batch = slot }) end
 items[1] = internal.buildItem('weapon_pistol', 1, 1, assert(inventory.weapons.prepareMetadata('weapon_pistol', {
@@ -61,11 +61,11 @@ local initialRounds = Core.util.deepClone(items[1].info.loadedBullets)
 items[2] = internal.buildItem('weapon_carbinerifle', 1, 2, { ammo = 0, serial = 'CARRIED-RIFLE' })
 items[20] = internal.buildItem('cash', 100, 20, { origin = 'existing-cash' })
 H.ok(Core.player.setPath(1, { 'items' }, items))
-Config.qbinventory.cash.asItem = true
+Config.kora_inventory.cash.asItem = true
 threads[1]() -- Activate the real physical-cash provider; do not start the session sweep.
 H.equal(Core.money.getMoney(1, 'cash'), 100)
 H.ok(inventory.weaponCarry.toggle(1, items[1]))
-mock.fireEvent('qbinventory:server:weaponToggled', 1, 1)
+mock.fireEvent('kora_inventory:server:weaponToggled', 1, 1)
 mock.drainTimeouts()
 
 local player = CoreInternal.player.bySource[1]
@@ -78,11 +78,11 @@ coreExports.setPath = function(src, path, value)
     writes[#writes + 1] = { path = Core.util.deepClone(path), value = Core.util.deepClone(value) }
     return originalSetPath(src, path, value)
 end
-AddEventHandler('qbcore:server:inventoryChanged', function(src)
+AddEventHandler('kora_core:server:inventoryChanged', function(src)
     if src == 1 then changes[#changes + 1] = Core.player.getPlayerData(1, { 'items', 1, 'info' }) end
 end)
-AddEventHandler('qbinventory:server:weaponRoundFired', function(_, round) rounds[#rounds + 1] = round end)
-AddEventHandler('qbinventory:server:weaponStateChanged', function(_, _, state) states[#states + 1] = state end)
+AddEventHandler('kora_inventory:server:weaponRoundFired', function(_, round) rounds[#rounds + 1] = round end)
+AddEventHandler('kora_inventory:server:weaponStateChanged', function(_, _, state) states[#states + 1] = state end)
 local firstEvent, firstState
 local function reset()
     writes, changes, rounds, states = {}, {}, {}, {}
@@ -118,7 +118,7 @@ local function assertShot(ammo, durability, roundId)
     H.ok(math.abs(states[1].durability - durability) < 0.000001)
     H.equal(#changes + #states + #rounds, 3, 'one native shot emits three local server events')
     H.ok(player._dirty.inventory, 'weapon metadata remains dirty for persistence')
-    local batches = events('qbcore:rep:delta')
+    local batches = events('kora_core:rep:delta')
     H.equal(#batches, 1)
     H.equal(#batches[1].args[2], 1, 'one delta op carries the changed slot')
     local op = batches[1].args[2][1]
@@ -135,7 +135,7 @@ local function assertShot(ammo, durability, roundId)
     H.equal(player.PlayerData.items[20].amount, 100, 'physical cash is unchanged')
     H.equal(Core.money.getMoney(1, 'cash'), 100)
     for index = firstState, #mock.stateWrites do
-        H.equal(mock.stateWrites[index].key == 'qbinventory:weaponCarry', false,
+        H.equal(mock.stateWrites[index].key == 'kora_inventory:weaponCarry', false,
             'ammo and wear changes do not republish carried props')
     end
 end
@@ -147,21 +147,21 @@ debug.sethook(function()
     if debug.getinfo(2, 'f').func == internal.view then viewCalls = viewCalls + 1 end
 end, 'c')
 clock = clock + 100
-mock.fireEvent('qbinventory:server:weaponFired', 1)
+mock.fireEvent('kora_inventory:server:weaponFired', 1)
 mock.drainTimeouts()
 debug.sethook()
 assertShot(3, 99.9, initialRounds[1].id)
 H.equal(viewCalls, 0, 'shooting does not build a view when no inventory is open')
-H.equal(#events('qbinventory:client:sessionPatched'), 0)
+H.equal(#events('kora_inventory:client:sessionPatched'), 0)
 H.equal(#events('qb-inventory:client:updateInventory'), 0)
 
 reset()
-mock.fireEvent('qbinventory:server:weaponFired', 1)
-mock.fireEvent('qbinventory:server:weaponFired', 999)
+mock.fireEvent('kora_inventory:server:weaponFired', 1)
+mock.fireEvent('kora_inventory:server:weaponFired', 999)
 mock.drainTimeouts()
 H.equal(#writes, 0, 'cooldown replays and unknown players do not mutate items')
 H.equal(#rounds, 0)
-H.equal(#events('qbcore:rep:delta'), 0)
+H.equal(#events('kora_core:rep:delta'), 0)
 H.ok(math.abs(player.PlayerData.items[1].info.durability - 99.9) < 0.000001,
     'rejected cooldown reports do not apply wear')
 
@@ -170,11 +170,11 @@ mock.drainTimeouts()
 local revision = internal.getRevision('player:1')
 reset()
 clock = clock + 100
-mock.fireEvent('qbinventory:server:weaponFired', 1)
+mock.fireEvent('kora_inventory:server:weaponFired', 1)
 mock.drainTimeouts()
 assertShot(2, 99.8, initialRounds[2].id)
 H.equal(internal.getRevision('player:1'), revision + 1, 'the combined shot advances the open session once')
-local patches = events('qbinventory:client:sessionPatched')
+local patches = events('kora_inventory:client:sessionPatched')
 H.equal(#patches, 1)
 H.equal(patches[1].args[2].revision, revision + 1)
 H.equal(patches[1].args[2].inventory.items[1].info.ammo, 2)
@@ -190,17 +190,17 @@ H.ok(math.abs(player.PlayerData.items[1].info.durability - 99.8) < 0.000001,
     'public fireRound retains its ammo-only contract, including ignored extra arguments')
 mock.drainTimeouts()
 reset()
-Config.qbinventory.weapons.ballistics.enabled = false
-mock.fireEvent('qbinventory:server:weaponAmmoConsumed', 1, 2, 0)
+Config.kora_inventory.weapons.ballistics.enabled = false
+mock.fireEvent('kora_inventory:server:weaponAmmoConsumed', 1, 2, 0)
 H.equal(#writes, 0, 'the legacy report must match the equipped slot')
-mock.fireEvent('qbinventory:server:weaponAmmoConsumed', 1, 1, 0)
+mock.fireEvent('kora_inventory:server:weaponAmmoConsumed', 1, 1, 0)
 mock.drainTimeouts()
 H.equal(player.PlayerData.items[1].info.ammo, 0, 'legacy reports can still lower ammo')
 H.ok(math.abs(player.PlayerData.items[1].info.durability - 99.7) < 0.000001)
 reset()
-mock.fireEvent('qbinventory:server:weaponAmmoConsumed', 1, 1, 100)
+mock.fireEvent('kora_inventory:server:weaponAmmoConsumed', 1, 1, 100)
 clock = clock + 100
-mock.fireEvent('qbinventory:server:weaponFired', 1)
+mock.fireEvent('kora_inventory:server:weaponFired', 1)
 mock.drainTimeouts()
 H.equal(#writes, 0, 'legacy ammo increases and empty native shots cannot commit')
 H.equal(#rounds, 0)
@@ -209,10 +209,10 @@ H.ok(math.abs(player.PlayerData.items[1].info.durability - 99.7) < 0.000001,
     'empty shots and rejected ammo increases do not apply wear')
 H.equal(inventoryExports.FireWeaponRound(999, 1), false, 'unknown players cannot fire a round')
 
-Config.qbinventory.weapons.ballistics.enabled = true
+Config.kora_inventory.weapons.ballistics.enabled = true
 H.ok(inventory.weapons.setAmmo(1, 1, 1))
 local heavy = Core.util.deepClone(otherItems[3])
-heavy.amount = Config.qbinventory.playerMaxWeight
+heavy.amount = Config.kora_inventory.playerMaxWeight
 H.ok(Core.player.setPath(1, { 'items', 3 }, heavy))
 mock.drainTimeouts()
 reset()
@@ -223,7 +223,7 @@ H.equal(#writes, 0)
 H.equal(player.PlayerData.items[1].info.ammo, 1)
 local rejectedState = mocks.stableEncode(player.PlayerData.items[1].info)
 clock = clock + 100
-mock.fireEvent('qbinventory:server:weaponFired', 1)
+mock.fireEvent('kora_inventory:server:weaponFired', 1)
 mock.drainTimeouts()
 H.equal(#writes, 0, 'an overweight native shot does not commit ammo or wear')
 H.equal(#changes + #states + #rounds, 0, 'failed shots emit no committed-state or evidence events')
@@ -265,13 +265,13 @@ reset()
 H.ok(Core.player.setPath(1, { 'items', 1 }, internal.buildItem('water_bottle', 1, 1, {})))
 H.equal(inventory.weaponCarry.equippedWeapon(1), nil, 'same-slot replacement clears the equipped weapon')
 H.ok(#mock.stateWrites >= firstState, 'same-slot replacement still refreshes carried props')
-H.equal(mock.stateWrites[#mock.stateWrites].key, 'qbinventory:weaponCarry')
+H.equal(mock.stateWrites[#mock.stateWrites].key, 'kora_inventory:weaponCarry')
 H.ok(Core.player.setPath(1, { 'items', 1 }, weapon))
 H.ok(inventory.weaponCarry.toggle(1, weapon))
-mock.fireEvent('qbinventory:server:weaponToggled', 1, 1)
+mock.fireEvent('kora_inventory:server:weaponToggled', 1, 1)
 reset()
 H.ok(Core.player.setPath(1, { 'items', 1 }, nil))
 H.equal(inventory.weaponCarry.equippedWeapon(1), nil, 'same-slot removal clears the equipped weapon')
 H.ok(#mock.stateWrites >= firstState, 'same-slot removal still refreshes carried props')
-H.equal(mock.stateWrites[#mock.stateWrites].key, 'qbinventory:weaponCarry')
+H.equal(mock.stateWrites[#mock.stateWrites].key, 'kora_inventory:weaponCarry')
 H.finish()

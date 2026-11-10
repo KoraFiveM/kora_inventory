@@ -13,8 +13,8 @@ end
 -- item -> weapon -> native-component shape from kora_inventory's two explicit
 -- allow-lists; nothing inferred from a caller reaches the result.
 local function legacyAttachmentConfig()
-    local weapons = (Config.qbinventory.weapons or {}).components or {}
-    local render = (Config.qbinventory.weaponCarry or {}).components or {}
+    local weapons = (Config.kora_inventory.weapons or {}).components or {}
+    local render = (Config.kora_inventory.weaponCarry or {}).components or {}
     local out = {}
     for weapon, allowed in pairs(weapons) do
         if type(weapon) == 'string' and type(allowed) == 'table' then
@@ -36,19 +36,19 @@ exports('getConfigWeaponAttachments', legacyAttachmentConfig)
 RegisterNetEvent('qb-weapons:client:UseWeapon', function(legacy)
     local slot = slotOf(legacy)
     if slot then
-        TriggerServerEvent('qbinventory:server:legacyWeaponUse', slot)
+        TriggerServerEvent('kora_inventory:server:legacyWeaponUse', slot)
     end
 end)
 
 RegisterNetEvent('qb-weapons:client:AddAmmo', function(_, _, legacy)
     local slot = slotOf(legacy)
     if slot then
-        TriggerServerEvent('qbinventory:server:legacyWeaponUse', slot)
+        TriggerServerEvent('kora_inventory:server:legacyWeaponUse', slot)
     end
 end)
 
 RegisterNetEvent('qb-weapons:client:CheckWeapon', function()
-    TriggerServerEvent('qbinventory:server:legacyWeaponHolster')
+    TriggerServerEvent('kora_inventory:server:legacyWeaponHolster')
 end)
 
 -- The two events below used to maintain qb-weapons' private client state.

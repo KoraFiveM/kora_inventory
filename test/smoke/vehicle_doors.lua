@@ -10,7 +10,7 @@ local f = {
     controlOk = true,
 }
 local env = setmetatable({}, { __index = _G })
-env.Config = { qbinventory = { vehicles = {
+env.Config = { kora_inventory = { vehicles = {
     enabled = true, trunkEnabled = true, respectLocks = true, bootReach = 1.8,
     frontBootModels = { 'adder' }, bootSkipClasses = { 8, 13, 21 },
     doors = {
@@ -19,9 +19,9 @@ env.Config = { qbinventory = { vehicles = {
         targetDistance = 3.0, partDepth = 1.3,
     },
 } } }
-local doors = env.Config.qbinventory.vehicles.doors
+local doors = env.Config.kora_inventory.vehicles.doors
 env.LocalPlayer = { state = {} }
-env.QbInventory = { clientApi = {
+env.KoraInventory = { clientApi = {
     getCurrentSession = function() return f.session end,
     openInventory = function(kind, id) f.opened[#f.opened + 1] = { kind = kind, id = id } end,
 } }
@@ -38,7 +38,7 @@ local Kora = {
         return f.controlOk
     end },
 }
-env.QB, env.Kora = Kora, Kora
+env.Kora, env.Kora = Kora, Kora
 env.GetCurrentResourceName = function() return 'kora_inventory' end
 env.GetResourceState = function() return 'started' end
 env.GetGameTimer = function() return f.now end
@@ -57,7 +57,7 @@ env.GetVehicleDoorAngleRatio = function(_, door) return f.doors[door] or 0.0 end
 env.SetVehicleDoorOpen = function(_, door) f.doors[door] = 1.0; f.doorCalls[#f.doorCalls + 1] = 'open:' .. door end
 env.SetVehicleDoorShut = function(_, door) f.doors[door] = 0.0; f.doorCalls[#f.doorCalls + 1] = 'shut:' .. door end
 env.GetVehicleDoorLockStatus = function() return 0 end
-env.Entity = function() return { state = { ['qbvehiclekeys:locked'] = f.lockedBag } } end
+env.Entity = function() return { state = { ['kora_vehiclekeys:locked'] = f.lockedBag } } end
 env.AddEventHandler = function() end
 env.Wait = function() end
 env.CreateThread = function(fn) fn() end
@@ -72,7 +72,7 @@ env.exports = { kora_target = {
 f.model = { [1] = 'sultan', [2] = 'adder' }
 assert(loadfile('client/vehicles.lua', 't', env))()
 assert(loadfile('client/vehicle_doors.lua', 't', env))()
-local D = env.QbInventory.vehicleDoors
+local D = env.KoraInventory.vehicleDoors
 
 H.equal(#f.registered, 1, 'one global vehicle registration')
 H.equal(f.registered[1].kind, 'vehicle', 'registered on vehicles')
@@ -93,7 +93,7 @@ local function reset()
     f.seat, f.inVehicle, f.valid, f.lockedBag, f.controlOk, f.session = nil, 0, true, nil, true, nil
     f.now = f.now + 5000
     doors.enabled, doors.targetOptions, doors.inventoryOption, doors.commands, doors.respectLocks = true, true, true, true, true
-    env.Config.qbinventory.vehicles.trunkEnabled = true
+    env.Config.kora_inventory.vehicles.trunkEnabled = true
 end
 
 -- Aiming: rear end shows the trunk, front end the hood, middle/side nothing.
@@ -220,7 +220,7 @@ reset(); f.lockedBag = true
 storage.onSelect(1)
 H.equal(#f.opened, 0, 'storage: locked vehicle refused')
 H.equal(f.notices[#f.notices], 'This vehicle is locked.', 'storage: locked notice')
-reset(); env.Config.qbinventory.vehicles.trunkEnabled = false
+reset(); env.Config.kora_inventory.vehicles.trunkEnabled = false
 H.equal(can(storage, 1, rear), false, 'trunkEnabled off: no storage entry')
 
 H.finish()

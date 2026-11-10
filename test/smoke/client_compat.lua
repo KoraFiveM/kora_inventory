@@ -3,18 +3,18 @@ local file = assert(io.open('client/compat.lua', 'r'))
 local source = file:read('*a')
 file:close()
 
-H.ok(source:find("'qbinventory:ui:sessionOpened'", 1, true), 'busy state follows opened session')
-H.ok(source:find("'qbinventory:ui:sessionClosed'", 1, true), 'busy state follows closed session')
+H.ok(source:find("'kora_inventory:ui:sessionOpened'", 1, true), 'busy state follows opened session')
+H.ok(source:find("'kora_inventory:ui:sessionClosed'", 1, true), 'busy state follows closed session')
 H.ok(source:find("LocalPlayer.state:set('inv_busy'", 1, true), 'uses LocalPlayer inv_busy state')
-H.ok(source:find("'qbinventory:client:useStarted'", 1, true), 'clears inv_busy while a close-on-use handler runs')
-H.ok(source:find("'qbinventory:client:useRejected'", 1, true), 'restores inv_busy when a use is rejected')
+H.ok(source:find("'kora_inventory:client:useStarted'", 1, true), 'clears inv_busy while a close-on-use handler runs')
+H.ok(source:find("'kora_inventory:client:useRejected'", 1, true), 'restores inv_busy when a use is rejected')
 H.ok(source:find("'qb-inventory:client:openInventory'", 1, true), 'bridges legacy open event')
 H.ok(source:find("'qb-inventory:client:closeInv'", 1, true), 'bridges legacy close event')
 H.ok(source:find("'qb-inventory:client:updateInventory'", 1, true), 'bridges legacy update event')
 H.ok(source:find("'qb-inventory:client:ItemBox'", 1, true), 'legacy item boxes are intercepted by inventory presentation policy')
 H.ok(source:find("RegisterCommand('inventory'", 1, true), 'inventory command')
 H.ok(source:find('inventoryApi.getCurrentSession()', 1, true) and source:find('inventoryApi.closeInventory()', 1, true),
-    'inventory command toggles an active qbinventory session closed')
+    'inventory command toggles an active kora_inventory session closed')
 H.ok(source:find('Kora.zones.isCreatorActive()', 1, true), 'TAB defers to an in-progress zone creator session instead of opening alongside it')
 H.ok(source:find('Kora.placement.isActive()', 1, true), 'TAB defers to an in-progress entity placement session through kora_lib export proxy')
 H.ok(source:find("RegisterCommand('closeInv'", 1, true), 'close command')
@@ -36,8 +36,8 @@ H.ok(not source:find('GetVehicle', 1, true), 'does not discover vehicles client-
 -- The busy poll must not announce "you can't do that while using an item" for
 -- the progress bar of a use that this very panel submitted.
 local clientSource = assert(io.open('client.lua', 'rb')):read('a')
-H.ok(clientSource:find('QbInventory.useInFlight = true', 1, true), 'a use marks itself in flight')
-H.ok(clientSource:find('if not QbInventory.useInFlight then%s+QbInventory.notifyBusyBlocked%(%)'),
+H.ok(clientSource:find('KoraInventory.useInFlight = true', 1, true), 'a use marks itself in flight')
+H.ok(clientSource:find('if not KoraInventory.useInFlight then%s+KoraInventory.notifyBusyBlocked%(%)'),
     'busy poll stays silent while the panel own use is in flight')
 -- No permanent idle poll: the thread is started by a session opening and ends with it.
 H.ok(not clientSource:find('Wait(session and 250 or 1000)', 1, true), 'no always-on busy poll while no session exists')

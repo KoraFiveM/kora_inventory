@@ -7,7 +7,7 @@ local function copy(value)
     for key, item in pairs(value) do result[key] = copy(item) end
     return result
 end
-QbInventory = { internal = {}, api = {}, copy = copy,
+KoraInventory = { internal = {}, api = {}, copy = copy,
     persistence = { flush = function() error('player saves must not flush unrelated secondary inventories') end } }
 exports = { kora_core = {
     savePlayer = function(_, src, field)
@@ -27,7 +27,7 @@ Kora = { sql = { flush = function(tableName)
     return table.unpack(flushResult)
 end } }
 dofile('server/compat/qb.lua')
-local save = QbInventory.compat.qb.SaveInventory
+local save = KoraInventory.compat.qb.SaveInventory
 H.equal(save(7), nil, 'online success preserves upstream nil return')
 H.equal(calls.online.src, 7, 'online save uses the player source')
 H.equal(calls.online.field, 'items', 'inventory fence must be checked before queueing')

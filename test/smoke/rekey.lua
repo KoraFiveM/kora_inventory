@@ -8,7 +8,7 @@
 -- what it was called.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
@@ -57,7 +57,7 @@ exports = setmetatable({}, {
 dofile('server/persistence.lua')
 dofile('server.lua')
 
-local internal = QbInventory.internal
+local internal = KoraInventory.internal
 H.ok(type(internal.rekeySecondary) == 'function', 'rekeySecondary is on the authority seam')
 
 -- Create a trunk inventory and give it contents.

@@ -4,22 +4,22 @@
 -- opens the session, so triggering this event away from a counter is harmless.
 
 local shop = assert(
-    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.ammunation,
-    'qbinventory Ammu-Nation configuration is required'
+    Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.ammunation,
+    'kora_inventory Ammu-Nation configuration is required'
 )
 
 local function openAmmunation()
     exports.kora_inventory:openInventory('shop', shop.id)
 end
 
-RegisterNetEvent('qbinventory:client:openAmmunation', function()
+RegisterNetEvent('kora_inventory:client:openAmmunation', function()
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
     openAmmunation()
 end)
 
-local targets = QbInventory.shopLocationTargets(shop, function()
+local targets = KoraInventory.shopLocationTargets(shop, function()
     return {
         {
             label = ('Browse %s'):format(shop.label),
@@ -42,7 +42,7 @@ AddEventHandler('onClientResourceStop', function(resource)
     end
 end)
 
--- Shopkeeper peds (Config.qbinventory.shops.ammunation.shopkeeper). Purely
+-- Shopkeeper peds (Config.kora_inventory.shops.ammunation.shopkeeper). Purely
 -- presentation: they are scoped local entities that exist only while the
 -- player is near, and the server never trusts them.
 local shopkeepers = {}
@@ -127,7 +127,7 @@ AddEventHandler('onClientResourceStop', function(resource)
     end
 end)
 
-QbInventory.shopLocationBlips(shop, Config.qbinventory.shops.ammunation.blip.category,
+KoraInventory.shopLocationBlips(shop, Config.kora_inventory.shops.ammunation.blip.category,
     function() return shop.blip end,
     function()
         return {

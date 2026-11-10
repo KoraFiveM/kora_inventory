@@ -2,11 +2,11 @@
 -- from kora_theme, no polling when far and a draw thread only while inside a zone.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 H.equal(Config.ShopHints.showText, false, 'the floating [ALT] Shop text is off by default')
 Config.ShopHints.showText = true -- the draw path below is exercised with the text switched on
-Config.qbinventory.shops = {
+Config.kora_inventory.shops = {
     a = { locations = { { x = 0.0, y = 0.0, z = 0.0 } } },
     b = { hint = false, locations = { { x = 500.0, y = 0.0, z = 0.0 } } },
     c = { enabled = false, locations = { { x = 600.0, y = 0.0, z = 0.0 } } },

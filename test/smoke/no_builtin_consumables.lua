@@ -3,11 +3,11 @@
 -- kora_consumables (no progress bar, wrong effects, item removed instantly).
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 
 local builtIn, explicit, increments = {}, {}, {}
-QbInventory = {
+KoraInventory = {
     internal = { setBuiltInUseable = function(name, fn) if fn then builtIn[name] = fn end end },
     api = {
         createUseable = function(name, fn) explicit[name] = fn end,
@@ -42,7 +42,7 @@ H.ok(builtIn.parachute ~= nil, 'the parachute built-in is still registered')
 -- The client half must not carry the old eat/drink effect either.
 local f = assert(io.open('client/useables.lua'))
 local client = f:read('*a'); f:close()
-H.ok(not client:find('consumeEffect', 1, true), 'client has no qbinventory:client:consumeEffect handler')
+H.ok(not client:find('consumeEffect', 1, true), 'client has no kora_inventory:client:consumeEffect handler')
 
 -- Source guard: nothing in the server half may write needs metadata.
 f = assert(io.open('server/useables.lua')); local server = f:read('*a'); f:close()

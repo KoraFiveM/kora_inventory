@@ -17,7 +17,7 @@ images/lockpick.gif
 
 The name must match the item's `name` in `kora_core/shared/items.lua` (not its
 label). Extensions are tried in the order set by
-`Config.qbinventory.ui.images.extensions` -- `webp`, `png`, `gif`, `jpg` by
+`Config.kora_inventory.ui.images.extensions` -- `webp`, `png`, `gif`, `jpg` by
 default -- so a `.webp` wins over a `.png` of the same item.
 
 **Animated WebP and GIF work as-is.** CEF animates both in a plain `<img>`, so

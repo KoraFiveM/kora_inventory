@@ -5,7 +5,7 @@ local ped, currentWeapon, now = 42, 0, 0
 local pedExports, pedNatives, ammoReads = 0, 0, 0
 local ammo = {}
 
-Config = { qbinventory = {
+Config = { kora_inventory = {
     weaponCarry = { enabled = false },
     weapons = { ballistics = { enabled = true } },
 } }
@@ -49,14 +49,14 @@ local function fire(time, shooter)
 end
 
 local function draw()
-    events['qbinventory:client:toggleWeapon']({
+    events['kora_inventory:client:toggleWeapon']({
         name = 'weapon_pistol', slot = 1, action = 'draw', duration = 0, ammo = 10,
     })
     sent = {}
 end
 
 local function holster()
-    events['qbinventory:client:toggleWeapon']({
+    events['kora_inventory:client:toggleWeapon']({
         name = 'weapon_pistol', slot = 1, action = 'holster', duration = 0,
     })
     sent = {}
@@ -77,7 +77,7 @@ fire(1001)
 fire(1005)
 fire(1064)
 H.equal(#sent, 1, 'callbacks inside the default 65 ms floor send one report')
-H.equal(sent[1].name, 'qbinventory:server:weaponFired', 'native reporting keeps the original event')
+H.equal(sent[1].name, 'kora_inventory:server:weaponFired', 'native reporting keeps the original event')
 H.equal(#sent[1].args, 0, 'native reporting keeps its payload-free contract')
 fire(1065)
 H.equal(#sent, 2, 'a shot exactly at the cadence boundary is reported')
@@ -88,18 +88,18 @@ H.equal(#sent, 5, 'automatic fire at 100 ms intervals remains accepted')
 H.equal(ammoReads, 0, 'native reports do not depend on ammunition changing before callbacks')
 H.equal(pedExports, exportsBeforeShots, 'shot callbacks do not cross the cache export boundary')
 
-Config.qbinventory.weapons.ballistics.shotCooldown = '100'
+Config.kora_inventory.weapons.ballistics.shotCooldown = '100'
 fire(1464)
 H.equal(#sent, 5, 'a runtime cooldown change applies immediately')
 fire(1465)
 H.equal(#sent, 6, 'the configured cadence boundary is inclusive')
-Config.qbinventory.weapons.ballistics.shotCooldown = 0
+Config.kora_inventory.weapons.ballistics.shotCooldown = 0
 for _ = 1, 5 do fire(1465) end
 H.equal(#sent, 11, 'zero cooldown preserves unrestricted native reporting')
-Config.qbinventory.weapons.ballistics.shotCooldown = -1
+Config.kora_inventory.weapons.ballistics.shotCooldown = -1
 fire(1465)
 H.equal(#sent, 12, 'negative cooldown is clamped to zero like the server')
-Config.qbinventory.weapons.ballistics.shotCooldown = nil
+Config.kora_inventory.weapons.ballistics.shotCooldown = nil
 
 holster()
 fire(1466)
@@ -132,29 +132,29 @@ fire(1470)
 H.equal(#sent, 1, 'drawing after death resets the client cadence')
 
 holster()
-events['qbinventory:client:startTrainingWeapon']('weapon_pistol', 10)
+events['kora_inventory:client:startTrainingWeapon']('weapon_pistol', 10)
 fire(1471)
 fire(1472)
 H.equal(#sent, 1, 'training uses the same cadence floor as its server handler')
-H.equal(sent[1].name, 'qbinventory:server:weaponFired', 'training keeps the native shot event')
+H.equal(sent[1].name, 'kora_inventory:server:weaponFired', 'training keeps the native shot event')
 H.equal(#sent[1].args, 0, 'training reports remain payload-free')
 fire(1536)
 H.equal(#sent, 2, 'training forwards a shot at the boundary')
-events['qbinventory:client:stopTrainingWeapon']()
+events['kora_inventory:client:stopTrainingWeapon']()
 fire(1537)
 H.equal(#sent, 2, 'stopped training does not report subsequent callbacks')
-events['qbinventory:client:startTrainingWeapon']('weapon_pistol', 10)
+events['kora_inventory:client:startTrainingWeapon']('weapon_pistol', 10)
 fire(1537)
 H.equal(#sent, 3, 'a new training session resets the client cadence')
 cacheHandlers.isDead(true)
 fire(1538)
 H.equal(#sent, 3, 'death stops training reports')
-events['qbinventory:client:startTrainingWeapon']('weapon_pistol', 10)
+events['kora_inventory:client:startTrainingWeapon']('weapon_pistol', 10)
 fire(1538)
 H.equal(#sent, 4, 'training after death starts a fresh cadence')
-events['qbinventory:client:stopTrainingWeapon']()
+events['kora_inventory:client:stopTrainingWeapon']()
 
-Config.qbinventory.weapons.ballistics.enabled = false
+Config.kora_inventory.weapons.ballistics.enabled = false
 draw()
 exportsBeforeShots = pedExports
 ammo['hash:weapon_pistol'] = 9
@@ -162,7 +162,7 @@ fire(1540)
 ammo['hash:weapon_pistol'] = 8
 fire(1541)
 H.equal(#sent, 2, 'legacy lower-only ammo reports are not throttled inside 65 ms')
-H.equal(sent[1].name, 'qbinventory:server:weaponAmmoConsumed', 'disabled ballistics keeps the legacy event')
+H.equal(sent[1].name, 'kora_inventory:server:weaponAmmoConsumed', 'disabled ballistics keeps the legacy event')
 H.equal(sent[1].args[1], 1, 'legacy reporting keeps the drawn slot')
 H.equal(sent[1].args[2], 9, 'legacy reporting reads the first native ammo count')
 H.equal(sent[2].args[2], 8, 'the final fast shot is persisted even when the burst stops')
@@ -171,21 +171,21 @@ fire(1541)
 H.equal(#sent, 3, 'unchanged legacy ammo reports preserve their existing behavior')
 H.equal(ammoReads, 3, 'the legacy path reads native ammo once per callback')
 
-events['qbinventory:client:startTrainingWeapon']('weapon_pistol', 10)
+events['kora_inventory:client:startTrainingWeapon']('weapon_pistol', 10)
 sent = {}
 fire(1542)
 fire(1543)
 H.equal(#sent, 1, 'training remains regulated when ordinary ballistics are disabled')
-H.equal(sent[1].name, 'qbinventory:server:weaponFired', 'training still reports a native round with ballistics disabled')
+H.equal(sent[1].name, 'kora_inventory:server:weaponFired', 'training still reports a native round with ballistics disabled')
 
-events['qbinventory:client:stopTrainingWeapon']()
-Config.qbinventory.weapons.ballistics.enabled = true
+events['kora_inventory:client:stopTrainingWeapon']()
+Config.kora_inventory.weapons.ballistics.enabled = true
 draw()
 fire(1608)
-events['qbinventory:client:addAmmo']({ weapon = 'weapon_pistol', rounds = 10, ammo = 20 })
+events['kora_inventory:client:addAmmo']({ weapon = 'weapon_pistol', rounds = 10, ammo = 20 })
 fire(1673)
 H.equal(#sent, 2, 'reloading does not suppress the next shot at the accepted cadence')
-H.equal(sent[2].name, 'qbinventory:server:weaponFired', 'reloading preserves payload-free native reporting')
+H.equal(sent[2].name, 'kora_inventory:server:weaponFired', 'reloading preserves payload-free native reporting')
 H.equal(ammoReads, 3, 'native reports after reloading still do not inspect ammo')
 
 H.finish()

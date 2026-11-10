@@ -2,15 +2,15 @@
 -- handlers as the kora_lib callbacks, and an answer on every path.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
 
-H.equal(Config.qbinventory.ui.directTransport, true, 'the direct transport is on by default')
-H.equal(Config.qbinventory.ui.moveTimeoutMs, 6000, 'the move deadline is generous when nothing blocks while it waits')
-H.equal(Config.qbinventory.ui.optimisticMoves, true, 'optimistic moves stay on by default')
-H.equal(Config.qbinventory.slowRequestMs, 250, 'slow requests are logged from 250 ms')
+H.equal(Config.kora_inventory.ui.directTransport, true, 'the direct transport is on by default')
+H.equal(Config.kora_inventory.ui.moveTimeoutMs, 6000, 'the move deadline is generous when nothing blocks while it waits')
+H.equal(Config.kora_inventory.ui.optimisticMoves, true, 'optimistic moves stay on by default')
+H.equal(Config.kora_inventory.slowRequestMs, 250, 'slow requests are logged from 250 ms')
 
 -- Server half -----------------------------------------------------------------
 
@@ -90,7 +90,7 @@ exports = setmetatable({}, {
 dofile('server/persistence.lua')
 dofile('server.lua')
 
-local internal = QbInventory.internal
+local internal = KoraInventory.internal
 internal.createSecondary('stash', 'direct', { label = 'Stash', slots = 40, maxWeight = 10000000 })
 local stashKey = internal.key('stash', 'direct')
 local src = 1
@@ -100,11 +100,11 @@ for slot = 1, 30 do
     H.ok(internal.addTo(stashKey, slot % 2 == 0 and 'water' or 'bread', 3, slot, {}, 'seed'), 'seeded slot ' .. slot)
 end
 
-local call = netHandlers['qbinventory:server:call']
+local call = netHandlers['kora_inventory:server:call']
 H.ok(type(call) == 'function', 'the server listens for direct requests')
 local function reply(requestId)
     for i = #sent, 1, -1 do
-        if sent[i].name == 'qbinventory:client:callResult' and sent[i].args[1] == requestId then return sent[i], i end
+        if sent[i].name == 'kora_inventory:client:callResult' and sent[i].args[1] == requestId then return sent[i], i end
     end
 end
 _G.source = src
@@ -122,7 +122,7 @@ H.equal(answer.args[2], true, 'the move succeeded')
 H.equal(type(answer.args[3]), 'table', 'with the new revisions')
 local firstPatch
 for i, event in ipairs(sent) do
-    if event.name == 'qbinventory:client:sessionPatched' then firstPatch = firstPatch or i end
+    if event.name == 'kora_inventory:client:sessionPatched' then firstPatch = firstPatch or i end
 end
 H.ok(firstPatch and firstPatch < index, 'the patches reach the client before the verdict')
 H.equal(internal.getInventory(playerKey).items[35].name, 'bread', 'the server did apply the move')
@@ -140,7 +140,7 @@ call(9, 'intent', { token = session.token, action = 'sync' })
 H.equal(reply(9).args[2], true, "a sync intent is answered ok: " .. tostring(reply(9).args[3]))
 local patches = 0
 for _, event in ipairs(sent) do
-    if event.name == 'qbinventory:client:sessionPatched' then patches = patches + 1 end
+    if event.name == 'kora_inventory:client:sessionPatched' then patches = patches + 1 end
 end
 H.equal(patches, 2, 'and re-sends both inventories')
 
@@ -181,15 +181,15 @@ print = realPrint
 H.equal(#lines, 0, 'a fast request logs nothing')
 
 -- The callbacks stay registered for third-party renderers.
-H.ok(callbacks['qbinventory:server:transfer'] and callbacks['qbinventory:server:intent'], 'kora_lib callbacks remain')
-local ok = callbacks['qbinventory:server:transfer'](src, {
+H.ok(callbacks['kora_inventory:server:transfer'] and callbacks['kora_inventory:server:intent'], 'kora_lib callbacks remain')
+local ok = callbacks['kora_inventory:server:transfer'](src, {
     token = session.token, fromInventory = playerKey, toInventory = playerKey, fromSlot = 35, toSlot = 36, amount = 1,
 })
 H.equal(ok, true, 'a callback transfer still works')
 
 -- Building a view looks each item up once per distinct name, not once per slot.
 definitionLookups = 0
-callbacks['qbinventory:server:intent'](src, { token = session.token, action = 'sync' })
+callbacks['kora_inventory:server:intent'](src, { token = session.token, action = 'sync' })
 H.ok(definitionLookups <= 8, ('a sync of 30 stacked slots made %d definition lookups'):format(definitionLookups))
 
 -- Client half -----------------------------------------------------------------
@@ -197,8 +197,8 @@ H.ok(definitionLookups <= 8, ('a sync of 30 stacked slots made %d definition loo
 local function read(path) local f = assert(io.open(path, 'r')); local s = f:read('*a'); f:close(); return s end
 local clientNet, clientEvents, serverCalls, timers, legacyCalls = {}, {}, {}, {}, {}
 local env = setmetatable({}, { __index = _G })
-env.Config = { qbinventory = { ui = {} } }
-env.QbInventory = {}
+env.Config = { kora_inventory = { ui = {} } }
+env.KoraInventory = {}
 env.exports = setmetatable({}, { __call = function() end, __index = function()
     return setmetatable({}, { __index = function() return function() return nil end end })
 end })
@@ -229,12 +229,12 @@ env.Citizen = { Await = function(p)
 end }
 assert(loadfile('client.lua', 't', env))()
 
-clientNet['qbinventory:client:sessionOpened']({
+clientNet['kora_inventory:client:sessionOpened']({
     token = 'T',
     primary = { key = 'player:1', items = {}, revision = 3 },
     secondary = { key = 'stash:a', items = {}, revision = 5 },
 })
-local submit = env.QbInventory.clientApi.submitIntent
+local submit = env.KoraInventory.clientApi.submitIntent
 local function run(intent)
     local result
     local routine = coroutine.create(function() result = table.pack(submit(intent)) end)
@@ -245,25 +245,25 @@ local move = { sessionId = 'T', token = 'T', intent = 'move', payload = { fromIn
 
 local routine, result = run(move)
 H.equal(#serverCalls, 1, 'a move is sent as one net event')
-H.equal(serverCalls[1].name, 'qbinventory:server:call', 'on the direct event')
+H.equal(serverCalls[1].name, 'kora_inventory:server:call', 'on the direct event')
 H.equal(serverCalls[1].args[2], 'transfer', 'as a transfer')
 H.equal(serverCalls[1].args[3].fromRevision, 5, 'carrying the source revision from the client mirror')
 H.equal(serverCalls[1].args[3].toRevision, 3, 'and the destination revision')
 H.equal(#legacyCalls, 0, 'kora_lib callbacks are not involved')
 H.equal(result(), nil, 'the caller waits for the verdict')
-clientNet['qbinventory:client:callResult'](serverCalls[1].args[1], true, { fromRevision = 6 })
+clientNet['kora_inventory:client:callResult'](serverCalls[1].args[1], true, { fromRevision = 6 })
 H.equal(result()[1], true, 'the verdict resumes the caller')
 H.equal(result()[2].fromRevision, 6, 'with the server result')
 
 serverCalls = {}
 routine, result = run(move)
-clientNet['qbinventory:client:callResult'](serverCalls[1].args[1], false, 'over weight')
+clientNet['kora_inventory:client:callResult'](serverCalls[1].args[1], false, 'over weight')
 H.equal(result()[1], false, 'a refusal comes back as false')
 H.equal(result()[2], 'over weight', 'with the reason')
 
 -- A verdict for a request nobody waits on, or answered twice, is ignored.
-clientNet['qbinventory:client:callResult'](999, true)
-clientNet['qbinventory:client:callResult'](serverCalls[1].args[1], true)
+clientNet['kora_inventory:client:callResult'](999, true)
+clientNet['kora_inventory:client:callResult'](serverCalls[1].args[1], true)
 H.equal(result()[1], false, 'a repeated verdict does not rewrite the first')
 
 -- No verdict at all: the deadline resolves the wait.
@@ -279,14 +279,14 @@ serverCalls = {}
 routine, result = run({ sessionId = 'T', token = 'T', intent = 'sync', payload = {} })
 H.equal(serverCalls[1].args[2], 'intent', 'sync travels as an intent')
 H.equal(serverCalls[1].args[3].action, 'sync', 'with its action')
-clientNet['qbinventory:client:callResult'](serverCalls[1].args[1], true)
+clientNet['kora_inventory:client:callResult'](serverCalls[1].args[1], true)
 
 -- The fallback.
-env.Config.qbinventory.ui.directTransport = false
+env.Config.kora_inventory.ui.directTransport = false
 serverCalls = {}
 routine, result = run(move)
 H.equal(#serverCalls, 0, 'with the option off nothing is sent on the direct event')
-H.equal(legacyCalls[1].name, 'qbinventory:server:transfer', 'the kora_lib callback carries the request instead')
+H.equal(legacyCalls[1].name, 'kora_inventory:server:transfer', 'the kora_lib callback carries the request instead')
 H.equal(result()[2], 'legacy', 'and its answer is returned unchanged')
 
 H.finish()

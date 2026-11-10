@@ -3,7 +3,7 @@ local function read(path) local f = assert(io.open(path, 'r')); local s = f:read
 local client, compat, ui = read('client.lua'), read('client/compat.lua'), read('client/ui.lua')
 
 local a = client:find('local function hasItem', 1, true)
-local b = client:find('QbInventory.clientApi = {', 1, true)
+local b = client:find('KoraInventory.clientApi = {', 1, true)
 local chunk = client:sub(a, b - 1) .. '\nreturn hasItem'
 local items = {
     { name = 'water', amount = 3 }, { name = 'water', amount = 2 }, { name = 'Bread', amount = 1 },
@@ -29,7 +29,7 @@ H.ok(not hasItem({}), 'empty table is false')
 H.ok(compat:find("RegisterNetEvent('qb-inventory:client:ItemBox', legacyItemBox)", 1, true), 'stock ItemBox is forwarded')
 H.ok(compat:find("RegisterNetEvent('inventory:client:ItemBox', legacyItemBox)", 1, true), 'legacy ItemBox alias is forwarded')
 H.ok(compat:find('itemData.koraReceipt', 1, true), 'the inventory\'s own legacy copy is not re-rendered')
-H.ok(ui:find("AddEventHandler('qbinventory:ui:legacyItemBox'", 1, true), 'UI bridge renders legacy item boxes')
+H.ok(ui:find("AddEventHandler('kora_inventory:ui:legacyItemBox'", 1, true), 'UI bridge renders legacy item boxes')
 H.ok(ui:find('policy.enabled ~= true', 1, true), 'legacy boxes obey the itemBoxes policy')
 H.ok(ui:find("getShared('items', name)", 1, true), 'legacy box label and art come from the registry, not the payload')
 H.ok(ui:find('takeSeen(seenReceipts.legacy, key)', 1, true) and ui:find('takeSeen(seenReceipts.native, key)', 1, true), 'native and legacy receipts de-duplicate each other')

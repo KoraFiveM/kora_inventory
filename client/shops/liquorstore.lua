@@ -4,29 +4,29 @@
 -- opens the session, so triggering this event away from a counter is harmless.
 
 local shop = assert(
-    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.liquorstore,
-    'qbinventory liquor store configuration is required'
+    Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.liquorstore,
+    'kora_inventory liquor store configuration is required'
 )
 
 local function openLiquorStore()
     exports.kora_inventory:openInventory('shop', shop.id)
 end
 
-RegisterNetEvent('qbinventory:client:openLiquorStore', function()
+RegisterNetEvent('kora_inventory:client:openLiquorStore', function()
     if type(GetInvokingResource) == 'function' and GetInvokingResource() then
         return
     end
     openLiquorStore()
 end)
 
-local targets = QbInventory.shopLocationTargets(shop, function(location)
+local targets = KoraInventory.shopLocationTargets(shop, function(location)
     return {
         {
             label = ('Browse %s'):format(location.name),
             icon = 'wine',
             onSelect = openLiquorStore,
             -- The clerk ped offers the same option while it is spawned.
-            canInteract = function() return not QbInventory.shopClerkActive(location) end,
+            canInteract = function() return not KoraInventory.shopClerkActive(location) end,
         },
     }
 end)
@@ -44,7 +44,7 @@ AddEventHandler('onClientResourceStop', function(resource)
     end
 end)
 
-QbInventory.shopLocationBlips(shop, Config.qbinventory.shops.liquorstore.blip.category,
+KoraInventory.shopLocationBlips(shop, Config.kora_inventory.shops.liquorstore.blip.category,
     function(location)
         return {
             sprite = shop.blip.sprite,

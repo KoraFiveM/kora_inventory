@@ -1,5 +1,5 @@
 -- Inventory and core commit both sides with the receipt before publishing items.
-local inventory, core = QbInventory, QbInventory.internal
+local inventory, core = KoraInventory, KoraInventory.internal
 local persistence = inventory.persistence
 
 local function receipt(provider, operationKey)
@@ -45,12 +45,12 @@ end
 local function claim(source, id, operationKey)
     local provider = GetInvokingResource() or GetCurrentResourceName()
     if type(id) ~= 'string' or type(operationKey) ~= 'string' or #operationKey < 1 or #operationKey > 128 then return false, 'Invalid recovery request.' end
-    if not persistence.getStatus().ready or Config.qbinventory.persistence.enabled == false then return false, 'Inventory persistence is unavailable.' end
+    if not persistence.getStatus().ready or Config.kora_inventory.persistence.enabled == false then return false, 'Inventory persistence is unavailable.' end
     local _, inv = core.resolveInventory('stash:' .. id)
     local data = exports.kora_core:getPlayerData(source)
     if not inv or inv.policyOwner ~= provider or not data or type(data.citizenid) ~= 'string' then return false, 'Recovery is unavailable.' end
     local cid, operation = data.citizenid, 'recovery:' .. provider .. ':' .. operationKey
-    local context = { key = 'qbinventory:' .. provider .. ':' .. operationKey,
+    local context = { key = 'kora_inventory:' .. provider .. ':' .. operationKey,
         fingerprint = json.encode({ provider, operationKey, id, cid }), citizenids = { cid } }
     return core.lock({ inv.key, core.playerKey(source) }, function()
         return persistence.withLock(inv.type, inv.id, function()
@@ -89,7 +89,7 @@ local function claim(source, id, operationKey)
             end
             data = exports.kora_core:getPlayerData(source)
             if not data or data.citizenid ~= cid then return reject('Your character changed. Try again.') end
-            local destination = { items = inventory.copy(data.items or {}), slots = Config.qbinventory.playerSlots, maxWeight = Config.qbinventory.playerMaxWeight }
+            local destination = { items = inventory.copy(data.items or {}), slots = Config.kora_inventory.playerSlots, maxWeight = Config.kora_inventory.playerMaxWeight }
             local count = 0
             for _, item in pairs(inv.items) do
                 local added, addErr = core.addSecondary(destination, item.name, item.amount, nil, item.info or item.metadata)

@@ -8,7 +8,7 @@
 -- real thing (visibility = 'hotbar').
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
@@ -130,9 +130,9 @@ dofile('server/useables.lua')
 dofile('server/crafting.lua')
 dofile('server/weaponcarry.lua')
 
-local carry = QbInventory.weaponCarry
-local cfg = Config.qbinventory.weaponCarry
-local buildItem = QbInventory.internal.buildItem
+local carry = KoraInventory.weaponCarry
+local cfg = Config.kora_inventory.weaponCarry
+local buildItem = KoraInventory.internal.buildItem
 
 local function give(slot, name)
     playersItems[7][slot] = buildItem(name, 1, slot, {})
@@ -210,7 +210,7 @@ end
 clientEvents = {}
 H.ok(carry.toggle(7, playersItems[7][9]), 'using a weapon item is accepted')
 local request = lastClientEvent()
-H.equal(request.name, 'qbinventory:client:toggleWeapon', 'the draw is handed to that one client to play out')
+H.equal(request.name, 'kora_inventory:client:toggleWeapon', 'the draw is handed to that one client to play out')
 H.equal(request.payload.action, 'draw', 'an empty-handed player draws')
 H.equal(request.payload.slot, 9, 'the client is told which slot it is drawing')
 H.equal(request.payload.duration, cfg.drawTime + cfg.concealedDrawTime,
@@ -223,10 +223,10 @@ H.equal(carry.equippedWeapon(7), nil, 'nothing is equipped until the client conf
 -- A confirmation for a slot the server did not ask about is ignored: the
 -- client may only finish the draw it was actually given.
 source = 7
-netEvents['qbinventory:server:weaponToggled'](1)
+netEvents['kora_inventory:server:weaponToggled'](1)
 H.equal(carry.equippedWeapon(7), nil, 'a confirmation for a different slot is rejected')
 
-netEvents['qbinventory:server:weaponToggled'](9)
+netEvents['kora_inventory:server:weaponToggled'](9)
 H.equal(carry.equippedWeapon(7).name, 'weapon_bat', 'the confirmed draw equips that weapon')
 H.equal(carry.equippedWeapon(7).slot, 9, 'the confirmed slot is recorded')
 cfg.components.test_suppressor = 'COMPONENT_AT_PI_SUPP'
@@ -239,14 +239,14 @@ H.equal(registered.GetEquippedWeapon(7).components[1], 'COMPONENT_AT_PI_SUPP', '
 playersItems[7][9].info.components = {}
 cfg.components.test_suppressor = nil
 
-netEvents['qbinventory:server:weaponAmmoConsumed'](9, 3)
-H.equal(QbInventory.weapons.getState(7, 9).ammo, 3, 'a shot report lowers durable ammo for the equipped weapon')
-H.equal(QbInventory.weapons.getState(7, 9).durability, 99.6,
+netEvents['kora_inventory:server:weaponAmmoConsumed'](9, 3)
+H.equal(KoraInventory.weapons.getState(7, 9).ammo, 3, 'a shot report lowers durable ammo for the equipped weapon')
+H.equal(KoraInventory.weapons.getState(7, 9).durability, 99.6,
     'durability loses the configured amount for every consumed round')
-netEvents['qbinventory:server:weaponAmmoConsumed'](9, 99)
-H.equal(QbInventory.weapons.getState(7, 9).ammo, 3, 'a shot report cannot increase durable ammunition')
+netEvents['kora_inventory:server:weaponAmmoConsumed'](9, 99)
+H.equal(KoraInventory.weapons.getState(7, 9).ammo, 3, 'a shot report cannot increase durable ammunition')
 
-local weaponDurability = Config.qbinventory.weapons.durability
+local weaponDurability = Config.kora_inventory.weapons.durability
 weaponDurability.multipliers.weapon_bat = 2
 H.ok(math.abs(carry.shotWear('weapon_bat', 3) - 0.6) < 0.000001,
     'a per-weapon multiplier scales wear by accepted shots')
@@ -255,12 +255,12 @@ H.equal(carry.shotWear('weapon_bat', 3), 0, 'excluded weapons do not wear from s
 weaponDurability.excluded.weapon_bat = nil
 weaponDurability.multipliers.weapon_bat = nil
 
-netEvents['qbinventory:server:weaponFired']()
-H.equal(QbInventory.weapons.getState(7, 9).ammo, 2, 'the native shot path consumes one server-owned round')
-H.equal(QbInventory.weapons.getState(7, 9).durability, 99.5,
+netEvents['kora_inventory:server:weaponFired']()
+H.equal(KoraInventory.weapons.getState(7, 9).ammo, 2, 'the native shot path consumes one server-owned round')
+H.equal(KoraInventory.weapons.getState(7, 9).durability, 99.5,
     'the native shot path applies one configured durability loss')
 
-netEvents['qbinventory:server:weaponToggled'](9)
+netEvents['kora_inventory:server:weaponToggled'](9)
 H.equal(carry.equippedWeapon(7).slot, 9, 'a replayed confirmation changes nothing -- the request is consumed')
 
 cfg.visibility = 'all'
@@ -274,38 +274,38 @@ clientEvents = {}
 carry.toggle(7, playersItems[7][9])
 H.equal(lastClientEvent().payload.action, 'holster', 'using the held weapon again holsters it')
 H.equal(lastClientEvent().payload.duration, cfg.holsterTime, 'a holster costs the holster time, never the surcharge')
-netEvents['qbinventory:server:weaponToggled'](9)
+netEvents['kora_inventory:server:weaponToggled'](9)
 H.equal(carry.equippedWeapon(7), nil, 'a confirmed holster empties the hands')
 
 -- Two presses inside one round trip: the client plays only the first (it
 -- ignores a request while one runs), so its confirm must still be honoured.
 carry.toggle(7, playersItems[7][1])
 carry.toggle(7, playersItems[7][3])
-netEvents['qbinventory:server:weaponToggled'](1)
+netEvents['kora_inventory:server:weaponToggled'](1)
 H.equal(carry.equippedWeapon(7) and carry.equippedWeapon(7).slot, 1, 'the confirm of the draw the client played still equips it')
-netEvents['qbinventory:server:weaponToggled'](3)
+netEvents['kora_inventory:server:weaponToggled'](3)
 H.equal(carry.equippedWeapon(7).slot, 1, 'the superseded request was dropped with the commit')
 carry.toggle(7, playersItems[7][1])
-netEvents['qbinventory:server:weaponToggled'](1)
+netEvents['kora_inventory:server:weaponToggled'](1)
 H.equal(carry.equippedWeapon(7), nil, 'and it holsters normally')
 
 -- Losing the weapon by any other route (weapon wheel, disarm, death) is
 -- reported with no payload -- there is nothing there worth trusting.
 carry.toggle(7, playersItems[7][9])
-netEvents['qbinventory:server:weaponToggled'](9)
+netEvents['kora_inventory:server:weaponToggled'](9)
 H.equal(carry.equippedWeapon(7).slot, 9, 'the weapon is drawn again')
-netEvents['qbinventory:server:weaponUnequipped']()
+netEvents['kora_inventory:server:weaponUnequipped']()
 H.equal(carry.equippedWeapon(7), nil, 'an unequip report puts the weapon back on the body')
 
 -- Giving the held weapon away must not leave the server believing it is still
 -- in the player's hands, hiding a weapon they no longer own.
 carry.toggle(7, playersItems[7][9])
-netEvents['qbinventory:server:weaponToggled'](9)
+netEvents['kora_inventory:server:weaponToggled'](9)
 playersItems[7][9] = nil
 clientEvents = {}
-localEvents['qbcore:server:inventoryChanged'](7)
+localEvents['kora_core:server:inventoryChanged'](7)
 H.equal(carry.equippedWeapon(7), nil, 'losing the held item clears the equipped record')
-H.equal(lastClientEvent().name, 'qbinventory:client:weaponRemoved',
+H.equal(lastClientEvent().name, 'kora_inventory:client:weaponRemoved',
     'the owning client is told to holster, not only the server record cleared')
 H.equal(lastClientEvent().source, 7, 'the strip goes to the player who lost the item')
 H.equal(lastClientEvent().payload, 'weapon_bat', 'the strip names the weapon that left')
@@ -351,18 +351,18 @@ H.ok(client:find('Kora.stream.loadWeaponAsset', 1, true) and client:find('Kora.s
     'streaming goes through kora_lib rather than raw request/poll loops')
 H.ok(client:find('IsWeaponValid(', 1, true),
     'a configured entry that is not a real weapon cannot assert inside the renderer')
-H.ok(useables:find('QbInventory.weaponCarry', 1, true),
+H.ok(useables:find('KoraInventory.weaponCarry', 1, true),
     'the weapon useable delegates the draw to the weapon carry module')
-H.ok(server:find("'qbinventory:server:weaponFired'", 1, true)
-    and client:find("'qbinventory:server:weaponFired'", 1, true),
+H.ok(server:find("'kora_inventory:server:weaponFired'", 1, true)
+    and client:find("'kora_inventory:server:weaponFired'", 1, true),
     'native shots reach the server without a client-selected weapon or ammo count')
 H.ok(manifest:find("'server/weaponcarry.lua'", 1, true) and manifest:find("'client/weaponcarry.lua'", 1, true),
     'both halves are loaded by the manifest')
 H.ok(server:find('damage = damageSettings(item.name)', 1, true)
     and client:find('applyDamageSettings(hash, request.damage)', 1, true),
     'damage settings travel from the shared weapon definition to a successful inventory draw')
-H.ok(server:find("'qbinventory:client:weaponRemoved'", 1, true)
-    and client:find("RegisterNetEvent('qbinventory:client:weaponRemoved'", 1, true)
+H.ok(server:find("'kora_inventory:client:weaponRemoved'", 1, true)
+    and client:find("RegisterNetEvent('kora_inventory:client:weaponRemoved'", 1, true)
     and client:find('RemoveWeaponFromPed(ped, hash)', 1, true),
     'a weapon whose item left the inventory is stripped from the ped by the client')
 H.ok(client:find("onPlayerDataChange({ 'items' }", 1, true),
@@ -371,7 +371,7 @@ local weaponClient = client:sub(1, assert(client:find('-- --- carried props', 1,
 H.ok(not weaponClient:find('while true do', 1, true)
     and weaponClient:find('SetWeaponDamageModifier', 1, true),
     'damage modifiers are draw-bound rather than continuously polled')
-H.ok(hotbar:find('Config.qbinventory.hotbarSlots', 1, true),
+H.ok(hotbar:find('Config.kora_inventory.hotbarSlots', 1, true),
     'the hotbar keybinds and the carry visibility read one shared slot range')
 
 H.finish()

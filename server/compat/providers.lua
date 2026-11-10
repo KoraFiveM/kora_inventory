@@ -2,7 +2,7 @@
 -- this is intentionally separate from kora_inventory's native export table so
 -- qb-inventory:GetInventory and ox_inventory:GetInventory can retain their
 -- incompatible upstream return shapes.
-local inventory = assert(QbInventory, 'qbinventory authority missing')
+local inventory = assert(KoraInventory, 'kora_inventory authority missing')
 local qb = assert(inventory.compat and inventory.compat.qb, 'qb compatibility missing')
 local ox = assert(inventory.compat and inventory.compat.ox, 'ox compatibility missing')
 
@@ -33,7 +33,7 @@ end
 
 for _, name in ipairs({ 'qb-inventory', 'ox_inventory', 'qb-weapons' }) do
     if conflicting(name) then
-        error(('qbinventory provider conflict: %s is running; stop it before starting qbinventory'):format(name))
+        error(('kora_inventory provider conflict: %s is running; stop it before starting kora_inventory'):format(name))
     end
 end
 

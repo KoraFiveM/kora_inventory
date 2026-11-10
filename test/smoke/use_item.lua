@@ -7,12 +7,12 @@
 local H = dofile('test/harness.lua')
 
 NOTIFIED = {}
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
 
-local QBCallbacks = {}
+local KoraCallbacks = {}
 Kora = {
     util = { deepClone = function(value)
         local seen = {}
@@ -27,7 +27,7 @@ Kora = {
         return clone(value)
     end },
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
-    callback = { register = function(name, fn) QBCallbacks[name] = fn end },
+    callback = { register = function(name, fn) KoraCallbacks[name] = fn end },
     sql = {},
     notify = { send = function(_, payload) NOTIFIED[#NOTIFIED + 1] = payload end },
     lang = function(key) return key end,
@@ -106,7 +106,7 @@ dofile('server.lua')
 
 -- buildItem derivation
 
-local buildItem = QbInventory.internal.buildItem
+local buildItem = KoraInventory.internal.buildItem
 
 local bandage = buildItem('bandage', 1, 1, {})
 H.equal(bandage.preventClose, false, 'default item closes the inventory after use')
@@ -133,20 +133,20 @@ playersItems[7] = {
 
 -- intentUse response signals whether the client should close the panel
 
-local ok, payload = QbInventory.internal.openSelf(7)
+local ok, payload = KoraInventory.internal.openSelf(7)
 H.ok(ok, 'own inventory opens')
 H.ok(payload.primary.items[5].useable, 'the current weapon definition restores the Use action in the inventory view')
 
-QbInventory.api.createUseable('bandage', function(src)
+KoraInventory.api.createUseable('bandage', function(src)
     -- Useables are expected to mutate inventories through the public API.
     -- This must not be rejected by a use-intent lock.
-    return QbInventory.api.addItem(src, 'potion', 1)
+    return KoraInventory.api.addItem(src, 'potion', 1)
 end)
-QbInventory.api.createUseable('map', function() return true end)
-QbInventory.api.createUseable('oldflare', function() return true end)
-QbInventory.api.createUseable('potion', function() return true end)
+KoraInventory.api.createUseable('map', function() return true end)
+KoraInventory.api.createUseable('oldflare', function() return true end)
+KoraInventory.api.createUseable('potion', function() return true end)
 
-local intent = QBCallbacks['qbinventory:server:intent']
+local intent = KoraCallbacks['kora_inventory:server:intent']
 H.ok(type(intent) == 'function', 'the restricted UI intent callback is registered')
 
 local useOK, useResult = intent(7, {
@@ -157,7 +157,7 @@ H.ok(useOK, 'using a default item succeeds')
 H.equal(useResult.preventClose, false, 'a default item tells the client to close the panel')
 H.equal(playersItems[7][4].name, 'potion', 'a useable can mutate the player inventory through AddItem')
 
-local reopened, refreshed = QbInventory.internal.openSelf(7)
+local reopened, refreshed = KoraInventory.internal.openSelf(7)
 H.ok(reopened, 'a fresh session opens after the useable mutation')
 payload = refreshed
 local revision = payload.primary.revision
@@ -177,7 +177,7 @@ H.equal(flareResult.preventClose, true, 'legacy shouldClose = false keeps the pa
 
 -- setItems cannot forge preventClose/useTime onto a stored item
 
-local setOK = QbInventory.api.setItems(7, {
+local setOK = KoraInventory.api.setItems(7, {
     [4] = { name = 'potion', amount = 1, slot = 4, preventClose = true, useTime = 999999 },
 })
 H.ok(setOK, 'setItems accepts a validated replacement')
@@ -186,7 +186,7 @@ H.equal(playersItems[7][4].useTime, 2500, 'a caller cannot forge useTime through
 
 -- downed / dead players cannot open or use items (server-enforced)
 
-local function useSlot2() return QbInventory.api.useItem(7, 4) end
+local function useSlot2() return KoraInventory.api.useItem(7, 4) end
 
 playersMetadata[7] = { inlaststand = true }
 local downedUse, downedErr = useSlot2()
@@ -198,7 +198,7 @@ H.equal(#NOTIFIED, 1, 'repeated attempts inside the cooldown do not spam')
 NOW = NOW + 5000
 useSlot2()
 H.equal(#NOTIFIED, 2, 'the notify fires again after the cooldown')
-H.equal(QbInventory.internal.openSelf ~= nil and select(1, QBCallbacks['qbinventory:server:open'](7, 'player', 7)), false,
+H.equal(KoraInventory.internal.openSelf ~= nil and select(1, KoraCallbacks['kora_inventory:server:open'](7, 'player', 7)), false,
     'a downed player cannot open an inventory')
 local downedIntent = intent(7, {
     token = payload.token, action = 'use',
@@ -209,13 +209,13 @@ H.equal(downedIntent, false, 'the NUI use intent is refused while downed')
 playersMetadata[7] = { isdead = true }
 H.equal((useSlot2()), false, 'a dead player cannot use items')
 
-Config.qbinventory.downedAllowedItems = { "POTION" }
+Config.kora_inventory.downedAllowedItems = { "POTION" }
 H.ok((useSlot2()), 'an allow-listed item stays usable while downed')
-Config.qbinventory.downedAllowedItems = {}
+Config.kora_inventory.downedAllowedItems = {}
 
-Config.qbinventory.blockWhenDowned = false
+Config.kora_inventory.blockWhenDowned = false
 H.ok((useSlot2()), 'blockWhenDowned = false restores the old behaviour')
-Config.qbinventory.blockWhenDowned = true
+Config.kora_inventory.blockWhenDowned = true
 
 playersMetadata[7] = { isdead = false, inlaststand = false }
 H.ok((useSlot2()), 'a standing player can use items again')
@@ -232,19 +232,19 @@ H.ok(cuffedErr:find('cuffed', 1, true), 'the refusal says why')
 H.equal(#NOTIFIED, 1, 'the blocked attempt notifies once')
 useSlot2()
 H.equal(#NOTIFIED, 1, 'repeated attempts inside the cooldown do not spam')
-H.equal(select(1, QBCallbacks['qbinventory:server:open'](7, 'player', 7)), false, 'a cuffed player cannot open an inventory')
+H.equal(select(1, KoraCallbacks['kora_inventory:server:open'](7, 'player', 7)), false, 'a cuffed player cannot open an inventory')
 local cuffedIntent = intent(7, {
     token = payload.token, action = 'use',
     payload = { slot = 2 }, primaryRevision = payload.primary.revision,
 })
 H.equal(cuffedIntent, false, 'a request on a session opened before the cuff is refused and closes it')
 
-Config.qbinventory.blockWhenCuffed = false
+Config.kora_inventory.blockWhenCuffed = false
 H.ok((useSlot2()), 'blockWhenCuffed = false restores the old behaviour')
-Config.qbinventory.blockWhenCuffed = true
+Config.kora_inventory.blockWhenCuffed = true
 
 playersMetadata[7] = {}
 H.ok((useSlot2()), 'an uncuffed player can use items again')
-H.ok(QbInventory.internal.openSelf(7), 'and open their inventory again')
+H.ok(KoraInventory.internal.openSelf(7), 'and open their inventory again')
 
 H.finish()

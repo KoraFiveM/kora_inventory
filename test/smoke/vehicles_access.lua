@@ -1,22 +1,22 @@
--- Run from qbinventory: lua test/smoke/vehicles_access.lua
+-- Run from kora_inventory: lua test/smoke/vehicles_access.lua
 -- Real server/vehicles.lua; only GTA natives and the kora_lib world/lookup
 -- helpers are faked. Covers the trunk distance and lock policy.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('shared.lua')
 
-local QB = { vehicle = {}, world = {}, lookup = {} }
-QB.vehicle.normalizePlate = function(value) return (tostring(value):gsub('%s+$', '')) end
-QB.world.resolveNetworkEntity = function(src, networkId, options)
+local Kora = { vehicle = {}, world = {}, lookup = {} }
+Kora.vehicle.normalizePlate = function(value) return (tostring(value):gsub('%s+$', '')) end
+Kora.world.resolveNetworkEntity = function(src, networkId, options)
     local a, b = GetEntityCoords(1), GetEntityCoords(networkId)
     local dx, dy, dz = a.x - b.x, a.y - b.y, a.z - b.z
     if math.sqrt(dx * dx + dy * dy + dz * dz) > options.maxDistance then return nil, 'too_far' end
     return networkId
 end
-QB.lookup.get = function() return { metadata = { class = 'SUPER' } } end
-_G.QB, _G.Kora = QB, QB
+Kora.lookup.get = function() return { metadata = { class = 'SUPER' } } end
+_G.Kora = Kora
 
 local vehicle = { coords = { x = 5, y = 0, z = 0 }, bag = nil, lock = 0 }
 GetPlayerPed = function() return 1 end
@@ -24,10 +24,10 @@ GetEntityCoords = function(entity) return entity == 1 and { x = 0, y = 0, z = 0 
 GetVehicleNumberPlateText = function() return 'ADDER01' end
 GetEntityModel = function() return 1 end
 GetVehicleDoorLockStatus = function() return vehicle.lock end
-Entity = function() return { state = { ['qbvehiclekeys:locked'] = vehicle.bag } } end
+Entity = function() return { state = { ['kora_vehiclekeys:locked'] = vehicle.bag } } end
 
 local V = dofile('server/vehicles.lua')
-local cfg = Config.qbinventory.vehicles
+local cfg = Config.kora_inventory.vehicles
 local function reset()
     vehicle.coords, vehicle.bag, vehicle.lock = { x = 5, y = 0, z = 0 }, nil, 0
     cfg.respectLocks, cfg.trunkDistance, cfg.distance = true, 7.0, 3.0

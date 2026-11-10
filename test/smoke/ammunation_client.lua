@@ -3,11 +3,11 @@
 -- identical Browse Ammu-Nation options at every counter.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
 
-local shop = Config.qbinventory.shops.ammunation
+local shop = Config.kora_inventory.shops.ammunation
 shop.locations = {
     { x = 10, y = 20, z = 30 },
     { x = 40, y = 50, z = 60 },
@@ -53,16 +53,16 @@ end
 H.equal(countActiveZones(), #shop.locations, 'initial load registers one target per Ammu-Nation counter')
 
 for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('kora_target') end
-H.equal(countActiveZones(), #shop.locations, 'a qbtarget start replaces existing Ammu-Nation targets')
+H.equal(countActiveZones(), #shop.locations, 'a kora_target start replaces existing Ammu-Nation targets')
 
 for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('kora_target') end
-H.equal(countActiveZones(), #shop.locations, 'repeated qbtarget starts cannot duplicate Ammu-Nation targets')
+H.equal(countActiveZones(), #shop.locations, 'repeated kora_target starts cannot duplicate Ammu-Nation targets')
 
 for _, callback in ipairs(handlers.onClientResourceStop or {}) do callback('kora_target') end
 -- kora_target's own stop handler removes its zone registrations before the next
 -- instance starts. Simulate that independent cleanup here.
 activeZones = {}
 for _, callback in ipairs(handlers.onClientResourceStart or {}) do callback('kora_target') end
-H.equal(countActiveZones(), #shop.locations, 'a restarted qbtarget instance does not remove targets registered after its stop')
+H.equal(countActiveZones(), #shop.locations, 'a restarted kora_target instance does not remove targets registered after its stop')
 
 H.finish()

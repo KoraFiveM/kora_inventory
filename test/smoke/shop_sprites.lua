@@ -2,7 +2,7 @@
 -- each shop zone is registered with.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config/shops/liquorstore.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
@@ -10,19 +10,19 @@ dofile('shared.lua')
 local location = { x = 1.0, y = 2.0, z = 3.0 }
 
 Config.showTargetHints = nil
-local zone = QbInventory.shopZoneSprite({}, location)
+local zone = KoraInventory.shopZoneSprite({}, location)
 H.equal(zone.drawSprite, nil, 'nil passes no drawSprite so kora_target decides')
 H.equal(zone.spriteCoords.x, 1.0, 'the icon sits at the counter')
 H.equal(zone.spriteCoords.z, 3.0, 'including its height')
 
 Config.showTargetHints = true
-H.equal(QbInventory.shopZoneSprite({}, location).drawSprite, true, 'true forces the icon on')
+H.equal(KoraInventory.shopZoneSprite({}, location).drawSprite, true, 'true forces the icon on')
 
 Config.showTargetHints = false
-H.equal(QbInventory.shopZoneSprite({}, location).drawSprite, false, 'false forces the icon off')
+H.equal(KoraInventory.shopZoneSprite({}, location).drawSprite, false, 'false forces the icon off')
 
 Config.showTargetHints = nil
-local override = QbInventory.shopZoneSprite({}, { x = 1, y = 2, z = 3, spriteCoords = { x = 9, y = 9, z = 9 } })
+local override = KoraInventory.shopZoneSprite({}, { x = 1, y = 2, z = 3, spriteCoords = { x = 9, y = 9, z = 9 } })
 H.equal(override.spriteCoords.x, 9, 'a location can override the icon position')
 
 -- The shop clients pass it through when they register.

@@ -4,16 +4,16 @@
 -- the mid-use lock, and a new drop never reuses the id of a live one.
 local H = dofile('test/harness.lua')
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
 
-local QBCallbacks = {}
+local KoraCallbacks = {}
 local CLIENT = {}
 Kora = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
-    callback = { register = function(name, fn) QBCallbacks[name] = fn end },
+    callback = { register = function(name, fn) KoraCallbacks[name] = fn end },
     sql = {},
     notify = { send = function() end },
     lang = function(key) return key end,
@@ -82,9 +82,9 @@ dofile('server.lua')
 dofile('server/containers.lua')
 dofile('server/compat/qb_callbacks.lua')
 
-local internal, api = QbInventory.internal, QbInventory.api
+local internal, api = KoraInventory.internal, KoraInventory.api
 local buildItem = internal.buildItem
-local transfer = QBCallbacks['qbinventory:server:transfer']
+local transfer = KoraCallbacks['kora_inventory:server:transfer']
 
 local function reset()
     playersItems[7] = { [1] = buildItem('bandage', 2, 1, {}), [2] = buildItem('water', 3, 2, {}) }
@@ -112,10 +112,10 @@ playersMetadata[7] = {}
 
 -- AddItem with a slot outside 1..playerSlots stores nothing invisible.
 reset()
-H.equal((api.addItem(7, 'water', 1, Config.qbinventory.playerSlots + 50)), false, 'an out-of-range slot is refused')
+H.equal((api.addItem(7, 'water', 1, Config.kora_inventory.playerSlots + 50)), false, 'an out-of-range slot is refused')
 H.equal((api.addItem(7, 'water', 1, 0.5)), false, 'a fractional slot is refused')
 H.ok(api.addItem(7, 'water', 1, 9), 'an in-range slot still works')
-H.equal(playersItems[7][Config.qbinventory.playerSlots + 50], nil, 'nothing was stored past the last slot')
+H.equal(playersItems[7][Config.kora_inventory.playerSlots + 50], nil, 'nothing was stored past the last slot')
 H.ok(api.addItem(7, 'water', 1, false), 'slot = false still means "anywhere"')
 
 -- A swap must not put a backpack into its own open container.
@@ -139,8 +139,8 @@ local _, fresh = internal.openSelf(7)
 local results
 api.createUseable('bandage', function(src)
     results = {
-        drop = QBCallbacks['qb-inventory:server:createDrop'](src, { fromSlot = 1, amount = 1 }),
-        give = QBCallbacks['qb-inventory:server:giveItem'](src, 8, 'bandage', 1, 1),
+        drop = KoraCallbacks['qb-inventory:server:createDrop'](src, { fromSlot = 1, amount = 1 }),
+        give = KoraCallbacks['qb-inventory:server:giveItem'](src, 8, 'bandage', 1, 1),
     }
     return true
 end)
@@ -156,7 +156,7 @@ H.equal(next(playersItems[8]), nil, 'nothing reached the other player')
 reset()
 internal.createSecondary('drop', 1, { coords = { x = 50.0, y = 0.0, z = 0.0 }, items = { [1] = buildItem('water', 1, 1, {}) }, temporary = true })
 local _, dropSession = internal.openSelf(7)
-local intent = QBCallbacks['qbinventory:server:intent']
+local intent = KoraCallbacks['kora_inventory:server:intent']
 local dropped, dropId = intent(7, { token = dropSession.token, action = 'drop', payload = { slot = 2, amount = 1 }, primaryRevision = dropSession.primary.revision })
 H.ok(dropped, 'the drop succeeds')
 H.ok(dropId ~= 1, 'the new drop takes a free id')

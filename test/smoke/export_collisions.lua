@@ -42,14 +42,14 @@ local serverScripts = pathsFrom(block)
 H.ok(#serverScripts >= 8, 'fxmanifest server_scripts were discovered')
 
 -- Shared-script prerequisites. Every server_scripts file below assumes
--- Config/QbInventory helpers and every shop's config are already in the VM,
+-- Config/KoraInventory helpers and every shop's config are already in the VM,
 -- exactly as fxmanifest.lua's shared_scripts load first on a real FXServer.
 --
 -- Discovered from the manifest rather than listed here: each shop's server file
 -- `assert`s its own config block at load time, so a newly added shop that this
 -- list had not been updated for failed the whole test with an assertion from
 -- inside the shop rather than anything to do with export collisions.
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 
 local sharedBlock = assert(manifest:match('shared_scripts%s*{(.-)\n}'), 'fxmanifest.lua must declare shared_scripts')
 for _, path in ipairs(pathsFrom(sharedBlock)) do
@@ -58,7 +58,7 @@ for _, path in ipairs(pathsFrom(sharedBlock)) do
     if path:sub(1, 1) ~= '@' then dofile(path) end
 end
 
--- A minimal Kora (kora_lib/qbsql) surface. Only the entry points touched
+-- A minimal Kora (kora_lib/kora_sql) surface. Only the entry points touched
 -- unconditionally at module-load time need to exist here; everything else in
 -- these files runs inside a function body and is never invoked by merely
 -- loading the module.
@@ -218,7 +218,7 @@ for _, path in ipairs(clientScripts) do
     -- statically, so a compat module is simply not allowed to do it.
     if isCompat and source:find('exports%(%s*[%a_][%w_]*%s*,') then
         clientProblems[#clientProblems + 1] =
-            ("%s registers exports dynamically into qbinventory's own table; publish under its provider identity instead"):format(path)
+            ("%s registers exports dynamically into kora_inventory's own table; publish under its provider identity instead"):format(path)
     end
 end
 table.sort(clientProblems)

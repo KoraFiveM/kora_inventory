@@ -1,7 +1,7 @@
 local H = dofile('test/harness.lua')
 
 local handlers = {}
-_G.QbInventory = { compat = { qb = { GetInventory = function() end }, ox = { GetInventory = function() end } } }
+_G.KoraInventory = { compat = { qb = { GetInventory = function() end }, ox = { GetInventory = function() end } } }
 _G.AddEventHandler = function(name, handler) handlers[name] = handler end
 _G.GetCurrentResourceName = function() return 'kora_inventory' end
 _G.Kora = { compat = { provideExport = function(identity, name, fn)

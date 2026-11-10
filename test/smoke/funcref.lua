@@ -14,7 +14,7 @@
 local H = dofile('test/harness.lua')
 
 -- Shared-script prerequisites, mirroring fxmanifest.lua's load order.
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile('config.lua')
 dofile('config/shops/ammunation.lua')
 dofile('shared.lua')
@@ -57,18 +57,18 @@ local function funcref(fn)
     return setmetatable({}, { __call = function(_, ...) return fn(...) end })
 end
 
-H.ok(QbInventory.isCallable(funcref(function() end)), 'a __call table is recognised as callable')
-H.ok(QbInventory.isCallable(function() end), 'a plain function is still recognised as callable')
-H.ok(not QbInventory.isCallable({}), 'a bare table is not callable')
-H.ok(not QbInventory.isCallable('handler'), 'a string is not callable')
-H.ok(not QbInventory.isCallable(nil), 'nil is not callable')
+H.ok(KoraInventory.isCallable(funcref(function() end)), 'a __call table is recognised as callable')
+H.ok(KoraInventory.isCallable(function() end), 'a plain function is still recognised as callable')
+H.ok(not KoraInventory.isCallable({}), 'a bare table is not callable')
+H.ok(not KoraInventory.isCallable('handler'), 'a string is not callable')
+H.ok(not KoraInventory.isCallable(nil), 'nil is not callable')
 
--- createUseable: the kora_police/kora_ambulance/qbdrugs boot failure.
+-- createUseable: the kora_police/kora_ambulance/kora_drugs boot failure.
 local calls = 0
 local handler = funcref(function() calls = calls + 1 end)
 local ok, err = pcall(registered.createUseable, 'handcuffs', handler)
 H.ok(ok, 'createUseable accepts a cross-resource funcref (' .. tostring(err) .. ')')
-H.ok(QbInventory.internal.hasUseable('handcuffs'), 'the funcref handler is actually registered as useable')
+H.ok(KoraInventory.internal.hasUseable('handcuffs'), 'the funcref handler is actually registered as useable')
 -- useItem invokes handlers through pcall(handler, src, item); a __call table
 -- must survive that, otherwise registration would succeed but using the item
 -- would fail at runtime instead of at boot.

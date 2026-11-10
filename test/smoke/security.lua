@@ -23,8 +23,8 @@ local manifest = read('fxmanifest.lua')
 -- an explicit regression guard.
 H.ok(not server:find('SetInventoryData', 1, true), 'server exposes no full-inventory replacement endpoint')
 H.ok(not client:find('SetInventoryData', 1, true), 'client cannot submit full-inventory replacement')
-H.ok(server:find("RegisterNetEvent('qbinventory:server:transfer'", 1, true), 'transfer transport is explicitly registered')
-H.ok(server:find("RegisterNetEvent('qbinventory:server:intent'", 1, true), 'restricted intent transport is explicitly registered')
+H.ok(server:find("RegisterNetEvent('kora_inventory:server:transfer'", 1, true), 'transfer transport is explicitly registered')
+H.ok(server:find("RegisterNetEvent('kora_inventory:server:intent'", 1, true), 'restricted intent transport is explicitly registered')
 H.ok(server:find("if type(request) ~= 'table'", 1, true), 'server rejects malformed transfer requests')
 
 -- Shops are read-only to generic transfers. Purchases have their own session,
@@ -36,7 +36,7 @@ H.ok(compactServer:find("if request.action == 'give' then return intentGive(src,
 H.ok(compactServer:find("if shop.type ~= 'shop' then return false, 'secondary inventory is not a shop' end", 1, true), 'buy verifies target is a shop')
 H.ok(server:find("and hookLegacyKeys(hook)) then", 1, true), 'kora-keys hooks can provide a user-facing denial reason')
 H.ok(server:find('exports.kora_core:removeMoney', 1, true), 'purchase takes server-side payment')
-H.ok(server:find("'qbinventory-refund'", 1, true), 'failed purchase is refunded server-side')
+H.ok(server:find("'kora_inventory-refund'", 1, true), 'failed purchase is refunded server-side')
 H.ok(server:find('local function normaliseShopStock(rows, slots)', 1, true), 'configured shop stock is normalised server-side')
 H.ok(server:find('local item, err = buildItem(row.name, amount, slot, row.info or row.metadata)', 1, true), 'shop stock uses canonical shared item definitions')
 H.ok(compactServer:find("if not amount or not price or price < 0 then return nil, 'invalid shop amount or price' end", 1, true), 'shop stock rejects invalid prices and counts')
@@ -67,11 +67,11 @@ H.ok(server:find("recordAudit('give'", 1, true), 'give is audited')
 
 -- kora_core remains the sole player data owner. Secondary persistence has a
 -- separate schema and operational, non-destructive migration path.
-H.ok(server:find('exports.kora_core:getPlayerData', 1, true), 'player state is read from qbcore')
-H.ok(server:find('exports.kora_core:setPath', 1, true), 'player mutation uses qbcore funnel')
+H.ok(server:find('exports.kora_core:getPlayerData', 1, true), 'player state is read from kora_core')
+H.ok(server:find('exports.kora_core:setPath', 1, true), 'player mutation uses kora_core funnel')
 H.ok(not server:find('INSERT INTO `players`', 1, true) and not server:find('UPDATE `players`', 1, true), 'authority does not write players table')
 H.ok(persistence:find("inv.type == 'player'", 1, true), 'persistence excludes player inventories')
-H.ok(persistence:find("RegisterCommand('qbinventory-migrate'", 1, true), 'migration is an explicit operator command')
+H.ok(persistence:find("RegisterCommand('kora_inventory-migrate'", 1, true), 'migration is an explicit operator command')
 H.ok(persistence:find('INFORMATION_SCHEMA', 1, true) and persistence:find("'unsupported legacy table'", 1, true), 'legacy import is defensive')
 H.ok(persistence:find('kora_inventory_migration_rows', 1, true), 'migration tracks idempotency rows')
 
@@ -82,12 +82,12 @@ H.ok(not server:find('SendNUIMessage', 1, true) and not server:find('RegisterNUI
 H.ok(not client:find('SendNUIMessage', 1, true) and not client:find('RegisterNUICallback', 1, true), 'client transport has no NUI bridge')
 H.ok(bridge:find('RegisterNUICallback', 1, true) and bridge:find('SendNUIMessage', 1, true), 'NUI bridge owns browser transport')
 H.ok(not bridge:find('TriggerServerEvent', 1, true), 'NUI bridge cannot mutate server directly')
-H.ok(bridge:find("TriggerEvent('qbinventory:client:submitIntent'", 1, true), 'NUI bridge hands intents to headless client transport')
+H.ok(bridge:find("TriggerEvent('kora_inventory:client:submitIntent'", 1, true), 'NUI bridge hands intents to headless client transport')
 H.ok(compactClient:find("if intent.token and intent.token ~= session.token then return false, 'stale session' end", 1, true), 'client rejects stale NUI token')
-H.ok(client:find("TriggerServerEvent('qbinventory:server:intent'", 1, true), 'client forwards only approved server intent actions')
-H.ok(client:find("TriggerEvent('qbinventory:client:requestGiveTarget'", 1, true), 'client resolves a give recipient locally before server intent')
+H.ok(client:find("TriggerServerEvent('kora_inventory:server:intent'", 1, true), 'client forwards only approved server intent actions')
+H.ok(client:find("TriggerEvent('kora_inventory:client:requestGiveTarget'", 1, true), 'client resolves a give recipient locally before server intent')
 H.ok(client:find("action = 'give'", 1, true), 'client submits only the resolved give recipient')
 H.ok(manifest:find("'client/ui.lua'", 1, true) and manifest:find("ui_page 'web/build/index.html'", 1, true), 'bundled UI is isolated to its client bridge')
-H.ok(not manifest:find("'@kora_core/init.lua'", 1, true), 'inventory does not load qbcore\'s unused optional registry mirror')
+H.ok(not manifest:find("'@kora_core/init.lua'", 1, true), 'inventory does not load kora_core\'s unused optional registry mirror')
 
 H.finish()

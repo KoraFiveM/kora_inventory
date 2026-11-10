@@ -25,10 +25,10 @@ local encoded, nextJson = {}, 0
 json = {
     encode = function(value)
         nextJson = nextJson + 1
-        encoded[tostring(nextJson)] = QbInventory.copy(value)
+        encoded[tostring(nextJson)] = KoraInventory.copy(value)
         return tostring(nextJson)
     end,
-    decode = function(token) return QbInventory.copy(encoded[token]) end,
+    decode = function(token) return KoraInventory.copy(encoded[token]) end,
 }
 Kora = {
     util = { deepClone = function(value)
@@ -112,7 +112,7 @@ rows[#rows + 1] = {
 
 dofile('server/persistence.lua')
 dofile('server.lua')
-local api, internal, persistence = QbInventory.api, QbInventory.internal, QbInventory.persistence
+local api, internal, persistence = KoraInventory.api, KoraInventory.internal, KoraInventory.persistence
 local seed = { { name = 'wood', amount = 10, price = 5 } }
 H.ok(api.RegisterShop('guns', { label = 'Guns', slots = 4, maxWeight = 500, inventory = seed }))
 H.ok(api.RegisterShop('catalogue', { label = 'Catalogue', slots = 4, maxWeight = 500, weightLimit = false, inventory = seed }))

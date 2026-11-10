@@ -11,8 +11,8 @@
 -- liquorstore.lua.
 
 local shop = assert(
-    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.convenience,
-    'qbinventory convenience store configuration is required'
+    Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.convenience,
+    'kora_inventory convenience store configuration is required'
 )
 
 if shop.enabled == false then

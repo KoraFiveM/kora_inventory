@@ -5,7 +5,7 @@
 -- decides what other players see on a body, and "was it visible" is exactly
 -- what prices a draw (see `concealedDrawTime`).
 --
--- Authority. The carried list is built HERE from qbcore-owned PlayerData and
+-- Authority. The carried list is built HERE from kora_core-owned PlayerData and
 -- pushed out on a server-set, replicated player state bag. A client never
 -- submits, edits or extends its own carried list -- it only renders whatever
 -- bag it receives -- so this cannot become a channel for advertising items a
@@ -17,11 +17,11 @@
 -- Nothing here mutates an inventory. Equipping does not remove the weapon
 -- item (see server/useables.lua's note on why v1 keeps it in the slot).
 
-QbInventory = QbInventory or {}
-local inventory = QbInventory
-local internal = assert(inventory.internal, 'qbinventory authority must load before weapon carry')
+KoraInventory = KoraInventory or {}
+local inventory = KoraInventory
+local internal = assert(inventory.internal, 'kora_inventory authority must load before weapon carry')
 
-local config = Config.qbinventory
+local config = Config.kora_inventory
 local carryConfig = config.weaponCarry or {}
 local weaponConfig = config.weapons or {}
 local durabilityConfig = weaponConfig.durability or {}
@@ -29,7 +29,7 @@ local durabilityConfig = weaponConfig.durability or {}
 -- Replicated. Cleared with an explicit `false`, never a nil deletion: a nil
 -- write is a key DELETION and does not replicate like a value change, so a
 -- client would keep rendering the last list forever.
-local STATE_KEY = 'qbinventory:weaponCarry'
+local STATE_KEY = 'kora_inventory:weaponCarry'
 
 -- src -> { slot, name }: what this player is currently holding, so it is not
 -- also drawn on their back. Confirmed by the client after the draw animation
@@ -51,7 +51,7 @@ local function stopTraining(src)
         return false
     end
     training[src] = nil
-    TriggerClientEvent('qbinventory:client:stopTrainingWeapon', src)
+    TriggerClientEvent('kora_inventory:client:stopTrainingWeapon', src)
     return true
 end
 
@@ -281,7 +281,7 @@ local function toggle(src, item)
         expires = GetGameTimer() + duration + 15000,
     }
 
-    TriggerClientEvent('qbinventory:client:toggleWeapon', src, {
+    TriggerClientEvent('kora_inventory:client:toggleWeapon', src, {
         name = item.name,
         slot = slot,
         action = action,
@@ -309,9 +309,9 @@ local function toggle(src, item)
 end
 
 ---The client reporting that the draw/holster this server asked for actually
----finished. The slot is re-resolved against qbcore-owned PlayerData: a client
+---finished. The slot is re-resolved against kora_core-owned PlayerData: a client
 ---cannot confirm a weapon it does not have, in a slot it was not asked about.
-RegisterNetEvent('qbinventory:server:weaponToggled', function(slot)
+RegisterNetEvent('kora_inventory:server:weaponToggled', function(slot)
     if GetInvokingResource() then
         return
     end
@@ -332,7 +332,7 @@ RegisterNetEvent('qbinventory:server:weaponToggled', function(slot)
         -- The item left the inventory while its draw bar ran; the client has
         -- already put the weapon in hand, so take it back out.
         if request.action == 'draw' then
-            TriggerClientEvent('qbinventory:client:weaponRemoved', src, request.name)
+            TriggerClientEvent('kora_inventory:client:weaponRemoved', src, request.name)
         end
         return
     end
@@ -346,7 +346,7 @@ end)
 ---wheel switch, a disarm, death, or a respawn. Carries no payload precisely
 ---because there is nothing here worth trusting a client with: it can only
 ---ever put a weapon BACK on its own player's body, never take one off.
-RegisterNetEvent('qbinventory:server:weaponUnequipped', function()
+RegisterNetEvent('kora_inventory:server:weaponUnequipped', function()
     if GetInvokingResource() then
         return
     end
@@ -362,7 +362,7 @@ end)
 ---The client's drawn throwable left its hand with no ammo left -- it was
 ---thrown. Payload-free like weaponUnequipped: it can only consume one of this
 ---player's own items, from the slot this server confirmed as drawn.
-RegisterNetEvent('qbinventory:server:throwableThrown', function()
+RegisterNetEvent('kora_inventory:server:throwableThrown', function()
     if GetInvokingResource() then
         return
     end
@@ -385,7 +385,7 @@ end)
 -- weapon the server has already confirmed as drawn; reloading is the sole
 -- server-side path that raises it. That makes this safe for both native
 -- kora_inventory draws and the qb-weapons compatibility adapter.
-RegisterNetEvent('qbinventory:server:weaponAmmoConsumed', function(slot, amount)
+RegisterNetEvent('kora_inventory:server:weaponAmmoConsumed', function(slot, amount)
     if GetInvokingResource() then
         return
     end
@@ -436,7 +436,7 @@ end)
 -- loaded round, then lets the police domain create a casing from server-owned
 -- data. FiveM cannot expose native weapon-fire state to the server, therefore
 -- the cadence limit is an intentional anti-spam floor.
-RegisterNetEvent('qbinventory:server:weaponFired', function()
+RegisterNetEvent('kora_inventory:server:weaponFired', function()
     if GetInvokingResource() then
         return
     end
@@ -451,7 +451,7 @@ RegisterNetEvent('qbinventory:server:weaponFired', function()
         lastShotAt[src] = current
         rangeWeapon.remaining = rangeWeapon.remaining - 1
         rangeWeapon.fired = rangeWeapon.fired + 1
-        TriggerEvent('qbinventory:server:trainingRoundFired', src, {
+        TriggerEvent('kora_inventory:server:trainingRoundFired', src, {
             owner = rangeWeapon.owner,
             weapon = rangeWeapon.name,
             shot = rangeWeapon.fired,
@@ -478,14 +478,14 @@ RegisterNetEvent('qbinventory:server:weaponFired', function()
         return
     end
     lastShotAt[src] = now
-    TriggerEvent('qbinventory:server:weaponRoundFired', src, round)
+    TriggerEvent('kora_inventory:server:weaponRoundFired', src, round)
 end)
 
 -- Every player item write funnels through kora_core's setPath, which fires this
 -- for kora_inventory's own transfers as well as another resource's AddItem, so
 -- one handler covers picking a rifle up, dropping it, and moving it in or out
 -- of the hotbar range.
-AddEventHandler('qbcore:server:inventoryChanged', function(src, path, value)
+AddEventHandler('kora_core:server:inventoryChanged', function(src, path, value)
     local holding = equipped[src]
     if holding then
         -- Metadata on the held weapon cannot change the list worn on the body.
@@ -500,7 +500,7 @@ AddEventHandler('qbcore:server:inventoryChanged', function(src, path, value)
             -- The server only forgot the weapon; the ped still holds it. Tell
             -- that client to holster and strip it (dropped, given, moved to a
             -- stash/trunk, removed by another resource, sold).
-            TriggerClientEvent('qbinventory:client:weaponRemoved', src, holding.name)
+            TriggerClientEvent('kora_inventory:client:weaponRemoved', src, holding.name)
         end
     end
     if enabled() then
@@ -528,7 +528,7 @@ AddEventHandler('QBCore:Server:OnPlayerUnload', function(src)
     end
 end)
 
-AddEventHandler('qbcore:server:playerLoaded', function(src)
+AddEventHandler('kora_core:server:playerLoaded', function(src)
     -- A fresh spawn holds nothing, whatever a previous session left behind,
     -- and the bag has to be seeded before any client can render it.
     trainingOwnership.untrack(src)
@@ -600,7 +600,7 @@ exports('StartTrainingWeapon', function(src, weaponName, rounds)
 
     training[src] = { owner = owner, name = weaponName, remaining = rounds, fired = 0 }
     trainingOwnership.track(owner, src)
-    TriggerClientEvent('qbinventory:client:startTrainingWeapon', src, weaponName, rounds, damageSettings(weaponName))
+    TriggerClientEvent('kora_inventory:client:startTrainingWeapon', src, weaponName, rounds, damageSettings(weaponName))
     return true
 end)
 

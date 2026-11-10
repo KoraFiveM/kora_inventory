@@ -89,7 +89,7 @@ const drag = async (fromLabel: string) => {
 }
 let ack: (value: Response) => void
 const holdFetch = () => sendIntent.mockImplementationOnce(() => new Promise((resolve) => { ack = resolve }))
-const verdict = (requestId: number, ok: boolean, error?: string) => post("qbinventory:nui:intentResult", { requestId, ok, error })
+const verdict = (requestId: number, ok: boolean, error?: string) => post("kora_inventory:nui:intentResult", { requestId, ok, error })
 const lastRequestId = () => (sendIntent.mock.calls.at(-1)![0] as { requestId: number }).requestId
 
 beforeEach(async () => {
@@ -98,7 +98,7 @@ beforeEach(async () => {
     host = document.createElement("div"); document.body.appendChild(host)
     root = createRoot(host)
     await act(async () => { root.render(<App />) })
-    await post("qbinventory:nui:sessionOpened", session([item(1, "bread", 2)]))
+    await post("kora_inventory:nui:sessionOpened", session([item(1, "bread", 2)]))
 })
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.useRealTimers() })
 
@@ -127,7 +127,7 @@ describe("a shop purchase over the direct transport", () => {
         await verdict(id, true)
         expect(filled(2)).toBe(true)
         expect(notice()).toBeUndefined()
-        await post("qbinventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [item(1, "bread", 2), item(2, "water", 1)]) })
+        await post("kora_inventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [item(1, "bread", 2), item(2, "water", 1)]) })
         expect(slot(2).getAttribute("data-pending")).toBeNull()
         await act(async () => { vi.advanceTimersByTime(20000) })
         expect(filled(2)).toBe(true)
@@ -174,10 +174,10 @@ describe("a shop purchase over the direct transport", () => {
     })
 
     it("paints nothing when optimistic moves are off, until the server patches", async () => {
-        await post("qbinventory:nui:config", { optimisticMoves: false })
+        await post("kora_inventory:nui:config", { optimisticMoves: false })
         await drag("water")
         expect(filled(2)).toBe(false)
-        await post("qbinventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [item(1, "bread", 2), item(2, "water", 1)]) })
+        await post("kora_inventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: view("player:1", [item(1, "bread", 2), item(2, "water", 1)]) })
         expect(filled(2)).toBe(true)
         expect(slot(2).getAttribute("data-pending")).toBeNull()
     })

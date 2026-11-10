@@ -20,7 +20,7 @@ local inventories = {
     ['stash:secret'] = { key = 'stash:secret', type = 'stash', id = 'secret' },
 }
 
-QbInventory = {
+KoraInventory = {
     internal = {
         playerKey = function(src) return 'player:' .. src end,
         resolveInventory = function(ref) return ref, inventories[ref] end,
@@ -86,11 +86,11 @@ session.secondary = 'stash:locker'
 
 -- No session at all means no transfer, whatever the payload says.
 transfers, rejected = {}, {}
-local realSessionOf = QbInventory.internal.sessionOf
-QbInventory.internal.sessionOf = function() return nil end
+local realSessionOf = KoraInventory.internal.sessionOf
+KoraInventory.internal.sessionOf = function() return nil end
 setData('player', 'locker', 1, 2, 1)
 H.equal(#transfers, 0, 'no open session means no transfer')
-QbInventory.internal.sessionOf = realSessionOf
+KoraInventory.internal.sessionOf = realSessionOf
 
 -- the rest
 handlers['qb-inventory:server:closeInventory']()

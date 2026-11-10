@@ -10,8 +10,8 @@
 -- convenience.lua.
 
 local shop = assert(
-    Config.qbinventory and Config.qbinventory.shops and Config.qbinventory.shops.ammunation,
-    'qbinventory Ammu-Nation configuration is required'
+    Config.kora_inventory and Config.kora_inventory.shops and Config.kora_inventory.shops.ammunation,
+    'kora_inventory Ammu-Nation configuration is required'
 )
 
 local function isAtApprovedLocation(source)
@@ -125,7 +125,7 @@ end
 if shop.limitedStock == false and type(AddEventHandler) == 'function' then
     -- Unlimited stock: refill just after the purchase commits (the event fires
     -- inside the purchase lock, so it is deferred to avoid re-entering it).
-    AddEventHandler('qbinventory:server:itemPurchased', function(_, purchase)
+    AddEventHandler('kora_inventory:server:itemPurchased', function(_, purchase)
         if restockQueued or type(purchase) ~= 'table' or purchase.shopId ~= shop.id then
             return
         end

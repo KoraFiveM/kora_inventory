@@ -22,14 +22,14 @@ function rootScale() {
     return Math.min(2, Math.max(0.5, Math.min(window.innerWidth / 1920, window.innerHeight / 1080)))
 }
 
-const SLOT_DRAG_TYPE = "qbinventory/slot"
+const SLOT_DRAG_TYPE = "kora_inventory/slot"
 
 // Drags that may wait behind an unanswered request before further ones are refused.
 const MAX_QUEUED_MOVES = 8
 
 /**
- * Presentation config from `Config.qbinventory.ui`, pushed on
- * `qbinventory:nui:config`.
+ * Presentation config from `Config.kora_inventory.ui`, pushed on
+ * `kora_inventory:nui:config`.
  *
  * The defaults here are what renders in the window between the UI mounting and
  * that message arriving (and in the dev harness, which sends no config at all),
@@ -239,6 +239,8 @@ function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHot
     return <button
         ref={setSlotRef}
         className={classes}
+        data-fft-kind={inventory.type === "shop" ? "shop-item" : inventory.type === "player" ? "player-slot" : undefined}
+        data-fft-item={item?.name}
         aria-label={item ? `${item.label ?? item.name}, slot ${index}` : `Empty slot ${index}`}
         aria-pressed={selected || undefined}
         aria-disabled={busy || undefined}
@@ -501,7 +503,7 @@ function InventoryApp() {
     // Merged onto the defaults rather than replacing them, so a config table
     // that omits a key keeps the shipped behaviour for it instead of dropping to
     // `undefined` and rendering as "off".
-    useNuiEvent<UiConfig>("qbinventory:nui:config", (config) => {
+    useNuiEvent<UiConfig>("kora_inventory:nui:config", (config) => {
         if (!config || typeof config !== "object") return
         setUiConfig((current) => ({
             ...current,
@@ -520,21 +522,21 @@ function InventoryApp() {
             images: { ...current.images, ...(config.images ?? {}) },
         }))
     })
-    useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number }>("qbinventory:nui:hotbar", ({ slots, seconds, bottom }) => {
+    useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom }) => {
         if (!Array.isArray(slots) || !(Number(seconds) > 0)) return
         window.clearTimeout(hotbarTimeout.current)
         setHotbar({ id: Date.now(), slots, bottom: Number.isFinite(bottom) ? Number(bottom) : undefined })
         hotbarTimeout.current = window.setTimeout(() => setHotbar(null), Number(seconds) * 1000)
     })
-    useNuiEvent<{ bottom?: number }>("qbinventory:nui:hotbarPosition", ({ bottom }) => {
+    useNuiEvent<{ bottom?: number }>("kora_inventory:nui:hotbarPosition", ({ bottom }) => {
         if (!Number.isFinite(bottom)) return
         setHotbar((current) => current ? { ...current, bottom: Number(bottom) } : current)
     })
-    useNuiEvent<SessionSnapshot>("qbinventory:nui:sessionOpened", (snapshot) => {
+    useNuiEvent<SessionSnapshot>("kora_inventory:nui:sessionOpened", (snapshot) => {
         window.clearTimeout(hotbarTimeout.current); setHotbar(null)
         clearPendingMove(); updateSession(() => snapshot); setSelected(undefined); setGiveAvailable(false); setError(undefined)
     })
-    useNuiEvent<SessionPatch>("qbinventory:nui:sessionPatched", (patch) => {
+    useNuiEvent<SessionPatch>("kora_inventory:nui:sessionPatched", (patch) => {
         // The server's items win over any prediction for the inventories they cover.
         if (optimistic.current) for (const id of refreshedInventories(patch)) optimistic.current.delete(id)
         queue.patched(patch.snapshot
@@ -543,22 +545,22 @@ function InventoryApp() {
         updateSession((current) => current && current.sessionId === patch.sessionId ? applyPatch(current, patch) : current)
         setSelected(undefined)
     })
-    useNuiEvent<{ sessionId: string; reason?: string }>("qbinventory:nui:sessionClosed", ({ sessionId }) => {
+    useNuiEvent<{ sessionId: string; reason?: string }>("kora_inventory:nui:sessionClosed", ({ sessionId }) => {
         clearPendingMove()
         updateSession((current) => current?.sessionId === sessionId ? null : current)
     })
-    useNuiEvent<{ reason?: string }>("qbinventory:nui:rejected", ({ reason }) => {
+    useNuiEvent<{ reason?: string }>("kora_inventory:nui:rejected", ({ reason }) => {
         const message = reason ?? "Action rejected by inventory"
         // Settles the request in flight (once); with nothing in flight it is only a notice.
         if (queue.pending) queue.reject(message)
         else setError(message)
     })
-    useNuiEvent<{ requestId?: number; ok?: boolean; error?: string }>("qbinventory:nui:intentResult", ({ requestId, ok, error }) => {
+    useNuiEvent<{ requestId?: number; ok?: boolean; error?: string }>("kora_inventory:nui:intentResult", ({ requestId, ok, error }) => {
         if (typeof requestId !== "number") return
         results.current.deliver(requestId, ok === true ? { ok: true } : { ok: false, error: error === "timeout" ? "Inventory did not respond" : error })
     })
-    useNuiEvent<{ available?: boolean }>("qbinventory:nui:giveAvailability", ({ available }) => setGiveAvailable(available === true))
-    useNuiEvent<ItemBoxReceipt>("qbinventory:nui:itemBox", (receipt) => {
+    useNuiEvent<{ available?: boolean }>("kora_inventory:nui:giveAvailability", ({ available }) => setGiveAvailable(available === true))
+    useNuiEvent<ItemBoxReceipt>("kora_inventory:nui:itemBox", (receipt) => {
         if (!receipt || typeof receipt.name !== "string" || !Number.isFinite(receipt.amount) || receipt.amount < 1) return
         const id = nextItemBoxId.current++
         setItemBoxes((current) => [...current.slice(-3), { ...receipt, id }])
@@ -657,6 +659,29 @@ function InventoryApp() {
         if (sourceInventory && targetInventory) move(sourceInventory.id, source.slot, targetInventory.id, target.slot, amount)
     }, [canDropSlot, move, selected, selectedCount, session])
 
+    useEffect(() => {
+        const handleDragBuy = (event: Event) => {
+            const detail = (event as CustomEvent<{item: string; accepted: boolean; error: string}>).detail
+            const shop = session?.secondary
+            const item = Object.values(shop?.items ?? {}).find(entry => entry?.name === detail.item)
+            const target = session?.player
+            if (!shop || shop.type !== "shop" || !item || !target || locked) {
+                detail.error = 'Shop item or player inventory is unavailable'
+                return
+            }
+            const destination = Object.values(target.items).find(entry => entry?.name === item.name)?.slot ??
+                Array.from({ length: target.slots }, (_, index) => index + 1).find(slot => !Object.values(target.items).some(entry => entry?.slot === slot))
+            if (!destination) { detail.error = 'No destination slot available'; return }
+            const source = { inventoryId: shop.id, slot: item.slot }
+            const dest = { inventoryId: target.id, slot: destination }
+            if (!canDropSlot(source, dest)) { detail.error = 'Player slot cannot accept the shop item'; return }
+            dropSlot(source, dest)
+            detail.accepted = true
+        }
+        window.addEventListener('fft:dragBuy', handleDragBuy)
+        return () => window.removeEventListener('fft:dragBuy', handleDragBuy)
+    }, [session, locked, canDropSlot, dropSlot])
+
     // A single click inspects, and only inspects. Moving is drag-only (drag onto
     // a slot to move/stack, drag outside the window to drop), so a click on an
     // empty slot can no longer fling the previous selection into it.
@@ -753,7 +778,7 @@ function InventoryApp() {
     // Per-player position/size/side from kora_hud's /ui editor (client/ui.lua
     // relays it). Defaults render exactly the shipped layout.
     const [playerLayout, setPlayerLayout] = useState<PlayerLayout>(DEFAULT_PLAYER_LAYOUT)
-    useNuiEvent<unknown>("qbinventory:nui:layout", (raw) => setPlayerLayout(normalizePlayerLayout(raw)))
+    useNuiEvent<unknown>("kora_inventory:nui:layout", (raw) => setPlayerLayout(normalizePlayerLayout(raw)))
     const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight })
     useEffect(() => {
         const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight })
@@ -825,8 +850,8 @@ function InventoryApp() {
                 <p>{filteredSelected.item.description ?? "No item description available."}</p>
                 <dl><dt>Amount</dt><dd>×{filteredSelected.item.amount}</dd><dt>Weight</dt><dd>{filteredSelected.item.weight ?? 0} g</dd>{filteredSelected.item.displayMeta?.map((meta, index) => <Fragment key={index}><dt>{meta.label}</dt><dd>{formatMetaValue(meta.value, uiConfig.inspectorDecimals)}</dd></Fragment>)}{filteredSelected.inventory.type === "shop" && <><dt>Price</dt><dd>${(filteredSelected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
                 {filteredSelected.inventory.type === "shop" ? <div className="amount-action">
-                    {selectedMax > 1 && <input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Quantity to buy, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} />}
-                    <button className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item, selectedCount)}>Buy {selectedCount} · ${((filteredSelected.item.price ?? 0) * selectedCount).toLocaleString()}</button>
+                    {selectedMax > 1 && <input data-fft-kind="quantity" className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Quantity to buy, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} />}
+                    <button data-fft-kind="buy" data-fft-item={filteredSelected.item.name} data-fft-quantity={selectedCount} className="primary-action" disabled={movePending} onClick={() => buy(filteredSelected.inventory, filteredSelected.item, selectedCount)}>Buy {selectedCount} · ${((filteredSelected.item.price ?? 0) * selectedCount).toLocaleString()}</button>
                 </div> : <>
                     {(filteredSelected.item.useable || filteredSelected.item.container) && <button className="primary-action" disabled={movePending} onClick={() => use(filteredSelected.inventory, filteredSelected.item)}>{filteredSelected.item.container ? `Open ${filteredSelected.item.label ?? "container"}` : "Use item"}</button>}
                     {selectedMax > 1 && <div className="amount-picker"><input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={`Amount to move, 1 to ${selectedMax}`} onChange={(event) => setSelectedAmount(Number(event.target.value))} /><input className="amount-input" type="number" min={1} max={selectedMax} value={selectedCount} disabled={movePending} aria-label="Amount to move" onChange={(event) => setSelectedAmount(Number(event.target.value))} /></div>}

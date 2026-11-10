@@ -3,9 +3,9 @@ import type { MoveAnswer } from "./moveQueue"
 /**
  * Pairs a request with the verdict the Lua bridge delivers later.
  *
- * With Config.qbinventory.ui.directTransport the intent fetch is acknowledged
+ * With Config.kora_inventory.ui.directTransport the intent fetch is acknowledged
  * at once (`pending: true`) and the server's verdict follows as a
- * `qbinventory:nui:intentResult` message carrying the request id. The verdict
+ * `kora_inventory:nui:intentResult` message carrying the request id. The verdict
  * can win the race against the fetch's own response, so one that arrives with
  * nobody waiting yet is kept (a small bounded set) and handed over on `wait`.
  */

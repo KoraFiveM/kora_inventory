@@ -1,13 +1,13 @@
 -- Server-only item/cash/reputation exchanges. Domain resources validate the
 -- gameplay; inventory owns planning, capacity, the durable player fence and
 -- one atomic receipt. A failed/unknown commit never permits a second payout.
-local inventory, internal = QbInventory, QbInventory.internal
+local inventory, internal = KoraInventory, KoraInventory.internal
 local busy = {}
 local prefix = 'exchange:'
 
 local function caller()
     local name = GetInvokingResource()
-    if name and #name <= 64 and not name:find(':', 1, true) and Config.qbinventory.exchangeCallers[name] == true then return name end
+    if name and #name <= 64 and not name:find(':', 1, true) and Config.kora_inventory.exchangeCallers[name] == true then return name end
 end
 
 local function integer(value, min, max)
@@ -77,7 +77,7 @@ end
 -- here because replica lag must never look like a rolled-back operation.
 local function reconcile(provider, key, fingerprint)
     local operation = identity(provider, key)
-    local settled, waitError = Kora.sql.awaitCheckedOperation('qbinventory:' .. operation, fingerprint)
+    local settled, waitError = Kora.sql.awaitCheckedOperation('kora_inventory:' .. operation, fingerprint)
     if not settled then return nil, 'pending', waitError end
     if settled.active and settled.result and settled.result.code == 'indeterminate' then
         return nil, 'pending', 'An earlier exchange worker must settle before receipt reconciliation.'
@@ -113,9 +113,9 @@ local function reconcile(provider, key, fingerprint)
 end
 
 local function plan(data, terms)
-    local draft = { items = inventory.copy(data.items or {}), slots = Config.qbinventory.playerSlots, maxWeight = Config.qbinventory.playerMaxWeight }
+    local draft = { items = inventory.copy(data.items or {}), slots = Config.kora_inventory.playerSlots, maxWeight = Config.kora_inventory.playerMaxWeight }
     local physical = exports.kora_core:isPhysicalCash('cash')
-    local cash = Config.qbinventory.cash
+    local cash = Config.kora_inventory.cash
     if physical and (not cash or not cash.asItem or cash.account ~= 'cash' or not internal.itemDef(cash.item)) then return nil, 'Physical cash policy is unavailable.' end
     for _, entry in ipairs(terms.take) do
         if physical and entry.name == cash.item then return nil, 'Use the cash field for physical currency.' end
@@ -185,7 +185,7 @@ local function execute(provider, source, key, terms, fingerprint)
             values = { provider, key, terms.citizenid, fingerprint, json.encode(values), json.encode(receipt) }, expectedRows = 1 },
         { query = 'UPDATE `players` SET `inventory`=?,`money`=?,`metadata`=? WHERE `citizenid`=? AND `deleted_at` IS NULL',
             values = { json.encode(values.inventory), json.encode(values.money), json.encode(values.metadata), terms.citizenid }, expectedRows = 1, failureCode = 'conflict' },
-    }, { key = 'qbinventory:' .. operation, fingerprint = fingerprint, citizenids = { terms.citizenid } })
+    }, { key = 'kora_inventory:' .. operation, fingerprint = fingerprint, citizenids = { terms.citizenid } })
     if not result or result.code == 'indeterminate' then return nil, 'pending', commitError or 'Exchange outcome needs reconciliation. Retry the same key.' end
     if not result.success then
         local found, foundCode, foundError = reconcile(provider, key, fingerprint)

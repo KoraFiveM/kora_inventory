@@ -7,18 +7,18 @@
 --
 -- Seated in a vehicle -> glovebox. On foot at the boot of a vehicle -> trunk,
 -- where the boot is the front for the rear/mid-engine models listed in
--- Config.qbinventory.vehicles.frontBootModels. client/compat.lua calls tryOpen()
+-- Config.kora_inventory.vehicles.frontBootModels. client/compat.lua calls tryOpen()
 -- from the inventory key before it falls back to the player's own inventory.
 
-QbInventory = QbInventory or {}
--- Locale text with an English fallback (shared.lua's QbInventory.text).
+KoraInventory = KoraInventory or {}
+-- Locale text with an English fallback (shared.lua's KoraInventory.text).
 local function localeText(key, fallback, vars)
-    local text = QbInventory and QbInventory.text
+    local text = KoraInventory and KoraInventory.text
     return text and text(key, fallback, vars) or fallback
 end
 
 local vehicleStorage = {}
-QbInventory.vehicleStorage = vehicleStorage
+KoraInventory.vehicleStorage = vehicleStorage
 
 -- Ignore key repeats while a request is in flight.
 local REQUEST_COOLDOWN_MS = 750
@@ -38,11 +38,11 @@ local pendingTrunk -- { vehicle, at } set by request(), consumed by the session 
 local activeAnim   -- the trunk animation currently owned by this file
 
 local function settings()
-    return (Config.qbinventory and Config.qbinventory.vehicles) or {}
+    return (Config.kora_inventory and Config.kora_inventory.vehicles) or {}
 end
 
 local function notify(key, fallback)
-    QB.notify.send({
+    Kora.notify.send({
         title = localeText('vehicle_doors.title', 'Vehicle'),
         message = localeText(key, fallback),
         type = 'error',
@@ -70,7 +70,7 @@ end
 ---Lock state as kora_vehiclekeys publishes it, falling back to the native
 ---door lock status for vehicles it does not manage (parked traffic).
 local function isLocked(vehicle)
-    local state = Entity(vehicle).state['qbvehiclekeys:locked']
+    local state = Entity(vehicle).state['kora_vehiclekeys:locked']
     if type(state) == 'boolean' then
         return state
     end
@@ -206,7 +206,7 @@ local function startTrunkAnimation(vehicle, cfg)
             if activeAnim ~= mine then
                 break
             end
-            local api = QbInventory.clientApi
+            local api = KoraInventory.clientApi
             local at = GetEntityCoords(PlayerPedId())
             local now = vehicleStorage.bootPosition(vehicle, vcfg)
             local dx, dy = now.x - at.x, now.y - at.y
@@ -220,7 +220,7 @@ local function startTrunkAnimation(vehicle, cfg)
     end)
 end
 
-AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
+AddEventHandler('kora_inventory:ui:sessionOpened', function(payload)
     local pending = pendingTrunk
     pendingTrunk = nil
     local cfg = animSettings()
@@ -232,12 +232,12 @@ AddEventHandler('qbinventory:ui:sessionOpened', function(payload)
     startTrunkAnimation(pending.vehicle, cfg)
 end)
 
-AddEventHandler('qbinventory:ui:sessionClosed', function()
+AddEventHandler('kora_inventory:ui:sessionClosed', function()
     pendingTrunk = nil
     stopTrunkAnimation()
 end)
 
-AddEventHandler('qbinventory:ui:rejected', function()
+AddEventHandler('kora_inventory:ui:rejected', function()
     pendingTrunk = nil
 end)
 
@@ -255,7 +255,7 @@ local function request(kind, vehicle)
     end
     lastRequest = GetGameTimer()
     pendingTrunk = kind == 'trunk' and { vehicle = vehicle, at = lastRequest } or nil
-    QbInventory.clientApi.openInventory(kind, NetworkGetNetworkIdFromEntity(vehicle))
+    KoraInventory.clientApi.openInventory(kind, NetworkGetNetworkIdFromEntity(vehicle))
     return true
 end
 
@@ -266,7 +266,7 @@ end
 ---@return boolean requested
 function vehicleStorage.openTrunk(vehicle)
     local cfg = settings()
-    local api = QbInventory.clientApi
+    local api = KoraInventory.clientApi
     if cfg.enabled == false or cfg.trunkEnabled == false or not api or api.getCurrentSession()
         or LocalPlayer.state.inv_busy or not vehicle or not DoesEntityExist(vehicle) then
         return false
@@ -286,7 +286,7 @@ end
 ---caller must not also open the player's own inventory).
 function vehicleStorage.tryOpen()
     local cfg = settings()
-    local api = QbInventory.clientApi
+    local api = KoraInventory.clientApi
     if cfg.enabled == false or not api or api.getCurrentSession() or LocalPlayer.state.inv_busy then
         return false
     end
@@ -294,7 +294,7 @@ function vehicleStorage.tryOpen()
         return true
     end
 
-    local seated = QB.cache.vehicle()
+    local seated = Kora.cache.vehicle()
     if seated and seated ~= 0 then
         if cfg.gloveboxEnabled == false then
             return false
@@ -305,7 +305,7 @@ function vehicleStorage.tryOpen()
     if cfg.trunkEnabled == false then
         return false
     end
-    local vehicle = vehicleStorage.findBootVehicle(QB.cache.coords(), cfg)
+    local vehicle = vehicleStorage.findBootVehicle(Kora.cache.coords(), cfg)
     if not vehicle then
         return false
     end

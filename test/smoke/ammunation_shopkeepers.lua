@@ -3,10 +3,10 @@
 -- resource that supplies its own clerk (kora_mdt at Legion Square).
 local H = dofile("test/harness.lua")
 
-Config = { qbinventory = {} }
+Config = { kora_inventory = {} }
 dofile("config/shops/ammunation.lua")
 dofile("shared.lua")
-local shop = Config.qbinventory.shops.ammunation
+local shop = Config.kora_inventory.shops.ammunation
 
 H.equal(shop.shopkeeper.enabled, true, "shopkeepers default on")
 H.equal(shop.limitedStock, true, "stock is limited by default")

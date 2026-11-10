@@ -20,7 +20,7 @@ for _, path in ipairs({
 
 local invoking, callbacks, threads, taxThreads = nil, {}, {}, {}
 local logs, notifications, xp, government = {}, {}, 0, 0
-local freshReferences = os.getenv('QB_CRAFT_TRANSPORT') ~= 'direct'
+local freshReferences = os.getenv('KORA_CRAFT_TRANSPORT') ~= 'direct'
 local functions = { kora_core = {}, kora_inventory = {} }
 for _, group in ipairs({ 'inventory', 'registry', 'player', 'money' }) do
     for name, fn in pairs(Core[group]) do
@@ -72,7 +72,7 @@ mock.resourceStates.kora_inventory = 'started'
 
 local inv = {}
 for name, value in pairs(_G) do inv[name] = value end
-inv.Config, inv.QbInventory = {}, nil
+inv.Config, inv.KoraInventory = {}, nil
 inv.exports = exportRealm('kora_inventory')
 inv.GetCurrentResourceName = function() return 'kora_inventory' end
 inv.CreateThread = function(fn) threads[#threads + 1] = fn end
@@ -80,8 +80,8 @@ inv.Kora = { resources = Kora.resources, sql = {}, distance = { player = functio
     callback = { register = function(name, fn) callbacks[name] = fn end } }
 local function inventory(path) return assert(loadfile(inventoryRoot .. path, 't', inv))() end
 inventory('config.lua'); inventory('shared.lua'); inventory('server.lua')
-assert(loadfile(os.getenv('QB_INVENTORY_CRAFT_SOURCE') or inventoryRoot .. 'server/crafting.lua', 't', inv))()
-local api, internal = inv.QbInventory.api, inv.QbInventory.internal
+assert(loadfile(os.getenv('KORA_INVENTORY_CRAFT_SOURCE') or inventoryRoot .. 'server/crafting.lua', 't', inv))()
+local api, internal = inv.KoraInventory.api, inv.KoraInventory.internal
 for name, definition in pairs({
     ballast = { weight = 114000 }, ingredient = { weight = 1000 },
     output_a = { weight = 4000 }, output_b = { weight = 4000 },
@@ -102,18 +102,18 @@ local job = {}
 for name, value in pairs(_G) do job[name] = value end
 job.Config = { notifyTitle = 'Crafting', recipes = {}, skills = { enabled = true,
     getLevel = function() return 100 end, addXp = function(_, _, amount) xp = xp + amount end } }
-job.QbJobCreator = {
+job.KoraJobCreator = {
     state = { get = function(id) return id == business.id and business or nil end,
         module = function() return module end, worksFor = function() return true end },
     logs = { record = function(_, entry) logs[#logs + 1] = entry end },
 }
 job.exports, job.Kora = exportRealm('kora_jobcreator'), inv.Kora
 job.Kora.notify = { send = function(_, payload) notifications[#notifications + 1] = payload end }
-assert(loadfile(os.getenv('QB_JOB_CRAFT_SOURCE') or root .. 'kora_jobcreator/server/crafting.lua', 't', job))()
-local crafting = job.QbJobCreator.crafting
+assert(loadfile(os.getenv('KORA_JOB_CRAFT_SOURCE') or root .. 'kora_jobcreator/server/crafting.lua', 't', job))()
+local crafting = job.KoraJobCreator.crafting
 local function item(name, amount, slot, info) return assert(internal.buildItem(name, amount, slot, info or {})) end
 local function reset(items, slots)
-    inv.Config.qbinventory.playerSlots = slots or 41
+    inv.Config.kora_inventory.playerSlots = slots or 41
     H.ok(Core.player.setPath(7, { 'items' }, items or {}))
     logs, notifications, xp = {}, {}, 0
 end
@@ -169,7 +169,7 @@ local custom = rewards({ { item = 'WOOD', count = 1.9, info = { ignored = true }
 })
 custom.completeLabel = 'Custom success'
 job.Config.recipes['custom recipe:/with spaces'] = custom
-local ok, message = invoke('kora_jobcreator', callbacks['qbjobcreator:server:craft'], 7, business.id, 1, 'custom recipe:/with spaces')
+local ok, message = invoke('kora_jobcreator', callbacks['kora_jobcreator:server:craft'], 7, business.id, 1, 'custom recipe:/with spaces')
 H.equal(ok, true, message)
 H.equal(message, 'Custom success')
 H.equal(count('wood'), 0, 'ingredient metadata remains a name-only check')
@@ -191,7 +191,7 @@ H.equal(weapon.info.ammo, 3); H.equal(weapon.info.custom, 'retained')
 -- The new query's permissive empty-input path and planner-only metadata option
 -- must not change either existing registered-recipe contract.
 reset({ [1] = item('wood', 1, 1) })
-local registered = inv.QbInventory.crafting
+local registered = inv.KoraInventory.crafting
 local emptyRegistered, emptyReason = registered.register('empty_inputs', {
     ingredients = {}, output = { name = 'board' },
 })
@@ -210,11 +210,11 @@ H.equal(staticWeapon.info.ammo, 0); H.equal(staticWeapon.info.custom, nil)
 H.ok(staticWeapon.info.serial ~= 'STATIC')
 
 reset()
-inv.Config.qbinventory.cash = false
+inv.Config.kora_inventory.cash = false
 H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards({}, { { item = 'cash', amount = 5, info = { custom = true } } }), business), 'invalid/off cash policy does not crash the capacity query')
 H.equal(api.getItemByName(7, 'cash').info.custom, true, 'cash-off remains an ordinary item grant')
 reset()
-inv.Config.qbinventory.cash = { asItem = true, item = 'CASH', account = 'CASH' }
+inv.Config.kora_inventory.cash = { asItem = true, item = 'CASH', account = 'CASH' }
 invoke('kora_inventory', threads[1]) -- Only real cash bootstrap; never drain permanent workers.
 H.ok(Core.money.isPhysicalCash('cash'))
 H.ok(Core.money.addMoney(7, 'cash', 100, 'seed', true))
@@ -226,7 +226,7 @@ H.ok(invoke('kora_jobcreator', crafting.craft, 7, rewards({ { item = 'cash', amo
     { item = 'board' }, { item = 'cash', amount = 5, info = { weight = 999999 } },
 }), business), 'physical cash keeps name-only consumption and ignores grant metadata')
 H.equal(Core.money.getMoney(7, 'cash'), 85)
-H.equal(Player(7).state['qbcore:money:cash'], 85)
+H.equal(Player(7).state['kora_core:money:cash'], 85)
 
 -- Execute only monetary deposit workers against a fake bank; no SQL service.
 CreateThread = function(fn) taxThreads[#taxThreads + 1] = fn end
@@ -243,7 +243,7 @@ H.equal(Core.money.getMoney(7, 'cash'), 95, 'gross cash grant is still taxed by 
 for _, fn in ipairs(taxThreads) do invoke('kora_core', fn) end
 taxThreads = {}
 H.equal(government, 5)
-H.equal(Player(7).state['qbcore:money:cash'], 95)
+H.equal(Player(7).state['kora_core:money:cash'], 95)
 
 reset()
 H.ok(Core.registry.registerShared('items', 'cash', { name = 'cash', weight = 1 }))

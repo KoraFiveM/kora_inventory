@@ -10,7 +10,7 @@ fixtures in `test/contracts/`, so same-named qb and ox exports keep their own
 upstream-specific signatures through separate identity routing. A real
 `qb-inventory` or `ox_inventory` resource must not run alongside it.
 
-Ownership never moves: [qbcore](https://qbcore2.github.io/kora_core/) owns the
+Ownership never moves: [kora_core](https://qbcore2.github.io/kora_core/) owns the
 slot-keyed `PlayerData.items` object and the `players.inventory` database
 column, and kora_inventory only mutates player items through kora_core's `setPath`
 funnel. kora_inventory owns everything else — stashes, temporary stashes, drops,
@@ -21,14 +21,14 @@ by default, with its own optional NUI as one renderer among possible others.
 ## Requirements
 
 - [kora_lib](https://qbcore2.github.io/kora_lib/)
-- [qbsql](https://qbcore2.github.io/kora_sql/)
-- [qbcore](https://qbcore2.github.io/kora_core/)
+- [kora_sql](https://qbcore2.github.io/kora_sql/)
+- [kora_core](https://qbcore2.github.io/kora_core/)
 
 ## Installation
 
-`server.cfg`, after qbcore:
+`server.cfg`, after kora_core:
 ```
-set mysql_connection_string "mysql://user:pass@localhost/qbcore?charset=utf8mb4"
+set mysql_connection_string "mysql://user:pass@localhost/kora_core?charset=utf8mb4"
 ensure kora_sql
 ensure kora_lib
 ensure kora_core
@@ -39,13 +39,13 @@ kora_inventory creates its own secondary-inventory tables
 at startup from `server/schema.lua` — no manual schema import needed.
 
 If you're migrating off a real `qb-inventory`/`ox_inventory`, run one of these
-from the server console (or grant `command.qbinventory`) once kora_inventory has
+from the server console (or grant `command.kora_inventory`) once kora_inventory has
 booted:
 ```
-qbinventory-migrate dry-run   -- inspect import eligibility without writing
-qbinventory-migrate run       -- idempotently import eligible legacy data
-qbinventory-migrate verify    -- validate stored item JSON, print migration state
-qbinventory-migrate retry     -- revisit only previously failed/quarantined rows
+kora_inventory-migrate dry-run   -- inspect import eligibility without writing
+kora_inventory-migrate run       -- idempotently import eligible legacy data
+kora_inventory-migrate verify    -- validate stored item JSON, print migration state
+kora_inventory-migrate retry     -- revisit only previously failed/quarantined rows
 ```
 Legacy rows are copied, never deleted or updated, and malformed rows land in
 `kora_inventory_quarantine` for review.
@@ -167,8 +167,8 @@ local dropId = exports.kora_inventory:dropCreate(GetEntityCoords(ped), {
 ```
 ```lua
 -- client: listen for drops appearing/disappearing to manage blips/targets
-RegisterNetEvent('qbinventory:client:dropCreated', function(id, coords) end)
-RegisterNetEvent('qbinventory:client:dropRemoved', function(id) end)
+RegisterNetEvent('kora_inventory:client:dropCreated', function(id, coords) end)
+RegisterNetEvent('kora_inventory:client:dropRemoved', function(id) end)
 
 -- client: open a known drop by id (server re-validates distance/existence)
 exports.kora_inventory:openInventory('drop', dropId)
@@ -286,7 +286,7 @@ keys in the id fields (and may also match `toType` in `typeFilter`) for
 backwards compatibility; pass `koraKeys = true/false` in the options to force
 either form.
 Opening another player's inventory is default-deny; a registered inspection
-policy (or `Config.qbinventory.playerInspection.access`) must return `true`
+policy (or `Config.kora_inventory.playerInspection.access`) must return `true`
 for an authorised police/admin/consent flow.
 
 ### Crafting (server-only, headless foundation)
@@ -302,7 +302,7 @@ exports.kora_inventory:RemoveCraftHook(id)
 Ships no station discovery, progress timers, or UI — a gameplay resource
 resolves its own server-side station/job/proximity checks before calling
 `CraftItem`. The optional amount defaults to one and is bounded by
-`Config.qbinventory.crafting.maxBatchAmount`; a batch remains one atomic
+`Config.kora_inventory.crafting.maxBatchAmount`; a batch remains one atomic
 ingredient/output transaction.
 
 ### Weapons (server-only)
@@ -316,13 +316,13 @@ exports.kora_inventory:SetWeaponComponents(...)
 exports.kora_inventory:FireWeaponRound(src, slot) -- consumes ammo only; returns true, round
 ```
 New weapon metadata gets a server-generated serial, bounded durability/ammo,
-and only components listed in `Config.qbinventory.weapons.components`.
+and only components listed in `Config.kora_inventory.weapons.components`.
 
-Native shot reports use `Config.qbinventory.weapons.ballistics.shotCooldown`
+Native shot reports use `Config.kora_inventory.weapons.ballistics.shotCooldown`
 on both client and server. Each accepted shot consumes one server-owned round
 and its configured wear in one weapon-slot commit, followed by one final
-`qbinventory:server:weaponStateChanged` and one
-`qbinventory:server:weaponRoundFired` notification. Ammo and durability remain
+`kora_inventory:server:weaponStateChanged` and one
+`kora_inventory:server:weaponRoundFired` notification. Ammo and durability remain
 authoritative immediately; `FireWeaponRound` retains its ammo-only contract.
 
 ### Visible weapon carry
@@ -330,38 +330,38 @@ authoritative immediately; `FireWeaponRound` retains its ammo-only contract.
 exports.kora_inventory:GetCarriedWeapons(src)  -- read-only, server-built
 exports.kora_inventory:GetEquippedWeapon(src)  -- { slot, name, components? } or nil; mapped components from server-owned item metadata
 ```
-`Config.qbinventory.weaponCarry` renders weapons a player owns but is not
+`Config.kora_inventory.weaponCarry` renders weapons a player owns but is not
 holding onto their body, and makes equipping one a timed, animated draw.
 `visibility = 'all'` shows every carryable weapon; `'hotbar'` shows only slots
 `1..hotbarSlots` and charges `concealedDrawTime` extra to draw anything stowed
 past them. The carried list is built on the server and pushed out on the
-replicated `qbinventory:weaponCarry` player state bag; clients only render it.
+replicated `kora_inventory:weaponCarry` player state bag; clients only render it.
 
 ### Vehicles (trunk/glovebox)
 ```lua
-QbInventory.vehicles.registerAccess(callback, options)   -- (in the domain module's realm)
+KoraInventory.vehicles.registerAccess(callback, options)   -- (in the domain module's realm)
 ```
-Or set `Config.qbinventory.vehicles.ownerCheck` / `.accessCheck` to trusted
+Or set `Config.kora_inventory.vehicles.ownerCheck` / `.accessCheck` to trusted
 callbacks. Only a network id is ever accepted from the client — plate, class,
 coordinates, and capacity are all resolved server-side. Slots/weight per
-vehicle class live in `Config.qbinventory.vehicles.classes`.
+vehicle class live in `Config.kora_inventory.vehicles.classes`.
 
 ### Item containers and evidence/confiscation
 ```lua
-QbInventory.containers.create(id, options)
-QbInventory.containers.open(src, id)
-QbInventory.containers.bindItem(src, slot, options)      -- portable container bound to a real item
-QbInventory.containers.openItem(src, slot)
+KoraInventory.containers.create(id, options)
+KoraInventory.containers.open(src, id)
+KoraInventory.containers.bindItem(src, slot, options)      -- portable container bound to a real item
+KoraInventory.containers.openItem(src, slot)
 
-QbInventory.evidence.open(src, evidenceId)                -- alias: QbInventory.confiscation
-QbInventory.evidence.seize(src, targetSource, evidenceId, sourceSlot, amount, evidenceSlot)
-QbInventory.evidence.release(src, targetSource, evidenceId, evidenceSlot, amount, playerSlot)
+KoraInventory.evidence.open(src, evidenceId)                -- alias: KoraInventory.confiscation
+KoraInventory.evidence.seize(src, targetSource, evidenceId, sourceSlot, amount, evidenceSlot)
+KoraInventory.evidence.release(src, targetSource, evidenceId, evidenceSlot, amount, playerSlot)
 ```
 Both are server-only domain modules with no NUI callback or network event of
 their own; a gameplay resource resolves its interaction server-side first.
-`Config.qbinventory.containers.items.backpack` ships as a ready-made 20-slot,
+`Config.kora_inventory.containers.items.backpack` ships as a ready-made 20-slot,
 60kg portable container. Evidence is default-deny — configure
-`Config.qbinventory.containers.evidence.access(source, action, context)`.
+`Config.kora_inventory.containers.evidence.access(source, action, context)`.
 
 ### Client and renderer contract
 ```lua
@@ -372,8 +372,8 @@ exports.kora_inventory:getCurrentSession()            -- client
 exports.kora_inventory:HasItem(names, amount)         -- client, reads the local session snapshot
 ```
 Local presentation events fired after the server resolves a request:
-`qbinventory:ui:sessionOpened`, `qbinventory:ui:sessionPatched`,
-`qbinventory:ui:sessionClosed`, `qbinventory:ui:rejected`.
+`kora_inventory:ui:sessionOpened`, `kora_inventory:ui:sessionPatched`,
+`kora_inventory:ui:sessionClosed`, `kora_inventory:ui:rejected`.
 
 ### Provider identities (qb-inventory / ox_inventory compat)
 Both identities are enabled and published under `__cfx_export_<identity>_<name>`
@@ -422,14 +422,14 @@ stack.
 
 ## Config highlights (`config.lua`)
 
-`Config.qbinventory.playerSlots` (41), `Config.qbinventory.defaultSlots` (50
-for stashes/shops/drops), `Config.qbinventory.vehicles.classes` (per-class
+`Config.kora_inventory.playerSlots` (41), `Config.kora_inventory.defaultSlots` (50
+for stashes/shops/drops), `Config.kora_inventory.vehicles.classes` (per-class
 trunk/glovebox slots and weight, set a type to `false` to disable it),
-`Config.qbinventory.playerInspection.access`, `Config.qbinventory.weapons.components`,
-`Config.qbinventory.hotbarSlots` (5 -- both the number-key range and what
-counts as openly carried), `Config.qbinventory.weaponCarry`,
-`Config.qbinventory.containers.items` (portable container item definitions,
-e.g. `backpack`), `Config.qbinventory.containers.evidence.access`. Bundled
+`Config.kora_inventory.playerInspection.access`, `Config.kora_inventory.weapons.components`,
+`Config.kora_inventory.hotbarSlots` (5 -- both the number-key range and what
+counts as openly carried), `Config.kora_inventory.weaponCarry`,
+`Config.kora_inventory.containers.items` (portable container item definitions,
+e.g. `backpack`), `Config.kora_inventory.containers.evidence.access`. Bundled
 Ammu-Nation shop data lives in `config/shops/ammunation.lua`.
 
 ## Related resources
@@ -437,9 +437,9 @@ Ammu-Nation shop data lives in `config/shops/ammunation.lua`.
 Part of the [qbcore2](https://github.com/qbcore2) resource set:
 
 - [kora_lib](https://qbcore2.github.io/kora_lib/) — shared helper library
-- [qbsql](https://qbcore2.github.io/kora_sql/) — database driver
-- [qbcore](https://qbcore2.github.io/kora_core/) — framework core
-- [qbtarget](https://qbcore2.github.io/kora_target/) — targeting/interaction
-- [qbclothing](https://qbcore2.github.io/kora_clothing/) — clothing/wardrobe
-- [qbdrugs](https://qbcore2.github.io/kora_drugs/) — drug production/economy job
+- [kora_sql](https://qbcore2.github.io/kora_sql/) — database driver
+- [kora_core](https://qbcore2.github.io/kora_core/) — framework core
+- [kora_target](https://qbcore2.github.io/kora_target/) — targeting/interaction
+- [kora_clothing](https://qbcore2.github.io/kora_clothing/) — clothing/wardrobe
+- [kora_drugs](https://qbcore2.github.io/kora_drugs/) — drug production/economy job
 - [full resource list ↗](https://github.com/orgs/qbcore2/repositories)

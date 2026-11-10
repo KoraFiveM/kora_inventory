@@ -1,6 +1,6 @@
-QbInventory = QbInventory or {}
+KoraInventory = KoraInventory or {}
 
-local inventory = QbInventory
+local inventory = KoraInventory
 
 function inventory.copy(value)
     return Kora.util.deepClone(value)
@@ -23,7 +23,7 @@ end
 
 ---Creates a shop map blip without letting a bad configured value abort the
 ---caller. `optionName` names the config option for the warning (for example
----`Config.qbinventory.shops.convenience.blip.category`). `blip.category` must be
+---`Config.kora_inventory.shops.convenience.blip.category`). `blip.category` must be
 ---a Kora.blips category (see Kora.blips.getCategories()). If kora_lib rejects
 ---the blip, one warning is printed and the blip is retried without a category.
 function inventory.createShopBlip(optionName, coords, options)

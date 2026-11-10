@@ -5,7 +5,7 @@ local H = dofile('test/harness.lua')
 local events, cacheHandlers, damageCalls, criticalCalls, sent = {}, {}, {}, {}, {}
 local currentWeapon = 0
 
-Config = { qbinventory = { weaponCarry = { enabled = false } } }
+Config = { kora_inventory = { weaponCarry = { enabled = false } } }
 exports = { kora_core = { onPlayerDataChange = function() end, getPlayerData = function() return {} end } }
 Kora = {
     cache = {
@@ -37,7 +37,7 @@ GetCurrentResourceName = function() return 'kora_inventory' end
 
 dofile('client/weaponcarry.lua')
 
-events['qbinventory:client:toggleWeapon']({
+events['kora_inventory:client:toggleWeapon']({
     name = 'weapon_pistol', slot = 1, action = 'draw', duration = 0, ammo = 0,
     damage = { modifier = 0.8, disableCriticalHits = true },
 })
@@ -45,17 +45,17 @@ H.equal(damageCalls[1].weapon, 'hash:weapon_pistol', 'damage is applied to the w
 H.equal(damageCalls[1].modifier, 0.8, 'the shared modifier reaches the native')
 H.equal(criticalCalls[1], false, 'the shared critical-hit setting reaches the native')
 
-events['qbinventory:client:toggleWeapon']({ name = 'weapon_pistol', slot = 1, action = 'holster', duration = 0 })
+events['kora_inventory:client:toggleWeapon']({ name = 'weapon_pistol', slot = 1, action = 'holster', duration = 0 })
 H.equal(damageCalls[2].modifier, 1.0, 'holstering restores GTA damage immediately')
 H.equal(criticalCalls[2], true, 'holstering restores critical hits immediately')
 
-events['qbinventory:client:toggleWeapon']({
+events['kora_inventory:client:toggleWeapon']({
     name = 'weapon_bat', slot = 2, action = 'draw', duration = 0, ammo = 0,
     damage = { modifier = 0.4, disableCriticalHits = true },
 })
 cacheHandlers.weapon('hash:weapon_unarmed')
 H.equal(damageCalls[4].modifier, 1.0, 'switching away resets damage without polling')
 H.equal(criticalCalls[4], true, 'switching away restores critical hits without polling')
-H.equal(sent[#sent].name, 'qbinventory:server:weaponUnequipped', 'switching away reports the server-owned unequip')
+H.equal(sent[#sent].name, 'kora_inventory:server:weaponUnequipped', 'switching away reports the server-owned unequip')
 
 H.finish()
