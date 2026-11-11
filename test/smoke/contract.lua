@@ -1,0 +1,25 @@
+local H = dofile('test/harness.lua')
+local file = assert(io.open('server.lua', 'r'))
+local source = file:read('*a')
+file:close()
+
+for _, exportName in ipairs({
+    'getWeight', 'canCarry', 'addItem', 'removeItem', 'getItemByName',
+    'getItemsByName', 'getItemBySlot', 'getItemCount', 'hasItem', 'getFreeSlot',
+    'moveItem', 'clearInventory', 'setItems', 'createUseable', 'useItem',
+    'stashGet', 'stashSet', 'stashOpen', 'shopGet', 'shopSet', 'dropCreate', 'dropTake',
+}) do
+    H.ok(source:find(exportName .. ' = ' .. exportName, 1, true), 'gateway export ' .. exportName)
+end
+local manifest = assert(io.open('fxmanifest.lua', 'r')):read('*a')
+H.ok(manifest:find("provide 'qb-inventory'", 1, true), 'advertises the qb provider identity')
+H.ok(manifest:find("provide 'ox_inventory'", 1, true), 'advertises the ox provider identity')
+H.ok(source:find("'kora_inventory:server:transfer'", 1, true), 'transfer transport')
+H.ok(source:find("'kora_inventory:server:intent'", 1, true), 'restricted UI intent transport')
+H.ok(source:find("shop items must be purchased", 1, true), 'shop cannot use generic transfer')
+H.ok(not source:find("inventory:server:SetInventoryData", 1, true), 'no client-authorised full inventory replacement')
+H.ok(not source:find('SendNUIMessage', 1, true), 'server remains headless')
+H.ok(source:find('PhoneItemTransaction = phoneItemTransaction', 1, true), 'phone gateway export')
+H.ok(source:find('api.phoneItemTransaction = api.PhoneItemTransaction', 1, true), 'phone gateway lowercase alias')
+H.ok(source:find('phoneCallers[GetInvokingResource()]', 1, true), 'phone gateway is restricted to the phone resource')
+H.finish()

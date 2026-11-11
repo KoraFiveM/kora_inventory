@@ -1,0 +1,377 @@
+KoraInventory = KoraInventory or {}
+
+local inventory = KoraInventory
+
+function inventory.copy(value)
+    return Kora.util.deepClone(value)
+end
+
+---Adds the world-icon fields to a kora_target zone for a shop counter.
+---`spriteCoords` is where the icon floats (the till/counter; a location can
+---override it). `Config.showTargetHints` is read on every call, so it applies
+---the next time zones are registered: nil follows kora_target's own sprite
+---setting, true/false force the icon on/off for these zones.
+function inventory.shopZoneSprite(zone, location)
+    zone.spriteCoords = location.spriteCoords or { x = location.x, y = location.y, z = location.z }
+    if Config.showTargetHints == true then
+        zone.drawSprite = true
+    elseif Config.showTargetHints == false then
+        zone.drawSprite = false
+    end
+    return zone
+end
+
+---Creates a shop map blip without letting a bad configured value abort the
+---caller. `optionName` names the config option for the warning (for example
+---`Config.kora_inventory.shops.convenience.blip.category`). `blip.category` must be
+---a Kora.blips category (see Kora.blips.getCategories()). If kora_lib rejects
+---the blip, one warning is printed and the blip is retried without a category.
+function inventory.createShopBlip(optionName, coords, options)
+    local ok, blip = pcall(Kora.blips.create, coords, options)
+    if ok then return blip end
+    print(("^3[kora_inventory] %s = %s was rejected by Kora.blips.create (%s); creating the blip without a category.^7")
+        :format(optionName, tostring(options.category), tostring(blip)))
+    local fallback = {}
+    for key, value in pairs(options) do fallback[key] = value end
+    fallback.category = nil
+    ok, blip = pcall(Kora.blips.create, coords, fallback)
+    if ok then return blip end
+    print(("^3[kora_inventory] %s: could not create the blip at all (%s).^7"):format(optionName, tostring(blip)))
+    return nil
+end
+
+---Builds a register/clear pair for a location-gated shop's kora_target sphere
+---zones, so each of convenience.lua/liquorstore.lua/ammunation.lua doesn't
+---carry its own copy of the same remove-then-reregister bookkeeping.
+---`buildOptions(location)` returns the target option rows for one location;
+---whether/when to call `.register()` (e.g. gating on `shop.enabled`) is left
+---to the caller, since not every shop gates registration the same way.
+---@param shop table
+---@param buildOptions fun(location: table): table[]
+---@return { register: fun(), clear: fun() }
+function inventory.shopLocationTargets(shop, buildOptions)
+    local targetIds = {}
+    local targets = {}
+
+    function targets.register()
+        for _, targetId in ipairs(targetIds) do
+            exports.kora_target:removeZone(targetId)
+        end
+        targetIds = {}
+
+        for _, location in ipairs(shop.locations or {}) do
+            targetIds[#targetIds + 1] = exports.kora_target:addSphereZone(inventory.shopZoneSprite({
+                coords = { x = location.x, y = location.y, z = location.z },
+                radius = shop.interactionDistance,
+                options = buildOptions(location),
+            }, location))
+        end
+    end
+
+    -- kora_target removes every zone it owns on stop. Forget the stale IDs so a
+    -- new kora_target instance cannot mistake a reused ID for one of ours.
+    function targets.clear()
+        targetIds = {}
+    end
+
+    return targets
+end
+
+---Registers one map blip per location for a location-gated shop, guarded by
+---`shop.blip.enabled`. Field construction is left to the caller: ammunation.lua
+---passes `shop.blip` wholesale while convenience.lua/liquorstore.lua rebuild a
+---subset keyed by location name, so this only shares the loop/gating shape.
+---@param shop table
+---@param optionName string Passed through to createShopBlip's own warning text.
+---@param buildOptions fun(location: table): table Kora.blips.create options for one location.
+---@param describe fun(location: table): table Kora.blips.setInfo payload; only used when shop.blip.info is unset.
+function inventory.shopLocationBlips(shop, optionName, buildOptions, describe)
+    if not (shop.blip and shop.blip.enabled) then
+        return
+    end
+
+    for _, location in ipairs(shop.locations or {}) do
+        local blip = inventory.createShopBlip(optionName, { x = location.x, y = location.y, z = location.z }, buildOptions(location))
+        if blip and not shop.blip.info then
+            Kora.blips.setInfo(blip, describe(location))
+        end
+    end
+end
+
+---Z for a prop that must rest on the ground: a model's origin is usually its
+---centre, so its lowest point (`minZ`, negative) has to be lifted back to the
+---surface. `offset` is the configured nudge applied after placement.
+function inventory.groundedZ(groundZ, minZ, offset)
+    return groundZ - (minZ or 0.0) + (offset or 0.0)
+end
+
+---A requested slot as an integer within 1..slots, or false when it is not one
+---(a fraction, 0, or past the end would store an item no panel can show).
+function inventory.validSlot(value, slots)
+    local slot = tonumber(value)
+    if not slot or slot % 1 ~= 0 or slot < 1 or slot > (tonumber(slots) or 0) then
+        return false
+    end
+    return math.floor(slot)
+end
+
+---Locale text with an English fallback, for strings read at load time or by
+---files that may run before kora_lib's locales resolve.
+---@param key string
+---@param fallback string
+---@param vars table|nil
+---@return string
+function inventory.text(key, fallback, vars)
+    local ok, value = pcall(Kora.lang, key, vars)
+    if ok and type(value) == 'string' and value ~= key then
+        return value
+    end
+    return fallback
+end
+
+function inventory.amount(value, fallback)
+    local number = math.floor(tonumber(value) or (fallback or 1))
+    return number > 0 and number or nil
+end
+
+-- Nested tables (e.g. a weapon's empty `components`) match by content, not by
+-- identity; otherwise two separately built stackable items never merge.
+local function sameValue(left, right, depth)
+    if left == right then
+        return true
+    end
+    if type(left) ~= 'table' or type(right) ~= 'table' or depth > 8 then
+        return false
+    end
+    for key, value in pairs(left) do
+        if not sameValue(value, right[key], depth + 1) then
+            return false
+        end
+    end
+    for key in pairs(right) do
+        if left[key] == nil then
+            return false
+        end
+    end
+    return true
+end
+
+function inventory.sameInfo(left, right)
+    return sameValue(left or {}, right or {}, 0)
+end
+
+---Normalises one coordinate or an array of coordinates into an array.
+---`nil` means no coordinate policy; a malformed non-nil value becomes an empty
+---array so callers fail closed rather than accidentally disabling distance.
+---@param coords any
+---@return table[]|nil
+function inventory.coordinateList(coords)
+    if coords == nil then
+        return nil
+    end
+    local kind = type(coords)
+    if kind ~= 'table' and kind ~= 'vector3' and kind ~= 'vector4' then
+        return {}
+    end
+    if coords.x ~= nil and coords.y ~= nil and coords.z ~= nil then
+        return { coords }
+    end
+
+    local out = {}
+    for _, point in ipairs(coords) do
+        local pointType = type(point)
+        if
+            (pointType == 'table' or pointType == 'vector3' or pointType == 'vector4')
+            and point.x ~= nil
+            and point.y ~= nil
+            and point.z ~= nil
+        then
+            out[#out + 1] = point
+        end
+    end
+    return out
+end
+
+-- FXServer's exports boundary hands a cross-resource function argument back as
+-- a table with a __call metamethod, not a plain Lua function -- so a bare
+-- type(x) == 'function' check rejects a perfectly callable handler registered
+-- from another resource. Mirrors kora_lib/local/events/server.lua:47 and
+-- kora_core/modules/registry/shared.lua:116 (RI.isCallable).
+function inventory.isCallable(value)
+    if type(value) == 'function' then
+        return true
+    end
+    local metatable = getmetatable(value)
+    return metatable ~= nil and type(metatable.__call) == 'function'
+end
+
+function inventory.itemMetadata(item)
+    if type(item) ~= 'table' then
+        return {}
+    end
+    if type(item.info) == 'table' then
+        return item.info
+    end
+    return type(item.metadata) == 'table' and item.metadata or {}
+end
+
+---Resolves the metadata fields that change an item's effective properties.
+---@param item table|nil
+---@param definition table|nil
+---@return table
+function inventory.effectiveItem(item, definition)
+    item = item or {}
+    definition = definition or {}
+    local metadata = inventory.itemMetadata(item)
+    local imageUrl
+    if type(metadata.imageUrl) == 'string' then
+        imageUrl = metadata.imageUrl
+    elseif type(metadata.image) ~= 'string' then
+        imageUrl = item.imageUrl or definition.imageUrl
+    end
+    return {
+        label = type(metadata.label) == 'string' and metadata.label or item.label or definition.label,
+        image = type(metadata.image) == 'string' and metadata.image or item.image or definition.image,
+        imageUrl = imageUrl,
+        -- `nil` rather than truthiness is intentional: zero-weight items are valid.
+        weight = type(metadata.weight) == 'number' and metadata.weight >= 0 and metadata.weight < math.huge and metadata.weight
+            or (item.weight ~= nil and item.weight or definition.weight) or 0,
+        description = type(metadata.description) == 'string' and metadata.description or item.description or definition.description,
+    }
+end
+
+function inventory.itemWeight(item)
+    return (tonumber(inventory.effectiveItem(item).weight) or 0) * (tonumber(item and item.amount) or 0)
+end
+
+function inventory.totalWeight(items)
+    local weight = 0
+    for _, item in pairs(items or {}) do
+        weight = weight + inventory.itemWeight(item)
+    end
+    return weight
+end
+
+function inventory.firstFreeSlot(items, slots)
+    for slot = 1, slots do
+        if not items[slot] then
+            return slot
+        end
+    end
+end
+
+---Scans `items` once for up to `count` free slots in `1..slots`, instead of
+---making `count` separate `firstFreeSlot` passes while placing a multi-slot
+---stack of unique items. Returns an array of slot numbers, shorter than
+---`count` if there wasn't room for that many.
+function inventory.reserveFreeSlots(items, slots, count)
+    local free = {}
+    for slot = 1, slots do
+        if #free >= count then
+            break
+        end
+        if not items[slot] then
+            free[#free + 1] = slot
+        end
+    end
+    return free
+end
+
+function inventory.canStack(current, item)
+    return current ~= nil
+        and current.name == item.name
+        and not current.unique
+        and not item.unique
+        and inventory.sameInfo(current.info, item.info)
+end
+
+function inventory.stackSlot(items, item)
+    if item.unique then
+        return nil
+    end
+    local best
+    for slot, current in pairs(items or {}) do
+        if
+            inventory.canStack(current, item)
+            and (not best or slot < best)
+        then
+            best = slot
+        end
+    end
+    return best
+end
+
+-- kora_core's registry stays authoritative and is never modified here. These
+-- two pure functions translate between kora records and the `data/items.lua`
+-- shape ox_inventory scripts expect from Items().
+
+---Kora record -> ox item definition. Kora's own fields are kept as extra keys;
+---the ox keys are derived and win on collision.
+---@param def table kora_core item/weapon record
+---@param name string|nil
+---@return table
+function inventory.toOxItemDef(def, name)
+    local out = inventory.copy(def)
+    name = def.name or name
+    out.name = name
+    out.label = def.label or name
+    out.weight = def.weight or 0
+    local isWeapon = def.type == 'weapon' or def.weapon == true
+    if def.stack ~= nil then
+        out.stack = def.stack ~= false
+    else
+        out.stack = not def.unique and not isWeapon
+    end
+    out.close = def.close
+    if out.close == nil then
+        out.close = def.shouldClose
+    end
+    if out.close == nil then
+        out.close = true
+    end
+    out.description = def.description
+    out.consume = def.consume
+    if out.consume == nil then
+        out.consume = 1
+    end
+    if isWeapon then
+        out.weapon = true
+    end
+    local client = type(def.client) == 'table' and inventory.copy(def.client) or {}
+    if client.image == nil then
+        client.image = def.image or def.imageUrl or (tostring(name) .. '.png')
+    end
+    out.client = client
+    out.server = type(def.server) == 'table' and inventory.copy(def.server) or {}
+    return out
+end
+
+---ox item table (data/items.lua entry) -> kora_core registry record. Unknown ox
+---fields (client, server, degrade, decay, consume, stack, ammoname, ...) are
+---preserved on the record so toOxItemDef round-trips them.
+---@param name string
+---@param ox table
+---@return table|nil record, string|nil err
+function inventory.fromOxItemDef(name, ox)
+    if type(name) ~= 'string' or name == '' then
+        return nil, 'invalid_item_name'
+    end
+    if type(ox) ~= 'table' then
+        return nil, 'invalid_item_definition'
+    end
+    local record = inventory.copy(ox)
+    record.name = name:lower()
+    record.label = type(ox.label) == 'string' and ox.label or name
+    record.weight = tonumber(ox.weight) or 0
+    record.type = ox.weapon and 'weapon' or ox.type or 'item'
+    record.unique = ox.stack == false
+    local client = type(ox.client) == 'table' and ox.client or {}
+    local server = type(ox.server) == 'table' and ox.server or {}
+    record.image = client.image or ox.image
+    record.shouldClose = ox.close ~= false
+    record.useable = ox.useable == true
+        or client.export ~= nil or client.event ~= nil or server.export ~= nil
+        or client.status ~= nil or client.anim ~= nil or client.prop ~= nil
+        or ox.consume ~= nil
+    return record
+end
