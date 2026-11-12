@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting
-sidebar_position: 22
+sidebar_position: 11
 ---
 
 # Troubleshooting

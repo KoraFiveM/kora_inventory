@@ -1,6 +1,6 @@
 ---
 title: FFT hooks
-sidebar_position: 20
+sidebar_position: 9
 ---
 
 # Optional FFT hooks
