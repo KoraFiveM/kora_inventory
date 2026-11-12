@@ -1,0 +1,13 @@
+# Local JavaScript toolchain; the committed Vite build is the runtime artifact.
+web/node_modules/
+
+# Local FiveM/runtime state.
+.fxdk/
+*.log
+
+# Generated per-server kora_lib configuration overrides.
+config.local.lua
+config.local.lua.bak
+
+# Python test cache
+__pycache__/

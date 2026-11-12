@@ -1,0 +1,37 @@
+{
+  "inventory": {
+    "title": "Inventory",
+    "blocked_downed": "You can't do that while downed.",
+    "blocked_cuffed": "You can't do that while restrained.",
+    "blocked_busy": "You can't do that while using an item.",
+    "gave_item": "You gave %{amount}x %{item}.",
+    "received_item": "You received %{amount}x %{item}.",
+    "purchased_item": "You bought %{amount}x %{item} for $%{price} (%{account}).",
+    "purchased_item_free": "You got %{amount}x %{item} for free.",
+    "account_cash": "cash",
+    "account_bank": "bank",
+    "parachute_equipped": "You already have a parachute equipped.",
+    "parachute_equipping": "Putting on parachute...",
+    "keybind_open": "Open inventory",
+    "keybind_hotbar": "Use hotbar item %{slot}",
+    "keybind_hotbar_show": "Show hotbar",
+    "give_selected": "Give selected item"
+  },
+  "vehicle_doors": {
+    "title": "Vehicle",
+    "trunk_open": "Open trunk",
+    "trunk_close": "Close trunk",
+    "hood_open": "Open hood",
+    "hood_close": "Close hood",
+    "trunk_storage": "Trunk storage",
+    "locked": "This vehicle is locked.",
+    "no_trunk": "This vehicle has no trunk.",
+    "no_hood": "This vehicle has no hood.",
+    "driver_only": "You must be in the driver seat.",
+    "no_control": "Could not reach the vehicle. Try again.",
+    "no_storage": "This vehicle has no storage you can open."
+  },
+  "shop_hints": {
+    "text": "[ALT] Shop"
+  }
+}

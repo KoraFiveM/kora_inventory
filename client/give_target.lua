@@ -1,0 +1,274 @@
+-- Privacy-preserving client resolver for an inventory "give" action.
+--
+-- This file deliberately has no NUI calls and no server event calls.  The NUI
+-- bridge can ask whether a recipient is available and start selection, but it
+-- must never receive a player list, a player name, a ped handle, or a server
+-- id.  A trusted client transport receives the resolved server id over the
+-- local `kora_inventory:client:giveTargetResolved` event and submits the bounded
+-- intent to kora_inventory's server authority, which still validates range,
+-- bucket, session, source slot and amount immediately before transfer.
+--
+-- Integration contract (implemented by client.lua/client/ui.lua):
+--   TriggerEvent('kora_inventory:client:requestGiveAvailability')
+--     -> kora_inventory:ui:giveAvailability { available = boolean }
+--   TriggerEvent('kora_inventory:client:requestGiveTarget', requestId)
+--     -> kora_inventory:client:giveTargetResolved {
+--          requestId = requestId, target = serverId
+--        }
+--        or { requestId = requestId, cancelled = true, reason = string }
+--   TriggerEvent('kora_inventory:client:cancelGiveTarget', reason?)
+--
+-- `kora_inventory:ui:giveTargeting` contains only `{ active = boolean }`.  The
+-- UI bridge uses it to relinquish NUI focus while kora_target is selecting an
+-- in-world ped, then restores focus on resolve/cancel.  Keeping focus control
+-- in client/ui.lua preserves kora_inventory's NUI ownership boundary.
+
+-- Locale text with an English fallback (shared.lua's KoraInventory.text).
+local function localeText(key, fallback, vars)
+    local text = KoraInventory and KoraInventory.text
+    return text and text(key, fallback, vars) or fallback
+end
+
+local giveTarget = {}
+KoraInventory = KoraInventory or {}
+KoraInventory.giveTarget = giveTarget
+
+local active
+local availabilityGeneration, lastAvailability = 0, nil
+
+local function giveDistance()
+    local config = Config and Config.kora_inventory or {}
+    return tonumber(config.giveDistance) or tonumber(config.interactionDistance) or 3.0
+end
+
+local function serverIdForPed(ped)
+    if not ped or ped == 0 or ped == Kora.cache.ped() then
+        return nil
+    end
+
+    for _, playerId in ipairs(GetActivePlayers()) do
+        if playerId ~= Kora.cache.playerId() and GetPlayerPed(playerId) == ped then
+            local serverId = GetPlayerServerId(playerId)
+            if type(serverId) == 'number' and serverId > 0 then
+                return serverId
+            end
+        end
+    end
+end
+
+-- Query closest first.  `Kora.closest.player` is kora_lib's established mapping
+-- from a nearby player ped to a FiveM player id; the full world query is only
+-- used after that to distinguish a single unambiguous recipient from several
+-- targetable peds.  Neither result crosses the Lua/NUI boundary.
+local function nearbyPlayers()
+    local coords = Kora.cache.coords()
+    local radius = giveDistance()
+    local closest = Kora.closest.player(coords, radius)
+    if not closest or not closest.id then
+        return {}
+    end
+
+    local matches = Kora.world.getNearbyEntities('player', coords, radius)
+    local recipients, seen = {}, {}
+    for _, match in ipairs(matches) do
+        local serverId = serverIdForPed(match.entity)
+        if serverId and not seen[serverId] then
+            seen[serverId] = true
+            recipients[#recipients + 1] = {
+                ped = match.entity,
+                serverId = serverId,
+                distance = match.distance,
+            }
+        end
+    end
+
+    table.sort(recipients, function(a, b)
+        return a.distance < b.distance
+    end)
+    return recipients
+end
+
+local function availability()
+    return #nearbyPlayers() > 0
+end
+
+local function emitAvailability()
+    local available = availability()
+    lastAvailability = available
+    TriggerEvent('kora_inventory:ui:giveAvailability', { available = available })
+end
+
+local function clearTargetRegistration()
+    if not active or not active.registrationId then
+        return
+    end
+    if GetResourceState('kora_target') == 'started' then
+        -- kora_target tears down the whole multi-ped registration when passed its
+        -- registration id, but its public remover still takes one numeric ped
+        -- as the first argument.
+        pcall(function()
+            exports.kora_target:removeEntity(active.peds[1], active.registrationId)
+        end)
+    end
+end
+
+local function finish(result)
+    local current = active
+    if not current then
+        return
+    end
+
+    clearTargetRegistration()
+    active = nil
+    TriggerEvent('kora_inventory:ui:giveTargeting', { active = false })
+    TriggerEvent('kora_inventory:client:giveTargetResolved', result)
+end
+
+---Cancel an outstanding multi-player target selection.  This produces no
+---browser payload; consumers use the local resolved event above.
+---@param reason? string
+function giveTarget.cancel(reason)
+    if not active then
+        return false
+    end
+    finish({ requestId = active.requestId, cancelled = true, reason = reason or 'cancelled' })
+    return true
+end
+
+---Whether there is at least one streamed-in remote player in validated
+---candidate range.  This only answers presentation availability; the server
+---is the authority for final range and routing-bucket validation.
+---@return boolean
+function giveTarget.available()
+    return availability()
+end
+
+---Resolve one recipient without exposing player identity to the browser.
+---With exactly one nearby player it resolves immediately.  With multiple
+---nearby players it starts kora_target on exactly those peds, requiring the
+---player to point at and select their intended recipient in the game world.
+---@param requestId string|number A browser-local opaque correlation id.
+---@return boolean started
+---@return string? reason
+function giveTarget.request(requestId)
+    if requestId == nil then
+        return false, 'missing give request id'
+    end
+    giveTarget.cancel('replaced')
+
+    local recipients = nearbyPlayers()
+    if #recipients == 0 then
+        TriggerEvent('kora_inventory:client:giveTargetResolved', {
+            requestId = requestId,
+            cancelled = true,
+            reason = 'no nearby player',
+        })
+        emitAvailability()
+        return false, 'no nearby player'
+    end
+
+    if #recipients == 1 then
+        TriggerEvent('kora_inventory:client:giveTargetResolved', {
+            requestId = requestId,
+            target = recipients[1].serverId,
+        })
+        emitAvailability()
+        return true
+    end
+
+    if GetResourceState('kora_target') ~= 'started' then
+        TriggerEvent('kora_inventory:client:giveTargetResolved', {
+            requestId = requestId,
+            cancelled = true,
+            reason = 'targeting unavailable',
+        })
+        return false, 'targeting unavailable'
+    end
+
+    local peds, allowed = {}, {}
+    for _, recipient in ipairs(recipients) do
+        peds[#peds + 1] = recipient.ped
+        allowed[recipient.ped] = recipient.serverId
+    end
+
+    active = { requestId = requestId, peds = peds, allowed = allowed }
+    local ok, registrationId = pcall(function()
+        return exports.kora_target:addEntity(peds, {
+            {
+                label = localeText('inventory.give_selected', 'Give selected item'),
+                icon = 'HandHeart',
+                distance = giveDistance(),
+                canInteract = function(entity)
+                    -- Target's entity list is a snapshot, so validate the ped
+                    -- and its server-id mapping again immediately before it is
+                    -- selectable.  No name/list is ever produced.
+                    return active and active.allowed[entity] == serverIdForPed(entity)
+                end,
+                onSelect = function(entity)
+                    if not active then
+                        return
+                    end
+                    local target = active.allowed[entity]
+                    if not target or target ~= serverIdForPed(entity) then
+                        return
+                    end
+                    finish({ requestId = active.requestId, target = target })
+                    emitAvailability()
+                end,
+            },
+        }, giveDistance())
+    end)
+
+    if not ok or type(registrationId) ~= 'number' then
+        active = nil
+        TriggerEvent('kora_inventory:client:giveTargetResolved', {
+            requestId = requestId,
+            cancelled = true,
+            reason = 'targeting unavailable',
+        })
+        return false, 'targeting unavailable'
+    end
+
+    active.registrationId = registrationId
+    TriggerEvent('kora_inventory:ui:giveTargeting', { active = true })
+
+    -- A temporary registration must not leak if the player changes their mind
+    -- or the target key is never used.  This is a UI selection timeout only;
+    -- it never authorises or mutates inventory state.
+    local expected = active
+    CreateThread(function()
+        Wait(15000)
+        if active == expected then
+            giveTarget.cancel('target selection timed out')
+        end
+    end)
+    return true
+end
+
+AddEventHandler('kora_inventory:client:requestGiveAvailability', emitAvailability)
+AddEventHandler('kora_inventory:client:requestGiveTarget', giveTarget.request)
+AddEventHandler('kora_inventory:client:cancelGiveTarget', giveTarget.cancel)
+AddEventHandler('kora_inventory:ui:sessionOpened', function()
+    availabilityGeneration = availabilityGeneration + 1
+    local generation = availabilityGeneration
+    lastAvailability = nil
+    CreateThread(function()
+        while generation == availabilityGeneration do
+            local available = availability()
+            if available ~= lastAvailability then
+                lastAvailability = available
+                TriggerEvent('kora_inventory:ui:giveAvailability', { available = available })
+            end
+            Wait(750)
+        end
+    end)
+end)
+AddEventHandler('kora_inventory:ui:sessionClosed', function()
+    giveTarget.cancel('inventory closed')
+    availabilityGeneration = availabilityGeneration + 1
+    lastAvailability = nil
+end)
+
+exports('giveTargetAvailable', giveTarget.available)
+exports('requestGiveTarget', giveTarget.request)
+exports('cancelGiveTarget', giveTarget.cancel)
