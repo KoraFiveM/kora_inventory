@@ -1,6 +1,6 @@
 ---
 title: Exports
-sidebar_position: 5
+sidebar_position: 6
 ---
 
 # Exports
@@ -39,7 +39,7 @@ Every function that changes inventory data returns `true` on success or `false, 
 
 | Export | Notes |
 | --- | --- |
-| `registerHook(event, callback, options?)` / `RegisterHook` | Returns a hook id. See [Hooks](./hooks.md). |
+| `registerHook(event, callback, options?)` / `RegisterHook` | Returns a hook id. See [Hooks](./api/hooks.md). |
 | `removeHooks(id?)` / `RemoveHooks` | Removes the caller's own hook, or all of the caller's hooks without an id. |
 | `registerInspectionAccess(callback)` / `RegisterInspectionAccess` | `callback(source, target, sourceData, targetData)`; must return `true` to allow opening another player's inventory. Removed with the resource. |
 | `removeInspectionAccess(id)` / `RemoveInspectionAccess` | |
@@ -58,7 +58,7 @@ Every function that changes inventory data returns `true` on success or `false, 
 | `stashOpen(src, id, opts?)` | Opens the stash for a player (server side). |
 | `createTemporaryStash(properties)` / `CreateTemporaryStash` | Returns an inventory key; not persisted unless `persistTemporary` is on. |
 
-Details: [Stashes and drops](./stashes-and-drops.md).
+Details: [Stashes and drops](./api/stashes.md).
 
 ## Shops and drops (server)
 
@@ -70,19 +70,19 @@ Details: [Stashes and drops](./stashes-and-drops.md).
 | `dropCreate(coords, items, bucket?)` | Returns the drop id. |
 | `dropTake(src, dropId, slot, amount?)` | |
 
-Details: [Shops](./shops.md), [Stashes and drops](./stashes-and-drops.md).
+Details: [Shops](./api/shops.md), [Stashes and drops](./api/stashes.md).
 
 ## Crafting and weapons (server)
 
-`RegisterCraftRecipe`, `RemoveCraftRecipe`, `GetCraftRecipe`, `CanCraftRecipe`, `CanCraftItems`, `CraftItem`, `RegisterCraftHook`, `RemoveCraftHook` (see [Crafting](./crafting.md)); `PrepareWeaponMetadata`, `GetWeaponState`, `SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, `SetWeaponComponents`, `LoadWeaponRounds`, `FireWeaponRound`, `GetCarriedWeapons`, `GetEquippedWeapon`, `StartTrainingWeapon`, `StopTrainingWeapon` (see [Weapons](./weapons.md)).
+`RegisterCraftRecipe`, `RemoveCraftRecipe`, `GetCraftRecipe`, `CanCraftRecipe`, `CanCraftItems`, `CraftItem`, `RegisterCraftHook`, `RemoveCraftHook` (see [Crafting](./api/crafting.md)); `PrepareWeaponMetadata`, `GetWeaponState`, `SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, `SetWeaponComponents`, `LoadWeaponRounds`, `FireWeaponRound`, `GetCarriedWeapons`, `GetEquippedWeapon`, `StartTrainingWeapon`, `StopTrainingWeapon` (see [Weapons](./api/weapons.md)).
 
 ## Exchanges and items (server)
 
 | Export | Notes |
 | --- | --- |
-| `ExecutePlayerExchange(source, operationKey, request)` | Callers must be in `exchangeCallers`. See [Player exchanges](./exchanges.md). |
+| `ExecutePlayerExchange(source, operationKey, request)` | Callers must be in `exchangeCallers`. See [Player exchanges](./api/exchange.md). |
 | `GetPlayerExchange(operationKey)` | Reads the calling resource's receipt. |
-| `ImportOxItems(definitions, opts?)` / `importOxItems` | Registers ox `data/items.lua` entries into kora_core's item registry. Existing items are skipped unless `opts.overwrite`. Returns `registered, errors`. See [Items](./items.md). |
+| `ImportOxItems(definitions, opts?)` / `importOxItems` | Registers ox `data/items.lua` entries into kora_core's item registry. Existing items are skipped unless `opts.overwrite`. Returns `registered, errors`. See [Items](./api/items.md). |
 
 ## Internal bridge exports (server)
 
@@ -101,4 +101,4 @@ Not for general use: `physicalCashGet`, `physicalCashAdd`, `physicalCashRemove`,
 | `getConfigWeaponAttachments()` | Legacy `qb-weapons` attachment config, derived from the configured component allow-lists. |
 | `fftVersion()`, `fftAction(action, item, amount)` | Only when FFT hooks are enabled, see [FFT hooks](./fft.md). |
 
-Modules such as `KoraInventory.containers`, `KoraInventory.evidence` and `KoraInventory.vehicles.registerAccess` are Lua globals inside this resource's server realm and are not exported. See [Containers and evidence](./containers-evidence.md) and [Vehicles](./vehicles.md).
+Modules such as `KoraInventory.containers`, `KoraInventory.evidence` and `KoraInventory.vehicles.registerAccess` are Lua globals inside this resource's server realm and are not exported. See [Containers and evidence](./api/containers.md) and [Vehicles](./api/vehicles.md).

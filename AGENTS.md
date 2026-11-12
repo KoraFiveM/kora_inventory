@@ -89,7 +89,9 @@ well as malformed and stale replies; do not require FFT for ordinary startup.
 
 ## Documentation
 
-User-facing documentation lives in `docs/` (Markdown, published via the Kora Docusaurus site, kora_docs_next). Read `docs/index.md` first for an overview of features, configuration, commands, exports, events, items, database usage and compatibility.
+User-facing documentation lives in `docs/` (Markdown, published via the Kora Docusaurus site, kora_docs_next). Read `docs/index.md` first: it is the hub with a documentation map linking every page.
+
+Layout: `docs/index.md` (overview and map), `docs/installation.md`, `docs/how-to-use.md`, `docs/commands.md` (commands, keybinds, ACE), `docs/api/` (one page per module: player items, items, inventories, stashes, shops, drops, usables, crafting, hooks, weapons, vehicles, containers, evidence, exchange, persistence/database, cash, events, client API, NUI/UI, the qb/ox/qb-weapons compat pages, and `configuration.md`, the full `Config` reference), plus topic pages (`exports.md`, `compatibility.md`, `security.md`, `fft.md`, `development.md`, `troubleshooting.md`). Update the page that owns the changed behaviour: config keys in `docs/api/configuration.md`, events in `docs/api/events.md`, tables in `docs/api/persistence.md`, and so on. The pages in `docs/api/` carry the original reference content plus an "Operating notes (from the code)" section.
 
 When you add, change, or remove a feature, config option, command, export, event, item, permission, or database table/column, update the matching page in `docs/` in the same change. Keep docs accurate to the code; do not document behaviour that does not exist.
 
