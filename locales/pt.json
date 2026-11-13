@@ -1,0 +1,37 @@
+{
+  "inventory": {
+    "title": "Inventário",
+    "blocked_downed": "Não podes fazer isso enquanto estiveres caído.",
+    "blocked_cuffed": "Não podes fazer isso enquanto estiveres imobilizado.",
+    "blocked_busy": "Não podes fazer isso enquanto estiveres a usar um item.",
+    "gave_item": "Entregaste %{amount}x %{item}.",
+    "received_item": "Recebeste %{amount}x %{item}.",
+    "purchased_item": "Compraste %{amount}x %{item} por $%{price} (%{account}).",
+    "purchased_item_free": "Recebeste %{amount}x %{item} gratuitamente.",
+    "account_cash": "dinheiro",
+    "account_bank": "banco",
+    "parachute_equipped": "Já tens um paraquedas equipado.",
+    "parachute_equipping": "A colocar paraquedas...",
+    "keybind_open": "Abrir inventário",
+    "keybind_hotbar": "Usar item da barra de atalhos %{slot}",
+    "keybind_hotbar_show": "Mostrar barra de atalhos",
+    "give_selected": "Entregar item selecionado"
+  },
+  "vehicle_doors": {
+    "title": "Veículo",
+    "trunk_open": "Abrir mala",
+    "trunk_close": "Fechar mala",
+    "hood_open": "Abrir capô",
+    "hood_close": "Fechar capô",
+    "trunk_storage": "Compartimento da mala",
+    "locked": "Este veículo está trancado.",
+    "no_trunk": "Este veículo não tem mala.",
+    "no_hood": "Este veículo não tem capô.",
+    "driver_only": "Tens de estar no lugar do condutor.",
+    "no_control": "Não foi possível alcançar o veículo. Tenta novamente.",
+    "no_storage": "Este veículo não tem arrumação que possas abrir."
+  },
+  "shop_hints": {
+    "text": "[ALT] Loja"
+  }
+}
