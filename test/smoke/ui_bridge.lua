@@ -41,9 +41,8 @@ H.equal(Config.kora_inventory.ui.moveTimeout, nil, 'the legacy seconds option is
 H.ok(source:find('moveTimeoutMs = moveTimeoutMs(),', 1, true),
     'the move timeout is read live and pushed in milliseconds')
 
-local canonicalImage = io.open('images/advancedlockpick.png', 'rb')
-H.ok(canonicalImage ~= nil, 'canonical qb-inventory artwork is bundled')
-if canonicalImage then canonicalImage:close() end
+H.equal(images.cdn, 'https://cdn.koraframe.work/inventory', 'items with no local artwork fall back to the inventory CDN')
+H.equal(images.cdnExtension, 'webp', 'the inventory CDN serves webp')
 
 -- Exercise the actual bridge; host presentation calls only record messages.
 local handlers, messages = {}, {}
