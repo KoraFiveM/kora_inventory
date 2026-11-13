@@ -329,6 +329,11 @@ Config.qbinventory = {
             -- Set false to never make an outbound image request at all. Items
             -- with no local file fall back to the first-letter placeholder.
             allowRemote = true,
+            -- Inventory CDN, used when no local file exists for an item:
+            -- <cdn>/<item name>.<cdnExtension>. Must be https://. Set to nil
+            -- (or allowRemote = false) to disable.
+            cdn = 'https://cdn.koraframe.work/inventory',
+            cdnExtension = 'webp',
         },
     },
     auditLimit = 1000,

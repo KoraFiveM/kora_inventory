@@ -593,7 +593,10 @@ Artwork is resolved as an ordered list of candidates, walked on `onError`:
 1. the item's own `imageUrl`, if it is `https://` and `allowRemote` is not false
 2. `<localPath>/<item.image>`, when the legacy `image` field carries an extension
 3. `<localPath>/<item.name>.<ext>` for each configured extension, in order
-4. the first letter of the label
+4. the inventory CDN, `<cdn>/<item.name>.<cdnExtension>` (`Config.qbinventory.ui.images.cdn`,
+   default `https://cdn.koraframe.work/inventory/<name>.webp`), placed after the local
+   candidates so a bundled file always wins
+5. the first letter of the label
 
 Ordered rather than probed: there is no way to ask whether a `nui://` file
 exists without requesting it, and an `<img onError>` chain gets that for free
