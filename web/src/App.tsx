@@ -55,6 +55,8 @@ const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo
         extensions: ["webp", "png", "gif", "jpg"],
         preferLocal: false,
         allowRemote: true,
+        cdn: "https://cdn.koraframe.work/inventory",
+        cdnExtension: "webp",
     },
 }
 
@@ -144,6 +146,14 @@ function artworkCandidates(item: Pick<InventoryItem, "name" | "label" | "image" 
 
     for (const extension of images.extensions ?? []) {
         const url = localImageUrl(images.localPath, item.name, extension)
+        if (url && !out.includes(url)) out.push(url)
+    }
+
+    // Inventory CDN: `<cdn>/<item name>.<cdnExtension>`. Sits after every local
+    // candidate, so a bundled file always wins and the CDN only serves items
+    // with no local artwork.
+    if (images.allowRemote !== false && images.cdn?.startsWith("https://")) {
+        const url = localImageUrl(images.cdn, item.name, images.cdnExtension ?? "webp")
         if (url && !out.includes(url)) out.push(url)
     }
 

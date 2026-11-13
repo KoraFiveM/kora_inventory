@@ -130,5 +130,9 @@ export interface UiConfig {
         preferLocal?: boolean
         /** When false, no outbound image request is ever made. */
         allowRemote?: boolean
+        /** `https://` base of the inventory CDN, serving `<cdn>/<item name>.<cdnExtension>`. */
+        cdn?: string
+        /** File extension on the CDN. Defaults to `webp`. */
+        cdnExtension?: string
     }
 }
