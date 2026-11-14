@@ -1,0 +1,37 @@
+{
+  "inventory": {
+    "title": "Inventar",
+    "blocked_downed": "Das kannst du nicht tun, während du am Boden liegst.",
+    "blocked_cuffed": "Das kannst du nicht tun, während du gefesselt bist.",
+    "blocked_busy": "Das kannst du nicht tun, während du einen Gegenstand benutzt.",
+    "gave_item": "Du hast %{amount}x %{item} gegeben.",
+    "received_item": "Du hast %{amount}x %{item} erhalten.",
+    "purchased_item": "Du hast %{amount}x %{item} für $%{price} gekauft (%{account}).",
+    "purchased_item_free": "Du hast %{amount}x %{item} kostenlos erhalten.",
+    "account_cash": "Bargeld",
+    "account_bank": "Bank",
+    "parachute_equipped": "Du hast bereits einen Fallschirm angelegt.",
+    "parachute_equipping": "Fallschirm wird angelegt...",
+    "keybind_open": "Inventar öffnen",
+    "keybind_hotbar": "Schnellleisten-Gegenstand %{slot} benutzen",
+    "keybind_hotbar_show": "Schnellleiste anzeigen",
+    "give_selected": "Ausgewählten Gegenstand geben"
+  },
+  "vehicle_doors": {
+    "title": "Fahrzeug",
+    "trunk_open": "Kofferraum öffnen",
+    "trunk_close": "Kofferraum schließen",
+    "hood_open": "Motorhaube öffnen",
+    "hood_close": "Motorhaube schließen",
+    "trunk_storage": "Kofferraum-Inventar",
+    "locked": "Dieses Fahrzeug ist abgeschlossen.",
+    "no_trunk": "Dieses Fahrzeug hat keinen Kofferraum.",
+    "no_hood": "Dieses Fahrzeug hat keine Motorhaube.",
+    "driver_only": "Du musst auf dem Fahrersitz sitzen.",
+    "no_control": "Das Fahrzeug konnte nicht erreicht werden. Versuch es erneut.",
+    "no_storage": "Dieses Fahrzeug hat keinen Stauraum, den du öffnen kannst."
+  },
+  "shop_hints": {
+    "text": "[ALT] Laden"
+  }
+}
