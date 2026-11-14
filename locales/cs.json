@@ -1,0 +1,37 @@
+{
+  "inventory": {
+    "title": "Inventář",
+    "blocked_downed": "To nemůžeš udělat, když ležíš na zemi.",
+    "blocked_cuffed": "To nemůžeš udělat, když máš pouta.",
+    "blocked_busy": "To nemůžeš udělat, když používáš předmět.",
+    "gave_item": "Předáno: %{amount}x %{item}.",
+    "received_item": "Obdrženo: %{amount}x %{item}.",
+    "purchased_item": "Zakoupeno: %{amount}x %{item} za $%{price} (%{account}).",
+    "purchased_item_free": "Získáno zdarma: %{amount}x %{item}.",
+    "account_cash": "hotovost",
+    "account_bank": "banka",
+    "parachute_equipped": "Už máš nasazený padák.",
+    "parachute_equipping": "Nasazování padáku...",
+    "keybind_open": "Otevřít inventář",
+    "keybind_hotbar": "Použít předmět z rychlé lišty %{slot}",
+    "keybind_hotbar_show": "Zobrazit rychlou lištu",
+    "give_selected": "Dát vybraný předmět"
+  },
+  "vehicle_doors": {
+    "title": "Vozidlo",
+    "trunk_open": "Otevřít kufr",
+    "trunk_close": "Zavřít kufr",
+    "hood_open": "Otevřít kapotu",
+    "hood_close": "Zavřít kapotu",
+    "trunk_storage": "Úložný prostor kufru",
+    "locked": "Toto vozidlo je zamčené.",
+    "no_trunk": "Toto vozidlo nemá kufr.",
+    "no_hood": "Toto vozidlo nemá kapotu.",
+    "driver_only": "Musíš sedět na místě řidiče.",
+    "no_control": "Nepodařilo se dosáhnout na vozidlo. Zkus to znovu.",
+    "no_storage": "Toto vozidlo nemá žádný úložný prostor, který lze otevřít."
+  },
+  "shop_hints": {
+    "text": "[ALT] Obchod"
+  }
+}
