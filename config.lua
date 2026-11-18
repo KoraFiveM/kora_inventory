@@ -322,9 +322,10 @@ Config.kora_inventory = {
         images = {
             localPath = 'nui://kora_inventory/images',
             extensions = { 'webp', 'png', 'gif', 'jpg' },
-            -- The canonical qb-inventory artwork is bundled in images/, so it
-            -- is the primary source. kora_core's remote catalogue remains a
-            -- fallback for server-specific items not present in that set.
+            -- Files named after an item in images/ are checked first and can
+            -- override both definition artwork and the remote catalogue.
+            -- kora_core's remote catalogue remains a fallback for items with
+            -- no local image.
             preferLocal = true,
             -- Set false to never make an outbound image request at all. Items
             -- with no local file fall back to the first-letter placeholder.

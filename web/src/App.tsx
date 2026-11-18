@@ -134,7 +134,14 @@ function artworkCandidates(item: Pick<InventoryItem, "name" | "label" | "image" 
     // value in `imageUrl` must never reach an `src`.
     const remote = images.allowRemote !== false && item.imageUrl?.startsWith("https://") ? item.imageUrl : undefined
 
-    if (remote && (item.imageOverride || !images.preferLocal)) out.push(remote)
+    if (remote && !images.preferLocal) out.push(remote)
+
+    // A file named after the item is the local override. Add
+    // `images/<item name>.<extension>` to replace CDN or definition artwork.
+    for (const extension of images.extensions ?? []) {
+        const url = localImageUrl(images.localPath, item.name, extension)
+        if (url && !out.includes(url)) out.push(url)
+    }
 
     // kora_core's legacy `image` field is a bare filename ('water_bottle.png'),
     // which is the one case where the extension is already chosen for us.
@@ -145,20 +152,14 @@ function artworkCandidates(item: Pick<InventoryItem, "name" | "label" | "image" 
         if (url) out.push(url)
     }
 
-    for (const extension of images.extensions ?? []) {
-        const url = localImageUrl(images.localPath, item.name, extension)
-        if (url && !out.includes(url)) out.push(url)
-    }
-
-    // Inventory CDN: `<cdn>/<item name>.<cdnExtension>`. Sits after every local
-    // candidate, so a bundled file always wins and the CDN only serves items
-    // with no local artwork.
+    // Inventory CDN uses the configured image filename when present, then the
+    // item name. It sits after every local candidate, so bundled artwork wins.
     if (images.allowRemote !== false && images.cdn?.startsWith("https://")) {
-        const url = localImageUrl(images.cdn, item.name, images.cdnExtension ?? "webp")
+        const url = localImageUrl(images.cdn, named || item.name, images.cdnExtension ?? "webp")
         if (url && !out.includes(url)) out.push(url)
     }
 
-    if (remote && !item.imageOverride && images.preferLocal) out.push(remote)
+    if (remote && images.preferLocal) out.push(remote)
 
     return out
 }
