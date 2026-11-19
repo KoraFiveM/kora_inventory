@@ -17,7 +17,7 @@ kora_inventory never stores definitions. Each time it needs one it asks kora_cor
 ## Adding a new item
 
 1. **Register the definition** — From a server script call `exports.kora_core:registerShared('items', name, record)` with a lower-case `name` equal to the key. A registered record is owned by your resource and is removed when it stops, so register on every start. Weapons go in the `weapons` registry with `type = 'weapon'`.
-2. **Add artwork** — Place `<name>.png` (or webp, gif, jpg) in `kora_inventory/images`, or set `imageUrl` on the record. `ui.images.preferLocal` decides which wins.
+2. **Add artwork** — Put the definition's `image` filename in `kora_inventory/images`. If an instance needs different artwork, set `info.image` to a local filename, or to a full `https://` or `nui://` URL.
 3. **Give it behaviour** — If it should be used, set `useable = true` and register a handler with `createUseable`. Items with `useable = true` and no handler fall back to the legacy `QBCore:Server:UseItem` event.
 4. **Grant it from the server** — Call `AddItem`. Weapons automatically receive serial, durability and ammo metadata on the way in.
 
@@ -51,7 +51,7 @@ Read by kora_inventory through `buildItem`, `effectiveItem`, the use flow, ammo 
 | `preventClose` | boolean | kora_inventory's own field with the opposite sense: `true` leaves the panel open after use. Set implicitly when `shouldClose = false`. |
 | `useTime` | integer | Milliseconds of kora_lib progress bar the client runs before a use is sent (hotbar and NUI). 0 or absent means immediate. A cancelled bar sends nothing to the server. |
 | `image` | string | Local artwork file name, for example `water_bottle.png`. |
-| `imageUrl` | string | Optional browser-ready URL used as a remote artwork source (see `ui.images`). |
+| `imageUrl` | string | Legacy data field. The built-in UI does not use it as an artwork source. |
 | `description` | string | Shown in the inspector. Overridable by `metadata.description`. |
 | `container` | boolean | Marks an item as a container for the UI. Set automatically on views of items whose definition has `container = true` (the shipped `backpack`). Opening is driven by `Config.kora_inventory.containers.items`, not by this flag. |
 | `ammoType` | string | Ammo items only: native ammo type such as `AMMO_PISTOL`. With a positive `rounds`, the item becomes loadable by a built-in handler. |
@@ -89,7 +89,8 @@ Any key can be stored. These change behaviour or display.
 | --- | --- | --- |
 | `label, description` | string | Replace the definition's label or description for this instance. |
 | `weight` | number | Per-instance weight override. Only a finite number of at least 0 is used; anything else falls back to the definition. |
-| `image / imageUrl` | string | `imageUrl` replaces the artwork URL for this instance. If `image` is set to a string and `imageUrl` is not, no remote URL is used. The UI marks an instance override as `imageOverride`. |
+| `image` | string | `info.image` overrides the definition image. `https://` and `nui://` values are used as-is; other values are filenames looked up in `kora_inventory/images`. |
+| `imageUrl` | string | Preserved for compatibility, but ignored by the built-in artwork renderer. |
 | `show` | boolean | Put `show = true` on a nested table to display its children in the inspector. Plain (non-table) values at the top level are always listed; other nested tables are hidden. |
 | `containerId` | string | Set by the container module when a portable container is bound to this unique item. Never accept it from a client. |
 | `serial, durability, quality, ammo, loadedBullets, tint, components` | mixed | Canonical weapon metadata managed by `PrepareWeaponMetadata` and the weapon exports. `quality` mirrors `durability`. |
@@ -203,9 +204,9 @@ On the `ox_inventory` identity, `Items()`, `Items(name)` and `ItemList` (server 
 
 Artwork is resolved as an ordered list and walked on `onError`:
 
-1. the item's own `imageUrl`, if it is `https://` and `ui.images.allowRemote` is not false
-2. `<localPath>/<item.image>` when the legacy `image` field has an extension
-3. `<localPath>/<item.name>.<ext>` for each extension in `ui.images.extensions` (`webp`, `png`, `gif`, `jpg`)
-4. the first letter of the label
+1. if `info.image` is a full `https://` or `nui://` URL, use that exact URL
+2. if `info.image` is a filename, look for that filename under `images/`
+3. otherwise, look for the definition's `image` filename under `images/`, then try `<item.name>.<ext>` for each configured extension
+4. show the first letter of the label if no local image loads
 
-`preferLocal` (default `true`) moves a remote URL to the end of the list; `allowRemote = false` drops remote URLs entirely. Only `https://` is accepted and a local name must be a plain identifier. Local files live in `images/` (served as `nui://kora_inventory/images/<file>`), outside `web/` so rebuilding the NUI cannot delete them. `html/images/` is shipped for legacy consumers that embed that path in their own NUI. Animated WebP and GIF work in CEF without extra handling.
+The built-in renderer does not fetch artwork from a CDN or from `imageUrl`. Local files are served as `nui://kora_inventory/images/<file>` and live outside `web/`, so rebuilding the NUI cannot delete them. `html/images/` remains available to legacy consumers that embed that path in their own NUI. Animated WebP and GIF work in CEF without extra handling.

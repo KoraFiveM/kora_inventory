@@ -28,7 +28,8 @@ Config = {}
 dofile('config.lua')
 local images = Config.kora_inventory.ui.images
 H.equal(images.localPath, 'nui://kora_inventory/images', 'artwork uses kora_inventory NUI paths')
-H.equal(images.preferLocal, true, 'bundled artwork is preferred over remote fallbacks')
+H.equal(images.extensions[1], 'webp', 'local WebP artwork is tried first')
+H.equal(images.allowRemote, nil, 'inventory artwork does not use remote URL fallbacks')
 
 H.equal(Config.kora_inventory.ui.scale, 1.0, 'UI scale defaults to 1.0 so the layout is unchanged')
 H.ok(source:find('scale = Kora.util.clamp(tonumber(ui.scale) or 1.0, 0.5, 2.0)', 1, true),
@@ -49,8 +50,7 @@ H.equal(Config.kora_inventory.ui.moveTimeout, nil, 'the legacy seconds option is
 H.ok(source:find('moveTimeoutMs = moveTimeoutMs(),', 1, true),
     'the move timeout is read live and pushed in milliseconds')
 
-H.equal(images.cdn, 'https://cdn.koraframe.work/inventory', 'items with no local artwork fall back to the inventory CDN')
-H.equal(images.cdnExtension, 'webp', 'the inventory CDN serves webp')
+H.equal(images.cdn, nil, 'inventory artwork does not use a CDN fallback')
 
 -- Exercise the actual bridge; host presentation calls only record messages.
 local handlers, messages = {}, {}

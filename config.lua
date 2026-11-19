@@ -311,30 +311,12 @@ Config.kora_inventory = {
         -- default; only read when moveTimeoutMs is absent from your config.
         -- moveTimeout = 10,
 
-        -- Item artwork resolution. `localPath` is tried before any remote
-        -- `imageUrl` when `preferLocal` is set, and always as the fallback when
-        -- a remote image 404s.
-        --
-        -- Extensions are tried in order for `<localPath>/<item name>.<ext>`, so
-        -- put the format you actually ship first. Animated WebP and GIF need no
-        -- special handling -- CEF animates both in a plain <img> -- so they are
-        -- listed purely to allow the extension.
+        -- Local item artwork. Definition image filenames and per-item
+        -- `info.image` filenames resolve under localPath. A full https:// or
+        -- nui:// value in info.image is used directly.
         images = {
             localPath = 'nui://kora_inventory/images',
             extensions = { 'webp', 'png', 'gif', 'jpg' },
-            -- Files named after an item in images/ are checked first and can
-            -- override both definition artwork and the remote catalogue.
-            -- kora_core's remote catalogue remains a fallback for items with
-            -- no local image.
-            preferLocal = true,
-            -- Set false to never make an outbound image request at all. Items
-            -- with no local file fall back to the first-letter placeholder.
-            allowRemote = true,
-            -- Inventory CDN, used when no local file exists for an item:
-            -- <cdn>/<item name>.<cdnExtension>. Must be https://. Set to nil
-            -- (or allowRemote = false) to disable.
-            cdn = 'https://cdn.koraframe.work/inventory',
-            cdnExtension = 'webp',
         },
     },
     auditLimit = 1000,

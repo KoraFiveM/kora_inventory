@@ -590,19 +590,16 @@ the server's handler.
 
 Artwork is resolved as an ordered list of candidates, walked on `onError`:
 
-1. the item's own `imageUrl`, if it is `https://` and `allowRemote` is not false
-2. `<localPath>/<item.image>`, when the legacy `image` field carries an extension
-3. `<localPath>/<item.name>.<ext>` for each configured extension, in order
-4. the inventory CDN, `<cdn>/<item.name>.<cdnExtension>` (`Config.qbinventory.ui.images.cdn`,
-   default `https://cdn.koraframe.work/inventory/<name>.webp`), placed after the local
-   candidates so a bundled file always wins
+1. a full `https://` or `nui://` URL in the instance's `info.image`, used as-is
+2. an `info.image` filename under `<localPath>`
+3. the definition's `image` filename under `<localPath>`
+4. `<localPath>/<item.name>.<ext>` for each configured extension, in order
 5. the first letter of the label
 
-Ordered rather than probed: there is no way to ask whether a `nui://` file
-exists without requesting it, and an `<img onError>` chain gets that for free
-with no HEAD requests and no manifest to keep in sync. Set `preferLocal = true`
-to move the remote URL to the end of that list, or `allowRemote = false` to drop
-it entirely.
+The built-in UI does not fetch artwork from `imageUrl` or a CDN. Ordered rather
+than probed: there is no way to ask whether a `nui://` file exists without
+requesting it, and an `<img onError>` chain gets that for free with no HEAD
+requests and no manifest to keep in sync.
 
 Local files live in `kora_inventory/images/` (see its README) and are served as
 `nui://kora_inventory/images/<file>`. That is outside `web/` on purpose: `web/build`

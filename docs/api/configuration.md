@@ -149,10 +149,8 @@ The only settings that cross into the browser. Nothing here is authority. Most a
 | `ui.directTransport` | boolean | Default `true`. Send move/buy/drop/use requests as one direct net event (`kora_inventory:server:call`) instead of kora_lib callbacks. Same handlers and checks either way. |
 | `ui.moveTimeoutMs` | integer | Default `6000`. Milliseconds before an unanswered move is rolled back and re-synced (500 to 60000). With `directTransport` off keep it near 1500. |
 | `ui.moveTimeout` | number | Not set by default. Legacy form of `moveTimeoutMs` in seconds (0.5 to 60); only read when `moveTimeoutMs` is absent. |
-| `ui.images.localPath` | string | Default `'nui://kora_inventory/images'`. Local artwork folder, tried as `<localPath>/<item name>.<ext>`. |
-| `ui.images.extensions` | string[] | Default `{ 'webp', 'png', 'gif', 'jpg' }`. Extensions tried in order. Animated webp and gif work in CEF. |
-| `ui.images.preferLocal` | boolean | Default `true`. Try the local file before a remote `imageUrl`; the local file is always the fallback when a remote image fails. |
-| `ui.images.allowRemote` | boolean | Default `true`. `false` never makes an outbound image request; items without a local file show a letter placeholder. |
+| `ui.images.localPath` | string | Default `'nui://kora_inventory/images'`. Local artwork folder for definition filenames and `info.image` filenames. |
+| `ui.images.extensions` | string[] | Default `{ 'webp', 'png', 'gif', 'jpg' }`. Tried in order when a filename has no extension. Animated WebP and GIF work in CEF. |
 
 ### Cash and item receipts
 
