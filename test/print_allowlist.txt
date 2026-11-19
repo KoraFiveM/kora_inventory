@@ -1,0 +1,2 @@
+# path:reason -- raw print/console diagnostics intentionally left in place (see kora_lib PR #43 spec rule 5).
+# (kora_inventory: none; every runtime diagnostic uses Kora.logging.)
