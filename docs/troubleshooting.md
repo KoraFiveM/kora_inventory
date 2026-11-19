@@ -21,6 +21,6 @@ sidebar_position: 11
 
 **A weapon cannot load ammo.** The weapon must be drawn, and the magazine's `ammoType` must match the weapon's `ammotype`.
 
-**Item art is missing.** Put `<item name>.webp` (or `png`, `gif`, `jpg`) in `images/`, restart the resource, and check `ui.images`. Remote art needs an `https://` `imageUrl`.
+**Item art is missing.** Check that the definition's `image` filename exists in `images/`. An instance's `info.image` can name a different file there, or contain a full `https://` / `nui://` URL. The built-in UI does not use `imageUrl` or fetch CDN artwork.
 
 **`kora_inventory-migrate` says permission denied.** See [Commands and keybinds](./commands.md); a player needs both ACEs. Use the server console otherwise.

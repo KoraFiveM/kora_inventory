@@ -13,8 +13,9 @@ export interface InventoryItem {
     weight?: number
     description?: string
     image?: string
+    /** Legacy field preserved on the wire; built-in art uses `image` only. */
     imageUrl?: string
-    /** True when imageUrl came from item metadata rather than the definition. */
+    /** True when `info.image` overrides the definition's image filename. */
     imageOverride?: boolean
     metadata?: Record<string, unknown>
     /** qb-style metadata table; items carry this or `metadata`. */
@@ -126,13 +127,5 @@ export interface UiConfig {
         localPath?: string
         /** Tried in order for `<localPath>/<name>.<ext>`. */
         extensions?: string[]
-        /** Try the local file before the item's own remote `imageUrl`. */
-        preferLocal?: boolean
-        /** When false, no outbound image request is ever made. */
-        allowRemote?: boolean
-        /** `https://` base of the inventory CDN, serving `<cdn>/<item name>.<cdnExtension>`. */
-        cdn?: string
-        /** File extension on the CDN. Defaults to `webp`. */
-        cdnExtension?: string
     }
 }

@@ -54,10 +54,6 @@ const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo
     images: {
         localPath: "nui://kora_inventory/images",
         extensions: ["webp", "png", "gif", "jpg"],
-        preferLocal: false,
-        allowRemote: true,
-        cdn: "https://cdn.koraframe.work/inventory",
-        cdnExtension: "webp",
     },
 }
 
@@ -126,46 +122,44 @@ function localImageUrl(base: string | undefined, name: string, extension: string
  * exists without requesting it, and an `<img onError>` chain gets that for free
  * with no HEAD requests and no manifest to keep in sync.
  */
-function artworkCandidates(item: Pick<InventoryItem, "name" | "label" | "image" | "imageUrl" | "imageOverride">, images: NonNullable<UiConfig["images"]>) {
-    const out: string[] = []
+function localArtworkCandidates(image: string, images: NonNullable<UiConfig["images"]>) {
+    const filename = image.split(/[\\/]/).pop() ?? ""
+    const extension = /\.([a-z0-9]+)$/i.exec(filename)?.[1]
+    const name = extension ? filename.slice(0, -(extension.length + 1)) : filename
+    if (!name) return []
 
-    // Only https:// remote artwork. The scheme allowlist is the point: an item
-    // definition is data from another resource, and a `javascript:` or `data:`
-    // value in `imageUrl` must never reach an `src`.
-    const remote = images.allowRemote !== false && item.imageUrl?.startsWith("https://") ? item.imageUrl : undefined
-
-    if (remote && (item.imageOverride || !images.preferLocal)) out.push(remote)
-
-    // kora_core's legacy `image` field is a bare filename ('water_bottle.png'),
-    // which is the one case where the extension is already chosen for us.
-    const named = typeof item.image === "string" ? item.image.replace(/\.[a-z0-9]+$/i, "") : undefined
-    const explicit = typeof item.image === "string" ? /\.([a-z0-9]+)$/i.exec(item.image)?.[1] : undefined
-    if (named && explicit) {
-        const url = localImageUrl(images.localPath, named, explicit)
-        if (url) out.push(url)
-    }
-
-    for (const extension of images.extensions ?? []) {
-        const url = localImageUrl(images.localPath, item.name, extension)
-        if (url && !out.includes(url)) out.push(url)
-    }
-
-    // Inventory CDN: `<cdn>/<item name>.<cdnExtension>`. Sits after every local
-    // candidate, so a bundled file always wins and the CDN only serves items
-    // with no local artwork.
-    if (images.allowRemote !== false && images.cdn?.startsWith("https://")) {
-        const url = localImageUrl(images.cdn, item.name, images.cdnExtension ?? "webp")
-        if (url && !out.includes(url)) out.push(url)
-    }
-
-    if (remote && !item.imageOverride && images.preferLocal) out.push(remote)
-
-    return out
+    const extensions = extension ? [extension] : images.extensions ?? []
+    return extensions
+        .map((candidate) => localImageUrl(images.localPath, name, candidate))
+        .filter((url): url is string => Boolean(url))
 }
 
-function ItemArtwork({ item, className }: { item: Pick<InventoryItem, "name" | "label" | "image" | "imageUrl" | "imageOverride">; className: string }) {
+function artworkCandidates(item: Pick<InventoryItem, "name" | "image" | "imageOverride">, images: NonNullable<UiConfig["images"]>) {
+    const image = typeof item.image === "string" ? item.image : ""
+
+    // info.image is the only per-item setting that may point outside the local
+    // image folder. Preserve a full URL exactly as the item supplied it.
+    if (item.imageOverride && (image.startsWith("https://") || image.startsWith("nui://"))) {
+        return [image]
+    }
+
+    // A filename in info.image replaces the definition filename, but stays
+    // under kora_inventory/images. Normal items use their definition filename.
+    if (item.imageOverride && image) {
+        return localArtworkCandidates(image, images)
+    }
+
+    const candidates = image ? localArtworkCandidates(image, images) : []
+    for (const extension of images.extensions ?? []) {
+        const url = localImageUrl(images.localPath, item.name, extension)
+        if (url && !candidates.includes(url)) candidates.push(url)
+    }
+    return candidates
+}
+
+function ItemArtwork({ item, className }: { item: Pick<InventoryItem, "name" | "label" | "image" | "imageOverride">; className: string }) {
     const { images } = useContext(UiConfigContext)
-    const candidates = useMemo(() => artworkCandidates(item, images), [item.name, item.image, item.imageUrl, item.imageOverride, images])
+    const candidates = useMemo(() => artworkCandidates(item, images), [item.name, item.image, item.imageOverride, images])
     const [attempt, setAttempt] = useState(0)
 
     // A different item in the same slot is a different candidate list, so the

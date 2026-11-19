@@ -285,7 +285,7 @@ local function showItemBox(src, name, amount, action, item)
         label = effective.label or tostring(name),
         image = effective.image,
         imageUrl = effective.imageUrl,
-        imageOverride = type(inventory.itemMetadata(item).imageUrl) == 'string',
+        imageOverride = type(inventory.itemMetadata(item).image) == 'string',
         amount = amount,
         action = action,
         duration = math.max(750, math.floor(tonumber(policy.duration) or 2600)),
@@ -631,9 +631,8 @@ local function viewItems(source)
         end
         return def or nil
     end
-    -- Older player records predate `imageUrl`. Resolve presentation fields from
-    -- the current core registry at render time so no player-inventory migration
-    -- is needed merely to adopt the remote artwork catalogue.
+    -- Older player records may predate the definition image filename. Resolve
+    -- it from the current core registry at render time without a migration.
     for _, item in pairs(items) do
         -- Trusted server integrations may attach bookkeeping to durable stock.
         -- It is authority state, not item metadata, and must never reach NUI.
@@ -651,7 +650,7 @@ local function viewItems(source)
         item.label = effective.label
         item.image = effective.image
         item.imageUrl = effective.imageUrl
-        item.imageOverride = type(metadata.imageUrl) == 'string'
+        item.imageOverride = type(metadata.image) == 'string'
         item.weight = effective.weight
         item.description = effective.description
 

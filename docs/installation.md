@@ -82,7 +82,7 @@ The committed `web/build` folder is the runtime artifact. After editing anything
 - `provider conflict: qb-inventory is running` — stop the other inventory resource.
 - `secondary inventory restore failed` or `schema setup failed` — kora_sql is not ready or the database user cannot create tables. Fix the connection and restart kora_inventory.
 - Stashes never open after a restart — check `exports.kora_inventory:getPersistenceStatus()`; a stash whose `RegisterStash` ran before persistence finished is merged with its stored contents once restoration completes.
-- Items show a letter instead of artwork — the file is not in `images/`, or `Config.kora_inventory.ui.images.allowRemote` is false and the item has no local file.
+- Items show a letter instead of artwork — check that the definition's `image` filename (or the `info.image` override) exists in `kora_inventory/images`.
 - The inventory will not open — the player is downed, cuffed, using a progress bar, or another resource set the `koraUiBlocked` state bag. See Configuration, "Blocking rules".
 
 ## Dependencies (from the code)
