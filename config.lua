@@ -381,6 +381,22 @@ Config.kora_inventory = {
         trunkEnabled = true,
         -- How close (metres) a player must stand to the boot position to open
         -- the trunk. The boot position is derived from the model dimensions.
+        -- vehicle spawn name. Restart after changing models or bounds.
+        trunkCargo = {
+            enabled = false,
+            drawDistance = 35.0,
+            maxProps = 24,
+            fallbackModel = 'prop_med_bag_01b',
+            models = {
+                water_bottle = 'prop_ld_flow_bottle',
+                sandwich = 'prop_sandwich_01',
+                phone = 'prop_npc_phone_02',
+                bandage = 'prop_ld_health_pack',
+                cash = 'prop_cash_pile_01',
+            },
+            bounds = {},
+        },
+
         bootReach = 1.8,
         -- Server-side limit (metres) from the player to the vehicle origin when
         -- opening a trunk. Larger than `distance` because the boot sits at the
