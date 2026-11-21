@@ -990,7 +990,7 @@ local function view(inventoryKey, viewer)
     -- The omnipack's stock IS its items table: never send ~1000 rows twice.
     local stock
     if not inv.omnipack then
-        stock = inv.stock and viewItems(inv.stock, false, true) or nil
+        stock = inv.stock and viewItems(inv.stock) or nil
     end
     return {
         id = inv.id,
@@ -3254,7 +3254,7 @@ local function removeItem(src, name, amount, slot, reason)
         return true
     end)
 end
-local function itemNameKey(name)
+function ext.itemNameKey(name)
     return type(name) == 'string' and name:lower() or nil
 end
 
@@ -3262,12 +3262,12 @@ end
 ---@param name string
 ---@return table|nil item
 local function getItemByName(src, name)
-    local wanted = itemNameKey(name)
+    local wanted = ext.itemNameKey(name)
     if not wanted then
         return nil
     end
     for _, item in pairs(playerItems(src)) do
-        if itemNameKey(item.name) == wanted then
+        if ext.itemNameKey(item.name) == wanted then
             return item
         end
     end
@@ -3276,12 +3276,12 @@ end
 ---@param name string
 ---@return table[] items
 local function getItemsByName(src, name)
-    local wanted, out = itemNameKey(name), {}
+    local wanted, out = ext.itemNameKey(name), {}
     if not wanted then
         return out
     end
     for _, item in pairs(playerItems(src)) do
-        if itemNameKey(item.name) == wanted then
+        if ext.itemNameKey(item.name) == wanted then
             out[#out + 1] = item
         end
     end
@@ -3299,10 +3299,10 @@ end
 local function getItemCount(src, names)
     local wanted, total = {}, 0
     if type(names) == 'string' then
-        wanted[itemNameKey(names)] = true
+        wanted[ext.itemNameKey(names)] = true
     elseif type(names) == 'table' then
         for _, name in pairs(names) do
-            local key = itemNameKey(name)
+            local key = ext.itemNameKey(name)
             if key then
                 wanted[key] = true
             end
@@ -3311,7 +3311,7 @@ local function getItemCount(src, names)
         return 0
     end
     for _, item in pairs(playerItems(src)) do
-        if wanted[itemNameKey(item.name)] then
+        if wanted[ext.itemNameKey(item.name)] then
             total = total + (tonumber(item.amount) or 0)
         end
     end
@@ -3327,12 +3327,12 @@ local function hasItem(src, names, amount)
     end
     local counts = {}
     for _, item in pairs(playerItems(src)) do
-        local name = itemNameKey(item.name)
+        local name = ext.itemNameKey(item.name)
         counts[name] = (counts[name] or 0) + (tonumber(item.amount) or 0)
     end
     local isArray = #names > 0
     for key, value in pairs(names) do
-        local name = itemNameKey(isArray and value or key)
+        local name = ext.itemNameKey(isArray and value or key)
         local required = isArray and (tonumber(amount) or 1) or (tonumber(value) or 1)
         if not name or (counts[name] or 0) < required then
             return false
@@ -3342,7 +3342,7 @@ local function hasItem(src, names, amount)
 end
 ---@param src integer
 ---@return integer|nil slot
-function ext.getFreeSlot(src)
+local function getFreeSlot(src)
     return inventory.firstFreeSlot(playerItems(src), config.playerSlots)
 end
 ---@param src integer
@@ -3394,10 +3394,10 @@ end
 local function clearInventory(src, keep)
     local keeps = {}
     if type(keep) == 'string' then
-        keeps[itemNameKey(keep)] = true
+        keeps[ext.itemNameKey(keep)] = true
     elseif type(keep) == 'table' then
         for key, value in pairs(keep) do
-            keeps[itemNameKey(type(key) == 'number' and value or key)] = true
+            keeps[ext.itemNameKey(type(key) == 'number' and value or key)] = true
         end
     end
     if cashItemsActive then
@@ -3405,7 +3405,7 @@ local function clearInventory(src, keep)
     end
     return lock({ playerKey(src) }, function()
         for slot, item in pairs(playerItems(src)) do
-            if not keeps[itemNameKey(item.name)] then
+            if not keeps[ext.itemNameKey(item.name)] then
                 local ok, err = playerSetPath(src, { 'items', slot }, nil)
                 if not ok then
                     return false, err
@@ -3861,7 +3861,7 @@ end)
 ---@param amount number|nil
 ---@return boolean taken
 ---@return any result
-function ext.dropTake(src, id, slot, amount)
+local function dropTake(src, id, slot, amount)
     local inv = getInventory(key('drop', id))
     if not inv then
         return false, 'no such drop'
@@ -3884,7 +3884,7 @@ function ext.dropTake(src, id, slot, amount)
 end
 
 -- Ox-style inventory constructors and shops.
-local function refreshRegistration(inv, opts, skipDirty)
+function ext.refreshRegistration(inv, opts, skipDirty)
     inv.label = opts.label or inv.label
     inv.slots = math.floor(tonumber(opts.slots) or inv.slots)
     inv.maxWeight = tonumber(opts.maxWeight or opts.maxweight) or inv.maxWeight
@@ -3936,7 +3936,7 @@ local function registerStash(id, label, slots, maxWeight, owner, groups, coords,
     if inv.policyOwner then return inv.key end
     -- Re-registration retains contents but refreshes the live access boundary.
     -- This matters for resources whose fixtures can be edited at runtime.
-    refreshRegistration(inv, opts)
+    ext.refreshRegistration(inv, opts)
     return inv.key
 end
 
@@ -3967,7 +3967,7 @@ local function registerStashPolicy(id, options, callback)
         if inv.policyOwner and inv.policyOwner ~= owner then return false, 'stash policy belongs to another resource' end
         if inv.durablePending then return false, 'inventory recovery is being reconciled' end
         local prepared = inventory.copy(inv)
-        refreshRegistration(prepared, options, true)
+        ext.refreshRegistration(prepared, options, true)
         prepared.access, prepared.accessRequired, prepared.policyOwner = callback, true, owner
         inv.access, inv.accessRequired, inv.policyOwner = nil, true, owner
         local saved, err = persistence.save(prepared)
@@ -4078,7 +4078,7 @@ local function registerShop(id, data)
     end
     data.slots = slots
     local inv, restored = secondary('shop', id, data)
-    refreshRegistration(inv, data)
+    ext.refreshRegistration(inv, data)
     if not restored then
         inv.stock = initial
         inv.items = inv.stock -- a shop is rendered as an inventory; stock is its authoritative slot table.
@@ -4935,7 +4935,7 @@ local api = {
     getItemBySlot = getItemBySlot,
     getItemCount = getItemCount,
     hasItem = hasItem,
-    getFreeSlot = ext.getFreeSlot,
+    getFreeSlot = getFreeSlot,
     moveItem = moveItem,
     clearInventory = clearInventory,
     setItems = setItems,
@@ -4946,7 +4946,7 @@ local api = {
     stashSet = stashSet,
     stashOpen = stashOpen,
     dropCreate = dropCreate,
-    dropTake = ext.dropTake,
+    dropTake = dropTake,
     AddItem = addItem,
     RemoveItem = removeItem,
     GetItemByName = getItemByName,
@@ -4954,7 +4954,7 @@ local api = {
     GetItemBySlot = getItemBySlot,
     GetItemCount = getItemCount,
     HasItem = hasItem,
-    GetFreeSlot = ext.getFreeSlot,
+    GetFreeSlot = getFreeSlot,
     CanAddItem = canCarry,
     GetFreeWeight = function(src)
         local currentWeight, maxWeight = getWeight(src)
@@ -5200,7 +5200,7 @@ AddEventHandler('kora_inventory:server:persistenceReady', function()
         if current then
             if current._registered then
                 inv.temporary = current.temporary
-                refreshRegistration(inv, current)
+                ext.refreshRegistration(inv, current)
                 if current.accessRequired and not current.access then
                     -- Keep a required callback unless re-registration removed it.
                     inv.accessRequired = true
