@@ -84,7 +84,7 @@ end
 local searchGrants = {}
 
 local function searchConfig()
-    local cfg = containerConfig and inventoryApi.config and inventoryApi.config.search
+    local cfg = inventoryApi.config.search
     return type(cfg) == 'table' and cfg or {}
 end
 
@@ -124,6 +124,12 @@ local function portableOptions(item, definition)
         end,
         portable = true,
     }
+end
+
+local function restorePortablePolicy(container, item, definition)
+    local options = portableOptions(item, definition)
+    container.access = options.access
+    container.label = options.label
 end
 
 local function policy(action, source, context)
@@ -188,7 +194,6 @@ local function ensureContainer(id, options)
     if not id then
         return nil, 'invalid container identifier'
     end
-    options = options or {}
     local containerKey, existing = inventoryApi.resolveInventory(key('container', id))
     if existing then
         return containerKey, existing
@@ -288,11 +293,7 @@ function containers.bindItem(source, slot, options)
     end
     local generated = ('item-%s%s'):format(ownerPart:sub(1, available), suffix)
     generated = cleanId(generated)
-    local boundOwner = owner
-    if options.portable == true then
-        boundOwner = nil
-    end
-    local prepared = containerOptions(options, boundOwner)
+    local prepared = containerOptions(options, options.portable ~= true and owner or nil)
     local containerKey, container = ensureContainer(generated, prepared)
     if not containerKey then
         return false, container
@@ -360,8 +361,7 @@ function containers.openConfiguredItem(source, slot)
     end
     -- Reinstall this non-serialisable policy after storage hydration and when
     -- a backpack changes hands. The policy validates the exact current item.
-    container.access = options.access
-    container.label = options.label
+    restorePortablePolicy(container, item, definition)
     return inventoryApi.open(source, containerKey)
 end
 
@@ -408,9 +408,7 @@ function containers.openForSearcher(searcher, targetSrc, slot)
     if not container then
         return false, 'bound container not found'
     end
-    local options = portableOptions(item, definition)
-    container.access = options.access
-    container.label = options.label
+    restorePortablePolicy(container, item, definition)
     local grant = { target = targetSrc, containerId = id, name = item.name }
     searchGrants[searcher] = grant
     local ok, result = inventoryApi.open(searcher, containerKey)
@@ -529,11 +527,11 @@ local function moveEvidence(action, source, target, evidenceId, slot, amount, ta
     if not source or not target or not slot or not amount then
         return false, 'invalid evidence transfer request'
     end
-    local evidenceKey, evidence, err = evidenceInventory(evidenceId)
-    if not evidence then
+    local evidenceKey, evidenceRecord, err = evidenceInventory(evidenceId)
+    if not evidenceRecord then
         return false, err
     end
-    local context = { evidenceId = evidence.id, target = target, slot = slot, amount = amount }
+    local context = { evidenceId = evidenceRecord.id, target = target, slot = slot, amount = amount }
     local allowed, reason = policy(action, source, context)
     if not allowed then
         return false, reason
@@ -551,7 +549,6 @@ local function moveEvidence(action, source, target, evidenceId, slot, amount, ta
         action == 'seize' and playerKey or evidenceKey, action == 'seize' and evidenceKey or playerKey
     return inventoryApi.lock({ fromKey, toKey }, function()
         local sourceInventory = select(2, inventoryApi.resolveInventory(fromKey))
-        local destinationInventory = select(2, inventoryApi.resolveInventory(toKey))
         local item = sourceInventory and sourceInventory.items[slot]
         if not item or amount > (tonumber(item.amount) or 0) then
             return false, 'item changed'
@@ -593,7 +590,7 @@ local function moveEvidence(action, source, target, evidenceId, slot, amount, ta
                 action,
                 source,
                 target,
-                evidence.id,
+                evidenceRecord.id,
                 inventoryApi.copy(removedItem)
             )
         end

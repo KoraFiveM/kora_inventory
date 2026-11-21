@@ -45,9 +45,8 @@ local function markDirty(inv)
     end
 end
 
----Walks an inventory and works out what decay has to do. With `apply = false`
----nothing is written (a dry run used to avoid the lock when there is nothing to
----do). Returns { stamps = {...}, expired = {...} }; both empty means no work.
+---Walks an inventory and works out what decay has to do. Pure planner: it never
+---writes. Returns { stamps = {...}, expired = {...} }; both empty means no work.
 local function plan(inv, cfg, now)
     local paused = D.paused(cfg, inv.type)
     local rules, result = {}, { stamps = {}, expired = {} }

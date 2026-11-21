@@ -1,5 +1,5 @@
 -- Inventory and core commit both sides with the receipt before publishing items.
-local inventory, core = KoraInventory, KoraInventory.internal
+local inventory, internal = KoraInventory, KoraInventory.internal
 local persistence = inventory.persistence
 
 local function receipt(provider, operationKey)
@@ -35,7 +35,7 @@ local function finish(inv, row, token)
         if inv.revision < revision then
             inv.items, inv.revision = {}, revision
             persistence.committed(inv)
-            core.broadcast(inv.key)
+            internal.broadcast(inv.key)
         end
         inv.durablePending = nil
     end
@@ -46,13 +46,13 @@ local function claim(source, id, operationKey)
     local provider = GetInvokingResource() or GetCurrentResourceName()
     if type(id) ~= 'string' or type(operationKey) ~= 'string' or #operationKey < 1 or #operationKey > 128 then return false, 'Invalid recovery request.' end
     if not persistence.getStatus().ready or Config.kora_inventory.persistence.enabled == false then return false, 'Inventory persistence is unavailable.' end
-    local _, inv = core.resolveInventory('stash:' .. id)
+    local _, inv = internal.resolveInventory('stash:' .. id)
     local data = exports.kora_core:getPlayerData(source)
     if not inv or inv.policyOwner ~= provider or not data or type(data.citizenid) ~= 'string' then return false, 'Recovery is unavailable.' end
     local cid, operation = data.citizenid, 'recovery:' .. provider .. ':' .. operationKey
     local context = { key = 'kora_inventory:' .. provider .. ':' .. operationKey,
         fingerprint = json.encode({ provider, operationKey, id, cid }), citizenids = { cid } }
-    return core.lock({ inv.key, core.playerKey(source) }, function()
+    return internal.lock({ inv.key, internal.playerKey(source) }, function()
         return persistence.withLock(inv.type, inv.id, function()
             local token, tokenErr = activeToken(operation)
             if token == false then return false, tokenErr end
@@ -77,7 +77,7 @@ local function claim(source, id, operationKey)
             -- after the recipient loses access to the original physical space.
             local accessInventory = inventory.copy(inv)
             accessInventory.coords, accessInventory.bucket = nil, nil
-            local allowed, accessErr = core.canAccess(source, accessInventory, { recovery = true }, true)
+            local allowed, accessErr = internal.canAccess(source, accessInventory, { recovery = true }, true)
             if not allowed then return false, accessErr end
             if not next(inv.items) then return false, 'Recovery storage is empty.' end
             local locked, code, lockErr = exports.kora_core:beginPlayerColumnOperation(operation, { cid }, { 'inventory' })
@@ -92,7 +92,7 @@ local function claim(source, id, operationKey)
             local destination = { items = inventory.copy(data.items or {}), slots = Config.kora_inventory.playerSlots, maxWeight = Config.kora_inventory.playerMaxWeight }
             local count = 0
             for _, item in pairs(inv.items) do
-                local added, addErr = core.addSecondary(destination, item.name, item.amount, nil, item.info or item.metadata)
+                local added, addErr = internal.addSecondary(destination, item.name, item.amount, nil, item.info or item.metadata)
                 if not added then return reject(addErr) end
                 count = count + item.amount
             end
