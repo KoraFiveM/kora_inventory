@@ -35,6 +35,8 @@ shared_scripts {
     'config/shops/convenience.lua',
     'shared.lua',
     'shared/trunk_cargo.lua',
+    -- Pure item decay maths (stamps, remaining life, merge/pause rules).
+    'shared/decay.lua',
     -- Pure quick slot resolver (pointers to real inventory slots). No state.
     'shared/quickslots.lua',
 }
@@ -47,6 +49,8 @@ server_scripts {
     'server/persistence.lua',
     'server.lua',
     'server/recovery.lua',
+    -- Item decay runtime (lazy expiry through the mutation funnel + sweep).
+    'server/decay.lua',
     'server/exchange.lua',
     'server/crafting.lua',
     -- Weapon/consumable use handlers.  This follows crafting.lua because the

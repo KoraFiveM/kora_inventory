@@ -22,6 +22,8 @@ return {
         ammo_rounds = 'Rounds',
         ammo_fits = 'Fits',
         ammo_more = '+%{count} more',
+        decay_expires = 'Expires in',
+        decay_spoiled = 'Spoiled',
     },
     vehicle_doors = {
         title = 'Vehicle',
@@ -147,5 +149,7 @@ return {
         ammo_rounds_per_item = 'Rounds per item',
         ammo_fits = 'Fits',
         ammo_type = 'Type',
+        decay_expires_in = 'Expires in %{time}',
+        decay_spoiled = 'Spoiled',
     },
 }

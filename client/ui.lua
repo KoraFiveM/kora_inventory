@@ -60,6 +60,7 @@ local UI_LOCALE_KEYS = {
     'quick_slot_unpin', 'quick_slot_pin_failed', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
     'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
     'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type',
+    'decay_expires_in', 'decay_spoiled',
 }
 
 local function pushLocales()
@@ -146,6 +147,16 @@ local function rightClickMode(ui)
     return ui.rightClickSplit == false and 'none' or 'split'
 end
 
+-- Read on every push so a live config edit applies on the next open.
+local function decayPresentation()
+    local decay = Config.kora_inventory.decay or {}
+    return {
+        enabled = decay.enabled == true,
+        showOnSlot = decay.showOnSlot ~= false,
+        warnBelow = Kora.util.clamp(tonumber(decay.warnBelow) or 0.25, 0.0, 1.0),
+    }
+end
+
 local function pushConfig()
     local ui = Config.kora_inventory.ui or {}
     local ammoInfo = (Config.kora_inventory.weapons or {}).ammoInfo or {}
@@ -186,6 +197,8 @@ local function pushConfig()
         -- Read on every push so a live config change applies on the next open.
         scale = Kora.util.clamp(tonumber(ui.scale) or 1.0, 0.5, 2.0),
         images = ui.images,
+        -- Item decay presentation (the server decides which items carry `decay`).
+        decay = decayPresentation(),
         inspectorDecimals = Kora.util.clamp(math.floor(tonumber((Config.Inspector or {}).decimals) or 1), 0, 3),
         -- Selectable inspector text + Copy button (item as JSON, incl. metadata).
         inspectorCopy = (Config.Inspector or {}).allowCopy ~= false,

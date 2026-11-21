@@ -220,12 +220,56 @@ local function copyItemExtensions(target, source)
     end
 end
 
+-- Item decay (shared/decay.lua, runtime in server/decay.lua). One table, not one
+-- local per helper: this file is close to Lua's 200-locals-per-function limit.
+-- These helpers only stamp, merge and pause/resume; deciding that an item has
+-- spoiled is the runtime's job. All of them are no-ops while
+-- Config.kora_inventory.decay is off.
+local decayHelpers = {}
+
+---Stamp an item that has no stamp yet (createdAt / decayLifetime).
+function decayHelpers.stamp(item, def)
+    local decay = inventory.decay
+    if not decay then return end
+    local cfg = decay.config()
+    if not decay.enabled(cfg) then return end
+    local rule = decay.rule(item.name, def, cfg)
+    if rule then
+        decay.stampItem(item, rule, os.time(), false)
+    end
+end
+
+---Pause or resume an item for the inventory type it is being placed into
+---(nil = a player inventory, which never pauses). Stamped items only.
+function decayHelpers.place(item, inventoryType)
+    local decay = inventory.decay
+    if not decay then return end
+    local cfg = decay.config()
+    if decay.enabled(cfg) then
+        decay.placeItem(item, decay.paused(cfg, inventoryType), os.time())
+    end
+end
+
+function decayHelpers.merge(target, incoming)
+    local decay = inventory.decay
+    if decay and decay.enabled(decay.config()) then
+        decay.mergeItems(target, incoming, os.time(), decay.mergePolicy(decay.config()))
+    end
+end
+
+---Purchases and shop stock never inherit a decay stamp: a bought item starts
+---fresh (the add path stamps it) and shelf stock does not age.
+function decayHelpers.strip(info)
+    local decay = inventory.decay
+    return decay and decay.strip(info) or info
+end
+
 local function buildItem(name, amount, slot, metadata)
     local def = itemDef(name)
     if not def then
         return nil, 'unknown item'
     end
-    return {
+    local built = {
         slot = slot,
         name = def.name or tostring(name):lower(),
         amount = amount,
@@ -253,6 +297,8 @@ local function buildItem(name, amount, slot, metadata)
         useTime = math.max(0, math.floor(tonumber(def.useTime) or 0)),
         created = os.time(),
     }
+    decayHelpers.stamp(built, def)
+    return built
 end
 
 -- Resolve presentation from the committed instance and the current definition,
@@ -596,7 +642,9 @@ end
 local function appendDisplayMetadata(displayed, metadata, topLevel)
     local keys = {}
     for key in pairs(metadata) do
-        if key ~= 'show' and not (topLevel and presentationFields[key]) then
+        -- Decay stamps (createdAt, ...) are bookkeeping, never a metadata row.
+        local decayKey = topLevel and inventory.decay and inventory.decay.KEYS[key]
+        if key ~= 'show' and not (topLevel and presentationFields[key]) and not decayKey then
             keys[#keys + 1] = key
         end
     end
@@ -742,8 +790,47 @@ local function applyAmmoInfo(item, def, metadata, settings)
     end
 end
 
-local function viewItems(source)
+---View-only `decay` field + optional inspector row. Never persisted: it is
+---set on the view copy only, after any value the record carried is cleared.
+function decayHelpers.apply(item, def, metadata, settings)
+    item.decay = nil
+    if not settings then
+        return
+    end
+    local decay = inventory.decay
+    local rule = decay.rule(item.name, def, settings.cfg)
+    local field = rule and decay.viewField(metadata, rule, settings.now)
+    if not field then
+        return
+    end
+    item.decay = field
+    if settings.inspector then
+        item.displayMeta[#item.displayMeta + 1] = {
+            key = 'decayRemaining',
+            label = inventory.text('inventory.decay_expires', 'Expires in'),
+            value = field.remaining > 0 and decay.format(field.remaining)
+                or inventory.text('inventory.decay_spoiled', 'Spoiled'),
+        }
+    end
+end
+
+function decayHelpers.settings()
+    local decay = inventory.decay
+    local cfg = decay and decay.config()
+    if not decay or not decay.enabled(cfg) then
+        return nil
+    end
+    local inspector, slot = cfg.showInInspector ~= false, cfg.showOnSlot ~= false
+    if not inspector and not slot then
+        return nil
+    end
+    return { cfg = cfg, now = os.time(), inspector = inspector }
+end
+
+local function viewItems(source, shelf)
     local items = inventory.copy(source or {})
+    -- Shelf stock (shops) never ages, so it carries no decay fields.
+    local decayView = not shelf and decayHelpers.settings() or nil
     -- One registry lookup per distinct item name instead of one cross-resource
     -- export call per slot: a move builds several views, and every slot of a
     -- stack-heavy inventory used to cost its own getShared round trip.
@@ -785,6 +872,7 @@ local function viewItems(source)
 
         appendDisplayMetadata(item.displayMeta, metadata, true)
         applyAmmoInfo(item, def, metadata, ammoSettings)
+        decayHelpers.apply(item, def, metadata, decayView)
         -- Player items can have been created by kora_core or loaded from an older
         -- persisted shape. Weapon type and the live handler table are
         -- authoritative so the UI does not hide their Use action.
@@ -798,7 +886,14 @@ local function view(inventoryKey)
     if not inv then
         return nil
     end
-    local items = viewItems(inv.items)
+    -- Item decay is evaluated lazily whenever an inventory is viewed: stamp
+    -- unseen items and spoil expired ones before the view is built. Returns
+    -- true when it changed the inventory, so re-read it.
+    local decayRuntime = inventory.decayRuntime
+    if decayRuntime and decayRuntime.refresh(inventoryKey, inv) then
+        inv = getInventory(inventoryKey) or inv
+    end
+    local items = viewItems(inv.items, inv.type == 'shop')
     return {
         id = inv.id,
         key = inv.key,
@@ -882,6 +977,7 @@ local function addSecondary(inv, name, amount, slot, metadata, exactSlot)
     if not item then
         return false, err
     end
+    decayHelpers.place(item, inv.type)
     local currentWeight = inventory.totalWeight(inv.items)
     if currentWeight + inventory.itemWeight(item) > inv.maxWeight then
         return false, 'over weight'
@@ -902,6 +998,8 @@ local function addSecondary(inv, name, amount, slot, metadata, exactSlot)
     local stack = slot and inventory.canStack(inv.items[slot], item) and slot
         or not exactSlot and inventory.stackSlot(inv.items, item)
     if stack then
+        -- The merged stack spoils with its oldest member (decay.mergePolicy).
+        decayHelpers.merge(inv.items[stack], item)
         inv.items[stack].amount = inv.items[stack].amount + amount
         return true, stack
     end
@@ -979,6 +1077,7 @@ local function addPlayer(src, name, amount, slot, metadata, reason, exactSlot)
     if not item then
         return false, err
     end
+    decayHelpers.place(item, nil)
     if inventory.totalWeight(items) + inventory.itemWeight(item) > config.playerMaxWeight then
         return false, 'over weight'
     end
@@ -1023,6 +1122,7 @@ local function addPlayer(src, name, amount, slot, metadata, reason, exactSlot)
     local stack = slot and inventory.canStack(items[slot], item) and slot or not exactSlot and inventory.stackSlot(items, item)
     if stack then
         local nextItem = inventory.copy(items[stack])
+        decayHelpers.merge(nextItem, item)
         nextItem.amount = nextItem.amount + amount
         local ok, err = playerSetPath(src, { 'items', stack }, nextItem)
         return ok, err, ok and nextItem or nil
@@ -1842,6 +1942,12 @@ local function transfer(src, request)
     if fromKey == toKey and toSlot == fromSlot then
         return true, { fromRevision = revision(fromKey), toRevision = revision(toKey) }
     end
+    -- A spoiled item is converted/removed instead of moved; the committed
+    -- change is broadcast, so the client re-syncs from the patch.
+    local decayRuntime = inventory.decayRuntime
+    if decayRuntime and (decayRuntime.guard(fromKey, fromSlot, src) or (toSlot and decayRuntime.guard(toKey, toSlot, src))) then
+        return false, 'item has spoiled'
+    end
     local ownKey = playerKey(src)
     if (fromKey == ownKey and isSlotBusy(src, fromSlot)) or (toKey == ownKey and isSlotBusy(src, toSlot)) then
         notifyBusyBlocked(src)
@@ -2472,7 +2578,7 @@ local function intentBuy(src, request)
         if not currentItem or currentItem.amount < count then
             return false, 'out of stock'
         end
-        local purchaseInfo = inventory.copy(currentItem.info or {})
+        local purchaseInfo = decayHelpers.strip(inventory.copy(currentItem.info or {}))
         if
             inventory.weapons
             and inventory.weapons.isWeapon
@@ -3082,6 +3188,11 @@ useItem = function(src, slotOrName)
     if not item then
         return false, 'item not found'
     end
+    -- A spoiled item cannot be used: it is converted/removed instead.
+    local decayRuntime = inventory.decayRuntime
+    if decayRuntime and decayRuntime.guard(playerKey(src), item.slot, src) then
+        return false, 'item has spoiled'
+    end
     if isDowned(src) and not downedItemAllowed(item.name) then
         notifyDownedBlocked(src)
         return false, 'you cannot use items while downed'
@@ -3241,6 +3352,10 @@ dropCreate = function(coords, items, bucket, reservedId)
     local id = reservedId
     if not id then
         id = reserveDropId()
+    end
+    -- Items put on the ground start their decay pause when pauseIn.drop is on.
+    for _, dropped in pairs(items or {}) do
+        decayHelpers.place(dropped, 'drop')
     end
     local inv = secondary('drop', id, {
         label = 'Ground drop',
@@ -3496,6 +3611,8 @@ local function normaliseShopStock(rows, slots)
         if not item then
             return nil, ('invalid shop item in slot %d: %s'):format(slot, tostring(err))
         end
+        -- Shelf stock never ages; a purchase is stamped by the player add path.
+        if inventory.decay then inventory.decay.unstampItem(item) end
         item.price = price
         entries[slot] = item
     end
@@ -3620,7 +3737,7 @@ local function buyItem(src, shopId, slot, count)
             return false, 'out of stock'
         end
         price = tonumber(item.price or (shop.prices and shop.prices[item.name])) or 0
-        local purchaseInfo = inventory.copy(item.info or {})
+        local purchaseInfo = decayHelpers.strip(inventory.copy(item.info or {}))
         if
             inventory.weapons
             and inventory.weapons.isWeapon
@@ -4048,6 +4165,13 @@ inventory.internal = {
     config = config,
     persistence = inventory.persistence,
 }
+
+-- Hooks for server/decay.lua (lazy expiry + sweep). Kept out of the table
+-- literal above so they do not collide with other additions to it.
+inventory.internal.recordAudit = recordAudit
+inventory.internal.showItemBox = showItemBox
+inventory.internal.playerSetPath = playerSetPath
+inventory.internal.removeEmptyDrop = removeEmptyDrop
 
 -- The schema event precedes yielding restoreAll. Consumers that depend on
 -- inventories being authoritative must wait for both phases.
