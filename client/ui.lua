@@ -133,6 +133,13 @@ local function pushConfig()
         where = 'both'
     end
 
+    local function weightWarnings()
+        local w = type(ui.weightWarnings) == 'table' and ui.weightWarnings or {}
+        local warnAt = Kora.util.clamp(tonumber(w.warnAt) or 0.75, 0.01, 1.0)
+        local dangerAt = Kora.util.clamp(tonumber(w.dangerAt) or 0.95, 0.01, 1.0)
+        return { enabled = w.enabled ~= false, warnAt = warnAt, dangerAt = math.max(warnAt, dangerAt) }
+    end
+
     send('kora_inventory:nui:config', {
         -- Presentation hint only; the server decides which fields exist on items.
         ammoInfo = {
@@ -167,6 +174,13 @@ local function pushConfig()
         layout = serverLayout(),
         layouts = allowedLayouts(),
         playerLayoutChoice = ui.playerLayoutChoice ~= false,
+        -- Quality-of-life presentation flags (all default on).
+        quickTransfer = ui.quickTransfer ~= false,
+        modifierDrag = ui.modifierDrag ~= false,
+        quickAmounts = ui.quickAmounts ~= false,
+        filters = ui.filters ~= false,
+        tooltips = ui.tooltips ~= false,
+        weightWarnings = weightWarnings(),
     })
 end
 

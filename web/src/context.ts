@@ -9,7 +9,7 @@ import type { UiConfig } from "@/lib/types"
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice">> & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]> } = {
+export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]> } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
@@ -29,6 +29,12 @@ export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreW
     layout: "classic",
     layouts: { classic: true, loadout: true, compact: true, dock: true },
     playerLayoutChoice: true,
+    quickTransfer: true,
+    modifierDrag: true,
+    quickAmounts: true,
+    filters: true,
+    tooltips: true,
+    weightWarnings: { enabled: true, warnAt: 0.75, dangerAt: 0.95 },
     images: {
         localPath: "nui://kora_inventory/images",
         extensions: ["webp", "png", "gif", "jpg"],

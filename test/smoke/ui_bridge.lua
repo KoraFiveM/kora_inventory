@@ -38,6 +38,14 @@ H.ok(source:find('scale = Kora.util.clamp(tonumber(ui.scale) or 1.0, 0.5, 2.0)',
 H.equal(Config.kora_inventory.ui.rightClickSplit, true, 'right-click split defaults on')
 H.ok(source:find('rightClickSplit = ui.rightClickSplit ~= false', 1, true), 'rightClickSplit is pushed to the NUI on every config push')
 
+for _, key in ipairs({ 'quickTransfer', 'modifierDrag', 'quickAmounts', 'filters', 'tooltips' }) do
+    H.equal(Config.kora_inventory.ui[key], true, key .. ' defaults on')
+    H.ok(source:find(key .. ' = ui.' .. key .. ' ~= false', 1, true), key .. ' is pushed to the NUI on every config push')
+end
+H.equal(Config.kora_inventory.ui.weightWarnings.warnAt, 0.75, 'weight warning threshold defaults to 0.75')
+H.equal(Config.kora_inventory.ui.weightWarnings.dangerAt, 0.95, 'weight danger threshold defaults to 0.95')
+H.ok(source:find('weightWarnings = weightWarnings()', 1, true), 'weightWarnings is pushed to the NUI')
+
 H.equal(Config.kora_inventory.ui.optimisticMoves, true, 'optimistic moves default on')
 H.ok(source:find('optimisticMoves = ui.optimisticMoves ~= false', 1, true), 'optimisticMoves is pushed to the NUI on every config push')
 

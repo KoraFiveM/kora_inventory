@@ -130,6 +130,18 @@ export interface UiConfig {
     layouts?: Partial<Record<LayoutId, boolean>>
     /** The player's own layout choice from the /ui editor is honoured (Config.kora_inventory.ui.playerLayoutChoice). */
     playerLayoutChoice?: boolean
+    /** Shift+click moves a whole stack to the other open inventory (Config.kora_inventory.ui.quickTransfer). */
+    quickTransfer?: boolean
+    /** Ctrl+drag moves half a stack, Alt+drag moves one (Config.kora_inventory.ui.modifierDrag). */
+    modifierDrag?: boolean
+    /** Preset amount buttons beside the amount slider (Config.kora_inventory.ui.quickAmounts). */
+    quickAmounts?: boolean
+    /** Category chips that dim non-matching slots (Config.kora_inventory.ui.filters). */
+    filters?: boolean
+    /** Weight bar turns warning/destructive near capacity (Config.kora_inventory.ui.weightWarnings). */
+    weightWarnings?: { enabled?: boolean; warnAt?: number; dangerAt?: number }
+    /** Hover tooltip on filled slots (Config.kora_inventory.ui.tooltips). */
+    tooltips?: boolean
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string

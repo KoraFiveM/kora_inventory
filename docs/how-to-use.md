@@ -169,6 +169,17 @@ Most server functions return `ok, reason`. The reason is a short string; branch 
 - Player inspection, evidence, vehicle storage and stash policies are default-deny callbacks supplied by trusted resources.
 - A busy slot (use handler running or progress bar active) cannot be dropped, given or moved, so an item cannot be used and kept.
 
+## Inventory shortcuts for players
+
+These are presentation features of the window; each can be switched off under `Config.kora_inventory.ui` (see the configuration page). The server validates every resulting move.
+
+- Shift+click a stack to send the whole stack to the other open inventory. It stacks onto a matching item first, otherwise takes the first empty slot, and never targets a shop. In a shop it buys one.
+- Ctrl+drag moves half a stack (rounded down, at least one); Alt+drag moves one item. Shift+drag is a normal drag.
+- The inspector has amount buttons (1, 5, 10, half, All) beside the slider.
+- Category chips on each panel dim items outside the chosen category. Slot numbers never change. The search box also dims non-matching items in your own inventory.
+- The weight bar turns amber at 75 percent of capacity and red at 95 percent (`ui.weightWarnings`).
+- Hovering a filled slot for a moment shows a tooltip with the item details.
+
 ## Limitations worth knowing
 
 - The container, evidence and vehicle-storage modules are Lua tables inside the resource (`KoraInventory.containers`, `KoraInventory.evidence`, `KoraInventory.vehicles`). They are not exported; other resources reach them through configuration callbacks and the exports listed under their modules.

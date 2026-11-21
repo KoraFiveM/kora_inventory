@@ -45,7 +45,7 @@ When `Config.kora_inventory.weapons.ammoInfo.enabled` is on, views (including sh
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice }`, derived from `Config.kora_inventory.ui`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. Pushed on resource start and on every session open. |
+| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice, quickTransfer, modifierDrag, quickAmounts, filters, tooltips, weightWarnings }`, derived from `Config.kora_inventory.ui`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. Pushed on resource start and on every session open. |
 | `kora_inventory:nui:layout` | table | The player's window placement from kora_hud's `/ui` editor: `{ x, y, scale, placed, playerSide, useForTransfer, layout? }`. Offsets and scale are clamped. `layout` is the player's chosen inventory layout, one of `classic`, `loadout`, `compact`, `dock`; any other value is dropped, and the page also checks it against the allowed set. Pushed when the editor applies or resets the layout and on every session open. |
 | `kora_inventory:nui:locales` | table | Flat key/value map for the React UI, resolved on the client with `Kora.lang()` from `locales/en.lua`. Pushed two seconds after the client resource starts so the page's message listener is ready. |
 | `kora_inventory:nui:sessionOpened` | table | `{ sessionId, token, revision, secondaryRevision, player, secondary?, expires }`. `player` and `secondary` are views `{ id (the inventory key), key, type, label, slots, maxWeight, weight, revision, items, stock? }`. |
@@ -168,6 +168,12 @@ The only config sent to the browser (`kora_inventory:nui:config`, at start and o
 | `layouts` | all `true` | Which layouts may be used. Sent as booleans only; if none is enabled, `classic` stays enabled. |
 | `playerLayoutChoice` | `true` | Add an "Inventory layout" select to the `/ui` editor and honour the player's choice. Needs `playerLayout` and `kora_hud`. |
 | `rightClickSplit` | `true` | Right-click on a stack of two or more opens the split dialog. |
+| `quickTransfer` | `true` | Shift+click moves a whole stack to the other open inventory (a buy of one from a shop). |
+| `modifierDrag` | `true` | Ctrl+drag moves half a stack, Alt+drag moves one. |
+| `quickAmounts` | `true` | Preset amount buttons beside the inspector's amount slider. |
+| `filters` | `true` | Category chips (All, Weapons, Ammo, Consumables, Other) that dim non-matching slots; the search box dims in the player panel. |
+| `weightWarnings` | `{ enabled = true, warnAt = 0.75, dangerAt = 0.95 }` | Weight bar turns warning-coloured and then destructive near capacity. |
+| `tooltips` | `true` | Hover tooltip on filled slots. |
 | `optimisticMoves` | `true` | Paint a move or purchase immediately and undo it if the server refuses or does not answer within `moveTimeoutMs`. The server validates every move either way. |
 | `queueMoves` | `true` | With `optimisticMoves`, queue up to eight further drags while one is pending. |
 | `directTransport` | `true` | Send requests as `kora_inventory:server:call` and receive `kora_inventory:client:callResult` instead of kora_lib callbacks. The `kora_inventory:server:transfer` and `intent` callbacks stay registered for third-party renderers. |

@@ -1,0 +1,25 @@
+/* Quality-of-life additions. kora_theme tokens only. */
+.slot-dimmed { opacity: .28; filter: saturate(.4); }
+
+.category-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 1px 10px; }
+.category-chip { padding: 2px 9px; border: 1px solid hsl(var(--border)); border-radius: 999px; background: hsl(var(--muted) / .5); color: hsl(var(--muted-foreground)); font-size: calc(10px * var(--ui-scale, 1)); font-weight: 650; cursor: pointer; }
+.category-chip:hover { color: hsl(var(--foreground)); }
+.category-chip-active { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft)); color: hsl(var(--primary)); }
+
+.quick-amounts { display: flex; flex-wrap: wrap; gap: 5px; }
+.quick-amount { min-width: 30px; padding: 2px 8px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--muted) / .5); color: hsl(var(--foreground)); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; }
+.quick-amount:disabled { opacity: .5; cursor: default; }
+.quick-amount-active { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft)); color: hsl(var(--primary)); }
+
+.weight-warn { color: hsl(var(--warning)); }
+.weight-warn b { background: hsl(var(--warning)); }
+.weight-danger { color: hsl(var(--destructive)); }
+.weight-danger b { background: hsl(var(--destructive)); }
+
+.slot-tooltip { position: fixed; z-index: 1000; max-width: 260px; padding: 8px 10px; border: 1px solid hsl(var(--border-strong)); border-radius: 8px; background: hsl(var(--background) / .97); color: hsl(var(--foreground)); font-size: calc(11px * var(--ui-scale, 1)); pointer-events: none; box-shadow: 0 6px 20px rgb(0 0 0 / .45); }
+.slot-tooltip strong { display: block; margin-bottom: 4px; font-size: calc(12px * var(--ui-scale, 1)); }
+.slot-tooltip dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; }
+.slot-tooltip dt { color: hsl(var(--muted-foreground)); }
+.slot-tooltip dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.slot-tooltip-row { display: contents; }
+.slot-tooltip p { margin: 6px 0 0; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }

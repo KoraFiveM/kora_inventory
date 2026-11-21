@@ -144,6 +144,12 @@ The only settings that cross into the browser. Nothing here is authority. Most a
 | `ui.hotbarSeconds` | number | Default `5`. Seconds the on-screen hotbar stays visible after the U key. `0` disables the key (live-editable, 0 to 30). |
 | `ui.scale` | number | Default `1.0`. Size multiplier for text, slots and counts, clamped 0.5 to 2.0. |
 | `ui.rightClickSplit` | boolean | Default `true`. Right-click on a stack of 2+ opens the split dialog; `false` makes right-click do nothing. |
+| `ui.quickTransfer` | boolean | Default `true`. Shift+click on a filled slot moves the whole stack to the other open inventory (stackable stack first, else first empty slot). From a shop it buys one. Never targets a shop. |
+| `ui.modifierDrag` | boolean | Default `true`. Ctrl+drag moves half the stack (rounded down, at least 1); Alt+drag moves one. |
+| `ui.quickAmounts` | boolean | Default `true`. Preset amount buttons (1, 5, 10, half, All, only those within the stack) beside the inspector's amount slider. |
+| `ui.filters` | boolean | Default `true`. Category chips on each panel and the search box dim non-matching slots in the player panel. Slots are never hidden or reordered. |
+| `ui.weightWarnings` | table | Default `{ enabled = true, warnAt = 0.75, dangerAt = 0.95 }`. The weight bar turns warning-coloured at `warnAt` and destructive at `dangerAt` (fractions of max weight, 0.01 to 1). |
+| `ui.tooltips` | boolean | Default `true`. Hover tooltip (after about 350 ms) with label, amount, weight, durability, display rows and description. |
 | `ui.optimisticMoves` | boolean | Default `true`. Paint a move or purchase at once, dimmed until the server confirms, and undo it with a notice if refused or unanswered. |
 | `ui.queueMoves` | boolean | Default `true`. Queue drags made while a move is pending. Needs `optimisticMoves`. |
 | `ui.directTransport` | boolean | Default `true`. Send move/buy/drop/use requests as one direct net event (`kora_inventory:server:call`) instead of kora_lib callbacks. Same handlers and checks either way. |
