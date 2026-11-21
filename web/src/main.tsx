@@ -7,6 +7,8 @@ import "./styles/qol.css"
 import "./styles/layouts.css"
 import "./styles/quickslots.css"
 import "./styles/weapon_upkeep.css"
+import "./styles/organize.css"
+import "./styles/tips.css"
 import "./lib/fft"
 
 const scaleNui = () => {

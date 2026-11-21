@@ -49,7 +49,20 @@ In order: the inventory must exist; `confiscation` inventories are always denied
 
 ## Which intents exist
 
-`use` (slot of the primary inventory), `drop` (slot and amount from the primary inventory; creates or merges into a drop), `give` (slot, amount and a recipient resolved locally by the client), `buy` (slot and amount from the shop in the session), `sync` (re-sends authoritative state, throttled to once per 200 ms). Moves and splits go through `kora_inventory:server:transfer` instead. Anything else answers `unsupported intent`.
+`use` (slot of the primary inventory), `drop` (slot and amount from the primary inventory; creates or merges into a drop), `give` (slot, amount and a recipient resolved locally by the client), `buy` (slot and amount from the shop in the session), `sync` (re-sends authoritative state, throttled to once per 200 ms), `organize` (Sort or Stack all of one panel, see below). Moves and splits go through `kora_inventory:server:transfer` instead. Anything else answers `unsupported intent`.
+
+## Organizing a panel (the organize intent)
+
+`organize` tidies one inventory of the session: `payload = { inventory, mode, revision, secondaryRevision }` with `mode` either `stack` or `sort`. It is validated exactly like a move and then some:
+
+1. `Config.kora_inventory.organize.enabled` and the switch for the mode must be on (`organizing is disabled`); the mode must be `sort` or `stack`.
+2. `inventory` must be the session's primary or secondary inventory (`inventory not in session`); the client names nothing else.
+3. The same `validSession` checks every move uses: the lease and token, cuffed or downed refusals, and `canAccess` (routing bucket, distance, owner, groups, access policy), plus both session revisions from the client bridge and from the payload (`stale inventory`).
+4. Shops are refused (`shop inventories cannot be organized`), as are locked inventories and inventories waiting for recovery.
+5. It is refused while any of the player's items is being used (`item is currently being used`), and rate limited by `organize.cooldownMs` (`organizing too quickly`).
+6. Everything is re-validated under the inventory lock, then the plan is computed by the pure planner in `shared/organize.lua` from the server's items and committed in one step: a single kora_core write of the player's items for a player inventory, an in-place replacement for a secondary one. The revision is bumped and the panel broadcast once.
+
+`stack` merges stackable stacks of one item with identical metadata (the same rule a drag-drop uses, `KoraInventory.canStack`) into the lowest slot, up to an optional `maxStack` on the item definition; unique items and items with different metadata never merge. `sort` stacks first, then orders by the configured category order, label, name and original slot, closing gaps. In a player inventory slots `1..hotbarSlots` are left alone when `organize.keepHotbar` is on. The plan can only rearrange and merge: it checks that no item is created or destroyed, that no slot is used twice, and that weight is unchanged, and refuses the whole request otherwise. A weapon held out of the hotbar range and moved by Sort is holstered by the weapon-carry rules exactly as if it had been dragged. Quick-slot pins follow the item to its new slot.
 
 ## Moving, stacking and swapping
 

@@ -2570,6 +2570,177 @@ local function intentSync(src, request)
     return true
 end
 
+-- Sort / Stack all. Wrapped in a block so its helpers add no file-level locals
+-- (this file is close to Lua's limit of 200 locals per function).
+do
+local lastOrganize = {}
+
+---True while any of the player's useables is still running (the mid-use lock).
+---Organizing is refused for that whole time, not just for the slot in use.
+---@param src integer
+---@return boolean
+local function isAnyUseBusy(src)
+    if config.blockWhileBusy == false or not busySlots[src] then
+        return false
+    end
+    for slot in pairs(busySlots[src]) do
+        if isSlotBusy(src, slot) then
+            return true
+        end
+    end
+    return false
+end
+
+---Category of an item for Sort, read from the live item definition.
+local function organizeCategory(item)
+    local def = itemDef(item.name) or {}
+    if def.type == 'weapon' or def.weapon == true or item.type == 'weapon' then
+        return 'weapon'
+    end
+    if def.ammoType ~= nil or def.ammotype ~= nil or def.type == 'ammo' or item.type == 'ammo' then
+        return 'ammo'
+    end
+    if item.useable == true or def.useable == true then
+        return 'useable'
+    end
+    return 'other'
+end
+
+---Largest stack of an item, from an optional `maxStack` on its definition.
+local function organizeMaxStack(item)
+    local def = itemDef(item.name)
+    return def and tonumber(def.maxStack) or nil
+end
+
+---Sort / Stack all for one panel of the session. Validated exactly like a
+---move (lease, both revisions, access, routing bucket, distance through
+---validSession), re-validated under the inventory lock, and committed through
+---the same funnel moves use: a single kora_core setPath for the player
+---inventory, an in-place replacement for a secondary one. The browser names
+---only an inventory the session was granted and a mode; the plan is computed
+---from server state, so no item, slot or amount ever comes from the client.
+local function intentOrganize(src, request)
+    local settings = config.organize
+    local session = sessions[src]
+    if type(settings) ~= 'table' or settings.enabled == false then
+        return false, 'organizing is disabled'
+    end
+    if not session or type(request.payload) ~= 'table' then
+        return false, 'invalid session action'
+    end
+    local mode = request.payload.mode
+    if mode ~= 'sort' and mode ~= 'stack' then
+        return false, 'invalid organize mode'
+    end
+    if settings[mode] == false then
+        return false, 'organizing is disabled'
+    end
+    local targetKey = request.payload.inventory or session.primary
+    if targetKey ~= session.primary and targetKey ~= session.secondary then
+        return false, 'inventory not in session'
+    end
+    local expected = targetKey == session.primary and request.primaryRevision or request.secondaryRevision
+    local _, target, targetErr = validSession(src, request.token, targetKey, targetKey, expected, expected)
+    if not target then
+        return false, targetErr or 'stale inventory'
+    end
+    -- Both revisions of the session, from the client bridge's envelope and from
+    -- the browser's own payload, must still be current for every inventory
+    -- named. The payload's `revision` is the player's, `secondaryRevision` the
+    -- second panel's (the same shape a move carries).
+    local function stale(inventoryKey, ...)
+        if not inventoryKey then
+            return false
+        end
+        local values = table.pack(...)
+        for index = 1, values.n do
+            local value = values[index]
+            if value ~= nil and tonumber(value) ~= revision(inventoryKey) then
+                return true
+            end
+        end
+        return false
+    end
+    if stale(session.primary, request.primaryRevision, request.payload.revision)
+        or stale(session.secondary, request.secondaryRevision, request.payload.secondaryRevision) then
+        return false, 'stale inventory'
+    end
+    if target.type == 'shop' then
+        return false, 'shop inventories cannot be organized'
+    end
+    if target.blocked or target.durablePending then
+        return false, 'inventory is locked'
+    end
+    if isAnyUseBusy(src) then
+        notifyBusyBlocked(src)
+        return false, BUSY_ERROR
+    end
+    local stamp = now()
+    local cooldown = math.max(0, tonumber(settings.cooldownMs) or 1000)
+    if lastOrganize[src] and stamp - lastOrganize[src] < cooldown then
+        return false, 'organizing too quickly'
+    end
+    lastOrganize[src] = stamp
+
+    return lock({ targetKey }, function()
+        -- Revalidate inside the critical section.
+        local _, current, currentErr = validSession(src, request.token, targetKey, targetKey, expected, expected)
+        if not current then
+            return false, currentErr or 'stale session'
+        end
+        if current.type == 'shop' or current.blocked or current.durablePending then
+            return false, 'inventory is locked'
+        end
+        local keep = 0
+        if current.type == 'player' and settings.keepHotbar ~= false then
+            keep = math.max(0, math.min(current.slots, math.floor(tonumber(config.hotbarSlots) or 5)))
+        end
+        local plan, planErr = inventory.organize.plan(current.items, current.slots, mode, {
+            keepSlots = keep,
+            order = type(settings.sortOrder) == 'table' and settings.sortOrder or nil,
+            classify = organizeCategory,
+            maxStack = organizeMaxStack,
+        })
+        if not plan then
+            return false, planErr
+        end
+        if not plan.changed then
+            -- Nothing to do. Re-send the (unchanged) panel anyway so a browser
+            -- waiting for the confirming patch is never left hanging.
+            broadcast(targetKey)
+            return true, { changed = false, revision = revision(targetKey) }
+        end
+        -- Weight never changes; refuse rather than commit a plan that would.
+        if math.abs(inventory.totalWeight(plan.items) - inventory.totalWeight(current.items)) > 1e-6 then
+            return false, 'plan mismatch'
+        end
+        if current.type == 'player' then
+            local ok, err = playerSetPath(src, { 'items' }, plan.items)
+            if not ok then
+                return false, err or 'inventory write failed'
+            end
+        else
+            -- Same table, new contents: other code may hold the reference.
+            for slot in pairs(current.items) do
+                current.items[slot] = nil
+            end
+            for slot, item in pairs(plan.items) do
+                current.items[slot] = item
+            end
+        end
+        bump(targetKey)
+        broadcast(targetKey)
+        recordAudit('organize', src, { inventory = targetKey, mode = mode })
+        return true, { changed = true, revision = revision(targetKey) }
+    end)
+end
+
+inventory._organize = {
+    intent = intentOrganize,
+    forget = function(src) lastOrganize[src] = nil end,
+}
+end
+
 local function handleIntent(src, request)
     if type(request) ~= 'table' or type(request.action) ~= 'string' or type(request.token) ~= 'string' then
         return false, 'invalid request'
@@ -2588,6 +2759,9 @@ local function handleIntent(src, request)
     end
     if request.action == 'sync' then
         return intentSync(src, request)
+    end
+    if request.action == 'organize' then
+        return inventory._organize.intent(src, request)
     end
     return false, 'unsupported intent'
 end
@@ -4651,6 +4825,7 @@ end)
 
 AddEventHandler('playerDropped', function()
     busySlots[source], lastBusyNotify[source] = nil, nil
+    inventory._organize.forget(source)
     dropViewers[source] = nil
     close(source, 'disconnected')
 end)

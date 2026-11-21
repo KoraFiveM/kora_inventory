@@ -79,7 +79,7 @@ export interface SessionPatch {
 export interface IntentPayload {
     sessionId: string
     token: string
-    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync"
+    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync" | "organize"
     payload: Record<string, unknown>
     /** Lets the Lua bridge answer the fetch at once and deliver the verdict as `kora_inventory:nui:intentResult`. */
     requestId?: number
@@ -102,6 +102,25 @@ export interface ItemBoxReceipt {
     action: "add" | "purchase" | "remove" | "use"
     imageOverride?: boolean
     duration?: number
+}
+
+/** Sort / Stack all / per-panel search switches (Config.kora_inventory.organize). */
+export interface OrganizeConfig {
+    /** Master switch; false hides every organize control. */
+    enabled: boolean
+    /** Show the Sort button. */
+    sort: boolean
+    /** Show the Stack all button. */
+    stack: boolean
+    /** Show a search box in every panel header. */
+    panelSearch: boolean
+}
+
+/** First-time tip card (Config.kora_inventory.ui.tips). */
+export interface TipsConfig {
+    enabled: boolean
+    /** The card appears on at most this many openings of the inventory. */
+    maxShows: number
 }
 
 export type RightClickMode = "split" | "menu" | "none"
@@ -200,6 +219,10 @@ export interface UiConfig {
     weightWarnings?: { enabled?: boolean; warnAt?: number; dangerAt?: number }
     /** Hover tooltip on filled slots (Config.kora_inventory.ui.tooltips). */
     tooltips?: boolean
+    /** Sort / Stack all buttons and per-panel search (Config.kora_inventory.organize). */
+    organize?: Partial<OrganizeConfig>
+    /** First-time tip card (Config.kora_inventory.ui.tips). */
+    tips?: Partial<TipsConfig>
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string

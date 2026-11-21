@@ -45,7 +45,7 @@ When `Config.kora_inventory.weapons.ammoInfo.enabled` is on, views (including sh
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, rightClick, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice, quickTransfer, modifierDrag, quickAmounts, filters, tooltips, weightWarnings }`, derived from `Config.kora_inventory.ui`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. Pushed on resource start and on every session open. |
+| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, rightClick, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice, quickTransfer, modifierDrag, quickAmounts, filters, tooltips, weightWarnings, organize, tips }`, derived from `Config.kora_inventory.ui`, `Config.kora_inventory.organize`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. Pushed on resource start and on every session open. |
 | `kora_inventory:nui:layout` | table | The player's window placement from kora_hud's `/ui` editor: `{ x, y, scale, placed, playerSide, useForTransfer, layout? }`. Offsets and scale are clamped. `layout` is the player's chosen inventory layout, one of `classic`, `loadout`, `compact`, `dock`; any other value is dropped, and the page also checks it against the allowed set. Pushed when the editor applies or resets the layout and on every session open. |
 | `kora_inventory:nui:locales` | table | Flat key/value map for the React UI, resolved on the client with `Kora.lang()` from `locales/en.lua`. Pushed two seconds after the client resource starts so the page's message listener is ready. |
 | `kora_inventory:nui:sessionOpened` | table | `{ sessionId, token, revision, secondaryRevision, player, secondary?, expires }`. `player` and `secondary` are views `{ id (the inventory key), key, type, label, slots, maxWeight, weight, revision, items, stock? }`. |
@@ -71,7 +71,7 @@ The only way the page changes anything. Validates the envelope, calls `submitInt
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `data` | table | `{ sessionId, token, intent, payload, requestId? }`. `intent` must be one of `close`, `move`, `use`, `drop`, `give`, `buy`, `sync`, `split`, `action`; `payload` must be a table. (`action` and unknown shapes are then refused by the transport as `unsupported intent`.) |
+| `data` | table | `{ sessionId, token, intent, payload, requestId? }`. `intent` must be one of `close`, `move`, `use`, `drop`, `give`, `buy`, `sync`, `organize`, `split`, `action`; `payload` must be a table. (`action` and unknown shapes are then refused by the transport as `unsupported intent`.) |
 
 **Returns**
 
@@ -156,7 +156,7 @@ await fetch('https://kora_inventory/kora_inventory:pinQuickSlot', { method: 'POS
 
 ## Limits and related APIs
 
-The page can only send the nine allowed intents (the quick slot pin is a separate local callback that never reaches the server). It never receives other players' names or ids and cannot mutate state: every verdict comes from the server. Presentation settings are pushed one way and never read back. The `kora_inventory:nui:rejected` message is accepted by the bundled page but not emitted by the bundled bridge.
+The page can only send the ten allowed intents (the quick slot pin is a separate local callback that never reaches the server). It never receives other players' names or ids and cannot mutate state: every verdict comes from the server. Presentation settings are pushed one way and never read back. The `kora_inventory:nui:rejected` message is accepted by the bundled page but not emitted by the bundled bridge.
 
 ## Related guides
 
@@ -168,7 +168,7 @@ The page can only send the nine allowed intents (the quick slot pin is a separat
 
 Facts below were written from the current code of this resource; they add to, and where noted refine, the reference above.
 
-kora_inventory ships a React NUI (`web/`, built into `web/build/`, served by `ui_page`). The NUI is only a renderer: `server.lua` is the sole authority and contains no NUI call, callback, `SendNUIMessage` or focus call. `client/ui.lua` owns the NUI page and focus, accepts only these NUI intents (`close`, `move`, `use`, `drop`, `give`, `buy`, `sync`, `split`, `action`) and forwards them as a restricted envelope to the local event `kora_inventory:client:submitIntent`. `client.lua` attaches the current token and revisions before sending anything to the server.
+kora_inventory ships a React NUI (`web/`, built into `web/build/`, served by `ui_page`). The NUI is only a renderer: `server.lua` is the sole authority and contains no NUI call, callback, `SendNUIMessage` or focus call. `client/ui.lua` owns the NUI page and focus, accepts only these NUI intents (`close`, `move`, `use`, `drop`, `give`, `buy`, `sync`, `organize`, `split`, `action`) and forwards them as a restricted envelope to the local event `kora_inventory:client:submitIntent`. `client.lua` attaches the current token and revisions before sending anything to the server.
 
 Another renderer can replace it: use the client exports `openInventory`, `closeInventory`, `submitIntent`, `getCurrentSession` and listen to the `kora_inventory:ui:*` events (see [Events](./events.md)).
 
@@ -203,6 +203,8 @@ The only config sent to the browser (`kora_inventory:nui:config`, at start and o
 | `filters` | `true` | Category chips (All, Weapons, Ammo, Consumables, Other) that dim non-matching slots; the search box dims in the player panel. |
 | `weightWarnings` | `{ enabled = true, warnAt = 0.75, dangerAt = 0.95 }` | Weight bar turns warning-coloured and then destructive near capacity. |
 | `tooltips` | `true` | Hover tooltip on filled slots. |
+| `organize` | `{ enabled = true, sort = true, stack = true, panelSearch = true }` | Which of the per-panel Sort and Stack all buttons and the panel search box to draw. `sort` and `stack` are already combined with `enabled`. Presentation only: the server enforces `organize.*` itself. |
+| `tips` | `{ enabled = true, maxShows = 5 }` | The first-time tip card: shown on at most `maxShows` openings (1 to 50). |
 | `optimisticMoves` | `true` | Paint a move or purchase immediately and undo it if the server refuses or does not answer within `moveTimeoutMs`. The server validates every move either way. |
 | `queueMoves` | `true` | With `optimisticMoves`, queue up to eight further drags while one is pending. |
 | `directTransport` | `true` | Send requests as `kora_inventory:server:call` and receive `kora_inventory:client:callResult` instead of kora_lib callbacks. The `kora_inventory:server:transfer` and `intent` callbacks stay registered for third-party renderers. |
@@ -211,6 +213,14 @@ The only config sent to the browser (`kora_inventory:nui:config`, at start and o
 | `images` | see [Items](./items.md) | Artwork resolution. |
 
 `hotbarSlots` is sent alongside so the outline and the keys cannot disagree. Top-level `Config.Inspector`, `Config.Slots` and `Config.Hotbar` also style the UI. The inspector's text is selectable only when `Config.Inspector.allowCopy` is true; its Copy button copies the item as JSON.
+
+### The `organize` intent
+
+Sort and Stack all send `{ intent = 'organize', payload = { inventory = '<id the session granted>', mode = 'sort' | 'stack', revision = <player revision>, secondaryRevision = <second panel revision> } }`. Only the inventory id, the mode and the two revisions the page is looking at travel; the server plans the result from its own state and answers with the usual verdict (`ok`, or an error such as `stale inventory`, `organizing too quickly` or `shop inventories cannot be organized`). The refreshed inventory arrives as an ordinary `kora_inventory:nui:sessionPatched` message, and a request that changes nothing still re-sends the panel so the page is never left waiting. Validation is described under [organizing a panel](./inventories.md#organizing-a-panel-the-organize-intent).
+
+### First-time tips
+
+When `ui.tips.enabled` is on, the page shows a small card at the bottom of the window on at most `ui.tips.maxShows` openings. It only offers tips for features that are enabled in the pushed config (`quickTransfer`, `modifierDrag`, `rightClick`, the quick slots message, `organize`, and `playerLayoutChoice` with more than one allowed layout), cycles with Next, and hides for good with Got it. Progress is kept in the browser's `localStorage` key `kora_inventory:tips` as `{ seen: string[], dismissed: boolean, opens: number }` (`opens` counts the openings used against `maxShows`). Nothing about tips is sent to the server.
 
 ### Weapon and ammo highlight
 

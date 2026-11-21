@@ -39,6 +39,24 @@ function mergeWeightWarnings(current: ResolvedUiConfig["weightWarnings"], pushed
     return { enabled: pushed.enabled ?? current.enabled, warnAt: ratio(pushed.warnAt, current.warnAt), dangerAt: ratio(pushed.dangerAt, current.dangerAt) }
 }
 
+function mergeOrganize(current: ResolvedUiConfig["organize"], pushed: UiConfig["organize"]): ResolvedUiConfig["organize"] {
+    if (!pushed || typeof pushed !== "object") return current
+    return {
+        enabled: typeof pushed.enabled === "boolean" ? pushed.enabled : current.enabled,
+        sort: typeof pushed.sort === "boolean" ? pushed.sort : current.sort,
+        stack: typeof pushed.stack === "boolean" ? pushed.stack : current.stack,
+        panelSearch: typeof pushed.panelSearch === "boolean" ? pushed.panelSearch : current.panelSearch,
+    }
+}
+
+function mergeTips(current: ResolvedUiConfig["tips"], pushed: UiConfig["tips"]): ResolvedUiConfig["tips"] {
+    if (!pushed || typeof pushed !== "object") return current
+    return {
+        enabled: typeof pushed.enabled === "boolean" ? pushed.enabled : current.enabled,
+        maxShows: Number.isFinite(pushed.maxShows) && Number(pushed.maxShows) >= 1 ? Math.floor(Number(pushed.maxShows)) : current.maxShows,
+    }
+}
+
 /**
  * Session state, selection, the optimistic move queue and every intent the
  * window can send. Presentation (which layout renders it) lives elsewhere; this
@@ -156,6 +174,8 @@ export function useInventorySession() {
             filters: config.filters ?? current.filters,
             tooltips: config.tooltips ?? current.tooltips,
             weightWarnings: mergeWeightWarnings(current.weightWarnings, config.weightWarnings),
+            organize: mergeOrganize(current.organize, config.organize),
+            tips: mergeTips(current.tips, config.tips),
         }))
     })
     useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number; quick?: HotbarQuickEntry[] }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom, quick }) => {
@@ -359,6 +379,22 @@ export function useInventorySession() {
             return { intent: "drop", payload: { inventory: source.inventoryId, slot: source.slot, amount: item.amount } }
         })
     }, [enqueueRequest, t])
+    // Sort / Stack all for one panel. The server plans and commits it (same
+    // validation as a move); the browser sends only which panel and which mode,
+    // plus the revisions it is looking at. The refreshed inventory arrives as a patch.
+    const organize = useCallback((inventory: InventoryView, mode: "sort" | "stack") => {
+        const settings = configRef.current.organize
+        if (!settings.enabled || !settings[mode] || inventory.type === "shop") return
+        enqueueRequest((current) => {
+            if (!findInventory(current, inventory.id)) return t("ui.item_unavailable")
+            setSelected(undefined)
+            return {
+                intent: "organize",
+                payload: { inventory: inventory.id, mode, revision: current.revision, secondaryRevision: current.secondaryRevision },
+                awaiting: [inventory.id],
+            }
+        })
+    }, [enqueueRequest, t])
     const split = useCallback((inventory: InventoryView, item: InventoryItem, requestedAmount?: number) => {
         if (!session || inventory.type === "shop" || item.amount < 2) return
         const amount = Math.floor(requestedAmount ?? selectedCount)
@@ -502,7 +538,7 @@ export function useInventorySession() {
         query, setQuery, itemBoxes, hotbar,
         selectedMax, selectedCount, setSelectedAmount, copyState, copySelected,
         splitTarget, confirmSplit, cancelSplit: () => setSplitTarget(undefined),
-        canDropSlot, dropSlot, dropOut, quickTransfer, selectSlot, promptSplit, activateItem,
+        canDropSlot, dropSlot, dropOut, organize, quickTransfer, selectSlot, promptSplit, activateItem,
         split, use, buy, submit, close, clearSelection: () => setSelected(undefined),
     }
 }

@@ -14,6 +14,7 @@ import { InventoryPanel } from "@/components/InventoryPanel"
 import { ItemBoxStack } from "@/components/ItemBoxStack"
 import { QuickSlotBar } from "@/components/QuickSlotBar"
 import { ShortcutBar } from "@/components/ShortcutBar"
+import { TipCard } from "@/components/TipCard"
 import { TopBar } from "@/components/TopBar"
 import { WorldDropZone } from "@/components/WorldDropZone"
 import { useInventorySession } from "@/hooks/useInventorySession"
@@ -37,7 +38,7 @@ function InventoryApp() {
     const layoutId = resolveLayout(uiConfig, shell.playerLayout)
     const Layout = LAYOUTS[layoutId]
 
-    const panelHandlers = { selected, busy: locked, canDropSlot: s.canDropSlot, onDrop: s.dropSlot, onDragEnd: noop, onSelect: s.selectSlot, onActivate: s.activateItem, onSplit: s.promptSplit, onQuickTransfer: s.quickTransfer }
+    const panelHandlers = { selected, busy: locked, canDropSlot: s.canDropSlot, onDrop: s.dropSlot, onDragEnd: noop, onSelect: s.selectSlot, onActivate: s.activateItem, onSplit: s.promptSplit, onQuickTransfer: s.quickTransfer, onOrganize: s.organize, pending: s.movePending }
     const buildInspector = (drawer: boolean) => <Inspector
             inspected={inspected}
             selected={selected}
@@ -87,7 +88,7 @@ function InventoryApp() {
         secondaryPanel: session.secondary
             ? <InventoryPanel inventory={session.secondary} {...panelHandlers} />
             : solo ? null : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>{t("ui.no_secondary_inventory")}</h2><p>{t("ui.open_secondary_inventory")}</p></section>,
-        shortcutBar: <ShortcutBar movePending={s.movePending} revision={session.revision} />,
+        shortcutBar: <div className="shortcut-stack"><TipCard sessionId={session.sessionId} quickSlotsEnabled={s.quickSlots.enabled} /><ShortcutBar movePending={s.movePending} revision={session.revision} /></div>,
         renderQuickSlots: (position) => <QuickSlotBar position={position} state={s.quickSlots} player={session.player} busy={locked} selected={selected} onSelect={s.selectSlot} onActivate={s.activateItem} onPin={s.pinQuick} onFlash={s.flashSlot} />,
     }
 
