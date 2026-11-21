@@ -71,6 +71,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/shop_hints.lua
 "${LUA:-lua}" test/smoke/shop_blip_fallback.lua
 "${LUA:-lua}" test/smoke/ammo.lua
+"${LUA:-lua}" test/smoke/ammo_info.lua
 "${LUA:-lua}" test/smoke/parachute.lua
 "${LUA:-lua}" test/smoke/vendingmachine.lua
 "${LUA:-lua}" test/smoke/vendingmachine_client.lua

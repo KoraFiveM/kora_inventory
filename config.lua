@@ -562,6 +562,15 @@ Config.kora_inventory = {
             shotCooldown = 65, -- client/server floor between native shot reports
             casingOffset = 0.75, -- metres behind/alongside the shooter for the recovered casing marker
         },
+        -- "Which ammo does this gun take?" Presentation only: the server adds
+        -- `ammo` to weapon views and `ammoType`/`rounds`/`fits` to ammo views,
+        -- computed from kora_core's definitions and the weapon's own metadata.
+        ammoInfo = {
+            enabled = true,
+            where = 'both',        -- 'inspector' | 'menu' | 'both' (hint for the UI)
+            showLoaded = true,     -- include the rounds currently loaded in the weapon
+            showCompatible = true, -- ammo items list the weapons they fit
+        },
         -- Wear is applied by the SERVER for every accepted round fired.
         -- `perShot` is durability percentage points (0.10 means 1 point per
         -- 10 shots); per-weapon multipliers make high-wear weapons degrade

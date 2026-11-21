@@ -246,6 +246,10 @@ Server-owned recipes, weapon metadata rules, ballistics and the visible carried-
 | `weapons.ballistics.maxLoadedRounds` | integer | Default `240`. Hard metadata cap per weapon. |
 | `weapons.ballistics.shotCooldown` | integer | Default `65` ms. Minimum gap between accepted shot reports. |
 | `weapons.ballistics.casingOffset` | number | Default `0.75`. Offset for the recovered casing marker. Present in config; not read by this resource's own scripts. |
+| `weapons.ammoInfo.enabled` | boolean | Default `true`. Adds the ammo view fields to weapon and ammo items. Set `false` to remove them entirely. |
+| `weapons.ammoInfo.where` | string | Default `both`. `inspector`, `menu` or `both`. With `inspector` or `both` the server also appends Takes, Loaded, Rounds and Fits rows to `displayMeta`; the value is also passed to the UI as a hint for the right-click menu entry. |
+| `weapons.ammoInfo.showLoaded` | boolean | Default `true`. Include the rounds currently loaded in a weapon. |
+| `weapons.ammoInfo.showCompatible` | boolean | Default `true`. Ammo items list the weapons they fit. |
 | `weapons.durability.enabled` | boolean | Default `true`. Server-applied wear per accepted round. |
 | `weapons.durability.perShot` | number | Default `0.10`. Durability percentage points lost per shot. |
 | `weapons.durability.defaultMultiplier` | number | Default `1.0`. |

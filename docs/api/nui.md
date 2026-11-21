@@ -34,9 +34,18 @@ Messages are sent with `SendNUIMessage({ action, data })` and received in the pa
 
 Each is `{ action, data }`. Items in views are keyed by slot and include `label`, `weight`, `description`, `image`, `imageUrl`, `useable`, `useTime`, `preventClose`, `unique`, `container`, `displayMeta` and `info`/`metadata`.
 
+When `Config.kora_inventory.weapons.ammoInfo.enabled` is on, views (including shop stock) may also carry these server-computed, view-only fields:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `ammo` | table | Weapons with an ammotype only: `type` (string), `item` (string), `label` (string) and `loaded` (integer, omitted when `showLoaded` is false). |
+| `ammoType` | string | Ammo items only. |
+| `rounds` | integer | Ammo items only: rounds per item. |
+| `fits` | array of string | Ammo items only, when `showCompatible` is on and a weapon matches: sorted weapon labels, at most 12, plus a final "+N more" entry. |
+
 | Option | Type | Description |
 | --- | --- | --- |
-| `kora_inventory:nui:config` | table | `{ hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice }`, derived from `Config.kora_inventory.ui`, `Config.Inspector` and `Config.Slots`. Pushed on resource start and on every session open. |
+| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice }`, derived from `Config.kora_inventory.ui`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. Pushed on resource start and on every session open. |
 | `kora_inventory:nui:layout` | table | The player's window placement from kora_hud's `/ui` editor: `{ x, y, scale, placed, playerSide, useForTransfer, layout? }`. Offsets and scale are clamped. `layout` is the player's chosen inventory layout, one of `classic`, `loadout`, `compact`, `dock`; any other value is dropped, and the page also checks it against the allowed set. Pushed when the editor applies or resets the layout and on every session open. |
 | `kora_inventory:nui:locales` | table | Flat key/value map for the React UI, resolved on the client with `Kora.lang()` from `locales/en.lua`. Pushed two seconds after the client resource starts so the page's message listener is ready. |
 | `kora_inventory:nui:sessionOpened` | table | `{ sessionId, token, revision, secondaryRevision, player, secondary?, expires }`. `player` and `secondary` are views `{ id (the inventory key), key, type, label, slots, maxWeight, weight, revision, items, stock? }`. |
