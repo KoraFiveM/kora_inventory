@@ -3,18 +3,19 @@ import type { ResolvedUiConfig } from "@/context"
 import { isLayoutId, LAYOUT_IDS, type LayoutId } from "@/lib/layoutIds"
 import type { PlayerLayout } from "@/lib/playerLayout"
 import { ClassicLayout } from "./ClassicLayout"
+import { CompactLayout } from "./CompactLayout"
+import { DockLayout } from "./DockLayout"
+import { LoadoutLayout } from "./LoadoutLayout"
 import type { LayoutProps } from "./types"
 
 export { LAYOUT_IDS, isLayoutId }
 export type { LayoutId, LayoutProps }
 
-// TODO: loadout, compact and dock are implemented separately; until they
-// exist each one renders the classic markup so every id in the config works.
 export const LAYOUTS: Record<LayoutId, ComponentType<LayoutProps>> = {
     classic: ClassicLayout,
-    loadout: ClassicLayout,
-    compact: ClassicLayout,
-    dock: ClassicLayout,
+    loadout: LoadoutLayout,
+    compact: CompactLayout,
+    dock: DockLayout,
 }
 
 /** A missing key counts as allowed: only an explicit `false` hides a layout. */

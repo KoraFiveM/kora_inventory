@@ -36,6 +36,26 @@ function InventoryApp() {
     const Layout = LAYOUTS[layoutId]
 
     const panelHandlers = { selected, busy: locked, canDropSlot: s.canDropSlot, onDrop: s.dropSlot, onDragEnd: noop, onSelect: s.selectSlot, onActivate: s.activateItem, onSplit: s.promptSplit }
+    const buildInspector = (drawer: boolean) => <Inspector
+            inspected={inspected}
+            selected={selected}
+            solo={drawer}
+            playerId={session.player.id}
+            movePending={s.movePending}
+            giveAvailable={s.giveAvailable}
+            inspectorCopy={uiConfig.inspectorCopy}
+            inspectorDecimals={uiConfig.inspectorDecimals}
+            copyState={s.copyState}
+            selectedMax={s.selectedMax}
+            selectedCount={s.selectedCount}
+            onAmountChange={s.setSelectedAmount}
+            onCopy={s.copySelected}
+            onCloseDrawer={s.clearSelection}
+            onBuy={s.buy}
+            onUse={s.use}
+            onSplitSelected={s.split}
+            onSubmit={(intent, payload) => s.submit(intent, payload)}
+        />
     const layoutProps: LayoutProps = {
         layoutId,
         session,
@@ -57,26 +77,10 @@ function InventoryApp() {
         // Solo layout starts as the player's inventory alone. Its inspector is a
         // drawer, mounted only after selection, so an idle personal inventory does
         // not reserve a permanently empty actions column.
-        inspector: (!solo || selected) ? <Inspector
-            inspected={inspected}
-            selected={selected}
-            solo={solo}
-            playerId={session.player.id}
-            movePending={s.movePending}
-            giveAvailable={s.giveAvailable}
-            inspectorCopy={uiConfig.inspectorCopy}
-            inspectorDecimals={uiConfig.inspectorDecimals}
-            copyState={s.copyState}
-            selectedMax={s.selectedMax}
-            selectedCount={s.selectedCount}
-            onAmountChange={s.setSelectedAmount}
-            onCopy={s.copySelected}
-            onCloseDrawer={s.clearSelection}
-            onBuy={s.buy}
-            onUse={s.use}
-            onSplitSelected={s.split}
-            onSubmit={(intent, payload) => s.submit(intent, payload)}
-        /> : null,
+        inspector: (!solo || selected) ? buildInspector(solo) : null,
+        // The drawer-styled inspector (with its close button) whatever the view,
+        // mounted only once something is selected: for layouts that float it.
+        drawerInspector: selected ? buildInspector(true) : null,
         secondaryPanel: session.secondary
             ? <InventoryPanel inventory={session.secondary} {...panelHandlers} />
             : solo ? null : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>{t("ui.no_secondary_inventory")}</h2><p>{t("ui.open_secondary_inventory")}</p></section>,

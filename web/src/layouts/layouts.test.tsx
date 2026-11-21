@@ -88,4 +88,14 @@ describe("layout in the app", () => {
         await post("kora_inventory:nui:layout", { layout: "dock" })
         expect(shell().getAttribute("data-layout")).toBe("dock")
     })
+    it("renders every layout with a real transfer session and drag-and-drop provider", async () => {
+        const secondary = { id: "stash:a", label: "Garage stash", type: "stash", slots: 5, weight: 0, maxWeight: 1000, items: [{ slot: 1, name: "water", label: "Water", amount: 2 }] }
+        await post("kora_inventory:nui:sessionOpened", { ...snapshot, secondary })
+        for (const layout of ["loadout", "compact", "dock"]) {
+            await post("kora_inventory:nui:layout", { layout })
+            expect(shell().getAttribute("data-layout")).toBe(layout)
+            expect(host.querySelectorAll(".inventory-panel").length).toBeGreaterThanOrEqual(2)
+            expect(host.querySelectorAll(".slot").length).toBe(10)
+        }
+    })
 })

@@ -325,7 +325,7 @@ Keys that exist in `config.lua` but are not listed in the reference tables above
 | `stackableWeapons` | table | `weapon_grenade`, `weapon_molotov` | Weapons that stack in one slot instead of one slot each (no serial). Only affects items added afterwards. |
 | `ui.playerLayout` | boolean | `true` | Register the window with kora_hud's `/ui` editor so players can move, resize (75-125 %) and pick a side. Needs `kora_hud`. |
 | `ui.playerLayoutTransfer` | boolean | `false` | Default for "Use my position for stashes and trunks". |
-| `ui.layout` | string | `'classic'` | Server default inventory layout: `classic`, `loadout`, `compact` or `dock`. An unknown value falls back to `classic`. Applied the next time the inventory opens. |
+| `ui.layout` | string | `'classic'` | Server default inventory layout: `classic` (original three columns), `loadout` (pockets, quick slots over the inspector, other inventory), `compact` (narrow single column, inspector as a popover) or `dock` (full-height edge panel with tabs; see [NUI and UI](./nui.md)). An unknown value falls back to `classic`. Applied the next time the inventory opens. |
 | `ui.layouts` | table | all four `true` | Which layouts may be used and picked, for example `classic = true, dock = false`. Only an explicit `false` disables one; if all are `false`, `classic` stays available. |
 | `ui.playerLayoutChoice` | boolean | `true` | Players choose their layout in kora_hud's `/ui` editor ("Inventory layout", listing only the allowed layouts). `false` gives everyone `ui.layout`. Needs `ui.playerLayout` and `kora_hud`. |
 | `vehicles.gloveboxRequireSeated` | boolean | `true` | The server requires the player to be seated in the vehicle for the glovebox. |

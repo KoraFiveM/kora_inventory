@@ -66,6 +66,12 @@ export interface LayoutProps {
     secondaryPanel: ReactNode
     /** The item inspector `aside`, or null when it is not mounted (solo view, nothing selected). */
     inspector: ReactNode
+    /**
+     * The inspector in its drawer form (close button included), whatever the
+     * view, or null while nothing is selected. For layouts that float or slide
+     * the inspector in only on demand instead of reserving a column for it.
+     */
+    drawerInspector: ReactNode
     /** Esc / Enter / Drag hints and the revision. */
     shortcutBar: ReactNode
     /** Builds the quick-slot bar for a position; layouts choose where it goes. */
