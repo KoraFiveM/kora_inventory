@@ -96,7 +96,6 @@ RegisterNetEvent('kora_inventory:client:sessionClosed', function(token, reason)
     if not session or token ~= session.token then
         return
     end
-    local closed = session
     session = nil
     pendingGive = nil
     TriggerEvent('kora_inventory:ui:sessionClosed', { token = token, reason = reason })
@@ -137,27 +136,28 @@ function KoraInventory.isCuffed()
     return type(metadata) == 'table' and metadata.ishandcuffed == true
 end
 
-local lastCuffedNotify = 0
----Notify that an action was blocked while cuffed, rate limited.
-function KoraInventory.notifyCuffedBlocked()
-    local now = GetGameTimer()
-    if now - lastCuffedNotify < (tonumber(Config.kora_inventory.downedNotifyCooldown) or 3000) then
-        return
+---Builds a notifier that raises one error notice with the given locale key and
+---ignores calls inside the shared cooldown window. Each notifier keeps its own
+---timestamp.
+---@param messageKey string
+---@return fun()
+local function rateLimitedNotifier(messageKey)
+    local lastNotify = 0
+    return function()
+        local now = GetGameTimer()
+        if now - lastNotify < (tonumber(Config.kora_inventory.downedNotifyCooldown) or 3000) then
+            return
+        end
+        lastNotify = now
+        Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang(messageKey), type = 'error' })
     end
-    lastCuffedNotify = now
-    Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_cuffed'), type = 'error' })
 end
 
-local lastDownedNotify = 0
+---Notify that an action was blocked while cuffed, rate limited.
+KoraInventory.notifyCuffedBlocked = rateLimitedNotifier('inventory.blocked_cuffed')
+
 ---Notify that an action was blocked while downed, rate limited.
-function KoraInventory.notifyDownedBlocked()
-    local now = GetGameTimer()
-    if now - lastDownedNotify < (tonumber(Config.kora_inventory.downedNotifyCooldown) or 3000) then
-        return
-    end
-    lastDownedNotify = now
-    Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_downed'), type = 'error' })
-end
+KoraInventory.notifyDownedBlocked = rateLimitedNotifier('inventory.blocked_downed')
 
 ---Name of the generic UI-block state bag (Config.kora_inventory.uiBlockBag), or nil
 ---when the feature is turned off.
@@ -192,16 +192,8 @@ function KoraInventory.isBusy()
     return Kora.progressbar.isActive() == true
 end
 
-local lastBusyNotify = 0
 ---Notify that an action was blocked while busy, rate limited.
-function KoraInventory.notifyBusyBlocked()
-    local now = GetGameTimer()
-    if now - lastBusyNotify < (tonumber(Config.kora_inventory.downedNotifyCooldown) or 3000) then
-        return
-    end
-    lastBusyNotify = now
-    Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_busy'), type = 'error' })
-end
+KoraInventory.notifyBusyBlocked = rateLimitedNotifier('inventory.blocked_busy')
 
 ---Open an inventory through the server. `data` is intent only; the server
 ---resolves/access-checks the inventory before it emits a session snapshot.
@@ -274,13 +266,13 @@ local function callServer(action, callbackName, request)
     return reply.ok, reply.result
 end
 
+local buyInFlight
+
 ---Submit a slot transfer from the active session. The server supplies and
 ---checks both revisions, so stale UI state cannot overwrite another viewer.
 ---@param intent table
 ---@return boolean accepted
 ---@return any result
-local buyInFlight
-
 local function submitIntent(intent)
     if not session or type(intent) ~= 'table' then
         return false, 'no active session'
@@ -557,7 +549,6 @@ KoraInventory.clientApi = {
     closeInventory = closeInventory,
     submitIntent = submitIntent,
     getCurrentSession = getCurrentSession,
-    hasItem = hasItem,
 }
 
 exports('openInventory', openInventory)
