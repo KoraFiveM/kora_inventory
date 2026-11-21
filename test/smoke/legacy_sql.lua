@@ -14,7 +14,7 @@ local function setup(initial, boot)
     if initial then f.rows['stash:policetrash'] = record(initial) end
     local env = {}; for k, v in pairs(_G) do env[k] = v end
     env.Config, env.KoraInventory = {}, nil
-    env.Kora = { resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end }, callback = { register = function() end } }
+    env.Kora = { resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end }, callback = { register = function() end }, util = { deepClone = dofile('test/deep_clone.lua') }, logging = dofile('test/logging_spy.lua').logging }
     env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.GetInvokingResource = function() return f.invoker or 'kora_sql' end
     env.GetGameTimer = function() return f.time end
