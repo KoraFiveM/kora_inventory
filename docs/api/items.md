@@ -92,8 +92,21 @@ Any key can be stored. These change behaviour or display.
 | `image` | string | `info.image` overrides the definition image. `https://` and `nui://` values are used as-is; other values are filenames looked up in `kora_inventory/images`. |
 | `imageUrl` | string | Preserved for compatibility, but ignored by the built-in artwork renderer. |
 | `show` | boolean | Put `show = true` on a nested table to display its children in the inspector. Plain (non-table) values at the top level are always listed; other nested tables are hidden. |
-| `containerId` | string | Set by the container module when a portable container is bound to this unique item. Never accept it from a client. |
+| `containerId` | string | Set by the container module when a portable container is bound to this unique item. Never accept it from a client. It is removed from the view another player gets when searching you. |
+| `waterDamaged` | boolean | Set by the water damage feature (`waterDamage.mode = 'flag'`). A flagged item cannot be used until it is repaired; see Water damage below. Shown as a badge and an inspector row; the view fields are recomputed from this metadata and never accepted from a client. |
 | `serial, durability, quality, ammo, loadedBullets, tint, components` | mixed | Canonical weapon metadata managed by `PrepareWeaponMetadata` and the weapon exports. `quality` mirrors `durability`. |
+
+## Water damage
+
+`Config.kora_inventory.waterDamage` (off by default) lets swimming ruin electronics. The client reports with no payload that its player has been swimming for `swimSeconds` (a one second tick that only runs while the feature is on). The server accepts at most one report per player every 10 seconds, then rolls each configured item (`items`, default `phone`, `iphone`, `samsungphone`, `radio`) in that player's pockets with its `chance`. Items inside a portable container are never rolled.
+
+- `mode = 'flag'` sets `info.waterDamaged = true`. The item cannot be used (the player is told "This item is water damaged.") until it is repaired. An item already flagged is not rolled again.
+- `mode = 'convert'` replaces the item with `into` (for example `garbage`). If `into` is not set or is not a known item the item is flagged instead; it is never deleted by mistake.
+- `mode = 'remove'` deletes the item. An unknown mode behaves like `flag`.
+- Using `repairItem` (default `electronickit`) repairs the first water damaged item in the player's pockets (lowest slot) and consumes one repair item. There is no choice menu because this stack has no kora_lib menu API. When nothing is damaged the repair item behaves as it always did.
+- With the feature turned off, flags are ignored and flagged items can be used again.
+
+Each roll is per stack, so a stack of three radios is damaged or spared together. `protectedBy` is reserved and currently has no effect; containers already protect their contents.
 
 ## Stacking
 

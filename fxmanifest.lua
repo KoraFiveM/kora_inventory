@@ -60,6 +60,8 @@ server_scripts {
     'server/vehicles.lua',
     'server/trunk_cargo.lua',
     'server/containers.lua',
+    -- Water damage for electronics (Config.kora_inventory.waterDamage, off by default).
+    'server/water_damage.lua',
     -- Visible weapon carry + draw/holster pacing. Loads after useables.lua,
     -- whose weapon handler delegates to it at call time, and after
     -- crafting.lua so weapon metadata rules are already in place.
@@ -111,6 +113,8 @@ client_scripts {
     -- Inventory-key access to glovebox/trunk; intent only, the server resolves the vehicle.
     'client/vehicles.lua',
     'client/trunk_cargo.lua',
+    -- Reports (payload-free) that the local player has been swimming.
+    'client/water_damage.lua',
     -- ALT-menu trunk/hood toggles and the /trunk and /hood commands.
     'client/vehicle_doors.lua',
     'client/shops/ammunation.lua',

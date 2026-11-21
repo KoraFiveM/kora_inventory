@@ -25,6 +25,8 @@ local allowedIntents = {
     split = true,
     action = true,
     combine = true,
+    -- Search: open a bag in the searched player's inventory (inventory + slot only).
+    openTargetContainer = true,
 }
 
 local function send(action, data)
@@ -66,6 +68,7 @@ local UI_LOCALE_KEYS = {
     'tips_title', 'tip_next', 'tip_got_it', 'tip_drag_drop', 'tip_quick_transfer', 'tip_modifier_drag',
     'tip_right_click_split', 'tip_right_click_menu', 'tip_quick_slot', 'tip_organize', 'tip_layout',
     'combine', 'combine_title', 'combine_items',
+    'closed_bag', 'closed', 'open_bag', 'water_damaged',
 }
 
 local function pushLocales()
@@ -609,7 +612,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
             delivered = true
             send('kora_inventory:nui:intentResult', { requestId = requestId, ok = ok == true, error = ok and nil or err })
         end
-        if data.intent ~= 'use' and data.intent ~= 'combine' then
+        if data.intent ~= 'use' and data.intent ~= 'combine' and data.intent ~= 'openTargetContainer' then
             SetTimeout(moveTimeoutMs(), function()
                 deliver(false, 'timeout')
             end)
@@ -648,7 +651,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
         answered = true
         cb(result)
     end
-    if data.intent ~= 'use' and data.intent ~= 'combine' then
+    if data.intent ~= 'use' and data.intent ~= 'combine' and data.intent ~= 'openTargetContainer' then
         SetTimeout(moveTimeoutMs(), function()
             reply({ ok = false, error = 'timeout' })
         end)

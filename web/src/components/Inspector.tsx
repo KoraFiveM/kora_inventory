@@ -4,6 +4,7 @@ import { quickAmounts } from "@/lib/quickAmounts"
 import { clampGiveAmount } from "@/lib/giveAmount"
 import { formatMetaValue } from "@/lib/format"
 import { useLocale } from "@/lib/locales"
+import { canOpenBag, isClosedBag } from "@/lib/search"
 import type { Selection } from "@/lib/inventory"
 import type { InventoryItem, InventoryView } from "@/lib/types"
 import { ItemArtwork } from "./ItemArtwork"
@@ -31,12 +32,14 @@ export interface InspectorProps {
     onCloseDrawer: () => void
     onBuy: (inventory: InventoryView, item: InventoryItem, amount: number) => void
     onUse: (inventory: InventoryView, item: InventoryItem) => void
+    /** Open a closed bag in a searched player's inventory (openTargetContainer intent). */
+    onOpenBag?: (inventory: InventoryView, item: InventoryItem) => void
     onSplitSelected: (inventory: InventoryView, item: InventoryItem) => void
     onSubmit: (intent: "drop" | "give", payload: Record<string, unknown>) => void
 }
 
 /** The `item-detail` aside: header, artwork, details and the item's actions. */
-export function Inspector({ inspected, selected, solo, playerId, movePending, giveAvailable, inspectorCopy, quickAmounts: showQuickAmounts, inspectorDecimals, copyState, selectedMax, selectedCount, onAmountChange, onCopy, onCloseDrawer, onBuy, onUse, onSplitSelected, onSubmit }: InspectorProps) {
+export function Inspector({ inspected, selected, solo, playerId, movePending, giveAvailable, inspectorCopy, quickAmounts: showQuickAmounts, inspectorDecimals, copyState, selectedMax, selectedCount, onAmountChange, onCopy, onCloseDrawer, onBuy, onUse, onOpenBag, onSplitSelected, onSubmit }: InspectorProps) {
     const t = useLocale()
     const presets = showQuickAmounts && selectedMax > 1 ? <div className="quick-amounts" role="group" aria-label={t("ui.quick_amounts")}>{quickAmounts(selectedMax).map((entry) => <button key={entry.key} type="button" className={`quick-amount${entry.value === selectedCount ? " quick-amount-active" : ""}`} disabled={movePending} onClick={() => onAmountChange(entry.value)}>{entry.key === "half" ? "½" : entry.key === "all" ? t("ui.all") : entry.key}</button>)}</div> : null
     return <aside className={`item-detail${solo ? " item-detail-drawer" : ""}${inspected ? "" : " item-detail-empty"}${inspected && inspectorCopy ? " item-detail-copyable" : ""}`} aria-label={t("ui.selected_item_actions")}>
@@ -45,13 +48,14 @@ export function Inspector({ inspected, selected, solo, playerId, movePending, gi
                 <ItemArtwork item={inspected.item} className="detail-art" />
                 <p className="eyebrow">{inspected.inventory.type === "shop" ? t("ui.shop_item") : t("ui.slot_number", { slot: inspected.item.slot })}</p>
                 <h1>{inspected.item.label ?? inspected.item.name}<JammedBadge item={inspected.item} className="jammed-badge-detail" /></h1>
-                <p>{inspected.item.description ?? t("ui.no_item_description")}</p>
+                <p>{isClosedBag(inspected.item) ? t("ui.closed_bag") : inspected.item.description ?? t("ui.no_item_description")}</p>
                 <dl><dt>{t("ui.amount")}</dt><dd>×{inspected.item.amount}</dd><dt>{t("ui.weight")}</dt><dd>{inspected.item.weight ?? 0} g</dd>{inspected.item.displayMeta?.map((meta, index) => <Fragment key={index}><dt>{meta.label}</dt><dd>{formatMetaValue(meta.value, inspectorDecimals)}</dd></Fragment>)}{inspected.inventory.type === "shop" && <><dt>{t("ui.price")}</dt><dd>${(inspected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
                 {inspected.inventory.type === "shop" ? <div className="amount-action">
                     {selectedMax > 1 && <input data-fft-kind="quantity" className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={t("ui.quantity_to_buy", { amount: selectedMax })} onChange={(event) => onAmountChange(Number(event.target.value))} />}
                     {presets}
                     <button data-fft-kind="buy" data-fft-item={inspected.item.name} data-fft-quantity={selectedCount} className="primary-action" disabled={movePending} onClick={() => onBuy(inspected.inventory, inspected.item, selectedCount)}>{t("ui.buy_amount_price", { amount: selectedCount, price: ((inspected.item.price ?? 0) * selectedCount).toLocaleString() })}</button>
                 </div> : <>
+                    {onOpenBag && canOpenBag(inspected.inventory, inspected.item, playerId) && <button className="primary-action" data-search-action="open-bag" disabled={movePending} onClick={() => onOpenBag(inspected.inventory, inspected.item)}>{t("ui.open_bag")}</button>}
                     {(inspected.item.useable || inspected.item.container) && <button className="primary-action" disabled={movePending} onClick={() => onUse(inspected.inventory, inspected.item)}>{inspected.item.container ? t("ui.open_container", { item: inspected.item.label ?? "container" }) : t("ui.use_item")}</button>}
                     {selectedMax > 1 && <div className="amount-picker"><input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={t("ui.amount_to_move", { amount: selectedMax })} onChange={(event) => onAmountChange(Number(event.target.value))} /><input className="amount-input" type="number" min={1} max={selectedMax} value={selectedCount} disabled={movePending} aria-label={t("ui.amount_to_move", { amount: selectedMax })} onChange={(event) => onAmountChange(Number(event.target.value))} /></div>}
                     {presets}

@@ -76,6 +76,39 @@ local function carrierHasContainer(source, containerId, expectedName)
     return false
 end
 
+-- Search grants: a searcher who opened ANOTHER player's bag through
+-- containers.openForSearcher. Server-only state, one per searcher, never taken
+-- from a client. It is only a pointer: every access check below re-derives the
+-- facts (target still carries the bag, still in range and bucket, search policy
+-- still allows it, config still enabled), so a stale grant grants nothing.
+local searchGrants = {}
+
+local function searchConfig()
+    local cfg = containerConfig and inventoryApi.config and inventoryApi.config.search
+    return type(cfg) == 'table' and cfg or {}
+end
+
+local function searcherMayOpen(source, containerId, expectedName)
+    local grant = searchGrants[source]
+    if not grant or grant.containerId ~= containerId or grant.name ~= expectedName then
+        return false
+    end
+    if searchConfig().openContainers ~= true then
+        return false
+    end
+    if source == grant.target or not carrierHasContainer(grant.target, containerId, expectedName) then
+        return false
+    end
+    local _, targetInventory = currentPlayer(grant.target)
+    if not targetInventory then
+        return false
+    end
+    -- Same rule as opening that player's inventory: bucket, distance and the
+    -- trusted inspection policy.
+    local allowed = inventoryApi.canAccess(source, targetInventory)
+    return allowed == true
+end
+
 local function portableOptions(item, definition)
     return {
         label = definition.label or item.label or item.name,
@@ -83,8 +116,11 @@ local function portableOptions(item, definition)
         maxWeight = tonumber(definition.maxWeight or definition.maxweight) or containerConfig.defaultMaxWeight,
         -- Functions are never persisted. openConfiguredItem restores this
         -- proof-of-possession policy every time a portable inventory is opened.
+        -- A search grant is the only other way in, and it is re-validated on
+        -- every session check (see searcherMayOpen).
         access = function(source, inventoryRecord)
             return carrierHasContainer(source, inventoryRecord.id, item.name)
+                or searcherMayOpen(source, inventoryRecord.id, item.name)
         end,
         portable = true,
     }
@@ -327,6 +363,107 @@ function containers.openConfiguredItem(source, slot)
     container.access = options.access
     container.label = options.label
     return inventoryApi.open(source, containerKey)
+end
+
+---Open a configured portable container carried by ANOTHER player, for the
+---searcher who is currently looking at that player's inventory. Trusted server
+---call only: `targetSrc` and `slot` come from the server-validated session
+---(server.lua's openTargetContainer intent), never from a browser container id.
+---Every policy check is repeated here and again by the access callback on each
+---later session validation. Returns the same (ok, payload|reason) as open.
+function containers.openForSearcher(searcher, targetSrc, slot)
+    searcher, targetSrc, slot = whole(searcher), whole(targetSrc), whole(slot)
+    if not searcher or not targetSrc or not slot or searcher == targetSrc then
+        return false, 'invalid search container request'
+    end
+    local cfg = searchConfig()
+    if cfg.openContainers ~= true then
+        return false, 'opening containers is disabled'
+    end
+    local _, targetInventory = currentPlayer(targetSrc)
+    if not targetInventory then
+        return false, 'target player not found'
+    end
+    -- Bucket, distance and the inspection policy: the same canAccess that
+    -- opening that player's inventory used.
+    local allowed, reason = inventoryApi.canAccess(searcher, targetInventory)
+    if not allowed then
+        return false, reason or 'access denied'
+    end
+    local item = targetInventory.items[slot]
+    local definition = item and portableDefinition(item.name)
+    if not item or not definition then
+        return false, 'item is not a portable container'
+    end
+    local info = itemInfo(item)
+    local id = info and cleanId(info.containerId)
+    if not id then
+        return false, 'container is empty'
+    end
+    -- Bound to this exact carried item (not merely any container with that id).
+    if not carrierHasContainer(targetSrc, id, item.name) then
+        return false, 'container is not carried by the target'
+    end
+    local containerKey, container = inventoryApi.resolveInventory(key('container', id))
+    if not container then
+        return false, 'bound container not found'
+    end
+    local options = portableOptions(item, definition)
+    container.access = options.access
+    container.label = options.label
+    local grant = { target = targetSrc, containerId = id, name = item.name }
+    searchGrants[searcher] = grant
+    local ok, result = inventoryApi.open(searcher, containerKey)
+    if not ok then
+        if searchGrants[searcher] == grant then
+            searchGrants[searcher] = nil
+        end
+        return false, result
+    end
+    grant.token = type(result) == 'table' and result.token or nil
+    return true, result
+end
+
+-- Closing the bag the searcher opened returns them to the target's inventory
+-- when that is still allowed. Only a deliberate close ('requested') of THIS
+-- session does so; expiry, range, cuffing and every other reason just close.
+if type(AddEventHandler) == 'function' then
+    AddEventHandler('kora_inventory:server:sessionClosed', function(source, session, reason)
+        local grant = searchGrants[source]
+        if not grant or type(session) ~= 'table' or grant.token ~= session.token then
+            return
+        end
+        searchGrants[source] = nil
+        if reason == 'requested' then
+            -- Best effort: out of range or no longer allowed simply stays closed.
+            inventoryApi.openInventory(source, 'player', grant.target)
+        end
+    end)
+end
+
+---View-only concealment for a player item that another player is searching.
+---Called on the COPY a view is built from, never on stored data. Strips the
+---server-bound container id (and the ox spelling) so nothing in the view can
+---point at the inner inventory, and flags the slot as a closed bag. A bag's own
+---weight is its definition weight; contents are never added to it, so nothing
+---about them can leak through `weight` either.
+---@return boolean concealed
+function containers.concealForSearch(item)
+    if type(item) ~= 'table' or not portableDefinition(item.name) then
+        return false
+    end
+    local cfg = searchConfig()
+    if cfg.hideContainerContents ~= false then
+        for _, field in ipairs({ 'info', 'metadata' }) do
+            if type(item[field]) == 'table' then
+                item[field].containerId = nil
+                item[field].container = nil
+            end
+        end
+        item.closedContainer = true
+    end
+    item.openable = cfg.openContainers == true
+    return true
 end
 
 function containers.isPortableItem(item)

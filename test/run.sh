@@ -89,3 +89,5 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/config_schema.lua
 "${LUA:-lua}" test/smoke/organize.lua
 "${LUA:-lua}" test/smoke/organize_intent.lua
+"${LUA:-lua}" test/smoke/search_containers.lua
+"${LUA:-lua}" test/smoke/water_damage.lua

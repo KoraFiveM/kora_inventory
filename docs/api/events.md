@@ -415,6 +415,18 @@ end)
 The range script scores a shot.
 ```
 
+#### `AddEventHandler('kora_inventory:server:searchedContainer', function(searcher, target, itemName) end)`
+
+Local event raised after a searcher opened a bag in another player's inventory through the `openTargetContainer` intent. No return value; the open is already committed.
+
+#### `AddEventHandler('kora_inventory:server:waterDamaged', function(src, outcomes) end)`
+
+Local event raised after a water damage report damaged items. `outcomes` is a list of `{ slot, name, label, mode }`. No return value.
+
+#### `RegisterNetEvent('kora_inventory:server:waterExposure', function() end)  -- client: TriggerServerEvent`
+
+Payload-free report that the sender has been swimming. Everything sent is ignored. Accepted at most once per player every 10 seconds and only while `waterDamage.enabled` is on; it can only affect the sender's own items.
+
 #### `AddEventHandler('kora_inventory:server:evidenceMoved', function(action, source, target, evidenceId, item) end)`
 
 Local event raised after an evidence seize or release commits.
@@ -652,7 +664,7 @@ Two items move to slot 5 of the stash; both inventories are patched.
 
 #### `RegisterNetEvent('kora_inventory:server:intent', function(request) end)  -- client: TriggerServerEvent`
 
-Net event for session intents `use`, `drop`, `give`, `buy` and `sync`. The same handler is registered as a callback. Failures return as `kora_inventory:client:rejected`. The `give` request is sent by `client.lua` after the recipient is resolved locally.
+Net event for session intents `use`, `drop`, `give`, `buy`, `sync` and `openTargetContainer` (open a bag in the player you are searching; payload exactly `{ inventory, slot }`, see [Containers and evidence](./containers.md)). The same handler is registered as a callback. Failures return as `kora_inventory:client:rejected`. The `give` request is sent by `client.lua` after the recipient is resolved locally.
 
 **Parameters**
 
@@ -989,7 +1001,7 @@ Every `kora_inventory:client:*` net handler starts with a `GetInvokingResource()
 ### Writing a custom renderer
 
 1. **Listen to the local UI events** — `kora_inventory:ui:sessionOpened`, `sessionPatched`, `sessionClosed` and `rejected` carry the session state.
-2. **Send intents** — Trigger `kora_inventory:client:submitIntent` or call the `submitIntent` export with a `move`, `use`, `drop`, `give`, `buy`, `sync` or `close` intent.
+2. **Send intents** — Trigger `kora_inventory:client:submitIntent` or call the `submitIntent` export with a `move`, `use`, `drop`, `give`, `buy`, `sync`, `openTargetContainer` or `close` intent.
 3. **Never hold authority** — Treat every view as a read-only snapshot; the server decides.
 
 ### Terms used on this page

@@ -250,6 +250,45 @@ Config.kora_inventory = {
     -- trusted server callback here (or register one at runtime) to opt into
     -- police/admin/consent rules; proximity alone is never authority.
     playerInspection = { access = nil },
+    -- What a searcher sees when they open ANOTHER player's inventory (search,
+    -- rob, police). Server-side; the browser only renders what it is sent.
+    search = {
+        -- Portable containers (bags) in the searched player's inventory are
+        -- shown closed: no bound container id and nothing about their contents.
+        -- A bag's own weight never includes its contents, so no weight leaks.
+        hideContainerContents = true,
+        -- Let the searcher open a searched player's bag (openTargetContainer
+        -- intent). Needs the normal search permission; the server re-checks
+        -- the session, the slot, the target's range/bucket and policy.
+        openContainers = true,
+        -- Milliseconds of progress bar the searcher's client runs before the
+        -- open request is sent. 0 = instant. Cosmetic delay (client side).
+        openTime = 2000,
+    },
+    -- Water damage for electronics. Off by default. The client reports (payload
+    -- free) that its own player has been swimming; the server rolls each
+    -- configured item in that player's own pockets.
+    waterDamage = {
+        enabled = false,
+        -- Seconds in the water before the client reports it.
+        swimSeconds = 3,
+        -- Item name -> { chance = 0..1 } per report. Defaults are existing items.
+        items = {
+            phone = { chance = 1.0 },
+            iphone = { chance = 1.0 },
+            samsungphone = { chance = 1.0 },
+            radio = { chance = 0.5 },
+        },
+        -- 'flag' marks info.waterDamaged (item cannot be used until repaired),
+        -- 'convert' turns the item into `into`, 'remove' deletes it.
+        mode = 'flag',
+        into = nil, -- item name used by mode = 'convert' (e.g. 'garbage')
+        -- Using this item clears the flag from a damaged item (one is consumed).
+        repairItem = 'electronickit',
+        -- Item names that protect what is stored in them. Portable containers
+        -- protect their contents automatically; only pockets are rolled.
+        protectedBy = { 'paperbag' },
+    },
     -- Milliseconds an open inventory may sit unused before the server closes it
     -- (the lease). With sessionSliding on, every request the player makes renews
     -- it, so it is an idle timeout. Off, it is a hard limit counted from the

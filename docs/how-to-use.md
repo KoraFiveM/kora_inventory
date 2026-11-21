@@ -189,6 +189,12 @@ exports.kora_inventory:registerCombination({
 
 Both items and the result must be real kora_core items. A combine fails, and nothing is consumed, if the result does not fit your weight or slots, the progress bar is cancelled, or the items change while it runs. Set `combine.enabled = false` to turn the whole feature off. See [Crafting](./api/crafting.md#combining-items-by-dragging) for every field.
 
+## Searching a player and water damage
+
+When you search another player (police or admin tools that grant `playerInspection`), their bags and backpacks appear as closed bags with a padlock and "Closed". Nothing about what is inside is shown. If `search.openContainers` is on, select the bag and press Open bag (or choose Open in the right-click menu); after the progress bar the bag opens. Closing it takes you back to the player's inventory. Turn `search.hideContainerContents` off to show bags like any other item.
+
+With `waterDamage.enabled` on, swimming can ruin the phone, iPhone, Samsung phone and radio in your pockets (not the ones in a bag). A damaged item shows a droplet badge and a "Condition: Water damaged" row, and cannot be used. Use an electronic kit to repair one; it takes one kit per item.
+
 ## Failure results and what they mean
 
 Most server functions return `ok, reason`. The reason is a short string; branch on `ok`, not on the text, except for the vocabularies called out in the compat modules.

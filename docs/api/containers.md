@@ -174,6 +174,39 @@ KoraInventory.containers.openConfiguredItem(src, 7)
 The backpack opens; `kora_inventory:server:openedContainer` fires from the use flow.
 ```
 
+### `KoraInventory.containers.openForSearcher(searcher, targetSource, slot)`
+
+Opens a portable container carried by another player, for the searcher who is looking at that player's inventory. It is the only way a bag that is not in your own inventory can be opened, and it is reached by the `openTargetContainer` intent (see Operating notes), never by a client event.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `searcher` | integer | Player server id of the searcher. Must differ from the target. |
+| `targetSource` | integer | Player server id carrying the bag, resolved by the server from the searcher's session. |
+| `slot` | integer | Slot of the bag in the target's inventory. |
+
+**Returns**
+
+- **opened** — boolean.
+- **result** — the session payload, or `opening containers is disabled`, `target player not found`, an access reason such as `too far away`, `different routing bucket` or `player inspection not authorised`, `item is not a portable container`, `container is empty` (the bag was never opened, so it has no bound container), `container is not carried by the target`, `bound container not found`.
+
+**Example**
+
+```lua
+local ok, result = KoraInventory.containers.openForSearcher(src, target, 7)
+```
+
+**Representative console output**
+
+```text
+The bag opens as the searcher's secondary inventory.
+```
+
+### `KoraInventory.containers.concealForSearch(item)`
+
+View helper used by the view builder. It is called on the copy of an item when one player is looking at another player's pockets. For a configured portable container it removes `info.containerId` (and the ox spelling `container`), sets `closedContainer = true` when `search.hideContainerContents` is on, and sets `openable` from `search.openContainers`. It returns true when the item was a portable container. It never touches stored data.
+
 ### `KoraInventory.containers.isPortableItem(item)`
 
 True when the item name is configured in `containers.items`.
@@ -266,6 +299,20 @@ The functions below describe the module for code that runs inside kora_inventory
 `containers.bindItem(source, slot, options)` reads the real kora_core-owned slot, derives the caller's citizen id, generates a container id on the server and writes it to the item's `info.containerId` through kora_core's mutation funnel. `containers.openItem(source, slot)` reads the same current slot. A browser item table, owner or container id is never accepted.
 
 `Config.kora_inventory.containers.items` promotes named unique items to portable containers. The shipped `backpack` is 20 slots and 60000 weight: using it from the player's own inventory binds an id on first use and opens it afterwards. Its access policy proves current possession of that exact item on every open and transfer, so giving the item gives access without exposing the id. Portable containers cannot be put into other containers, nor inside themselves, unless `allowNested = true` together with an explicit server policy.
+
+### Searching a player's bag
+
+When a player searches another player (rob, police, admin) the target's portable containers are shown closed. The searcher's view of that inventory, including every live patch sent while it is open, has no container id and nothing about what is inside. A bag's own weight is its definition weight and never includes its contents, so no weight leaks either. The owner's own view is unchanged. Configure this under `search` (see [Configuration](./configuration.md)).
+
+If `search.openContainers` is on, the searcher can open a bag with the `openTargetContainer` session intent, whose payload is exactly `{ inventory, slot }`:
+
+1. `inventory` must be the target inventory granted to this session; any other key is refused, and so is any extra field (a container id, owner, target or item record is refused, never read).
+2. The lease, cuffed and downed rules, access, routing bucket, distance and both revisions are checked exactly as for a move out of that inventory.
+3. The server resolves the real item in that slot, checks that it is a configured portable container bound to the target, and calls `containers.openForSearcher`, which checks bucket, distance and the player inspection policy again.
+4. The bag opens as the searcher's secondary inventory. Its access policy accepts the searcher only while the target still carries that exact bag, is in range, and search policy still allows it; it is re-checked on every request, so walking away or the target dropping the bag closes it.
+5. Closing the bag on purpose returns the searcher to the target's inventory if that is still allowed. Any other close reason (expiry, range, cuffing) just closes.
+
+The bundled client shows a progress bar for `search.openTime` before it sends the request. That delay is drawn on the searcher's own screen and is not enforced by the server, like the use progress bar.
 
 ### Evidence and confiscation
 
