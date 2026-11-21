@@ -13,11 +13,10 @@ import { DEFAULT_TRADE_CONFIG } from "@/lib/trade"
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig; organize: OrganizeConfig; tips: TipsConfig; controls: ControlsConfig; combine: CombineConfig; decay: DecayConfig; trade: TradeUiConfig } = {
+export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "slotBorderWidth" | "optimisticMoves" | "queueMoves" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig; organize: OrganizeConfig; tips: TipsConfig; controls: ControlsConfig; combine: CombineConfig; decay: DecayConfig; trade: TradeUiConfig } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
-    rightClickSplit: true,
     // Split dialog by default; `menu` and `none` come from ui.rightClick.
     rightClick: "split",
     ammoInfo: DEFAULT_AMMO_INFO,
@@ -25,7 +24,6 @@ export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreW
     decay: DEFAULT_DECAY,
     optimisticMoves: true,
     queueMoves: true,
-    directTransport: true,
     // A move that gets no answer would otherwise stay pending for good. Generous
     // because nothing blocks while it waits: a lag spike must not look like a
     // failure and snap the item back (config.lua: ui.moveTimeoutMs).
@@ -33,6 +31,7 @@ export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreW
     inspectorDecimals: 1,
     inspectorCopy: true,
     scale: 1,
+    slotBorderWidth: 1,
     // Layout registry (web/src/layouts): the server default, which layouts may
     // be used, and whether the player's own choice is honoured.
     layout: "classic",

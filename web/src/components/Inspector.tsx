@@ -10,7 +10,7 @@ import type { InventoryItem, InventoryView } from "@/lib/types"
 import { ItemArtwork } from "./ItemArtwork"
 import { JammedBadge } from "./JammedBadge"
 
-export interface InspectorProps {
+interface InspectorProps {
     /** The selection after the search filter; undefined renders the empty state. */
     inspected: Selection | undefined
     /** The raw selection, only used to explain an item hidden by the search. */
@@ -62,9 +62,9 @@ export function Inspector({ inspected, selected, solo, playerId, movePending, gi
                     {selectedMax > 1 && <button className="quiet-action" disabled={movePending} onClick={() => onSplitSelected(inspected.inventory, inspected.item)}>{t("ui.split_amount", { amount: selectedCount, remaining: selectedMax - selectedCount })}</button>}
                     {inspected.inventory.id === playerId && <>
                         <div className="amount-action">
-                            <button className="quiet-action" disabled={movePending} onClick={() => void onSubmit("drop", { inventory: inspected.inventory.id, slot: inspected.item.slot, amount: selectedCount })}>{t("ui.drop_amount", { amount: selectedCount })}</button>
+                            <button className="quiet-action" disabled={movePending} onClick={() => onSubmit("drop", { inventory: inspected.inventory.id, slot: inspected.item.slot, amount: selectedCount })}>{t("ui.drop_amount", { amount: selectedCount })}</button>
                         </div>
-                        {giveAvailable && <button className="quiet-action" disabled={movePending} onClick={() => void onSubmit("give", { inventory: inspected.inventory.id, slot: inspected.item.slot, amount: clampGiveAmount(selectedCount, inspected.item.amount) })}>{t("ui.give_amount", { amount: selectedCount })}</button>}
+                        {giveAvailable && <button className="quiet-action" disabled={movePending} onClick={() => onSubmit("give", { inventory: inspected.inventory.id, slot: inspected.item.slot, amount: clampGiveAmount(selectedCount, inspected.item.amount) })}>{t("ui.give_amount", { amount: selectedCount })}</button>}
                     </>}
                 </>}
             </> : <div className="empty-detail"><span className="empty-detail-icon"><PackageOpen size={30} /></span><h1>{t("ui.inspect_item")}</h1><p>{selected ? t("ui.hidden_by_search", { item: selected.item.label ?? selected.item.name }) : t("ui.select_item_help")}</p></div>}</aside>
