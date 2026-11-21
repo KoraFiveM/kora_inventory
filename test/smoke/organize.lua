@@ -348,7 +348,7 @@ do
     H.ok(server:find('validSession(src, request.token, targetKey, targetKey, expected, expected)', 1, true), 'organize validates through validSession')
     H.ok(server:find("lock({ targetKey }", 1, true), 'organize runs under the inventory lock')
     H.ok(server:find("shop inventories cannot be organized", 1, true), 'shops are refused')
-    H.ok(server:find('isAnyUseBusy(target.type == '"'"'player'"'"' and target.source or src)', 1, true), 'refused while an item use is in progress')
+    H.ok(server:find("isAnyUseBusy(target.type == 'player' and target.source or src)", 1, true), 'refused while an item use is in progress')
     H.ok(server:find('settings.cooldownMs', 1, true), 'rate limited by organize.cooldownMs')
     H.ok(server:find("playerSetPath(current.source, { 'items' }, plan.items)", 1, true), 'player writes go through the kora_core funnel')
     H.ok(ui:find('organize = true', 1, true), 'the NUI bridge allows the organize intent')
