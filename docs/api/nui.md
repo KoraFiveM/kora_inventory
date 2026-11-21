@@ -44,7 +44,8 @@ Each is `{ action, data }`. Items in views are keyed by slot and include `label`
 | `kora_inventory:nui:intentResult` | table | `{ requestId, ok, error? }`: the deferred verdict of an intent. |
 | `kora_inventory:nui:itemBox` | table | Item receipt `{ name, label, image, imageUrl, amount, action, imageOverride, duration }` with `action` `add`, `purchase`, `remove` or `use`. |
 | `kora_inventory:nui:giveAvailability` | table | `{ available }`: whether a nearby give recipient exists. No names or ids are ever sent. |
-| `kora_inventory:nui:hotbar` | table | `{ slots, seconds, bottom }` for the on-screen hotbar overlay (U key). `slots[i]` is `{ slot, name?, label?, amount?, image?, imageUrl? }`. |
+| `kora_inventory:nui:hotbar` | table | `{ slots, seconds, bottom }` for the on-screen hotbar overlay (U key). `slots[i]` is `{ slot, name?, label?, amount?, image?, imageUrl? }`. When `quickSlots.inHotbarHud` is on the payload also carries `quick`, the resolved quick slots that have an item: `{ id, slotLabel, slot, name, label, amount, total?, key, pinned, image?, imageUrl? }`, where `label` is the item's label, `slotLabel` the quick slot's label and `amount` the total for linked ammunition. |
+| `kora_inventory:nui:quickSlots` | table | `{ enabled, hideWhenMissing, showKeyHints, slots }` where `slots` is the resolved quick slot list in config order: `{ id, label, slot, name, total, pinned, key, linked }`. `slot` and `name` are nil when nothing resolves; `slot` is a real inventory slot (the page reads the item from its own copy of the player view). `total` is only set for linked ammunition. `pinned` is true when a local pin chose the item. `key` is the key label currently bound in Settings, Key Bindings (`''` when unbound). `linked` marks slots that cannot be pinned. Sent on every session open and again when the items, the drawn weapon or a pin change and the result differs. With `quickSlots.enabled = false` the only message is `{ enabled = false }`, sent once after start. |
 | `kora_inventory:nui:hotbarPosition` | table | `{ bottom }` pixels from the screen bottom; resent when the player enters or leaves a vehicle. |
 | `kora_inventory:nui:rejected` | table | Listened to by the page (`{ reason }`) but not sent by the bundled bridge, which shows refusals through `Kora.notify` instead. |
 
@@ -111,6 +112,33 @@ await fetch('https://kora_inventory/kora_inventory:nui:close', { method: 'POST',
 { ok: true }
 ```
 
+### `RegisterNUICallback('kora_inventory:pinQuickSlot', function(data, cb) end)`
+
+The page asks to pin an item to a quick slot, or to clear the pin. This is a local display preference: it is answered on the client, stored in client key-value storage for the current character and never forwarded to the server. Registered only while `quickSlots.enabled` is not `false`.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `data` | table | `{ id, slot }`. `id` must be a configured quick slot that is not linked. `slot` is an integer from `1` to `playerSlots` holding an item that matches that quick slot's filter; `nil` or `0` removes the pin. |
+
+**Returns**
+
+- **cb(&#123; ok = true &#125;)** after storing the pin and re-sending `kora_inventory:nui:quickSlots`.
+- **cb(&#123; ok = false, error = reason &#125;)** for an unknown or linked id, an invalid slot, an empty slot, an item that does not fit, or no active character.
+
+**Example**
+
+```lua
+await fetch('https://kora_inventory/kora_inventory:pinQuickSlot', { method: 'POST', body: JSON.stringify({ id: 'weapon', slot: 7 }) })
+```
+
+**Representative console output**
+
+```text
+{ ok: true }
+```
+
 ## Common use cases
 
 - Replacing the bundled UI with a custom page.
@@ -118,7 +146,7 @@ await fetch('https://kora_inventory/kora_inventory:nui:close', { method: 'POST',
 
 ## Limits and related APIs
 
-The page can only send the nine allowed intents. It never receives other players' names or ids and cannot mutate state: every verdict comes from the server. Presentation settings are pushed one way and never read back. The `kora_inventory:nui:rejected` message is accepted by the bundled page but not emitted by the bundled bridge.
+The page can only send the nine allowed intents (the quick slot pin is a separate local callback that never reaches the server). It never receives other players' names or ids and cannot mutate state: every verdict comes from the server. Presentation settings are pushed one way and never read back. The `kora_inventory:nui:rejected` message is accepted by the bundled page but not emitted by the bundled bridge.
 
 ## Related guides
 

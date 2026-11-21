@@ -152,9 +152,29 @@ Press 2
 
 The item's `useTime` progress bar runs (if set), then `QBCore:Server:UseItem` is sent with the slot; the server re-reads the slot and uses it.
 
+### `Key: unbound (kora_inventory:quick_<id>)`
+
+Uses the item a quick slot currently points at. One binding exists per entry of `Config.kora_inventory.quickSlots.slots`; the shipped slots give `kora_inventory:quick_weapon`, `kora_inventory:quick_ammo`, `kora_inventory:quick_phone` and `kora_inventory:quick_radio`. They are unbound by default and are listed under Settings, Key Bindings, FiveM as `Quick slot: label`. Set `key` on a slot in the config to give it a default key.
+
+| Field | Details |
+| --- | --- |
+| Context | Key binding (rebindable) |
+| Arguments | No arguments. |
+| Access | Exactly the hotbar number keys' guards: blocked while the pause menu or NUI is focused, while busy, UI-blocked, cuffed, or downed (unless the item is in `downedAllowedItems`). Does nothing when the quick slot resolves to no item. |
+
+**Example**
+
+```text
+Press the key you bound to Quick slot: Weapon
+```
+
+**Result**
+
+The quick slot is resolved to a real inventory slot and that slot is used through the hotbar's own path (progress bar gate, then `QBCore:Server:UseItem`). For the weapon slot that draws or holsters the weapon. For the ammo slot it uses the ammunition item, which the server accepts only if it fits the weapon it has recorded as drawn. No new server event exists.
+
 ### `Key: U (kora_inventory:hotbarshow)`
 
-Shows the on-screen hotbar overlay listing the first `hotbarSlots` slots.
+Shows the on-screen hotbar overlay listing the first `hotbarSlots` slots, plus the resolved quick slots when `quickSlots.inHotbarHud` is on.
 
 | Field | Details |
 | --- | --- |
@@ -208,6 +228,7 @@ Registered through `Kora.keybind`, so players can rebind them in Settings > Key 
 | --- | --- | --- |
 | `openInv` | `TAB` | Same as `/inventory`. |
 | `kora_inventory:hotbar1` ... `hotbarN` | `1` ... `5` | Use the item in that slot (`N` is `Config.kora_inventory.hotbarSlots`). Ignored while the NUI is focused or the pause menu is open. |
+| `kora_inventory:quick_<id>` | unbound | Use the item a quick slot points at, one binding per configured quick slot, under the same guards as the hotbar keys. |
 | `kora_inventory:hotbarshow` | `U` | Show the on-screen hotbar for `ui.hotbarSeconds` seconds (`0` disables the key). |
 
 ## Migration actions and permissions (from the code)

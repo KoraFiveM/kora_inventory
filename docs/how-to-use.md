@@ -15,6 +15,7 @@ Kora Inventory is a set of server exports plus a client session layer. Your reso
 - **Item definitions live in kora_core's shared registry** (`items` and `weapons`). kora_inventory looks a definition up every time it needs one (`exports.kora_core:getShared('items', name)`), so items you register at runtime work immediately.
 - **The NUI is only a renderer.** The bundled page sends intents through `client/ui.lua`; `server.lua` validates the session token, both inventory revisions, access, routing bucket and distance before changing anything.
 - **Weights are in grams.** The default player limit `120000` is 120 kg. `slots` are counted per inventory. Slots `1..hotbarSlots` (5 by default) double as the hotbar.
+- **Quick slots are shortcuts, not slots.** The side rail of the inventory shows a Weapon, Ammo, Phone and Radio shortcut by default. Each points at an item that stays where it is in your inventory. Pin a different item to a shortcut from the page, or leave it to pick the drawn weapon and then the first matching item. Bind a key to a shortcut under Settings, Key Bindings, FiveM (`Quick slot: Weapon` and so on) to draw, holster, load or use it without opening the inventory. See [Configuration](./api/configuration.md) to change which shortcuts exist.
 
 ## Inventory types
 
