@@ -11,10 +11,11 @@ local sessions = {}
 local dropViewers = {}
 local hooks = {}
 local runHooks, finishHooks
-local audit = {}
 local locks = {}
 local ownPlayerWrites = {}
 local inspectionHooks = {}
+-- `owner = true` registrations are templates, not one globally shared stash.
+-- The actual secondary record is created lazily per citizen when they open it.
 local ownedStashTemplates = {}
 local persistenceHydrated, persistenceRestoreError = false, nil
 
@@ -30,8 +31,6 @@ local canCarry
 local hasUseable
 local useItem
 local dropCreate, canAddToInventory
--- `owner = true` registrations are templates, not one globally shared stash.
--- The actual secondary record is created lazily per citizen when they open it.
 
 local function now()
     return GetGameTimer()
@@ -83,25 +82,28 @@ local function isCuffed(src)
     local metadata = exports.kora_core:getPlayerData(src, { 'metadata' })
     return type(metadata) == 'table' and metadata.ishandcuffed == true
 end
-local lastCuffedNotify = {}
-local function notifyCuffedBlocked(src)
+-- Feature functions that need this file's locals (item audit, omnipack take)
+-- live on one table: the main chunk is at Lua's 200-local limit.
+local ext = {}
+ext.openingBag = {}
+
+-- Rate-limited "blocked" toast: one per `stamps[src]` cooldown window.
+function ext.notifyBlocked(src, stamps, langKey)
     local now = GetGameTimer()
     local cooldown = tonumber(config.downedNotifyCooldown) or 3000
-    if lastCuffedNotify[src] and now - lastCuffedNotify[src] < cooldown then
+    if stamps[src] and now - stamps[src] < cooldown then
         return
     end
-    lastCuffedNotify[src] = now
-    Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_cuffed'), type = 'error' })
+    stamps[src] = now
+    Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = Kora.lang(langKey), type = 'error' })
+end
+local lastCuffedNotify = {}
+local function notifyCuffedBlocked(src)
+    ext.notifyBlocked(src, lastCuffedNotify, 'inventory.blocked_cuffed')
 end
 local lastDownedNotify = {}
 local function notifyDownedBlocked(src)
-    local now = GetGameTimer()
-    local cooldown = tonumber(config.downedNotifyCooldown) or 3000
-    if lastDownedNotify[src] and now - lastDownedNotify[src] < cooldown then
-        return
-    end
-    lastDownedNotify[src] = now
-    Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_downed'), type = 'error' })
+    ext.notifyBlocked(src, lastDownedNotify, 'inventory.blocked_downed')
 end
 -- Slots whose useable handler is still running, per source. A handler such as
 -- kora_consumables blocks on a client progress bar and only removes the item at
@@ -128,12 +130,7 @@ local function isSlotBusy(src, slot)
     return true
 end
 local function notifyBusyBlocked(src)
-    local now = GetGameTimer()
-    if lastBusyNotify[src] and now - lastBusyNotify[src] < (tonumber(config.downedNotifyCooldown) or 3000) then
-        return
-    end
-    lastBusyNotify[src] = now
-    Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = Kora.lang('inventory.blocked_busy'), type = 'error' })
+    ext.notifyBlocked(src, lastBusyNotify, 'inventory.blocked_busy')
 end
 local BUSY_ERROR = 'item is currently being used'
 local function downedItemAllowed(name)
@@ -185,15 +182,7 @@ local function playerSetPath(src, path, value)
     return table.unpack(results, 1, results.n)
 end
 
--- Feature functions that need this file's locals (item audit, omnipack take)
--- live on one table: the main chunk is at Lua's 200-local limit.
-local ext = {}
-
 local function recordAudit(action, src, details)
-    audit[#audit + 1] = { at = os.time(), action = action, source = src, details = inventory.copy(details or {}) }
-    if #audit > config.auditLimit then
-        table.remove(audit, 1)
-    end
     TriggerEvent('kora_inventory:server:audit', action, src, details)
 end
 
@@ -1814,7 +1803,6 @@ local function buyItemHook(src, shop, slot, item, count, price, metadata)
         shopType = shop.id,
         shopId = shop.id,
         toInventory = src,
-        toSlot = nil,
         fromSlot = fromSlot,
         itemName = item.name,
         metadata = inventory.copy(metadata or {}),
@@ -2114,8 +2102,15 @@ local function transfer(src, request)
         if not currentItem then
             return false, 'source item changed'
         end
-        if fromKey == toKey and toSlot == fromSlot then
-            return true
+        local function commitBoth()
+            bump(fromKey)
+            if toKey ~= fromKey then
+                bump(toKey)
+            end
+            broadcast(fromKey)
+            if toKey ~= fromKey then
+                broadcast(toKey)
+            end
         end
         local target = toSlot and currentTo.items[toSlot] or nil
         local stacks = target
@@ -2173,14 +2168,7 @@ local function transfer(src, request)
                 addTo(fromKey, sourceItem.name, sourceItem.amount, fromSlot, sourceItem.info, 'swap-rollback')
                 return false, placeTargetErr
             end
-            bump(fromKey)
-            if toKey ~= fromKey then
-                bump(toKey)
-            end
-            broadcast(fromKey)
-            if toKey ~= fromKey then
-                broadcast(toKey)
-            end
+            commitBoth()
             recordAudit('swap', src, { from = fromKey, to = toKey, source = sourceItem.name, target = targetItem.name })
             TriggerEvent('kora_inventory:server:itemsMoved', src, payload)
             return true, { fromRevision = revision(fromKey), toRevision = revision(toKey) }
@@ -2194,14 +2182,7 @@ local function transfer(src, request)
             addTo(fromKey, removed.name, amount, fromSlot, removed.info, 'transfer-rollback')
             return false, addedErr
         end
-        bump(fromKey)
-        if toKey ~= fromKey then
-            bump(toKey)
-        end
-        broadcast(fromKey)
-        if toKey ~= fromKey then
-            broadcast(toKey)
-        end
+        commitBoth()
         recordAudit('transfer', src, { from = fromKey, to = toKey, item = removed.name, amount = amount })
         TriggerEvent('kora_inventory:server:itemsMoved', src, payload)
         local result = { fromRevision = revision(fromKey), toRevision = revision(toKey) }
@@ -2268,9 +2249,6 @@ local function intentUse(src, request)
     return true, { preventClose = preventClose }
 end
 
----Nearest live ground drop within config.drops.mergeRadius of `coords` that
----can take `name` x `amount`, so several drops in one spot share one bag.
----Returns the inventory key, or nil when merging is off or nothing fits.
 ---Next numeric drop id not already in use. With persistDrops on, restored
 ---drops keep ids from the previous run while the counter restarts at 1, and
 ---secondary() returns an existing record unchanged -- the new drop's items
@@ -2284,6 +2262,9 @@ local function reserveDropId()
     return id
 end
 
+---Nearest live ground drop within config.drops.mergeRadius of `coords` that
+---can take `name` x `amount`, so several drops in one spot share one bag.
+---Returns the inventory key, or nil when merging is off or nothing fits.
 local function findMergeDrop(src, coords, name, amount, metadata)
     local radius = tonumber(config.drops and config.drops.mergeRadius) or 0
     if radius <= 0 then return nil end
@@ -2421,6 +2402,12 @@ local function intentDrop(src, request)
     end)
 end
 
+-- Locale lookup that also substitutes %{...} placeholders itself, in case the
+-- locale helper leaves them as-is.
+function ext.langFormat(langKey, vars)
+    return (tostring(Kora.lang(langKey, vars)):gsub('%%{(%w+)}', function(k) return tostring(vars[k] or '') end))
+end
+
 -- Toast both players after a committed give (Config.kora_inventory.giveNotify).
 local function notifyGive(src, target, name, amount)
     if config.giveNotify == false or not Kora.notify or not Kora.lang then
@@ -2428,13 +2415,9 @@ local function notifyGive(src, target, name, amount)
     end
     local def = itemDef(name)
     local vars = { amount = amount, item = def and def.label or tostring(name) }
-    local function text(key)
-        -- Substitute here too in case the locale helper leaves %{...} as-is.
-        return (tostring(Kora.lang(key, vars)):gsub('%%{(%w+)}', function(k) return tostring(vars[k] or '') end))
-    end
     local title = Kora.lang('inventory.title')
-    Kora.notify.send(src, { title = title, message = text('inventory.gave_item'), type = 'success' })
-    Kora.notify.send(target, { title = title, message = text('inventory.received_item'), type = 'success' })
+    Kora.notify.send(src, { title = title, message = ext.langFormat('inventory.gave_item', vars), type = 'success' })
+    Kora.notify.send(target, { title = title, message = ext.langFormat('inventory.received_item', vars), type = 'success' })
 end
 
 -- Toast the buyer after a committed shop purchase (Config.kora_inventory.purchaseNotify):
@@ -2465,9 +2448,8 @@ local function notifyPurchase(src, shop, name, amount, total)
         price = formatPrice(total),
         account = accountLabel,
     }
-    local key = (tonumber(total) or 0) > 0 and 'inventory.purchased_item' or 'inventory.purchased_item_free'
-    -- Substitute here too in case the locale helper leaves %{...} as-is.
-    local message = tostring(Kora.lang(key, vars)):gsub('%%{(%w+)}', function(k) return tostring(vars[k] or '') end)
+    local langKey = (tonumber(total) or 0) > 0 and 'inventory.purchased_item' or 'inventory.purchased_item_free'
+    local message = ext.langFormat(langKey, vars)
     Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = message, type = 'success' })
 end
 
@@ -2671,7 +2653,7 @@ function ext.omnipackTake(src, request, session, shopKey)
     if type(requested) ~= 'number' or requested ~= requested or requested % 1 ~= 0 then
         return false, 'invalid amount'
     end
-    local count = requested >= 1 and requested <= omnipack.maxAmount() and math.floor(requested) or nil
+    local count = requested >= 1 and requested <= omnipack.maxAmount() and requested or nil
     if not count then
         return false, 'invalid amount'
     end
@@ -2809,7 +2791,7 @@ local function intentBuy(src, request)
             shop = currentShop.id,
             item = currentItem.name,
             amount = count,
-            price = price * count,
+            price = total,
             serverData = inventory.copy(currentItem.serverData),
         })
         ext.auditAdd('purchase', src, playerKey(src), currentItem.name, count, 'shop:' .. tostring(currentShop.id))
@@ -2820,7 +2802,7 @@ local function intentBuy(src, request)
             itemName = currentItem.name,
             count = count,
             metadata = inventory.copy(purchaseInfo),
-            price = price * count,
+            price = total,
         })
         return true
     end)
@@ -3083,7 +3065,6 @@ function ext.intentOpenTargetContainer(src, request)
     -- re-validated and the slot re-resolved before anything opens.
     local openTime = math.min(20000, math.max(0, math.floor(tonumber(config.search.openTime) or 0)))
     if openTime > 0 then
-        ext.openingBag = ext.openingBag or {}
         if ext.openingBag[src] then
             return false, 'already opening a container'
         end
@@ -3365,9 +3346,9 @@ local function getItemCount(src, names)
         wanted[ext.itemNameKey(names)] = true
     elseif type(names) == 'table' then
         for _, name in pairs(names) do
-            local key = ext.itemNameKey(name)
-            if key then
-                wanted[key] = true
+            local nameKey = ext.itemNameKey(name)
+            if nameKey then
+                wanted[nameKey] = true
             end
         end
     else
