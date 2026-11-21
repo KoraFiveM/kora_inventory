@@ -176,6 +176,26 @@ Optional physical cash and the item notification boxes.
 | `itemBoxes.showRemovals` | boolean | Default `true`. Receipts for `RemoveItem`. |
 | `itemBoxes.showUses` | boolean | Default `false`. Receipts for item use. Off by default because a consuming use already draws a removal receipt. |
 
+### Item decay (decay)
+
+Items spoil in real time and are converted or removed when fully decayed. Shipped off. Rules, stamping and the paused-storage behaviour are described under [Item decay](./items.md#item-decay). Every key below is read at call time and applies live; the presentation keys reach the page the next time a player opens their inventory.
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `decay.enabled` | boolean | Default `false`. Master switch. Off stamps nothing, spoils nothing and removes every decay view field. |
+| `decay.defaultAction` | string | Default `'convert'`. `'convert'` turns a spoiled item into its rule's `into` item (same slot and amount) and removes it when the rule has none. `'remove'` always removes. |
+| `decay.items` | map | Default `sandwich` and `burger` (172800 s, into `garbage`) and `water_bottle` (604800 s, removed). Per item name: `lifetime` in seconds of real time and optional `into` item name. Wins over a `decay` field on the kora_core item definition; `false` exempts an item. A lifetime is stamped on each item when it is created, so edits apply to new items. Server-only. |
+| `decay.showInInspector` | boolean | Default `true`. Adds an "Expires in 1h 20m" row to the item inspector and tooltip. |
+| `decay.showOnSlot` | boolean | Default `true`. Draws a thin freshness bar on the slot of decaying items. |
+| `decay.warnBelow` | number | Default `0.25`. Fraction of life left below which the bar uses the warning colour. Below 0.1 it always uses the destructive colour. |
+| `decay.sweepSeconds` | integer | Default `300`. Seconds between sweeps of online players' inventories. `0` turns the sweep off (items then spoil only when viewed, used or moved). Values from 1 to 29 behave as 30. Server-only. |
+| `decay.mergePolicy` | string | Default `'oldest'`. `'oldest'`: differently aged stacks merge and spoil with the oldest member (the stamps are ignored by the stack check). `'separate'`: items stack only when their stamps are identical. |
+| `decay.pauseIn.stash` | boolean | Default `false`. When true, time does not count while an item sits in a stash. Server-only. |
+| `decay.pauseIn.trunk` | boolean | Default `false`. Same for vehicle trunks. |
+| `decay.pauseIn.glovebox` | boolean | Default `false`. Same for vehicle gloveboxes. |
+| `decay.pauseIn.container` | boolean | Default `false`. Same for portable containers. |
+| `decay.pauseIn.drop` | boolean | Default `false`. Same for ground drops. |
+
 ### Persistence (persistence)
 
 Durable storage for secondary inventories only. Player items are never stored here.
@@ -310,7 +330,7 @@ With `cash.asItem = true` kora_inventory registers with kora_core (`registerPhys
 
 ## Live editing
 
-Settings registered through `Kora.config` carry a scope (server or client) and a `live` flag: vehicle switches, door switches, UI toggles, `hotbarSeconds`, `slowRequestMs`, `sessionSliding`, `groundOffset` and `showTargetHints` apply on the next use or open. The vehicle class table, weapon components and carried-weapon components are edited through the config editor but apply after a restart. `Config` is replaced by the adopted copy at the end of `config.lua`, so scripts keep reading `Config.kora_inventory` as normal.
+Settings registered through `Kora.config` carry a scope (server or client) and a `live` flag: vehicle switches, door switches, UI toggles, every `decay` key, `hotbarSeconds`, `slowRequestMs`, `sessionSliding`, `groundOffset` and `showTargetHints` apply on the next use or open. The vehicle class table, weapon components and carried-weapon components are edited through the config editor but apply after a restart. `Config` is replaced by the adopted copy at the end of `config.lua`, so scripts keep reading `Config.kora_inventory` as normal.
 
 ## Tables that other files re-read
 
