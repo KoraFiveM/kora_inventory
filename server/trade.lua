@@ -32,6 +32,10 @@ local OPS = {
     unready = true,
     confirm = true,
     cancel = true,
+    -- Sent by the open trade window every 30 s: validSession below slides
+    -- both players' inventory lease, so a player waiting on the other side is
+    -- not closed out (and the trade cancelled) by the idle timeout.
+    keepalive = true,
 }
 
 local function settingsRaw()
@@ -455,6 +459,8 @@ function trade.intent(src, request)
         return machine.confirm(src, current.id, payload.revision)
     elseif op == 'cancel' then
         return machine.cancel(src, current.id, 'cancelled by a player')
+    elseif op == 'keepalive' then
+        return true
     end
     return false, 'invalid trade action'
 end

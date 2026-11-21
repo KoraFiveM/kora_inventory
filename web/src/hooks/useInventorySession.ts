@@ -18,6 +18,7 @@ import { copyText, itemCopyText } from "@/lib/clipboard"
 import { clampGiveAmount } from "@/lib/giveAmount"
 import { isAmmoCompatible, mergeAmmoInfo, resolveRightClick } from "@/lib/ammo"
 import { EMPTY_QUICK_SLOTS, normalizeQuickSlots, type QuickSlotsState } from "@/lib/quickSlots"
+import { mergeTradeConfig } from "@/lib/trade"
 import type { SlotUi } from "@/slotUi"
 
 // Drags that may wait behind an unanswered request before further ones are refused.
@@ -156,6 +157,7 @@ export function useInventorySession() {
             filters: config.filters ?? current.filters,
             tooltips: config.tooltips ?? current.tooltips,
             weightWarnings: mergeWeightWarnings(current.weightWarnings, config.weightWarnings),
+            trade: mergeTradeConfig(current.trade, config.trade),
         }))
     })
     useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number; quick?: HotbarQuickEntry[] }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom, quick }) => {

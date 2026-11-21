@@ -29,12 +29,14 @@ export interface SlotProps {
     hotbar?: boolean
     /** The last slot of that range, which closes the outline on the right. */
     lastHotbar?: boolean
+    /** Amount of this stack offered in an open trade. */
+    offered?: number
 }
 
 /** React DnD's TouchBackend uses global CEF input listeners for both touch and
  * mouse. Unlike HTML5 DnD or source pointer-capture, it resolves the actual
  * destination slot after the cursor leaves the source element. */
-export function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, dimmed }: SlotProps) {
+export function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, dimmed, offered }: SlotProps) {
     const { quickTransfer, modifierDrag, tooltips, inspectorDecimals } = useContext(UiConfigContext)
     const dndManager = useDragDropManager()
     // Ctrl/Alt as they were when the gesture began; read when the drag item is built.
@@ -91,6 +93,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
         flashing && `slot-flash slot-flash-${(slotUi.flash?.nonce ?? 0) % 2}`,
         item && slotUi.isCompatible(item) && "slot-compatible",
         isOver && canDrop && "slot-move-target", isOver && !canDrop && "slot-drop-invalid",
+        item && offered && "slot-offered",
     ].filter(Boolean).join(" ")
 
     return <button
@@ -159,6 +162,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
                 {inventory.type === "shop" && typeof item.price === "number" && <span className="item-price">${item.price.toLocaleString()}</span>}
             </span>
             <span className="item-amount">×{item.amount}</span>
+            {offered ? <span className="slot-offered-badge" title={t("ui.trade_offered", { amount: offered })}>{offered}</span> : null}
             {typeof item.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, item.durability))}%` }} /></span>}
         </>}
         {tip && item && !isDragging && <SlotTooltip item={item} x={tip.x} y={tip.y} decimals={inspectorDecimals} />}

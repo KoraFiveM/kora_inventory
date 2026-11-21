@@ -10,7 +10,8 @@ import { SLOT_DRAG_TYPE } from "./dnd"
  * `didDrop()` is belt-and-braces for the same reason. */
 export function WorldDropZone({ session, busy, onDropOut }: { session: SessionSnapshot; busy: boolean; onDropOut: (source: DragSlot) => void }) {
     const t = useLocale()
-    const dragging = useDragLayer((monitor) => monitor.isDragging())
+    // Only inventory slot drags can hit the floor (a trade offer dragged away is withdrawn, not dropped).
+    const dragging = useDragLayer((monitor) => monitor.isDragging() && monitor.getItemType() === SLOT_DRAG_TYPE)
     const [{ isOver, canDrop }, dropRef] = useDrop<DragSlot, undefined, { isOver: boolean; canDrop: boolean }>(() => ({
         accept: SLOT_DRAG_TYPE,
         // Only the player's own items can hit the floor. A stash, container or

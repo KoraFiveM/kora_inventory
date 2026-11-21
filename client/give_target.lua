@@ -148,9 +148,10 @@ end
 ---nearby players it starts kora_target on exactly those peds, requiring the
 ---player to point at and select their intended recipient in the game world.
 ---@param requestId string|number A browser-local opaque correlation id.
+---@param label? string kora_target option label (client/trade.lua passes its own).
 ---@return boolean started
 ---@return string? reason
-function giveTarget.request(requestId)
+function giveTarget.request(requestId, label)
     if requestId == nil then
         return false, 'missing give request id'
     end
@@ -195,7 +196,7 @@ function giveTarget.request(requestId)
     local ok, registrationId = pcall(function()
         return exports.kora_target:addEntity(peds, {
             {
-                label = localeText('inventory.give_selected', 'Give selected item'),
+                label = type(label) == 'string' and label or localeText('inventory.give_selected', 'Give selected item'),
                 icon = 'HandHeart',
                 distance = giveDistance(),
                 canInteract = function(entity)

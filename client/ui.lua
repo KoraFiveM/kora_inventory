@@ -23,6 +23,10 @@ local allowedIntents = {
     sync = true,
     split = true,
     action = true,
+    -- Player trade: offer/unoffer/cash/ready/unready/confirm/cancel, and the
+    -- Trade button (resolved locally, see client/trade.lua).
+    trade = true,
+    tradeRequest = true,
 }
 
 local function send(action, data)
@@ -60,6 +64,12 @@ local UI_LOCALE_KEYS = {
     'quick_slot_unpin', 'quick_slot_pin_failed', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
     'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
     'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type',
+    'trade', 'trade_request', 'trade_you_offer', 'trade_they_offer', 'trade_cash', 'trade_cash_balance',
+    'trade_set_cash', 'trade_ready', 'trade_unready', 'trade_confirm', 'trade_cancel', 'trade_waiting',
+    'trade_partner_ready', 'trade_partner_not_ready', 'trade_partner_confirmed', 'trade_countdown',
+    'trade_locked', 'trade_drop_here', 'trade_remove_offer', 'trade_offer_amount', 'trade_offer',
+    'trade_empty_offer', 'trade_nothing_offered', 'trade_you_ready', 'trade_you_confirmed', 'trade_ends_in',
+    'trade_offered',
 }
 
 local function pushLocales()
@@ -203,6 +213,17 @@ local function pushConfig()
         filters = ui.filters ~= false,
         tooltips = ui.tooltips ~= false,
         weightWarnings = weightWarnings(),
+        -- Player trade presentation: whether the Trade button shows, how many
+        -- offer slots to draw and whether the cash field exists. The server
+        -- enforces all three on every trade action regardless.
+        trade = (function()
+            local trade = type(Config.kora_inventory.trade) == 'table' and Config.kora_inventory.trade or {}
+            return {
+                enabled = trade.enabled ~= false,
+                slots = math.floor(Kora.util.clamp(tonumber(trade.slots) or 8, 1, 32)),
+                allowCash = trade.allowCash ~= false,
+            }
+        end)(),
     })
 end
 

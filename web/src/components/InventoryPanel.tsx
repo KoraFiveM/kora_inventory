@@ -7,7 +7,7 @@ import { useLocale } from "@/lib/locales"
 import { weightLevel } from "@/lib/weightLevel"
 import { InventorySlot } from "./InventorySlot"
 
-export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, query }: {
+export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, query, offered }: {
     inventory: InventoryView
     selected?: Selection
     busy: boolean
@@ -22,6 +22,8 @@ export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlo
     query?: string
     /** True for the player's own inventory -- the only one with a hotbar. */
     isPlayer?: boolean
+    /** Slot -> amount currently offered in an open trade (marked, still usable). */
+    offered?: Map<number, number>
 }) {
     const { hotbarSlots, showHotbar, filters, weightWarnings } = useContext(UiConfigContext)
     const t = useLocale()
@@ -49,7 +51,7 @@ export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlo
             {Array.from({ length: inventory.slots }, (_, offset) => {
                 const slot = offset + 1
                 const item = bySlot.get(slot)
-                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} hotbar={slot <= hotbarCount} lastHotbar={slot === hotbarCount} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} onSplit={onSplit} onQuickTransfer={onQuickTransfer} dimmed={filters && isDimmed(item, category, query ?? "")} />
+                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} hotbar={slot <= hotbarCount} lastHotbar={slot === hotbarCount} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} onSplit={onSplit} onQuickTransfer={onQuickTransfer} dimmed={filters && isDimmed(item, category, query ?? "")} offered={offered?.get(slot)} />
             })}
         </div>
     </section>

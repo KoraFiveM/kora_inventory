@@ -77,7 +77,7 @@ export interface SessionPatch {
 export interface IntentPayload {
     sessionId: string
     token: string
-    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync"
+    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync" | "trade" | "tradeRequest"
     payload: Record<string, unknown>
     /** Lets the Lua bridge answer the fetch at once and deliver the verdict as `kora_inventory:nui:intentResult`. */
     requestId?: number
@@ -198,10 +198,65 @@ export interface UiConfig {
     weightWarnings?: { enabled?: boolean; warnAt?: number; dangerAt?: number }
     /** Hover tooltip on filled slots (Config.kora_inventory.ui.tooltips). */
     tooltips?: boolean
+    /** Player trade presentation (Config.kora_inventory.trade); the server enforces all of it. */
+    trade?: Partial<TradeUiConfig>
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string
         /** Tried in order for `<localPath>/<name>.<ext>`. */
         extensions?: string[]
     }
+}
+
+/** Config.kora_inventory.trade as the page needs it. */
+export interface TradeUiConfig {
+    enabled: boolean
+    /** Offer slots drawn per side. */
+    slots: number
+    allowCash: boolean
+}
+
+/** One offered stack as the server describes it. Partner offers carry display fields only (no raw metadata). */
+export interface TradeOffer {
+    /** The offerer's own inventory slot this offer points at. */
+    slot: number
+    amount: number
+    name: string
+    label?: string
+    image?: string
+    imageUrl?: string
+    imageOverride?: boolean
+    weight?: number
+    description?: string
+    displayMeta?: Array<{ key: string; label: string; value: unknown }>
+    unique?: boolean
+}
+
+export interface TradeSide {
+    offers: TradeOffer[]
+    cash: number
+    ready: boolean
+    confirmed: boolean
+    /** Own side only: the cash the server says you hold. */
+    balance?: number
+}
+
+export type TradePhase = "open" | "locked" | "committing"
+
+/** `kora_inventory:nui:trade`: the server's view of the trade for this player. */
+export interface TradeView {
+    id: string
+    phase: TradePhase
+    /** Echoed back on Ready/Confirm; a mismatch means the player has not seen the latest offers. */
+    revision: number
+    slots: number
+    allowCash: boolean
+    you: TradeSide
+    them: TradeSide
+    /** Milliseconds until Confirm is accepted, when locked. */
+    confirmInMs?: number
+    confirmDelayMs?: number
+    /** Milliseconds until the trade is cancelled for running too long. */
+    endsInMs?: number
+    lastError?: string
 }

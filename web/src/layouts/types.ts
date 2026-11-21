@@ -7,6 +7,14 @@ import type { InventoryItem, InventoryView, SessionSnapshot } from "@/lib/types"
 
 export type { LayoutId }
 
+/** The secondary view type: another inventory, or the player trade window. */
+export interface SecondaryView {
+    kind: "inventory" | "trade"
+    label: string
+    /** Items shown in it (tab badge). */
+    count: number
+}
+
 /** Where a layout wants the quick-slot (hotbar) bar relative to the player panel. */
 export type QuickSlotPosition = "side" | "top" | "bottom"
 
@@ -64,6 +72,13 @@ export interface LayoutProps {
     playerPanel: ReactNode
     /** The open secondary inventory panel, or the empty placeholder panel; null in solo view. */
     secondaryPanel: ReactNode
+    /**
+     * What `secondaryPanel` shows when it is not the empty placeholder: an
+     * inventory, or the trade window (kind 'trade'). Layouts that only place
+     * `secondaryPanel` can ignore it; tabbed layouts use it for the tab.
+     * Omitted: derived from `session.secondary`.
+     */
+    secondaryView?: SecondaryView
     /** The item inspector `aside`, or null when it is not mounted (solo view, nothing selected). */
     inspector: ReactNode
     /**

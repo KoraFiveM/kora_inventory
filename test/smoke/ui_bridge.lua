@@ -356,6 +356,24 @@ handlers['kora_inventory:ui:sessionOpened']({ token = 'L3', primary = view('play
 H.equal(lastConfig().layouts.classic, true, 'classic stays allowed when everything is disabled')
 uiCfg.layout, uiCfg.layouts, uiCfg.playerLayoutChoice = savedUi.layout, savedUi.layouts, savedUi.choice
 
+-- Player trade presentation flags (the server enforces them regardless).
+do
+    local tradePush = lastConfig().trade
+    H.ok(type(tradePush) == 'table', 'trade flags reach the NUI')
+    H.equal(tradePush.enabled, true, 'trade is enabled by default')
+    H.equal(tradePush.slots, 8, 'eight offer slots by default')
+    H.equal(tradePush.allowCash, true, 'cash may be offered by default')
+    local savedTrade = Config.kora_inventory.trade
+    Config.kora_inventory.trade = { enabled = false, slots = 99, allowCash = false }
+    handlers['kora_inventory:ui:sessionOpened']({ token = 'T1', primary = view('player:1', 1) })
+    tradePush = lastConfig().trade
+    H.equal(tradePush.enabled, false, 'trade.enabled = false is pushed')
+    H.equal(tradePush.slots, 32, 'offer slots are clamped')
+    H.equal(tradePush.allowCash, false, 'trade.allowCash = false is pushed')
+    Config.kora_inventory.trade = savedTrade
+end
+H.ok(source:find('tradeRequest = true', 1, true) and source:find('    trade = true,', 1, true), 'the bridge forwards the trade intents')
+
 -- Right-click mode: valid values pass through, anything else falls back to the legacy boolean.
 H.equal(lastConfig().rightClick, 'split', 'the right-click mode reaches the NUI')
 local savedClick = { mode = uiCfg.rightClick, split = uiCfg.rightClickSplit }

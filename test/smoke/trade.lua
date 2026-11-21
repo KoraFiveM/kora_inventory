@@ -929,4 +929,28 @@ invoke('kora_inventory:server:tradeRequest', 9, 7)
 H.equal(KoraInventory.trade.machine.count(), 0, 'disabled trade refuses requests')
 Config.kora_inventory.trade.enabled = true
 
+-- /config schema: every key registered, live where read at call time,
+-- server-only tuning kept off clients.
+do
+    local seen = {}
+    local function field(kind)
+        return function(value, options)
+            seen[#seen + 1] = { kind = kind, value = value, options = options }
+            return value
+        end
+    end
+    Kora.config = { adopt = function(c) return c end, boolean = field('boolean'), integer = field('integer'), number = field('number'), string = field('string') }
+    dofile('config/schema/trade.lua')
+    local byLabel = {}
+    for _, entry in ipairs(seen) do byLabel[entry.options.label] = entry end
+    H.equal(#seen, 9, 'every trade key has a /config entry')
+    for _, entry in ipairs(seen) do
+        H.ok(type(entry.options.description) == 'string' and #entry.options.description > 20, entry.options.label .. ' is described')
+    end
+    H.equal(byLabel['Enable player trading'].options.live, true, 'enabled is live')
+    H.equal(byLabel['Trade distance (metres)'].options.scope, 'server', 'distance is server-only')
+    H.equal(byLabel['Trade chat command'].options.live, nil, 'the command needs a restart')
+    Kora.config = nil
+end
+
 H.finish()

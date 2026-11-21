@@ -15,9 +15,12 @@ import { ItemBoxStack } from "@/components/ItemBoxStack"
 import { QuickSlotBar } from "@/components/QuickSlotBar"
 import { ShortcutBar } from "@/components/ShortcutBar"
 import { TopBar } from "@/components/TopBar"
+import { TradePanel } from "@/components/TradePanel"
 import { WorldDropZone } from "@/components/WorldDropZone"
 import { useInventorySession } from "@/hooks/useInventorySession"
 import { useShellLayout } from "@/hooks/useShellLayout"
+import { useTrade } from "@/hooks/useTrade"
+import { offeredSlots } from "@/lib/trade"
 import { LAYOUTS, resolveLayout } from "@/layouts"
 import type { LayoutProps } from "@/layouts/types"
 import { PackageOpen } from "lucide-react"
@@ -29,15 +32,26 @@ function InventoryApp() {
     const t = useLocale()
     const s = useInventorySession()
     const { session, uiConfig } = s
-    const shell = useShellLayout({ hasSession: Boolean(session), transferView: Boolean(session?.secondary) })
+    // An open trade is the secondary view: the trade window takes the place of
+    // a second inventory in every layout.
+    const trade = useTrade({ session, submit: s.submit })
+    const trading = trade.active
+    const shell = useShellLayout({ hasSession: Boolean(session), transferView: Boolean(session?.secondary) || trading })
 
     if (!session) return <UiConfigContext.Provider value={uiConfig}><DragGuard open={false} />{s.hotbar && <HotbarHud hotbar={s.hotbar} />}<ItemBoxStack boxes={s.itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
 
-    const { solo, selected, inspected, locked } = s
+    const { selected, inspected, locked } = s
+    const solo = s.solo && !trading
     const layoutId = resolveLayout(uiConfig, shell.playerLayout)
     const Layout = LAYOUTS[layoutId]
 
     const panelHandlers = { selected, busy: locked, canDropSlot: s.canDropSlot, onDrop: s.dropSlot, onDragEnd: noop, onSelect: s.selectSlot, onActivate: s.activateItem, onSplit: s.promptSplit, onQuickTransfer: s.quickTransfer }
+    // While trading, Shift+click on your own stack offers it instead of moving it.
+    const playerHandlers = trading
+        ? { ...panelHandlers, onQuickTransfer: uiConfig.quickTransfer ? (_inventory: unknown, item: Parameters<typeof trade.offerItem>[0]) => trade.offerItem(item) : undefined }
+        : panelHandlers
+    const offered = trading ? offeredSlots(trade.view) : undefined
+    const tradeButton = uiConfig.trade.enabled && s.giveAvailable && !trading && !session.secondary ? trade.request : undefined
     const buildInspector = (drawer: boolean) => <Inspector
             inspected={inspected}
             selected={selected}
@@ -64,7 +78,7 @@ function InventoryApp() {
         session,
         inspected,
         solo,
-        transferView: Boolean(session.secondary),
+        transferView: Boolean(session.secondary) || trading,
         playerLayout: shell.playerLayout,
         drawerLeft: shell.offsetPx.x > 0,
         movePending: s.movePending,
@@ -75,8 +89,8 @@ function InventoryApp() {
         onClose: s.close,
         onClearSelection: s.clearSelection,
         dragPreview: <DragPreview session={session} />,
-        topbar: <TopBar transfer={Boolean(session.secondary)} query={s.query} onQueryChange={s.setQuery} error={s.error} onClose={s.close} />,
-        playerPanel: <InventoryPanel inventory={session.player} isPlayer query={s.query} {...panelHandlers} />,
+        topbar: <TopBar transfer={Boolean(session.secondary)} trading={trading} query={s.query} onQueryChange={s.setQuery} error={s.error} onClose={s.close} onTrade={tradeButton} />,
+        playerPanel: <InventoryPanel inventory={session.player} isPlayer query={s.query} offered={offered} {...playerHandlers} />,
         // Solo layout starts as the player's inventory alone. Its inspector is a
         // drawer, mounted only after selection, so an idle personal inventory does
         // not reserve a permanently empty actions column.
@@ -84,9 +98,14 @@ function InventoryApp() {
         // The drawer-styled inspector (with its close button) whatever the view,
         // mounted only once something is selected: for layouts that float it.
         drawerInspector: selected ? buildInspector(true) : null,
-        secondaryPanel: session.secondary
+        secondaryPanel: trading
+            ? <TradePanel trade={trade} player={session.player} busy={locked} />
+            : session.secondary
             ? <InventoryPanel inventory={session.secondary} {...panelHandlers} />
             : solo ? null : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>{t("ui.no_secondary_inventory")}</h2><p>{t("ui.open_secondary_inventory")}</p></section>,
+        secondaryView: trading && trade.view
+            ? { kind: "trade", label: t("ui.trade"), count: trade.view.you.offers.length + trade.view.them.offers.length }
+            : undefined,
         shortcutBar: <ShortcutBar movePending={s.movePending} revision={session.revision} />,
         renderQuickSlots: (position) => <QuickSlotBar position={position} state={s.quickSlots} player={session.player} busy={locked} selected={selected} onSelect={s.selectSlot} onActivate={s.activateItem} onPin={s.pinQuick} onFlash={s.flashSlot} />,
     }
