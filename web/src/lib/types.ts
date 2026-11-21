@@ -31,6 +31,12 @@ export interface InventoryItem {
     /** Set by the browser on an item it painted ahead of the server; never sent by it. */
     pending?: boolean
     container?: boolean
+    /** View-only (search): a bag in another player's inventory whose contents were not sent. */
+    closedContainer?: boolean
+    /** View-only (search): the server would let this viewer open the closed bag. */
+    openable?: boolean
+    /** View-only (waterDamage): electronics that stopped working until repaired. */
+    waterDamaged?: boolean
     useable?: boolean
     /** Ms the client runs kora_lib's progress bar for before a use resolves. */
     useTime?: number
@@ -77,7 +83,7 @@ export interface SessionPatch {
 export interface IntentPayload {
     sessionId: string
     token: string
-    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync"
+    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync" | "openTargetContainer"
     payload: Record<string, unknown>
     /** Lets the Lua bridge answer the fetch at once and deliver the verdict as `kora_inventory:nui:intentResult`. */
     requestId?: number

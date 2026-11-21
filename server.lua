@@ -742,7 +742,14 @@ local function applyAmmoInfo(item, def, metadata, settings)
     end
 end
 
-local function viewItems(source)
+-- Another player's pockets are being looked at (search / rob / police): their
+-- portable containers are concealed in that view. The owner's own view and
+-- every non-player inventory are never touched.
+local function searchedBy(inv, viewer)
+    return inv ~= nil and inv.type == 'player' and viewer ~= nil and inv.source ~= nil and inv.source ~= viewer
+end
+
+local function viewItems(source, searched)
     local items = inventory.copy(source or {})
     -- One registry lookup per distinct item name instead of one cross-resource
     -- export call per slot: a move builds several views, and every slot of a
@@ -766,6 +773,10 @@ local function viewItems(source)
         -- Trusted server integrations may attach bookkeeping to durable stock.
         -- It is authority state, not item metadata, and must never reach NUI.
         item.serverData = nil
+        -- View-only fields are always recomputed here, never trusted from a record.
+        item.closedContainer, item.openable, item.waterDamaged = nil, nil, nil
+        local concealed = searched and inventory.containers and inventory.containers.concealForSearch
+            and inventory.containers.concealForSearch(item)
         local def = item and cachedDef(item.name)
         if def then
             item.image = def.image or item.image
@@ -784,21 +795,29 @@ local function viewItems(source)
         item.description = effective.description
 
         appendDisplayMetadata(item.displayMeta, metadata, true)
+        if inventory.waterDamage and inventory.waterDamage.decorate then
+            inventory.waterDamage.decorate(item, metadata)
+        end
         applyAmmoInfo(item, def, metadata, ammoSettings)
         -- Player items can have been created by kora_core or loaded from an older
         -- persisted shape. Weapon type and the live handler table are
         -- authoritative so the UI does not hide their Use action.
         item.useable = (def and (def.type == 'weapon' or def.useable == true)) or hasUseable(item.name)
+        if concealed and item.closedContainer then
+            -- A closed bag has no Use action for the searcher; opening it is the
+            -- separate openTargetContainer intent (item.openable).
+            item.useable, item.container = false, false
+        end
     end
     return items
 end
 
-local function view(inventoryKey)
+local function view(inventoryKey, viewer)
     local inv = getInventory(inventoryKey)
     if not inv then
         return nil
     end
-    local items = viewItems(inv.items)
+    local items = viewItems(inv.items, searchedBy(inv, viewer))
     return {
         id = inv.id,
         key = inv.key,
@@ -813,17 +832,23 @@ local function view(inventoryKey)
     }
 end
 
-local function patchView(inventoryKey)
-    return { key = inventoryKey, revision = revision(inventoryKey), inventory = view(inventoryKey) }
+local function patchView(inventoryKey, viewer)
+    return { key = inventoryKey, revision = revision(inventoryKey), inventory = view(inventoryKey, viewer) }
 end
 
 local function broadcast(inventoryKey)
-    local update
+    -- One patch per kind of viewer: the owner (and every non-player inventory)
+    -- gets the full view, anyone searching a player's pockets the concealed one.
+    local updates, current = {}, nil
     for src, session in pairs(sessions) do
+        if session.primary == inventoryKey or session.secondary == inventoryKey then
+            current = current or getInventory(inventoryKey)
+        end
         if (session.primary == inventoryKey or session.secondary == inventoryKey)
-            and sameDropBucket(src, getInventory(inventoryKey)) then
-            update = update or patchView(inventoryKey)
-            TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, update)
+            and sameDropBucket(src, current) then
+            local variant = searchedBy(current, src) and 'searched' or 'plain'
+            updates[variant] = updates[variant] or patchView(inventoryKey, src)
+            TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, updates[variant])
             -- Legacy qb-inventory dependants listen for this to re-read their
             -- own PlayerData after a change. kora_inventory's own client bridge
             -- treats it as a refresh request, and third-party scripts that only
@@ -1707,8 +1732,12 @@ local function open(src, secondaryKey, opts)
     finishHooks(hookHandle, true)
     local token = ('%s:%d:%d'):format(src, now(), math.random(100000, 999999))
     sessions[src] = { token = token, primary = primary, secondary = secondaryKey, expires = now() + config.sessionTtl }
-    local payload =
-        { token = token, primary = view(primary), secondary = view(secondaryKey), expires = sessions[src].expires }
+    local payload = {
+        token = token,
+        primary = view(primary, src),
+        secondary = view(secondaryKey, src),
+        expires = sessions[src].expires,
+    }
     TriggerClientEvent('kora_inventory:client:sessionOpened', src, payload)
     TriggerEvent('kora_inventory:server:sessionOpened', src, payload)
     return true, payload
@@ -1725,7 +1754,7 @@ local function openSelf(src)
     end
     local token = ('%s:%d:%d'):format(src, now(), math.random(100000, 999999))
     sessions[src] = { token = token, primary = primary, secondary = nil, expires = now() + config.sessionTtl }
-    local payload = { token = token, primary = view(primary), secondary = nil, expires = sessions[src].expires }
+    local payload = { token = token, primary = view(primary, src), secondary = nil, expires = sessions[src].expires }
     TriggerClientEvent('kora_inventory:client:sessionOpened', src, payload)
     TriggerEvent('kora_inventory:server:sessionOpened', src, payload)
     return true, payload
@@ -2558,11 +2587,63 @@ local function intentSync(src, request)
         return true
     end
     session.lastSync = stamp
-    TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, patchView(session.primary))
+    TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, patchView(session.primary, src))
     if session.secondary then
-        TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, patchView(session.secondary))
+        TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, patchView(session.secondary, src))
     end
     return true
+end
+
+-- Searcher opens a bag in the inventory of the player they are searching.
+-- The payload carries ONLY `{ inventory, slot }`: the inventory must be the
+-- secondary granted to this session, and everything else (the target player,
+-- the real item in that slot, that it is a configured portable container
+-- bound to that player, range, bucket and search policy) is resolved here and
+-- in containers.openForSearcher. A container id, owner, target or item record
+-- in the payload is refused, never read.
+local function intentOpenTargetContainer(src, request)
+    local session, payload = sessions[src], request.payload
+    if not session or type(payload) ~= 'table' then
+        return false, 'invalid session action'
+    end
+    for field in pairs(payload) do
+        if field ~= 'inventory' and field ~= 'slot' then
+            return false, 'invalid request'
+        end
+    end
+    local containerApi = inventory.containers
+    if not containerApi or not containerApi.openForSearcher then
+        return false, 'containers unavailable'
+    end
+    if type(config.search) ~= 'table' or config.search.openContainers ~= true then
+        return false, 'opening containers is disabled'
+    end
+    if not session.secondary or payload.inventory ~= session.secondary then
+        return false, 'inventory not in session'
+    end
+    -- Exactly the checks a move out of this inventory gets: lease, cuffed /
+    -- downed, access, both revisions.
+    local _, target, primary = validSession(
+        src, request.token, session.secondary, session.primary, request.secondaryRevision, request.primaryRevision
+    )
+    if not target then
+        return false, primary
+    end
+    if target.type ~= 'player' or not target.source or target.source == src then
+        return false, 'not a searched player inventory'
+    end
+    local slot = math.floor(tonumber(payload.slot) or 0)
+    if slot < 1 or slot > target.slots or not target.items[slot] then
+        return false, 'invalid item slot'
+    end
+    local itemName, targetSrc = target.items[slot].name, target.source
+    local ok, result = containerApi.openForSearcher(src, targetSrc, slot)
+    if not ok then
+        return false, result
+    end
+    recordAudit('search-open-container', src, { target = targetSrc, item = itemName, slot = slot })
+    TriggerEvent('kora_inventory:server:searchedContainer', src, targetSrc, itemName)
+    return true, { preventClose = true }
 end
 
 local function handleIntent(src, request)
@@ -2583,6 +2664,9 @@ local function handleIntent(src, request)
     end
     if request.action == 'sync' then
         return intentSync(src, request)
+    end
+    if request.action == 'openTargetContainer' then
+        return intentOpenTargetContainer(src, request)
     end
     return false, 'unsupported intent'
 end
@@ -3090,6 +3174,10 @@ useItem = function(src, slotOrName)
         notifyCuffedBlocked(src)
         return false, 'you cannot use items while cuffed'
     end
+    -- Water damaged electronics stay unusable until repaired (waterDamage config).
+    if inventory.waterDamage and inventory.waterDamage.blocksUse(src, item) then
+        return false, 'this item is water damaged'
+    end
     local allowed, err, useHandle = runHooks('usingItem', src, {
         itemName = item.name,
         item = oxSlot(item, type(slotOrName) == 'number' and slotOrName or item.slot),
@@ -3116,6 +3204,13 @@ useItem = function(src, slotOrName)
             return true
         end
         return false, result
+    end
+    -- The repair item clears a water damaged item instead of running its own
+    -- handler, but only while something is actually damaged; otherwise it falls
+    -- through and behaves as it always did.
+    if inventory.waterDamage and inventory.waterDamage.tryRepair(src, item) then
+        TriggerEvent('kora_inventory:server:usedItem', src, item.name, item)
+        return true
     end
     local handler = useables[item.name] or builtInUseables[item.name]
     if handler then

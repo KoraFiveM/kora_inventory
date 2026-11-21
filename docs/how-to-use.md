@@ -160,6 +160,12 @@ To pin an item to a quick slot, drag it from your inventory onto the tile. Right
 
 Set `Config.kora_inventory.ui.rightClick` to choose what right-click does on an item: `split` (the default) opens the split dialog, `menu` opens a context menu with Use, Split, Drop, Give, Ammo info and Copy as they apply, and `none` does nothing. While a weapon is selected the matching ammo is outlined, and while ammo is selected the weapons that take it are outlined. See [NUI contract](./api/nui.md) for details.
 
+## Searching a player and water damage
+
+When you search another player (police or admin tools that grant `playerInspection`), their bags and backpacks appear as closed bags with a padlock and "Closed". Nothing about what is inside is shown. If `search.openContainers` is on, select the bag and press Open bag (or choose Open in the right-click menu); after the progress bar the bag opens. Closing it takes you back to the player's inventory. Turn `search.hideContainerContents` off to show bags like any other item.
+
+With `waterDamage.enabled` on, swimming can ruin the phone, iPhone, Samsung phone and radio in your pockets (not the ones in a bag). A damaged item shows a droplet badge and a "Condition: Water damaged" row, and cannot be used. Use an electronic kit to repair one; it takes one kit per item.
+
 ## Failure results and what they mean
 
 Most server functions return `ok, reason`. The reason is a short string; branch on `ok`, not on the text, except for the vocabularies called out in the compat modules.

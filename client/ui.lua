@@ -23,6 +23,8 @@ local allowedIntents = {
     sync = true,
     split = true,
     action = true,
+    -- Search: open a bag in the searched player's inventory (inventory + slot only).
+    openTargetContainer = true,
 }
 
 local function send(action, data)
@@ -60,6 +62,7 @@ local UI_LOCALE_KEYS = {
     'quick_slot_unpin', 'quick_slot_pin_failed', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
     'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
     'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type',
+    'closed_bag', 'closed', 'open_bag', 'water_damaged',
 }
 
 local function pushLocales()
@@ -573,7 +576,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
             delivered = true
             send('kora_inventory:nui:intentResult', { requestId = requestId, ok = ok == true, error = ok and nil or err })
         end
-        if data.intent ~= 'use' then
+        if data.intent ~= 'use' and data.intent ~= 'openTargetContainer' then
             SetTimeout(moveTimeoutMs(), function()
                 deliver(false, 'timeout')
             end)
@@ -612,7 +615,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
         answered = true
         cb(result)
     end
-    if data.intent ~= 'use' then
+    if data.intent ~= 'use' and data.intent ~= 'openTargetContainer' then
         SetTimeout(moveTimeoutMs(), function()
             reply({ ok = false, error = 'timeout' })
         end)

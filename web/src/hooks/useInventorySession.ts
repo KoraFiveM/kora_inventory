@@ -16,6 +16,7 @@ import { modifierDragAmount } from "@/lib/modifierDrag"
 import { pickTransferSlot } from "@/lib/quickTransfer"
 import { copyText, itemCopyText } from "@/lib/clipboard"
 import { clampGiveAmount } from "@/lib/giveAmount"
+import { canOpenBag, openBagPayload } from "@/lib/search"
 import { isAmmoCompatible, mergeAmmoInfo, resolveRightClick } from "@/lib/ammo"
 import { EMPTY_QUICK_SLOTS, normalizeQuickSlots, type QuickSlotsState } from "@/lib/quickSlots"
 import type { SlotUi } from "@/slotUi"
@@ -244,7 +245,7 @@ export function useInventorySession() {
                     setError(message)
                 },
                 // Use can legitimately run long (progress bar), everything else gets a deadline.
-                timeoutMs: intent === "use" ? undefined : config.moveTimeoutMs,
+                timeoutMs: intent === "use" || intent === "openTargetContainer" ? undefined : config.moveTimeoutMs,
                 // The server sends its patches before it answers, so with queued
                 // moves the answer alone settles; waiting for a patch as well would
                 // hold every later drag behind an inventory the server did not re-send.
@@ -393,6 +394,12 @@ export function useInventorySession() {
         if (inventory.id !== session?.player.id) { setError(t("ui.use_player_item_only")); return }
         void submit("use", { inventory: inventory.id, slot: item.slot })
     }, [session, submit, t])
+    // Search: open a bag in the searched player's inventory. Only the inventory id
+    // and slot are sent; it may wait on the searcher's progress bar, so no deadline.
+    const openBag = useCallback((inventory: InventoryView, item: InventoryItem) => {
+        if (!session || !canOpenBag(inventory, item, session.player.id)) return
+        void submit("openTargetContainer", openBagPayload(inventory, item))
+    }, [session, submit])
     const buy = useCallback((inventory: InventoryView, item: InventoryItem, amount = 1) => {
         if (inventory.type !== "shop" || !session) return
         const stock = Math.max(1, Math.floor(item.amount))
@@ -408,8 +415,9 @@ export function useInventorySession() {
     // otherwise), rather than each re-deciding it themselves.
     const activateItem = useCallback((inventory: InventoryView, item: InventoryItem) => {
         if (inventory.type === "shop") buy(inventory, item)
+        else if (session && canOpenBag(inventory, item, session.player.id)) openBag(inventory, item)
         else use(inventory, item)
-    }, [buy, use])
+    }, [buy, openBag, session, use])
     const openMenu = useCallback((point: { x: number; y: number }, inventory: InventoryView, item: InventoryItem) => {
         if (locked) return
         setMenu({ ...point, inventory, item })
@@ -503,6 +511,6 @@ export function useInventorySession() {
         selectedMax, selectedCount, setSelectedAmount, copyState, copySelected,
         splitTarget, confirmSplit, cancelSplit: () => setSplitTarget(undefined),
         canDropSlot, dropSlot, dropOut, quickTransfer, selectSlot, promptSplit, activateItem,
-        split, use, buy, submit, close, clearSelection: () => setSelected(undefined),
+        split, use, openBag, buy, submit, close, clearSelection: () => setSelected(undefined),
     }
 }

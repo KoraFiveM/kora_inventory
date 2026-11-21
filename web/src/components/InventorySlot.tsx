@@ -1,7 +1,9 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { Droplets, Lock } from "lucide-react"
 import { useDrag, useDragDropManager, useDrop } from "react-dnd"
 import { UiConfigContext } from "@/context"
 import { useLocale } from "@/lib/locales"
+import { isClosedBag, isWaterDamaged } from "@/lib/search"
 import { SlotUiContext } from "@/slotUi"
 import type { DragSlot, SlotTarget } from "@/lib/inventory"
 import type { InventoryItem, InventoryView } from "@/lib/types"
@@ -80,6 +82,9 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
         inventory.type === "shop" && "slot-priced",
         // Painted ahead of the server and not confirmed yet: dimmed until its patch lands.
         item?.pending && "slot-pending",
+        // Search: a bag in another player's pockets, contents not sent / water damaged electronics.
+        isClosedBag(item) && "slot-closed-bag",
+        isWaterDamaged(item) && "slot-water-damaged",
         // Accent outline on the hotbar range. `hotbar` is decided by the panel,
         // not here: the range only means anything on the player's own
         // inventory, and a stash's first five slots are not bound to anything.
@@ -159,6 +164,8 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
                 {inventory.type === "shop" && typeof item.price === "number" && <span className="item-price">${item.price.toLocaleString()}</span>}
             </span>
             <span className="item-amount">×{item.amount}</span>
+            {isClosedBag(item) && <span className="closed-bag-overlay" role="img" aria-label={t("ui.closed_bag")} title={t("ui.closed_bag")}><Lock size={14} aria-hidden /><em>{t("ui.closed")}</em></span>}
+            {isWaterDamaged(item) && <span className="water-badge" role="img" aria-label={t("ui.water_damaged")} title={t("ui.water_damaged")}><Droplets size={11} aria-hidden /></span>}
             {typeof item.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, item.durability))}%` }} /></span>}
         </>}
         {tip && item && !isDragging && <SlotTooltip item={item} x={tip.x} y={tip.y} decimals={inspectorDecimals} />}

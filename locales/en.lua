@@ -22,6 +22,13 @@ return {
         ammo_rounds = 'Rounds',
         ammo_fits = 'Fits',
         ammo_more = '+%{count} more',
+        opening_bag = 'Opening bag...',
+        water_damaged_use = 'This item is water damaged.',
+        water_damaged_item = 'Your %{item} got wet and stopped working.',
+        water_ruined_item = 'Your %{item} was ruined by the water.',
+        water_repaired = 'You repaired your %{item}.',
+        water_damaged_label = 'Condition',
+        water_damaged_value = 'Water damaged',
     },
     vehicle_doors = {
         title = 'Vehicle',
@@ -147,5 +154,9 @@ return {
         ammo_rounds_per_item = 'Rounds per item',
         ammo_fits = 'Fits',
         ammo_type = 'Type',
+        closed_bag = 'Closed bag — open to search',
+        closed = 'Closed',
+        open_bag = 'Open bag',
+        water_damaged = 'Water damaged',
     },
 }

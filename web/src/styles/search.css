@@ -1,0 +1,17 @@
+/* Searching another player's inventory (closed bags) and water damaged items.
+   kora_theme tokens only. */
+.slot-closed-bag .item-art { opacity: .55; filter: saturate(.5); }
+.closed-bag-overlay {
+    position: absolute; inset: 0; z-index: 2;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    border-radius: inherit; background: hsl(var(--background) / .55);
+    color: hsl(var(--foreground)); pointer-events: none;
+}
+.closed-bag-overlay em { font-style: normal; font-size: calc(9px * var(--ui-scale, 1)); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.water-badge {
+    position: absolute; top: 3px; right: 3px; z-index: 2;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border: 1px solid hsl(var(--brand-border)); border-radius: 999px;
+    background: hsl(var(--brand-soft)); color: hsl(var(--primary)); pointer-events: none;
+}
+.slot-water-damaged .item-art { filter: saturate(.6); }
