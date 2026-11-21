@@ -202,8 +202,9 @@ end
 -- FXServer's exports boundary hands a cross-resource function argument back as
 -- a table with a __call metamethod, not a plain Lua function -- so a bare
 -- type(x) == 'function' check rejects a perfectly callable handler registered
--- from another resource. Mirrors kora_lib/local/events/server.lua:47 and
--- kora_core/modules/registry/shared.lua:116 (RI.isCallable).
+-- from another resource. Mirrors kora_lib/compat/provider.lua:4
+-- (Kora.compat.isCallable) and kora_core/modules/registry/shared.lua:87
+-- (RI.isCallable).
 function inventory.isCallable(value)
     if type(value) == 'function' then
         return true
