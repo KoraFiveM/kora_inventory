@@ -407,12 +407,10 @@ function weapons.prepareMetadata(name, metadata)
     end
     local components, err = normaliseComponents(name, info.components)
     if not components then
-        -- Existing/migrated weapons with no component data are valid. Any
-        -- supplied components must be explicitly configured.
-        if info.components ~= nil then
-            return nil, err
-        end
-        components = {}
+        -- Existing/migrated weapons with no component data are valid (they
+        -- normalise to {}). Any supplied components must be explicitly
+        -- configured.
+        return nil, err
     end
     info.components = components
     if weapon.unique == false then
@@ -511,11 +509,11 @@ end
 
 local function planCraft(src, recipe, amount, preserveMetadata)
     local primary = internal.playerKey(src)
-    local key, inventory = internal.resolveInventory(primary)
-    if key ~= primary or not inventory then
+    local key, inv = internal.resolveInventory(primary)
+    if key ~= primary or not inv then
         return nil, 'player inventory not found'
     end
-    local planned = copy(inventory.items)
+    local planned = copy(inv.items)
     for _, ingredient in ipairs(recipe.ingredients) do
         local removed, removeErr = consume(planned, scaledEntry(ingredient, amount))
         if not removed then
@@ -523,12 +521,12 @@ local function planCraft(src, recipe, amount, preserveMetadata)
         end
     end
     for _, output in ipairs(recipe.outputs) do
-        local inserted, insertErr = insertOutput(planned, inventory.slots, scaledEntry(output, amount), preserveMetadata)
+        local inserted, insertErr = insertOutput(planned, inv.slots, scaledEntry(output, amount), preserveMetadata)
         if not inserted then
             return nil, insertErr
         end
     end
-    if internal.totalWeight(planned) > inventory.maxWeight then
+    if internal.totalWeight(planned) > inv.maxWeight then
         return nil, 'over weight'
     end
     return planned, nil, primary

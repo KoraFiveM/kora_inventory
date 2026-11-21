@@ -147,6 +147,7 @@ KoraInventory.waterDamage = {
 KoraInventory.internal.auditAdd = function(action, src, key, name, amount, reason)
     creations[#creations + 1] = { action = action, src = src, key = key, name = name, amount = amount, reason = reason }
 end
+dofile('shared.lua')
 dofile('server/combine.lua')
 local combine = KoraInventory.combine
 
