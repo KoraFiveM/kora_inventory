@@ -40,7 +40,7 @@ end
 -- Item-creating exports record WHO called them for the audit log: the invoking
 -- resource is captured here, at the export boundary (server/audit_log.lua).
 local auditLog = inventory.auditLog
-local audited = { AddItem = true, RemoveItem = true, SetInventory = true, BuyItem = true }
+local audited = { AddItem = true, RemoveItem = true, SetInventory = true }
 
 local function register(identity, surface)
     for name, fn in pairs(surface) do

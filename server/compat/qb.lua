@@ -516,8 +516,7 @@ end
 -- separate from kora_inventory's own flat export table. That separation is what
 -- lets GetInventory and CanAddItem keep their upstream qb-inventory return
 -- shapes here while server.lua's native exports of the same names keep theirs.
--- (An earlier version of this file did call exports() and silently overwrote
--- the native ones; test/smoke/export_collisions.lua guards that regression.)
+-- test/smoke/export_collisions.lua guards that separation.
 local api = {
     GetSlotsByItem = slotsByItem,
     GetFirstSlotByItem = firstSlotByItem,
@@ -618,7 +617,7 @@ api.OpenInventoryById = function(source, target)
     if not target or not playerSource(target) then
         return false, 'player not found'
     end
-    return inventory.internal.open(source, 'player:' .. target)
+    return internal.open(source, 'player:' .. target)
 end
 
 ---Upstream: CreateShop(shopData) -- ONE table. `shopData.name` names the shop;
