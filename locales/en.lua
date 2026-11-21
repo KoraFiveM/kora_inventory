@@ -16,6 +16,12 @@ return {
         keybind_hotbar = 'Use hotbar item %{slot}',
         keybind_hotbar_show = 'Show hotbar',
         give_selected = 'Give selected item',
+        ammo_takes = 'Takes',
+        ammo_loaded = 'Loaded',
+        ammo_loaded_value = '%{count} rounds',
+        ammo_rounds = 'Rounds',
+        ammo_fits = 'Fits',
+        ammo_more = '+%{count} more',
     },
     vehicle_doors = {
         title = 'Vehicle',

@@ -95,8 +95,20 @@ end
 
 local function pushConfig()
     local ui = Config.kora_inventory.ui or {}
+    local ammoInfo = (Config.kora_inventory.weapons or {}).ammoInfo or {}
+    local where = ammoInfo.where
+    if where ~= 'inspector' and where ~= 'menu' then
+        where = 'both'
+    end
 
     send('kora_inventory:nui:config', {
+        -- Presentation hint only; the server decides which fields exist on items.
+        ammoInfo = {
+            enabled = ammoInfo.enabled ~= false,
+            where = where,
+            showLoaded = ammoInfo.showLoaded ~= false,
+            showCompatible = ammoInfo.showCompatible ~= false,
+        },
         hotbarSlots = Config.kora_inventory.hotbarSlots,
         centreWhenSolo = ui.centreWhenSolo ~= false,
         showHotbar = ui.showHotbar ~= false,

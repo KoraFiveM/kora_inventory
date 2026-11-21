@@ -614,6 +614,134 @@ local function appendDisplayMetadata(displayed, metadata, topLevel)
     end
 end
 
+-- Ammo info (view only). Everything here is derived server-side from kora_core's
+-- definitions and the item's own metadata; no client value is ever read.
+--
+-- Item definitions themselves are never cached (they are resolved through
+-- itemDef per use). The only retained structure is an ammotype -> sorted weapon
+-- label index. It is a derived projection of the weapons registry, rebuilt from
+-- scratch whenever kora_core reports a weapons/items change.
+local ammoFitIndex
+local ammoFitSubscribed = false
+local AMMO_FIT_CAP = 12
+
+local function invalidateAmmoFitIndex()
+    ammoFitIndex = nil
+end
+
+local function buildAmmoFitIndex()
+    if not ammoFitSubscribed then
+        ammoFitSubscribed = true
+        -- Guarded: a registry without change notifications just never invalidates
+        -- early; it is still rebuilt on restart.
+        pcall(function()
+            exports.kora_core:onSharedChange('weapons', invalidateAmmoFitIndex)
+            exports.kora_core:onSharedChange('items', invalidateAmmoFitIndex)
+        end)
+    end
+    local index = {}
+    local ok, defs = pcall(function() return exports.kora_core:allShared('weapons') end)
+    for _, def in ipairs(ok and type(defs) == 'table' and defs or {}) do
+        if type(def) == 'table' and type(def.ammotype) == 'string' and def.ammotype ~= '' then
+            local list = index[def.ammotype] or {}
+            index[def.ammotype] = list
+            list[#list + 1] = tostring(def.label or def.name or def.ammotype)
+        end
+    end
+    for _, list in pairs(index) do
+        table.sort(list)
+    end
+    return index
+end
+
+local function ammoInfoConfig()
+    local cfg = (config.weapons or {}).ammoInfo
+    if type(cfg) ~= 'table' then
+        cfg = {}
+    end
+    if cfg.enabled == false then
+        return nil
+    end
+    local where = cfg.where
+    if where ~= 'inspector' and where ~= 'menu' then
+        where = 'both'
+    end
+    return {
+        where = where,
+        showLoaded = cfg.showLoaded ~= false,
+        showCompatible = cfg.showCompatible ~= false,
+    }
+end
+
+local function ammoFits(ammoType)
+    ammoFitIndex = ammoFitIndex or buildAmmoFitIndex()
+    local list = ammoFitIndex[ammoType]
+    if not list then
+        return nil
+    end
+    local out = {}
+    for i = 1, math.min(#list, AMMO_FIT_CAP) do
+        out[i] = list[i]
+    end
+    if #list > AMMO_FIT_CAP then
+        out[#out + 1] = inventory.text('inventory.ammo_more', ('+%d more'):format(#list - AMMO_FIT_CAP),
+            { count = #list - AMMO_FIT_CAP })
+    end
+    return out
+end
+
+local function loadedRounds(metadata)
+    if type(metadata.loadedBullets) == 'table' and #metadata.loadedBullets > 0 then
+        return #metadata.loadedBullets
+    end
+    return math.max(0, math.floor(tonumber(metadata.ammo) or 0))
+end
+
+local function applyAmmoInfo(item, def, metadata, settings)
+    -- Never trust anything already on the record: these are view-only fields.
+    item.ammo, item.ammoType, item.rounds, item.fits = nil, nil, nil, nil
+    if not settings or type(def) ~= 'table' then
+        return
+    end
+    local inspector = settings.where ~= 'menu'
+    local function row(key, labelKey, fallback, value)
+        item.displayMeta[#item.displayMeta + 1] = {
+            key = key, label = inventory.text(labelKey, fallback), value = value,
+        }
+    end
+    if type(def.ammotype) == 'string' and def.ammotype ~= '' then
+        local ammoDef = type(def.ammoItem) == 'string' and itemDef(def.ammoItem) or nil
+        local info = {
+            type = def.ammotype,
+            item = def.ammoItem,
+            label = tostring(ammoDef and ammoDef.label or def.ammoItem or def.ammotype),
+        }
+        if settings.showLoaded then
+            info.loaded = loadedRounds(metadata)
+        end
+        item.ammo = info
+        if inspector then
+            row('ammoTakes', 'inventory.ammo_takes', 'Takes', info.label)
+            if info.loaded then
+                row('ammoLoaded', 'inventory.ammo_loaded', 'Loaded', inventory.text('inventory.ammo_loaded_value',
+                    ('%d rounds'):format(info.loaded), { count = info.loaded }))
+            end
+        end
+    elseif type(def.ammoType) == 'string' and def.ammoType ~= '' and (tonumber(def.rounds) or 0) > 0 then
+        item.ammoType = def.ammoType
+        item.rounds = math.floor(tonumber(def.rounds))
+        if inspector then
+            row('ammoRounds', 'inventory.ammo_rounds', 'Rounds', item.rounds)
+        end
+        if settings.showCompatible then
+            item.fits = ammoFits(def.ammoType)
+            if item.fits and inspector then
+                row('ammoFits', 'inventory.ammo_fits', 'Fits', table.concat(item.fits, ', '))
+            end
+        end
+    end
+end
+
 local function viewItems(source)
     local items = inventory.copy(source or {})
     -- One registry lookup per distinct item name instead of one cross-resource
@@ -633,6 +761,7 @@ local function viewItems(source)
     end
     -- Older player records may predate the definition image filename. Resolve
     -- it from the current core registry at render time without a migration.
+    local ammoSettings = ammoInfoConfig()
     for _, item in pairs(items) do
         -- Trusted server integrations may attach bookkeeping to durable stock.
         -- It is authority state, not item metadata, and must never reach NUI.
@@ -655,6 +784,7 @@ local function viewItems(source)
         item.description = effective.description
 
         appendDisplayMetadata(item.displayMeta, metadata, true)
+        applyAmmoInfo(item, def, metadata, ammoSettings)
         -- Player items can have been created by kora_core or loaded from an older
         -- persisted shape. Weapon type and the live handler table are
         -- authoritative so the UI does not hide their Use action.
