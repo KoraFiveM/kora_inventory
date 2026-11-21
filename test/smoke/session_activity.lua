@@ -27,9 +27,10 @@ local framework = {
     callback = { register = function(name, fn) callbacks[name] = fn end },
     compat = { provideExport = function() end },
     sql = {},
+    util = { deepClone = dofile('test/deep_clone.lua') },
     distance = { player = function() return true end },
 }
-env.Kora, env.Kora = framework, framework
+env.Kora = framework
 env.GetCurrentResourceName = function() return 'kora_inventory' end
 env.GetInvokingResource = function() return nil end
 env.CreateThread, env.RegisterCommand = function() end, function() end
@@ -156,6 +157,6 @@ local function read(path) local f = assert(io.open(path, 'r')); local s = f:read
 H.ok(read('client/ui.lua'):find('sync = true,', 1, true), 'the NUI bridge allows the sync intent')
 local client = read('client.lua')
 H.ok(client:find("action == 'sync'", 1, true), 'the client transport forwards the sync intent to the server')
-H.ok(select(2, client:gsub("result or 'inventory request failed'", '')) == 2, 'both transport paths give a rejection a reason when the callback returns none')
+H.ok(select(2, client:gsub("result or 'inventory request failed'", '')) == 3, 'all three transport paths (intent, openTargetContainer, transfer) give a rejection a reason when the callback returns none')
 
 H.finish()

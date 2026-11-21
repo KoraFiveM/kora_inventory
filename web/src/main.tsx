@@ -2,6 +2,7 @@ import React from "react"
 import ReactDOM from "react-dom/client"
 import App from "./App"
 import { LocaleProvider } from "./lib/locales"
+import { rootScale } from "./lib/playerLayout"
 import "./styles.css"
 import "./styles/qol.css"
 import "./styles/layouts.css"
@@ -18,7 +19,7 @@ import "./lib/fft"
 
 const scaleNui = () => {
     const root = document.getElementById("root")!
-    const scale = Math.min(2, Math.max(0.5, Math.min(window.innerWidth / 1920, window.innerHeight / 1080)))
+    const scale = rootScale()
     root.style.width = `${window.innerWidth / scale}px`
     root.style.height = `${window.innerHeight / scale}px`
     root.style.transform = `scale(${scale})`

@@ -27,6 +27,7 @@ local manifest = read('fxmanifest.lua')
 -- Comment lines inside these blocks contain apostrophes ("client.lua's
 -- validated transport"), which a bare '([^']+)' scan happily reads as quoted
 -- paths. Skip comment lines before extracting.
+local expandGlobs = dofile('test/manifest_glob.lua')
 local function pathsFrom(block)
     local paths = {}
     for line in block:gmatch('[^\n]+') do
@@ -34,7 +35,8 @@ local function pathsFrom(block)
             for path in line:gmatch("'([^']+)'") do paths[#paths + 1] = path end
         end
     end
-    return paths
+    -- fxmanifest.lua entries may be globs (config/schema/*.lua); FXServer expands them.
+    return expandGlobs(paths)
 end
 
 local block = assert(manifest:match('server_scripts%s*{(.-)\n}'), 'fxmanifest.lua must declare server_scripts')
@@ -112,8 +114,11 @@ local exportsProxy = setmetatable({}, {
 exports = exportsProxy
 
 for _, path in ipairs(serverScripts) do
-    currentFile = path
-    dofile(path)
+    -- '@kora_sql/init.lua' is another resource; its Kora surface is mocked above.
+    if path:sub(1, 1) ~= '@' then
+        currentFile = path
+        dofile(path)
+    end
 end
 
 local collisions = {}
@@ -169,7 +174,19 @@ for _, pair in ipairs({
     H.ok(lowerEntries ~= nil, 'export ' .. lower .. ' is registered')
     H.ok(upperEntries ~= nil, 'export ' .. upper .. ' is registered')
     if lowerEntries and upperEntries then
-        H.ok(lowerEntries[#lowerEntries].fn == upperEntries[#upperEntries].fn,
+        -- Since 0917908 the item-creating exports (addItem/removeItem/...) are each
+        -- wrapped by auditLog.wrapExport, so the two spellings are distinct closures
+        -- around one function. Compare what they wrap, not the wrappers.
+        local function unwrap(fn)
+            for index = 1, 255 do
+                local name, value = debug.getupvalue(fn, index)
+                if name == nil then break end
+                if name == 'fn' and type(value) == 'function' then return value end
+            end
+            return fn
+        end
+        local lowerFn, upperFn = lowerEntries[#lowerEntries].fn, upperEntries[#upperEntries].fn
+        H.ok(lowerFn == upperFn or unwrap(lowerFn) == unwrap(upperFn),
             'export ' .. pair .. ' resolve to the same function')
     end
 end

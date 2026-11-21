@@ -8,7 +8,7 @@ local function setup()
     local f = { calls = {}, threads = {} }
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
-    env.Config, env.KoraInventory, env.Kora = {}, nil, {}
+    env.Config, env.KoraInventory, env.Kora = {}, nil, { util = { deepClone = dofile('test/deep_clone.lua') }, logging = dofile('test/logging_spy.lua').logging }
     env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.CreateThread = function(fn) f.threads[#f.threads + 1] = fn end
     env.RegisterCommand, env.AddEventHandler, env.TriggerEvent = function() end, function() end, function() end

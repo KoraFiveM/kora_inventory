@@ -1,14 +1,15 @@
 -- ox_inventory server-export compatibility adapter.
 --
 -- This file deliberately does not register any exports or provide an
--- `ox_inventory` identity. server.lua owns the authority and decides when the
--- compatibility contract is complete enough to expose. Keeping this adapter
--- as a table also makes it safe to load alongside native kora_inventory callers.
+-- `ox_inventory` identity. It builds a table which server/compat/providers.lua
+-- publishes under the `ox_inventory` identity. Keeping this adapter as a table
+-- also makes it safe to load alongside native kora_inventory callers.
 --
--- Required trusted seam (provided by server.lua):
+-- Trusted seam used (provided by server.lua):
 --   KoraInventory.internal.resolveInventory(reference, preferredType)
 --   KoraInventory.internal.{lock,setInventoryItems,canAdd,addTo,removeFrom}
---   KoraInventory.internal.{itemDef,bump,broadcast,totalWeight,config}
+--   KoraInventory.internal.{itemDef,itemWeight,totalWeight,copy,key,playerKey}
+--   KoraInventory.internal.{bump,broadcast,createItemHook,auditAdd}
 --   KoraInventory.internal.{createSecondary,removeSecondary,rekeySecondary,open}
 -- Never call any of these from a client event. In particular, setInventoryItems
 -- preserves kora_core as the only writer of player PlayerData.items.
@@ -19,16 +20,11 @@
 -- at the point of divergence -- an undocumented difference here is a silent
 -- misbehaviour in every third-party resource written against upstream.
 
-KoraInventory = KoraInventory or {}
-KoraInventory.compat = KoraInventory.compat or {}
-
 local inventory = KoraInventory
 local core = assert(inventory.internal, 'kora_inventory ox adapter loaded before server authority')
 local ox = {}
 
-local function copy(value)
-    return core.copy(value)
-end
+local copy = core.copy
 
 local function countOf(item)
     return math.floor(tonumber(item and (item.amount or item.count)) or 0)
@@ -73,10 +69,10 @@ end
 
 -- Upstream picks its comparator as `strict and table.matches or table.contains`,
 -- so a nil/false `strict` means PARTIAL matching -- the requested metadata only
--- has to be a subset of the slot's. Defaulting to strict here (as this adapter
--- used to) made every unqualified GetSlotWithItem/GetItemCount/Search call miss
--- slots that carry extra metadata, which is nearly all of them. `strict` is
--- therefore taken exactly as given; the two exports that DO default to strict
+-- has to be a subset of the slot's. Defaulting to strict would make every
+-- unqualified GetSlotWithItem/GetItemCount/Search call miss slots that carry
+-- extra metadata, which is nearly all of them. `strict` is therefore taken
+-- exactly as given; the two exports that DO default to strict
 -- upstream (GetItemSlots, RemoveItem) apply that default themselves.
 local function metadataMatches(actual, metadata, strict)
     metadata = normaliseMetadata(metadata)
@@ -89,10 +85,7 @@ local function metadataMatches(actual, metadata, strict)
     return contains(actual or {}, metadata)
 end
 
-local function resolve(reference, preferredType)
-    local key, inv = core.resolveInventory(reference, preferredType)
-    return key, inv
-end
+local resolve = core.resolveInventory
 
 -- Upstream resolves the requested name through the item registry first and
 -- returns nil outright when it is unknown, then matches slots against the
@@ -700,7 +693,7 @@ end
 -- Three return values upstream: a slot-id-keyed MAP OF COUNTS ({ [3] = 5 }),
 -- the total across those slots, and the inventory's remaining empty slots.
 -- Callers index it by slot id and read `totalCount`; an array of item tables
--- (what this used to return) silently reads as empty for both.
+-- would silently read as empty for both.
 -- One of only two exports that default to strict metadata matching.
 function ox.GetItemSlots(reference, item, metadata, strict)
     local _, inv = resolve(reference)
@@ -730,7 +723,7 @@ end
 -- missing one from `metadata.size` = { slots, maxWeight }. kora_inventory's own
 -- container domain writes `info.containerId`, so both spellings are accepted.
 function ox.GetContainerFromSlot(reference, slot)
-    local key, inv = resolve(reference)
+    local _, inv = resolve(reference)
     slot = math.floor(tonumber(slot) or 0)
     if not inv or slot < 1 then
         return nil
@@ -842,9 +835,7 @@ function ox.SwapSlots(fromInventory, toInventory, slot1, slot2)
 end
 
 -- Real weight arithmetic, as upstream: could this inventory hold `testCount` of
--- `testItem` if `firstCount` of `firstItem` left it? The previous "advisory"
--- stub returned true for any resolvable inventory and two non-nil names, which
--- is not advisory -- it is an unconditional yes that callers acted on.
+-- `testItem` if `firstCount` of `firstItem` left it?
 function ox.CanSwapItem(reference, firstItem, firstCount, testItem, testCount)
     local _, inv = resolve(reference)
     if not inv then
@@ -966,7 +957,7 @@ function ox.CustomDrop(prefix, items, coords, slots, maxWeight, instance, model)
 end
 
 -- Upstream copies the player's items into the drop AND THEN clears the player,
--- returning the drop id. Skipping the clear (as this used to) leaves the same
+-- returning the drop id. Skipping the clear would leave the same
 -- items in both inventories -- a duplication bug, not a cosmetic one. The clear
 -- runs inside the SAME lock as the copy so nothing can be added in between.
 function ox.CreateDropFromPlayer(playerId)
@@ -1070,9 +1061,8 @@ function ox.UpdateVehicle(oldPlate, newPlate)
     end
 end
 
--- Upstream is InspectInventory(playerId, invId): the VIEWER comes FIRST. The
--- old (target, source) order here inverted every upstream call site, opening
--- the inspected player's panel on the inspector instead. Returns nothing.
+-- Upstream is InspectInventory(playerId, invId): the VIEWER comes FIRST.
+-- Returns nothing.
 function ox.InspectInventory(playerId, invId)
     playerId = tonumber(playerId)
     if not playerId then
@@ -1287,5 +1277,6 @@ function ox.giveCard(...)
     return false
 end
 
+inventory.compat = inventory.compat or {}
 inventory.compat.ox = ox
 return ox

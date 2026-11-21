@@ -1,9 +1,9 @@
 -- Item-creation audit log.
 --
 -- Purpose: tell admins WHICH script created WHICH items, so duplication and
--- badly written scripts can be found. server.lua calls `auditLog.record` from
--- every place an item is created (never for transfers between inventories),
--- and server/admin_tools.lua serves the /invaudit viewer from `auditLog.query`.
+-- badly written scripts can be found. Every place an item is created (never a
+-- transfer between inventories) goes through `internal.auditAdd` (server.lua),
+-- which calls `auditLog.record`; server/admin_tools.lua serves the /invaudit viewer from `auditLog.query`.
 --
 -- Design rules:
 --   * Recording never waits on SQL. Entries go to an in-memory ring and a
@@ -27,8 +27,6 @@ local PAGE_SIZE = 100
 local QUEUE_CAP = 5000 -- rows held while the database is unavailable
 local PRUNE_INTERVAL = 3600
 local RANGES = { ['1h'] = 3600, ['24h'] = 86400, ['7d'] = 604800 }
-auditLog.PAGE_SIZE = PAGE_SIZE
-auditLog.RANGES = RANGES
 
 -- Overridable for tests.
 auditLog.clock = os.time

@@ -138,15 +138,12 @@ local function stopTrunkAnimation()
     -- Only shut a door this script opened; never one the player or another
     -- script already had open.
     if anim.openedDoor and DoesEntityExist(anim.vehicle) then
-        if NetworkHasControlOfEntity(anim.vehicle) then
-            SetVehicleDoorShut(anim.vehicle, anim.door, false)
-        else
+        if not NetworkHasControlOfEntity(anim.vehicle) then
             NetworkRequestControlOfEntity(anim.vehicle)
-            SetVehicleDoorShut(anim.vehicle, anim.door, false)
         end
+        SetVehicleDoorShut(anim.vehicle, anim.door, false)
     end
 end
-vehicleStorage.stopTrunkAnimation = stopTrunkAnimation
 
 local function loadAnimDict(dict)
     if HasAnimDictLoaded(dict) then
@@ -315,5 +312,3 @@ function vehicleStorage.tryOpen()
     end
     return request('trunk', vehicle)
 end
-
-return vehicleStorage

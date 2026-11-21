@@ -140,7 +140,7 @@ export function formatDuration(ms: number) {
     return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`
 }
 
-export type TradeStatus = "editing" | "you_ready" | "partner_ready" | "countdown" | "confirm" | "you_confirmed" | "committing"
+type TradeStatus = "editing" | "you_ready" | "partner_ready" | "countdown" | "confirm" | "you_confirmed" | "committing"
 
 /** The single headline state the panel shows. */
 export function tradeStatus(view: TradeView, remaining: number): TradeStatus {

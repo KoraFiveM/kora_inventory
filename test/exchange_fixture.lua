@@ -1,6 +1,7 @@
 -- Real core fences, player funnel and inventory planner with SQL transport mocked.
 return function(database)
     local mocks = dofile('../kora_core/test/mocks.lua').install()
+    Kora.util.deepClone = dofile('test/deep_clone.lua')
     dofile('../kora_core/config.lua')
     for _,name in ipairs({'items','jobs','gangs','weapons','vehicles','locations'}) do dofile('../kora_core/shared/'..name..'.lua') end
     for _,path in ipairs({'util/shared','registry/shared','registry/server','player/shared','inventory/shared','replication/server','persistence/server','persistence/operations','player/server','money/server','metadata/server','inventory/server'}) do dofile('../kora_core/modules/'..path..'.lua') end

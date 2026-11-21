@@ -6,8 +6,6 @@ export interface NuiWireMessage<T = unknown> {
     data: T
 }
 
-export type ThemeTokens = Record<string, string>
-
 export interface InventoryItem {
     slot: number
     name: string

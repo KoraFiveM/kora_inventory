@@ -1,7 +1,6 @@
 import type { AuditFilter, AuditRange, AuditRow, InventoryItem } from "./types"
 
 export const AUDIT_RANGES: AuditRange[] = ["1h", "24h", "7d"]
-export const AUDIT_PAGE_SIZE = 100
 
 export function emptyAuditFilter(initial?: Partial<AuditFilter>): AuditFilter {
     const range = AUDIT_RANGES.includes(initial?.range as AuditRange) ? (initial!.range as AuditRange) : "24h"
@@ -33,7 +32,7 @@ export function auditPlayer(row: AuditRow): string {
     return "—"
 }
 
-export interface OmnipackSlice {
+interface OmnipackSlice {
     shown: InventoryItem[]
     /** Items matching the search, before the page limit. */
     total: number

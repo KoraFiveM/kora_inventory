@@ -86,7 +86,6 @@ describe("right-click split", () => {
         rightClick()
         await post("kora_inventory:nui:sessionPatched", { sessionId: "s1", revision: 2, player: snapshot.player })
         expect(dialog()).toBeNull()
-        await post("kora_inventory:nui:rejected", { reason: "nope" })
         rightClick()
         expect(dialog()).not.toBeNull()
     })

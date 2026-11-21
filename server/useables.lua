@@ -53,16 +53,7 @@ exports.kora_core:onSharedChange('weapons', function(_, name, def)
     refreshWeaponUseable(name, def)
 end)
 
--- Food, drink, alcohol and smokes are NOT handled here. kora_consumables owns every
--- consumable (progress bar, prop, status effects, removal on finish); this resource
--- only registers weapon, ammo and parachute use.
-
 -- Loading a magazine into the weapon in the player's hands.
---
--- Before this, no ammo useable was registered at all: `pistol_ammo` and the
--- rest were stocked by Ammu-Nation, defined with an `ammoType` and a `rounds`
--- count in kora_core's shared items, and completely inert -- every weapon sat at
--- zero rounds forever with no way to load one.
 --
 -- Which weapon is being loaded is resolved on the SERVER, from
 -- weaponcarry's `equipped` record. That record is only ever set after the
@@ -78,7 +69,7 @@ end)
 -- feature -- and silently accepting the use while doing nothing would consume
 -- the magazine for no effect, which is worse than refusing it.
 local function ammoUseable(src, item)
-    local def = KoraInventory.internal.itemDef(item.name)
+    local def = internal.itemDef(item.name)
     local rounds = math.floor(tonumber(def and def.rounds) or 0)
     if not def or not def.ammoType or rounds <= 0 then
         return false, 'not usable ammunition'
@@ -90,7 +81,7 @@ local function ammoUseable(src, item)
         return false, 'draw a weapon before loading ammunition'
     end
 
-    local weaponDef = KoraInventory.internal.itemDef(holding.name)
+    local weaponDef = internal.itemDef(holding.name)
     if not weaponDef or weaponDef.ammotype ~= def.ammoType then
         return false,
             ('%s does not take %s'):format(
@@ -106,7 +97,7 @@ local function ammoUseable(src, item)
             and KoraInventory.weapons.getState
             and KoraInventory.weapons.getState(src, holding.slot)
         or {}
-    local current = math.floor(tonumber(state and state.ammo) or 0)
+    local current = math.floor(tonumber(state.ammo) or 0)
     local weaponConfig = Config.kora_inventory.weapons or {}
     local ceiling = math.floor(tonumber(weaponConfig.maxAmmo) or 0)
     local ballisticCap = math.floor(tonumber((weaponConfig.ballistics or {}).maxLoadedRounds) or ceiling)

@@ -13,11 +13,6 @@
 -- 'hotbar' visibility mode shows exactly these slots on a player's body and
 -- charges extra to draw from outside them. Two constants would silently
 -- disagree about which slots the player can actually see.
--- Locale text with an English fallback (shared.lua's KoraInventory.text).
-local function localeText(key, fallback, vars)
-    local text = KoraInventory and KoraInventory.text
-    return text and text(key, fallback, vars) or fallback
-end
 
 local HOTBAR_SLOTS = math.max(0, math.floor(tonumber(Config.kora_inventory.hotbarSlots) or 5))
 
@@ -76,17 +71,15 @@ function KoraInventory.useSlot(slot)
     TriggerServerEvent('QBCore:Server:UseItem', { slot = slot, name = item.name })
 end
 
-local useHotbarSlot = KoraInventory.useSlot
-
 for slot = 1, HOTBAR_SLOTS do
     local command = ('kora_inventory:hotbar%d'):format(slot)
     Kora.keybind.add({
         name = command,
-        description = localeText('inventory.keybind_hotbar', ('Use hotbar item %d'):format(slot), { slot = slot }),
+        description = KoraInventory.text('inventory.keybind_hotbar', ('Use hotbar item %d'):format(slot), { slot = slot }),
         defaultMapper = 'keyboard',
         defaultKey = tostring(slot),
         onPressed = function()
-            useHotbarSlot(slot)
+            KoraInventory.useSlot(slot)
         end,
     })
 end
@@ -96,7 +89,7 @@ end
 -- while hidden: the NUI hides it again after the configured seconds.
 Kora.keybind.add({
     name = 'kora_inventory:hotbarshow',
-    description = localeText('inventory.keybind_hotbar_show', 'Show hotbar'),
+    description = KoraInventory.text('inventory.keybind_hotbar_show', 'Show hotbar'),
     defaultMapper = 'keyboard',
     defaultKey = 'U',
     onPressed = function()

@@ -87,7 +87,6 @@ local function metadataOf(item)
     end
     return type(item.metadata) == 'table' and item.metadata or {}
 end
-TradeState.metadataOf = metadataOf
 
 local function wholeNumber(value, min, max)
     return type(value) == 'number' and value == value and value % 1 == 0 and value >= min and value <= max
@@ -240,7 +239,6 @@ function TradeState.new(deps)
         end
         return nil
     end
-    machine.presenceProblem = presenceProblem
 
     local function cashBalance(src)
         local balance = deps.cashBalance and deps.cashBalance(src) or nil
@@ -312,7 +310,6 @@ function TradeState.new(deps)
         end
         return changed
     end
-    machine.refresh = refresh
 
     ---refresh() and, when it changed anything, tell both players at once so the
     ---refusal that may follow is about the state they can now see.
@@ -737,21 +734,19 @@ function TradeState.new(deps)
                 local added, addErr = deps.draftAdd(draft, leg.name, leg.amount, copy(leg.info))
                 if not added then
                     return nil, (addErr == 'over weight' or addErr == 'no free slot')
-                        and ('partner cannot carry that: ' .. addErr) or (addErr or 'cannot receive item'),
-                        receiver
+                        and ('partner cannot carry that: ' .. addErr) or (addErr or 'cannot receive item')
                 end
             end
             local cash = trade.sides[src].cash or 0
             if cashItem and cash > 0 then
                 local added, addErr = deps.draftAdd(draft, cashItem, cash, {})
                 if not added then
-                    return nil, 'partner cannot carry the cash: ' .. tostring(addErr), receiver
+                    return nil, 'partner cannot carry the cash: ' .. tostring(addErr)
                 end
             end
         end
         return drafts, legs
     end
-    machine.plan = plan
 
     local function changedSlots(original, draft, maxSlot)
         local out = {}
@@ -917,11 +912,9 @@ function TradeState.new(deps)
 
     function commit(trade)
         trade.phase = 'committing'
-        local ok, err, fatal, receipts
-        local results = table.pack(deps.lock(trade.a, trade.b, function()
+        local ok, err, fatal, receipts = deps.lock(trade.a, trade.b, function()
             return commitLocked(trade)
-        end))
-        ok, err, fatal, receipts = results[1], results[2], results[3], results[4]
+        end)
         if ok == true then
             finish(trade, 'completed', true)
             if deps.committed then

@@ -1,7 +1,6 @@
 -- Shared "must be standing at one of these counters" policy for location-gated
 -- shops (ammunation.lua, liquorstore.lua, convenience.lua). Loads before all
--- three; see their file headers for why this was extracted rather than copied
--- a third time.
+-- three.
 
 ---Whether `source`'s ped is at one of `shop.locations`: matching routing
 ---bucket, within `shop.interactionDistance` (default 2.25). Every default

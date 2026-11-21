@@ -56,6 +56,8 @@ local function setup(database, skipRestore)
     env.Kora = {
         resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
         callback = { register = function() end }, distance = { player = function() return not f.far end }, sql = {},
+        util = { deepClone = dofile('test/deep_clone.lua') }, 
+        logging = dofile('test/logging_spy.lua').logging,
     }
     local sql = env.Kora.sql
     sql.ready, sql.ensureTables = function() return true end, function() return true end

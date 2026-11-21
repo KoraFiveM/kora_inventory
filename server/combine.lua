@@ -274,6 +274,16 @@ function combine.register(recipe)
     return true, parsed.id
 end
 
+local function unregister(id)
+    registered[id], owners[id] = nil, nil
+    for index, existing in ipairs(registeredOrder) do
+        if existing == id then
+            table.remove(registeredOrder, index)
+            break
+        end
+    end
+end
+
 ---Remove a recipe added with register. Only the resource that added it may.
 function combine.remove(id)
     if type(id) ~= 'string' or not registered[id] then
@@ -282,13 +292,7 @@ function combine.remove(id)
     if owners[id] ~= resourceName() then
         return false, 'not combination owner'
     end
-    registered[id], owners[id] = nil, nil
-    for index, existing in ipairs(registeredOrder) do
-        if existing == id then
-            table.remove(registeredOrder, index)
-            break
-        end
-    end
+    unregister(id)
     announce()
     return true
 end
@@ -297,27 +301,13 @@ local function dropOwned(resource)
     local changed = false
     for id, owner in pairs(owners) do
         if owner == resource then
-            registered[id], owners[id] = nil, nil
-            for index, existing in ipairs(registeredOrder) do
-                if existing == id then
-                    table.remove(registeredOrder, index)
-                    break
-                end
-            end
+            unregister(id)
             changed = true
         end
     end
     if changed then
         announce()
     end
-end
-
-local function slotNumber(value, slots)
-    local number = tonumber(value)
-    if not number or number ~= number or number < 1 or number > slots or number ~= math.floor(number) then
-        return nil
-    end
-    return number
 end
 
 local function snapshot(item)
@@ -452,7 +442,7 @@ function combine.intent(src, request)
     if not primary then
         return false, 'stale inventory'
     end
-    local fromSlot, toSlot = slotNumber(payload.fromSlot, primary.slots), slotNumber(payload.toSlot, primary.slots)
+    local fromSlot, toSlot = inventory.validSlot(payload.fromSlot, primary.slots), inventory.validSlot(payload.toSlot, primary.slots)
     if not fromSlot or not toSlot or fromSlot == toSlot then
         return false, 'invalid item slot'
     end

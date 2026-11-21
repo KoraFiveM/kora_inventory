@@ -140,7 +140,6 @@ local function decorate(src, offers)
             for _, field in ipairs(DISPLAY_FIELDS) do
                 entry[field] = internal.copy(item[field])
             end
-            entry.amount = offer.amount
         end
         out[index] = entry
     end
@@ -550,12 +549,3 @@ CreateThread(function()
         end
     end
 end)
-
-function trade.cancelFor(src, reason)
-    return machine.cancelFor(src, reason)
-end
-
-function trade.of(src)
-    local current = machine.of(src)
-    return current and viewFor(current, src) or nil
-end

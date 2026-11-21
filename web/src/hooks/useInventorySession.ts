@@ -168,12 +168,10 @@ export function useInventorySession() {
             hotbarSlots: Number.isFinite(config.hotbarSlots) ? Number(config.hotbarSlots) : current.hotbarSlots,
             centreWhenSolo: config.centreWhenSolo ?? current.centreWhenSolo,
             showHotbar: config.showHotbar ?? current.showHotbar,
-            rightClickSplit: config.rightClickSplit ?? current.rightClickSplit,
             rightClick: resolveRightClick(config, current.rightClick),
             ammoInfo: mergeAmmoInfo(current.ammoInfo, config.ammoInfo),
             optimisticMoves: config.optimisticMoves ?? current.optimisticMoves,
             queueMoves: config.queueMoves ?? current.queueMoves,
-            directTransport: config.directTransport ?? current.directTransport,
             moveTimeoutMs: Number.isFinite(config.moveTimeoutMs) && Number(config.moveTimeoutMs) > 0 ? Number(config.moveTimeoutMs) : current.moveTimeoutMs,
             inspectorDecimals: Number.isFinite(config.inspectorDecimals) ? Number(config.inspectorDecimals) : current.inspectorDecimals,
             inspectorCopy: config.inspectorCopy ?? current.inspectorCopy,
@@ -225,12 +223,6 @@ export function useInventorySession() {
         clearPendingMove()
         setCombineTarget(undefined)
         updateSession((current) => current?.sessionId === sessionId ? null : current)
-    })
-    useNuiEvent<{ reason?: string }>("kora_inventory:nui:rejected", ({ reason }) => {
-        const message = reason ?? t("ui.action_rejected")
-        // Settles the request in flight (once); with nothing in flight it is only a notice.
-        if (queue.pending) queue.reject(message)
-        else setError(message)
     })
     useNuiEvent<{ requestId?: number; ok?: boolean; error?: string }>("kora_inventory:nui:intentResult", ({ requestId, ok, error }) => {
         if (typeof requestId !== "number") return
@@ -476,13 +468,13 @@ export function useInventorySession() {
 
     const use = useCallback((inventory: InventoryView, item: InventoryItem) => {
         if (inventory.id !== session?.player.id) { setError(t("ui.use_player_item_only")); return }
-        void submit("use", { inventory: inventory.id, slot: item.slot })
+        submit("use", { inventory: inventory.id, slot: item.slot })
     }, [session, submit, t])
     // Search: open a bag in the searched player's inventory. Only the inventory id
     // and slot are sent; it may wait on the searcher's progress bar, so no deadline.
     const openBag = useCallback((inventory: InventoryView, item: InventoryItem) => {
         if (!session || !canOpenBag(inventory, item, session.player.id)) return
-        void submit("openTargetContainer", openBagPayload(inventory, item))
+        submit("openTargetContainer", openBagPayload(inventory, item))
     }, [session, submit])
     const buy = useCallback((inventory: InventoryView, item: InventoryItem, amount = 1) => {
         if (inventory.type !== "shop" || !session) return
@@ -554,10 +546,8 @@ export function useInventorySession() {
 
     // Read by styles.css for text and slot sizes; 1 leaves every size as authored.
     useEffect(() => { document.documentElement.style.setProperty("--ui-scale", String(uiConfig.scale)) }, [uiConfig.scale])
-    // Config.Slots.borderWidth (client/ui.lua pushes slotBorderWidth). This was
-    // in the served web/build but missing from web/src; restored here so a
-    // rebuild from source keeps the configured slot border.
-    useEffect(() => { document.documentElement.style.setProperty("--slot-border-width", `${typeof (uiConfig as UiConfig).slotBorderWidth === "number" ? (uiConfig as UiConfig).slotBorderWidth : 1}px`) }, [(uiConfig as UiConfig).slotBorderWidth])
+    // Config.Slots.borderWidth (client/ui.lua pushes slotBorderWidth).
+    useEffect(() => { document.documentElement.style.setProperty("--slot-border-width", `${typeof uiConfig.slotBorderWidth === "number" ? uiConfig.slotBorderWidth : 1}px`) }, [uiConfig.slotBorderWidth])
 
     const solo = Boolean(session && uiConfig.centreWhenSolo && !session.secondary)
     // Search belongs to the three-column transfer view. It is intentionally

@@ -1,11 +1,6 @@
 -- The bundled UI is intentionally presentation-only. kora_inventory owns session
 -- creation, all inventory state and every server request; this bridge just
 -- translates its local client events into this resource's NUI wire contract.
--- Locale text with an English fallback (shared.lua's KoraInventory.text).
-local function localeText(key, fallback, vars)
-    local text = KoraInventory and KoraInventory.text
-    return text and text(key, fallback, vars) or fallback
-end
 
 -- Controls overlay (client/controls.lua): optional, so the bridge also loads
 -- without it. Presentation only.
@@ -65,9 +60,6 @@ KoraInventory.ui = {
         SetNuiFocus(on == true, on == true)
         return true
     end,
-    sessionActive = function()
-        return activeSession ~= nil
-    end,
 }
 
 local function pushTheme()
@@ -78,20 +70,20 @@ end
 -- Keep the locale push delayed on client startup so it cannot reach the page
 -- before that listener exists.
 local UI_LOCALE_KEYS = {
-    'inventory_label', 'revision', 'slot_item', 'slot_number', 'split_amount', 'drop_amount', 'amount', 'weight', 'price', 'empty_slot', 'received', 'purchased', 'removed', 'used', 'updated',
+    'inventory_label', 'slot_item', 'slot_number', 'split_amount', 'drop_amount', 'amount', 'all', 'durability', 'weight', 'price', 'empty_slot', 'received', 'purchased', 'removed', 'used', 'updated',
     'item_receipts', 'hotbar', 'release_to_drop', 'drag_out_to_drop', 'updating_inventory',
     'cannot_drop', 'action_rejected', 'inventory_timeout', 'too_many_moves', 'item_unavailable',
-    'shop_player_only', 'shop_read_only', 'choose_split_amount', 'no_empty_slot',
+    'shop_player_only', 'shop_read_only', 'choose_split_amount', 'no_empty_slot', 'no_other_inventory', 'no_room_other',
     'use_player_item_only', 'shop_item_unavailable', 'no_destination_slot',
-    'player_slot_rejects_shop_item', 'filter_selected_item', 'transfer_open',
-    'personal_inventory', 'close_inventory', 'selected_item_actions', 'selected',
+    'player_slot_rejects_shop_item', 'filter_selected_item', 'filter_items', 'filter_all', 'filter_weapons', 'filter_ammo', 'filter_consumables', 'filter_other', 'transfer_open',
+    'personal_inventory', 'dock_tabs', 'dock_tab_pockets', 'dock_tab_items', 'close_inventory', 'selected_item_actions', 'selected',
     'select_an_item', 'copy_item_details', 'copied', 'copy_failed', 'copy',
     'close_item_drawer', 'shop_item', 'quantity_to_buy', 'amount_to_move', 'use_item',
     'open_container', 'buy_amount_price', 'give_amount', 'no_item_description', 'item_inspector', 'inspect_item',
     'no_secondary_inventory', 'open_secondary_inventory', 'hidden_by_search',
-    'select_item_help', 'close', 'use_selected', 'move_or_stack', 'drop',
+    'select_item_help',
     'split_dialog', 'split_title', 'move_how_many', 'cancel', 'split',
-    'quick_slots', 'quick_slot_item', 'quick_slot_empty', 'quick_slot_pinned', 'quick_slot_key',
+    'quick_amounts', 'quick_slots', 'quick_slot_item', 'quick_slot_empty', 'quick_slot_pinned',
     'quick_slot_unpin', 'quick_slot_pin_failed', 'quick_drawer_collapse', 'quick_drawer_expand', 'loadout', 'quick_slot_loaded', 'quick_slot_mags', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
     'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
     'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type', 'jammed',
@@ -123,29 +115,22 @@ local function pushLocales()
     send('kora_inventory:nui:locales', locales)
 end
 
--- The presentation half of Config.kora_inventory, and the ONLY config that crosses
--- into the browser. Sent as a whole table rather than folded into the theme
--- tokens (which are CSS custom properties, not structured data), and re-sent on
--- every session open so a UI that reloaded mid-session is never left rendering
--- defaults.
---
--- hotbarSlots is included because the NUI draws the hotbar boundary and cannot
--- know where it is otherwise; it stays a read of the same single source
--- client/hotbar.lua binds its keys from, so the outline and the keys cannot
--- disagree.
+local function uiConfig()
+    return (Config.kora_inventory or {}).ui or {}
+end
+
+local function directTransport()
+    return uiConfig().directTransport ~= false
+end
+
 -- How long the UI, and this bridge, wait for the server to answer a request
 -- before giving up on it (ms). Config.kora_inventory.ui.moveTimeoutMs, or the
 -- older moveTimeout in seconds when only that is configured. With the direct
 -- transport the browser's fetch is acknowledged at once, so a long deadline
 -- costs nothing (no busy cursor, no snap-back at a normal lag spike); the
 -- blocking fallback keeps the short one because its fetch stays pending.
-local function directTransport()
-    local ui = (Config.kora_inventory or {}).ui or {}
-    return ui.directTransport ~= false
-end
-
 local function moveTimeoutMs()
-    local ui = (Config.kora_inventory or {}).ui or {}
+    local ui = uiConfig()
     local ms = tonumber(ui.moveTimeoutMs)
     if not ms and tonumber(ui.moveTimeout) then
         ms = tonumber(ui.moveTimeout) * 1000
@@ -166,14 +151,14 @@ local function knownLayout(value)
 end
 
 local function serverLayout()
-    local ui = ((Config.kora_inventory or {}).ui) or {}
+    local ui = uiConfig()
     return knownLayout(ui.layout) or 'classic'
 end
 
 -- Which layouts players may pick: booleans only, missing = allowed, and an
 -- empty result still allows 'classic' so there is always something to render.
 local function allowedLayouts()
-    local ui = ((Config.kora_inventory or {}).ui) or {}
+    local ui = uiConfig()
     local configured = type(ui.layouts) == 'table' and ui.layouts or {}
     local allowed = {}
     for _, id in ipairs(LAYOUT_IDS) do
@@ -235,6 +220,16 @@ local function decayPresentation()
     }
 end
 
+-- The presentation half of Config.kora_inventory, and the ONLY config that crosses
+-- into the browser. Sent as a whole table rather than folded into the theme
+-- tokens (which are CSS custom properties, not structured data), and re-sent on
+-- every session open so a UI that reloaded mid-session is never left rendering
+-- defaults.
+--
+-- hotbarSlots is included because the NUI draws the hotbar boundary and cannot
+-- know where it is otherwise; it stays a read of the same single source
+-- client/hotbar.lua binds its keys from, so the outline and the keys cannot
+-- disagree.
 local function pushConfig()
     local ui = Config.kora_inventory.ui or {}
     local ammoInfo = (Config.kora_inventory.weapons or {}).ammoInfo or {}
@@ -325,9 +320,6 @@ end
 -- inventory state. Without kora_hud, or with Config.kora_inventory.ui.playerLayout
 -- = false, the window stays exactly as configured.
 local UI_ID = 'inventory'
-local function uiConfig()
-    return (Config.kora_inventory or {}).ui or {}
-end
 
 local function defaultPlayerLayout()
     return {
@@ -551,7 +543,7 @@ AddEventHandler('kora_inventory:ui:rejected', function(payload)
     end
     lastNotice.reason, lastNotice.at = text, stamp
     Kora.notify.send({
-        title = localeText('inventory.title', 'Inventory'),
+        title = KoraInventory.text('inventory.title', 'Inventory'),
         message = tostring(reason or 'Action rejected'),
         type = 'error',
     })
@@ -775,7 +767,7 @@ RegisterNUICallback('kora_inventory:controls', function(data, cb)
         cb({ ok = false, error = 'controls unavailable' })
         return
     end
-    local ui = (Config.kora_inventory or {}).ui or {}
+    local ui = uiConfig()
     if wanted and activeSession and controls.settings(ui).button then
         cb({ ok = controls.show(ui), visible = controls.isVisible() })
         return

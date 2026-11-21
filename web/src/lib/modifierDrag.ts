@@ -1,4 +1,4 @@
-export interface DragModifiers { ctrl?: boolean; alt?: boolean }
+interface DragModifiers { ctrl?: boolean; alt?: boolean }
 
 /** Ctrl = half the stack (floor, min 1), Alt = one, otherwise undefined (normal drag). */
 export function modifierDragAmount(modifiers: DragModifiers | undefined, stack: number): number | undefined {
