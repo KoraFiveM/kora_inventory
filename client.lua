@@ -331,7 +331,7 @@ local function submitIntent(intent)
         TriggerEvent('kora_inventory:client:requestGiveTarget', pendingGive.id)
         return true
     end
-    if action == 'use' or action == 'drop' or action == 'buy' or action == 'sync' then
+    if action == 'use' or action == 'drop' or action == 'buy' or action == 'sync' or action == 'combine' then
         local slot = action == 'use' and math.floor(tonumber(payload.slot) or 0)
         local item = slot and session.primary.items and session.primary.items[slot]
         local clearedBusy = item and item.preventClose ~= true

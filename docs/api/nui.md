@@ -71,12 +71,12 @@ The only way the page changes anything. Validates the envelope, calls `submitInt
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `data` | table | `{ sessionId, token, intent, payload, requestId? }`. `intent` must be one of `close`, `move`, `use`, `drop`, `give`, `buy`, `sync`, `split`, `action`; `payload` must be a table. (`action` and unknown shapes are then refused by the transport as `unsupported intent`.) |
+| `data` | table | `{ sessionId, token, intent, payload, requestId? }`. `intent` must be one of `close`, `move`, `use`, `drop`, `give`, `buy`, `sync`, `split`, `action`, `combine`; `payload` must be a table. (`action` and unknown shapes are then refused by the transport as `unsupported intent`.) |
 
 **Returns**
 
 - **cb(&#123; ok, error? &#125;)**
-- **With direct transport and a `requestId`: `cb({ ok = true, pending = true, requestId })` first, then the verdict message. Invalid envelopes answer `{ ok = false, error = 'invalid intent' }`. An unanswered non-`use` request answers `timeout` after `moveTimeoutMs`.**
+- **With direct transport and a `requestId`: `cb({ ok = true, pending = true, requestId })` first, then the verdict message. Invalid envelopes answer `{ ok = false, error = 'invalid intent' }`. An unanswered request other than `use` and `combine` answers `timeout` after `moveTimeoutMs`.**
 
 **Example**
 
@@ -179,6 +179,17 @@ The client receives a short-lived token only after the server has resolved and a
 ### Using items from the UI and hotbar
 
 Double-clicking a slot, the Use or Buy button and Enter on a selected item all run one `activateItem`. Number keys use slots `1..hotbarSlots` with the panel closed. Both go through `KoraInventory.useGate`, which runs the `useTime` progress bar before any request is sent.
+
+### Combining items (the `combine` intent)
+
+Dropping one item onto a different item in the player's own inventory asks "Combine / Cancel" when the pushed `combine` list pairs the two names; otherwise the drop is an ordinary move. Choosing Combine sends:
+
+```lua
+{ sessionId = ..., token = ..., intent = 'combine', requestId = 9,
+  payload = { inventory = 'player:12', fromSlot = 1, toSlot = 2, revision = 41 } }
+```
+
+The page names no recipe, item, amount or result. The server validates the session lease, the revision, access, cuffed and downed state and the busy-slot lock exactly as for `use`, re-reads both slots, takes the recipe from its own registry and answers with the verdict. Like `use`, it may wait on a progress bar, so the bridge does not apply `moveTimeoutMs` to it. The page pushes the presentation list inside `kora_inventory:nui:config` as `combine = { enabled, recipes = { { a, b, label } } }`: item names and label only, no amounts. See [Crafting](./crafting.md#combining-items-by-dragging).
 
 ### Presentation config (`Config.kora_inventory.ui`)
 

@@ -147,5 +147,8 @@ return {
         ammo_rounds_per_item = 'Rounds per item',
         ammo_fits = 'Fits',
         ammo_type = 'Type',
+        combine = 'Combine',
+        combine_title = '%{label}?',
+        combine_items = '%{from} + %{to}',
     },
 }

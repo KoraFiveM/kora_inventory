@@ -23,6 +23,7 @@ local allowedIntents = {
     sync = true,
     split = true,
     action = true,
+    combine = true,
 }
 
 local function send(action, data)
@@ -60,6 +61,7 @@ local UI_LOCALE_KEYS = {
     'quick_slot_unpin', 'quick_slot_pin_failed', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
     'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
     'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type',
+    'combine', 'combine_title', 'combine_items',
 }
 
 local function pushLocales()
@@ -203,6 +205,10 @@ local function pushConfig()
         filters = ui.filters ~= false,
         tooltips = ui.tooltips ~= false,
         weightWarnings = weightWarnings(),
+        -- Drag-to-combine: recipe names + labels only (client/combine.lua). The
+        -- server decides which recipe applies and what it costs.
+        combine = KoraInventory.combinePresentation and KoraInventory.combinePresentation()
+            or { enabled = false, recipes = {} },
     })
 end
 
@@ -573,7 +579,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
             delivered = true
             send('kora_inventory:nui:intentResult', { requestId = requestId, ok = ok == true, error = ok and nil or err })
         end
-        if data.intent ~= 'use' then
+        if data.intent ~= 'use' and data.intent ~= 'combine' then
             SetTimeout(moveTimeoutMs(), function()
                 deliver(false, 'timeout')
             end)
@@ -602,7 +608,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
     -- so cb runs exactly once and never later than the move deadline: if the
     -- server round trip is still outstanding then, the browser is answered
     -- { ok = false, error = 'timeout' } and the late result is dropped (the UI
-    -- rolls back and asks for a resync). `use` is exempt: it may wait on a
+    -- rolls back and asks for a resync). `use` and `combine` are exempt: they may wait on a
     -- progress bar.
     local answered = false
     local function reply(result)
@@ -612,7 +618,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
         answered = true
         cb(result)
     end
-    if data.intent ~= 'use' then
+    if data.intent ~= 'use' and data.intent ~= 'combine' then
         SetTimeout(moveTimeoutMs(), function()
             reply({ ok = false, error = 'timeout' })
         end)

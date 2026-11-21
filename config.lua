@@ -645,6 +645,40 @@ Config.kora_inventory = {
     crafting = {
         maxBatchAmount = 100,
     },
+    -- Drag one item of the player's own inventory onto another to combine them
+    -- (for example rolling paper + weed = joint). Recipes are order independent:
+    -- a + b is the same as b + a. The server holds the only recipe registry
+    -- (these entries plus those other resources add with the registerCombination
+    -- export); the browser only learns each pair's names and label so it can
+    -- ask "Roll a joint? Combine / Cancel" instead of swapping the two slots.
+    -- Read when a combine is attempted, so edits apply without a restart.
+    combine = {
+        -- Master switch. Off: no popover, the combine intent is refused and
+        -- dropping one item on another swaps or stacks them as before.
+        enabled = true,
+        -- Show the kora_lib progress bar for recipes with a time above 0. Off:
+        -- every combine completes at once.
+        progress = true,
+        -- a, b:      the two item names (any order; they must be different
+        --            slots, and may be the same item).
+        -- result:    the item name produced, `amount` of it (default 1).
+        -- consumeA/consumeB: how many of a / b are used up (default 1; 0 keeps
+        --            that item, for example a tool).
+        -- time:      progress bar milliseconds (0 = instant, default 0).
+        -- label:     the question and the progress bar text.
+        recipes = {
+            {
+                a = 'rolling_paper',
+                b = 'weed',
+                result = 'joint',
+                amount = 1,
+                consumeA = 1,
+                consumeB = 1,
+                time = 2500,
+                label = 'Roll a joint',
+            },
+        },
+    },
     weapons = {
         defaultDurability = 100,
         maxAmmo = 10000,

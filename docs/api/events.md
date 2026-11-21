@@ -272,6 +272,31 @@ end)
 Runs only when no useable handler exists for `old_radio`.
 ```
 
+#### `AddEventHandler('kora_inventory:server:combined', function(src, info) end)`
+
+Local event raised after a drag-to-combine commits (see [Crafting](./crafting.md#combining-items-by-dragging)). Raised from `server/combine.lua`.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `src` | integer | Player. |
+| `info` | table | `{ recipe, result, amount }`: the recipe id, the item given and how many. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+AddEventHandler('kora_inventory:server:combined', function(src, info)
+    if info.result == 'joint' then
+        giveXp(src, 'rolling')
+    end
+end)
+```
+
 #### `AddEventHandler('kora_inventory:server:crafted', function(src, recipeId, result) end)`
 
 Local event raised after `CraftItem` commits. Raised from `crafting.craft`.

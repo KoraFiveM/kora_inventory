@@ -76,6 +76,10 @@ Details: [Shops](./api/shops.md), [Stashes and drops](./api/stashes.md).
 
 `RegisterCraftRecipe`, `RemoveCraftRecipe`, `GetCraftRecipe`, `CanCraftRecipe`, `CanCraftItems`, `CraftItem`, `RegisterCraftHook`, `RemoveCraftHook` (see [Crafting](./api/crafting.md)); `PrepareWeaponMetadata`, `GetWeaponState`, `SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, `SetWeaponComponents`, `LoadWeaponRounds`, `FireWeaponRound`, `GetCarriedWeapons`, `GetEquippedWeapon`, `StartTrainingWeapon`, `StopTrainingWeapon` (see [Weapons](./api/weapons.md)).
 
+## Combining items (server)
+
+`registerCombination(recipe)` returns `true, id` or `false, reason`; `removeCombination(id)` returns `true` or `false, reason` and only the owning resource may remove a recipe. See [Crafting](./api/crafting.md#combining-items-by-dragging).
+
 ## Exchanges and items (server)
 
 | Export | Notes |

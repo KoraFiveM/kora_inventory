@@ -1,5 +1,6 @@
 import { createContext } from "react"
 import { DEFAULT_AMMO_INFO } from "@/lib/ammo"
+import { DEFAULT_COMBINE, type CombineConfig } from "@/lib/combine"
 import type { AmmoInfoConfig, RightClickMode, UiConfig } from "@/lib/types"
 
 /**
@@ -10,7 +11,7 @@ import type { AmmoInfoConfig, RightClickMode, UiConfig } from "@/lib/types"
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig } = {
+export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig; combine: CombineConfig } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
@@ -39,6 +40,8 @@ export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreW
     filters: true,
     tooltips: true,
     weightWarnings: { enabled: true, warnAt: 0.75, dangerAt: 0.95 },
+    // Drag one item onto another for a recipe (Config.kora_inventory.combine).
+    combine: DEFAULT_COMBINE,
     images: {
         localPath: "nui://kora_inventory/images",
         extensions: ["webp", "png", "gif", "jpg"],

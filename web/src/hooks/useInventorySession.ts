@@ -16,6 +16,7 @@ import { modifierDragAmount } from "@/lib/modifierDrag"
 import { pickTransferSlot } from "@/lib/quickTransfer"
 import { copyText, itemCopyText } from "@/lib/clipboard"
 import { clampGiveAmount } from "@/lib/giveAmount"
+import { findCombination, mergeCombine, type CombineRecipe } from "@/lib/combine"
 import { isAmmoCompatible, mergeAmmoInfo, resolveRightClick } from "@/lib/ammo"
 import { EMPTY_QUICK_SLOTS, normalizeQuickSlots, type QuickSlotsState } from "@/lib/quickSlots"
 import type { SlotUi } from "@/slotUi"
@@ -55,6 +56,8 @@ export function useInventorySession() {
     const [itemBoxes, setItemBoxes] = useState<ActiveItemBox[]>([])
     const [selectedAmount, setSelectedAmount] = useState(1)
     const [splitTarget, setSplitTarget] = useState<Selection | undefined>()
+    // A drop onto an item a recipe pairs it with, waiting for Combine / Cancel.
+    const [combineTarget, setCombineTarget] = useState<{ recipe: CombineRecipe; fromSlot: number; toSlot: number; fromItem: InventoryItem; toItem: InventoryItem } | undefined>()
     const [uiConfig, setUiConfig] = useState(DEFAULT_UI_CONFIG)
     const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
     const [quickSlots, setQuickSlots] = useState<QuickSlotsState>(EMPTY_QUICK_SLOTS)
@@ -156,6 +159,7 @@ export function useInventorySession() {
             filters: config.filters ?? current.filters,
             tooltips: config.tooltips ?? current.tooltips,
             weightWarnings: mergeWeightWarnings(current.weightWarnings, config.weightWarnings),
+            combine: mergeCombine(current.combine, config.combine),
         }))
     })
     useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number; quick?: HotbarQuickEntry[] }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom, quick }) => {
@@ -171,7 +175,7 @@ export function useInventorySession() {
     })
     useNuiEvent<SessionSnapshot>("kora_inventory:nui:sessionOpened", (snapshot) => {
         window.clearTimeout(hotbarTimeout.current); setHotbar(null)
-        clearPendingMove(); updateSession(() => snapshot); setSelected(undefined); setGiveAvailable(false); setError(undefined)
+        clearPendingMove(); updateSession(() => snapshot); setSelected(undefined); setGiveAvailable(false); setError(undefined); setCombineTarget(undefined)
     })
     useNuiEvent<SessionPatch>("kora_inventory:nui:sessionPatched", (patch) => {
         // The server's items win over any prediction for the inventories they cover.
@@ -185,6 +189,7 @@ export function useInventorySession() {
     })
     useNuiEvent<{ sessionId: string; reason?: string }>("kora_inventory:nui:sessionClosed", ({ sessionId }) => {
         clearPendingMove()
+        setCombineTarget(undefined)
         updateSession((current) => current?.sessionId === sessionId ? null : current)
     })
     useNuiEvent<{ reason?: string }>("kora_inventory:nui:rejected", ({ reason }) => {
@@ -243,8 +248,8 @@ export function useInventorySession() {
                     setSelected(undefined)
                     setError(message)
                 },
-                // Use can legitimately run long (progress bar), everything else gets a deadline.
-                timeoutMs: intent === "use" ? undefined : config.moveTimeoutMs,
+                // Use and combine can legitimately run long (progress bar), everything else gets a deadline.
+                timeoutMs: intent === "use" || intent === "combine" ? undefined : config.moveTimeoutMs,
                 // The server sends its patches before it answers, so with queued
                 // moves the answer alone settles; waiting for a patch as well would
                 // hold every later drag behind an inventory the server did not re-send.
@@ -295,9 +300,38 @@ export function useInventorySession() {
         const targetInventory = findInventory(session, target.inventoryId)
         const sourceItem = findItem(sourceInventory, source.slot)
         const modified = configRef.current.modifierDrag && sourceItem ? modifierDragAmount(source.modifiers, sourceItem.amount) : undefined
+        // Two different items in the player's own inventory that a recipe pairs:
+        // ask instead of swapping. No recipe (or combining off) falls through to
+        // the ordinary move/swap/stack below, exactly as before.
+        if (sourceInventory && targetInventory && sourceItem && sourceInventory.id === session.player.id && targetInventory.id === session.player.id) {
+            const targetItem = findItem(targetInventory, target.slot)
+            const recipe = findCombination(sourceItem, targetItem, configRef.current.combine)
+            if (recipe && targetItem) {
+                setSelected(undefined)
+                setCombineTarget({ recipe, fromSlot: source.slot, toSlot: target.slot, fromItem: sourceItem, toItem: targetItem })
+                return
+            }
+        }
         const amount = modified ?? (selected?.inventory.id === source.inventoryId && selected.item.slot === source.slot ? selectedCount : undefined)
         if (sourceInventory && targetInventory) move(sourceInventory.id, source.slot, targetInventory.id, target.slot, amount)
     }, [canDropSlot, move, selected, selectedCount, session])
+
+    // Combine / Cancel on the popover. Only the two slots and the revision go to
+    // the server, which finds the recipe in its own registry and re-reads both
+    // slots; nothing the browser knows about the recipe is sent.
+    const confirmCombine = useCallback(() => {
+        const pending = combineTarget
+        setCombineTarget(undefined)
+        if (!pending) return
+        enqueueRequest((current) => {
+            const player = current.player
+            const from = findItem(player, pending.fromSlot)
+            const to = findItem(player, pending.toSlot)
+            if (!from || !to || findCombination(from, to, configRef.current.combine) === null) return t("ui.item_unavailable")
+            return { intent: "combine", payload: { inventory: player.id, fromSlot: pending.fromSlot, toSlot: pending.toSlot, revision: current.revision }, awaiting: [player.id] }
+        })
+    }, [combineTarget, enqueueRequest, t])
+    const cancelCombine = useCallback(() => setCombineTarget(undefined), [])
 
     useEffect(() => {
         const handleDragBuy = (event: Event) => {
@@ -444,13 +478,14 @@ export function useInventorySession() {
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.key === "Escape" && splitTarget) { setSplitTarget(undefined); return }
+            if (event.key === "Escape" && combineTarget) { setCombineTarget(undefined); return }
             if (event.key === "Escape" && menu) return
             if (event.key === "Escape" || event.key === "Tab") close()
-            if (event.key === "Enter" && selected && !locked && !movePending) activateSelected(selected)
+            if (event.key === "Enter" && selected && !locked && !movePending && !combineTarget) activateSelected(selected)
         }
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
-    }, [activateSelected, close, locked, menu, movePending, selected, splitTarget])
+    }, [activateSelected, close, combineTarget, locked, menu, movePending, selected, splitTarget])
 
     // A refusal notice is information, not a state: let it go once it has been read.
     useEffect(() => {
@@ -502,6 +537,7 @@ export function useInventorySession() {
         query, setQuery, itemBoxes, hotbar,
         selectedMax, selectedCount, setSelectedAmount, copyState, copySelected,
         splitTarget, confirmSplit, cancelSplit: () => setSplitTarget(undefined),
+        combineTarget, confirmCombine, cancelCombine,
         canDropSlot, dropSlot, dropOut, quickTransfer, selectSlot, promptSplit, activateItem,
         split, use, buy, submit, close, clearSelection: () => setSelected(undefined),
     }

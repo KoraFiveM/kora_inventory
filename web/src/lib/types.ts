@@ -1,4 +1,5 @@
 import type { LayoutId } from "@/lib/layoutIds"
+import type { CombineRecipe } from "@/lib/combine"
 
 export interface NuiWireMessage<T = unknown> {
     action: string
@@ -77,7 +78,7 @@ export interface SessionPatch {
 export interface IntentPayload {
     sessionId: string
     token: string
-    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync"
+    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync" | "combine"
     payload: Record<string, unknown>
     /** Lets the Lua bridge answer the fetch at once and deliver the verdict as `kora_inventory:nui:intentResult`. */
     requestId?: number
@@ -198,6 +199,8 @@ export interface UiConfig {
     weightWarnings?: { enabled?: boolean; warnAt?: number; dangerAt?: number }
     /** Hover tooltip on filled slots (Config.kora_inventory.ui.tooltips). */
     tooltips?: boolean
+    /** Drag-to-combine presentation list: item names + label only (Config.kora_inventory.combine). */
+    combine?: { enabled?: boolean; recipes?: CombineRecipe[] }
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string
