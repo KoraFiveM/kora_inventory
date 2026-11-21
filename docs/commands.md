@@ -222,7 +222,7 @@ Writes the replicated player bag `kora_inventory:weaponCarry` (server) and the l
 
 ## Keybinds (summary)
 
-Registered through `Kora.keybind`, so players can rebind them in Settings > Key Bindings > FiveM.
+Registered through `Kora.keybind`, so players can rebind them in **Settings → Key Bindings → FiveM**.
 
 | Binding | Default | Effect |
 | --- | --- | --- |
