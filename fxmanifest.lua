@@ -34,6 +34,8 @@ shared_scripts {
     'config/shops/liquorstore.lua',
     'config/shops/convenience.lua',
     'shared.lua',
+    -- Pure sort / stack-all planner used by the `organize` intent. No state.
+    'shared/organize.lua',
     'shared/trunk_cargo.lua',
     -- Pure quick slot resolver (pointers to real inventory slots). No state.
     'shared/quickslots.lua',

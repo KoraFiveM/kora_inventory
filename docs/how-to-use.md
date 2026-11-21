@@ -192,6 +192,8 @@ These are presentation features of the window; each can be switched off under `C
 - Category chips on each panel dim items outside the chosen category. Slot numbers never change. The search box also dims non-matching items in your own inventory.
 - The weight bar turns amber at 75 percent of capacity and red at 95 percent (`ui.weightWarnings`).
 - Hovering a filled slot for a moment shows a tooltip with the item details.
+- Each panel header (your pockets, stashes, trunks, gloveboxes, containers and ground drops, but not shops) has a Sort button, a Stack all button and its own search box. Stack all merges partial stacks of the same item with identical metadata; Sort stacks and then orders by weapons, ammo, useable items and the rest, then by name. Weapons and other unique items are never merged, your hotbar slots stay where they are, and weight never changes. Sorting is refused while you are using an item, and there is a short cooldown (`organize`).
+- The first few times you open the inventory a small tip card at the bottom suggests features you may not have found yet. Next shows another tip, Got it hides it for good (`ui.tips`).
 
 ## Limitations worth knowing
 

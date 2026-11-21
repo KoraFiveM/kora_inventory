@@ -107,6 +107,21 @@ export const DEFAULT_LOCALES: Record<string, string> = {
     "ui.ammo_rounds_per_item": "Rounds per item",
     "ui.ammo_fits": "Fits",
     "ui.ammo_type": "Type",
+    "ui.sort_panel": "Sort",
+    "ui.stack_panel": "Stack all",
+    "ui.panel_search": "Search this panel",
+    "ui.panel_search_placeholder": "Search…",
+    "ui.tips_title": "Tip",
+    "ui.tip_next": "Next",
+    "ui.tip_got_it": "Got it",
+    "ui.tip_drag_drop": "Drag an item out of the window to drop it on the ground.",
+    "ui.tip_quick_transfer": "Shift+click an item to move the whole stack to the other inventory.",
+    "ui.tip_modifier_drag": "Hold Ctrl while dragging to move half a stack, or Alt to move just one.",
+    "ui.tip_right_click_split": "Right-click a stack to split it.",
+    "ui.tip_right_click_menu": "Right-click an item for its actions menu.",
+    "ui.tip_quick_slot": "Right-click a quick slot to pin the item you want it to point at.",
+    "ui.tip_organize": "Use Sort and Stack all in a panel's header to tidy it up.",
+    "ui.tip_layout": "Pick the inventory layout you like best in the /ui editor.",
 }
 
 type LocaleContextValue = (key: string, values?: Record<string, string | number>) => string

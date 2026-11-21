@@ -24,3 +24,9 @@ export function isDimmed(item: (Parameters<typeof classifyItem>[0] & { label?: s
     const needle = query.trim().toLowerCase()
     return needle !== "" && !(item.label ?? item.name).toLowerCase().includes(needle)
 }
+
+/** True when the item's label (or name) contains the search text; an empty search matches everything. */
+export function matchesQuery(item: { name: string; label?: string }, query: string): boolean {
+    const needle = query.trim().toLowerCase()
+    return needle === "" || (item.label ?? item.name).toLowerCase().includes(needle)
+}

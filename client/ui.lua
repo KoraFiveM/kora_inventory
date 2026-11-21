@@ -21,6 +21,7 @@ local allowedIntents = {
     give = true,
     buy = true,
     sync = true,
+    organize = true,
     split = true,
     action = true,
 }
@@ -60,6 +61,9 @@ local UI_LOCALE_KEYS = {
     'quick_slot_unpin', 'quick_slot_pin_failed', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
     'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
     'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type',
+    'sort_panel', 'stack_panel', 'panel_search', 'panel_search_placeholder',
+    'tips_title', 'tip_next', 'tip_got_it', 'tip_drag_drop', 'tip_quick_transfer', 'tip_modifier_drag',
+    'tip_right_click_split', 'tip_right_click_menu', 'tip_quick_slot', 'tip_organize', 'tip_layout',
 }
 
 local function pushLocales()
@@ -146,6 +150,27 @@ local function rightClickMode(ui)
     return ui.rightClickSplit == false and 'none' or 'split'
 end
 
+local function organizeConfig()
+    local organize = Config.kora_inventory.organize
+    organize = type(organize) == 'table' and organize or {}
+    local enabled = organize.enabled ~= false
+    return {
+        enabled = enabled,
+        sort = enabled and organize.sort ~= false,
+        stack = enabled and organize.stack ~= false,
+        panelSearch = organize.panelSearch ~= false,
+    }
+end
+
+local function tipsConfig()
+    local tips = ((Config.kora_inventory.ui or {}).tips)
+    tips = type(tips) == 'table' and tips or {}
+    return {
+        enabled = tips.enabled ~= false,
+        maxShows = math.floor(Kora.util.clamp(tonumber(tips.maxShows) or 5, 1, 50)),
+    }
+end
+
 local function pushConfig()
     local ui = Config.kora_inventory.ui or {}
     local ammoInfo = (Config.kora_inventory.weapons or {}).ammoInfo or {}
@@ -203,6 +228,11 @@ local function pushConfig()
         filters = ui.filters ~= false,
         tooltips = ui.tooltips ~= false,
         weightWarnings = weightWarnings(),
+        -- Sort / Stack all buttons and per-panel search. The server enforces
+        -- the same switches; these only decide what is drawn.
+        organize = organizeConfig(),
+        -- First-time tip card (shown at most maxShows openings per player).
+        tips = tipsConfig(),
     })
 end
 

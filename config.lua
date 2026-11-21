@@ -103,6 +103,33 @@ Config.kora_inventory = {
     -- inventory is closed; the only visual is the accent outline on those
     -- slots inside the open panel (ui.showHotbar). 0 disables the key binds.
     hotbarSlots = 5,
+    -- Sort and Stack-all buttons on every inventory panel header (player,
+    -- stash, trunk, glovebox, container, drop; never shops). Both are server
+    -- operations: the `organize` intent is validated exactly like a move
+    -- (session, revisions, access, routing bucket, distance), runs under the
+    -- inventory lock and never creates, destroys or merges different items.
+    -- Read on every request, so changes apply without a restart (the buttons
+    -- themselves appear the next time the inventory opens).
+    organize = {
+        enabled = true,
+        -- 'stack': merge stackable stacks of the same item with identical
+        -- metadata into the lowest slots (unique items never merge).
+        stack = true,
+        -- 'sort': stack, then reorder by sortOrder, label, name, original slot.
+        sort = true,
+        -- Player inventory only: slots 1..hotbarSlots are never moved or
+        -- emptied, so hotbar keys and visible weapon carry do not change.
+        -- (Their stacks may still grow when the same item is stacked in.)
+        keepHotbar = true,
+        -- Minimum milliseconds between two organizes by the same player.
+        cooldownMs = 1000,
+        -- Category order for Sort. Categories: 'weapon', 'ammo', 'useable',
+        -- 'other'. A category left out sorts last.
+        sortOrder = { 'weapon', 'ammo', 'useable', 'other' },
+        -- A small search box in every panel header that dims non-matching
+        -- slots in that panel. Browser-only.
+        panelSearch = true,
+    },
     -- Quick slots are SHORTCUTS, not physical slots. Items stay wherever they
     -- are in the normal inventory; a quick slot is a pointer that resolves to
     -- the real slot of a matching item. It is shown at the side of the
@@ -395,6 +422,13 @@ Config.kora_inventory = {
         -- Legacy form of moveTimeoutMs, in seconds (0.5-60). Not set by
         -- default; only read when moveTimeoutMs is absent from your config.
         -- moveTimeout = 10,
+
+        -- Small dismissible tip card at the bottom of the inventory window for
+        -- players who are new to it. Shown on at most `maxShows` openings,
+        -- cycling through short tips about features that are switched on; the
+        -- player can press Got it to hide it forever. Progress is kept on the
+        -- player's own machine. Applied the next time the inventory opens.
+        tips = { enabled = true, maxShows = 5 },
 
         -- Local item artwork. Definition image filenames and per-item
         -- `info.image` filenames resolve under localPath. A full https:// or

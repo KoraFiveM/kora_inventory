@@ -79,6 +79,7 @@ Core limits and session behaviour.
 | `playerMaxWeight` | integer | Default `120000` grams. Maximum carried weight. |
 | `hotbarSlots` | integer | Default `5`. Slots `1..hotbarSlots` double as the hotbar: number keys 1 to N are bound to them, and weapon carry in `hotbar` mode treats them as openly carried. `0` disables the key binds. Read once at start. |
 | `quickSlots` | table | Quick slots: shortcuts to items that stay in the normal inventory. See [Quick slots](#quick-slots-configkora_inventoryquickslots) below. |
+| `organize` | table | Sort and Stack all buttons and per-panel search. See [Sort and Stack all](#sort-and-stack-all-configkora_inventoryorganize) below. |
 | `defaultSlots` | integer | Default `50`. Slot count for secondary inventories that do not specify `slots`. Also the slot count of ground drops. |
 | `defaultMaxWeight` | integer | Default `100000` grams. Capacity for secondary inventories that do not specify `maxWeight`. |
 | `interactionDistance` | number | Default `3.0` metres. Default reach for secondary inventories, player inspection and give targets. |
@@ -152,6 +153,7 @@ The only settings that cross into the browser. Nothing here is authority. Most a
 | `ui.filters` | boolean | Default `true`. Category chips on each panel and the search box dim non-matching slots in the player panel. Slots are never hidden or reordered. |
 | `ui.weightWarnings` | table | Default `{ enabled = true, warnAt = 0.75, dangerAt = 0.95 }`. The weight bar turns warning-coloured at `warnAt` and destructive at `dangerAt` (fractions of max weight, 0.01 to 1). |
 | `ui.tooltips` | boolean | Default `true`. Hover tooltip (after about 350 ms) with label, amount, weight, durability, display rows and description. |
+| `ui.tips` | table | Default `{ enabled = true, maxShows = 5 }`. A small dismissible tip card at the bottom of the window for players new to the inventory. It appears on at most `maxShows` openings (1 to 50), cycling through short tips about features that are switched on in this table (drag out to drop, Shift+click, Ctrl/Alt drag, right-click as configured by `ui.rightClick`, quick slots, Sort and Stack all, and the layout choice in the `/ui` editor). Next shows another tip; Got it hides the card for good. Progress is kept in the player's own browser storage under `kora_inventory:tips`. It is never shown while an item is being dragged. Applied the next time the inventory opens. |
 | `ui.optimisticMoves` | boolean | Default `true`. Paint a move or purchase at once, dimmed until the server confirms, and undo it with a notice if refused or unanswered. |
 | `ui.queueMoves` | boolean | Default `true`. Queue drags made while a move is pending. Needs `optimisticMoves`. |
 | `ui.directTransport` | boolean | Default `true`. Send move/buy/drop/use requests as one direct net event (`kora_inventory:server:call`) instead of kora_lib callbacks. Same handlers and checks either way. |
@@ -347,6 +349,22 @@ Keys that exist in `config.lua` but are not listed in the reference tables above
 `slowRequestMs` logs `slow <action> request from player <id>: <n> ms server-side` to the server console.
 
 See also [Installation](../installation.md) and [Commands and keybinds](../commands.md).
+
+## Sort and Stack all (`Config.kora_inventory.organize`)
+
+Every inventory panel except shops (player, stash, trunk, glovebox, container and ground drop) gets a Sort button, a Stack all button and its own search box in its header. Sort and Stack all are server operations (the `organize` intent, see [Opening inventories and sessions](./inventories.md#organizing-a-panel-the-organize-intent)); the search box only dims non-matching slots in that panel and never reaches the server. Config is read on every request, so the server applies a change at once; the buttons appear or disappear the next time a player opens the inventory.
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `organize.enabled` | boolean | Default `true`. Master switch. When off the server refuses every `organize` intent and the buttons are hidden. |
+| `organize.stack` | boolean | Default `true`. Allow Stack all: merge stackable stacks of the same item with identical metadata into the lowest slot, never above an item definition's optional `maxStack`. Unique items never merge. |
+| `organize.sort` | boolean | Default `true`. Allow Sort: stack, then reorder by `sortOrder`, then label (case-insensitive), then item name, then original slot. |
+| `organize.keepHotbar` | boolean | Default `true`. In a player inventory slots `1..hotbarSlots` are never moved or emptied, so hotbar keys and visible weapon carry keep working. A matching loose stack can still be added to a hotbar stack. Other inventories have no protected slots. |
+| `organize.cooldownMs` | integer | Default `1000`. Minimum milliseconds between two organizes by one player (0 to 60000). |
+| `organize.sortOrder` | string[] | Default `{ 'weapon', 'ammo', 'useable', 'other' }`. Category order for Sort. A weapon is an item whose definition is a weapon, ammo has an `ammoType` (or type `ammo`), useable has a use action; a category left out of the list sorts last. |
+| `organize.panelSearch` | boolean | Default `true`. Show the per-panel search box. The top bar search keeps dimming the player panel as before. |
+
+The `/config` editor entries live in `config/schema/organize.lua` (and `config/schema/tips.lua` for `ui.tips`).
 
 ## Quick slots (`Config.kora_inventory.quickSlots`)
 

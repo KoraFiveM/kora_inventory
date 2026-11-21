@@ -1,0 +1,10 @@
+/* First-time tip card at the bottom of the window. kora_theme tokens only. */
+.shortcut-stack { min-width: 0; display: grid; gap: 8px; }
+.tip-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid hsl(var(--brand-border)); border-radius: 10px; background: hsl(var(--brand-soft)); color: hsl(var(--foreground)); font-size: calc(12px * var(--ui-scale, 1)); }
+.tip-card svg { color: hsl(var(--primary)); }
+.tip-card p { margin: 0; line-height: 1.35; }
+.tip-card strong { color: hsl(var(--primary)); margin-right: 4px; }
+.tip-actions { display: flex; gap: 6px; }
+.tip-button { padding: 3px 10px; border: 1px solid hsl(var(--border-strong)); border-radius: 7px; background: hsl(var(--background) / .7); color: hsl(var(--foreground)); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 650; cursor: pointer; }
+.tip-button:hover { border-color: hsl(var(--brand-border)); }
+.tip-button-primary { border-color: hsl(var(--brand-border)); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
