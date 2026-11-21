@@ -1,6 +1,7 @@
+import { canOpenBag } from "./search"
 import type { AmmoInfoConfig, InventoryItem, InventoryView } from "./types"
 
-export type MenuEntry = "use" | "split" | "drop" | "give" | "ammo" | "copy"
+export type MenuEntry = "use" | "open" | "split" | "drop" | "give" | "ammo" | "copy"
 
 /**
  * Which actions the right-click menu offers for an item, in display order.
@@ -20,6 +21,8 @@ export function contextMenuEntries(options: {
     const own = inventory.id === playerId
     const entries: MenuEntry[] = []
     if (own && (item.useable || item.container)) entries.push("use")
+    // A closed bag in a searched player's inventory: open it (server re-checks everything).
+    if (canOpenBag(inventory, item, playerId)) entries.push("open")
     if (inventory.type !== "shop" && item.amount >= 2) entries.push("split")
     if (own) entries.push("drop")
     if (own && giveAvailable) entries.push("give")

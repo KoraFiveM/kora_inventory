@@ -1,0 +1,9 @@
+/* Per-panel Sort / Stack all buttons and search box. kora_theme tokens only. */
+.panel-tools { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 0 0 9px; }
+.panel-search { flex: 1 1 auto; min-width: 0; max-width: 220px; display: grid; grid-template-columns: 14px 1fr; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--background) / .62); color: hsl(var(--muted-foreground)); }
+.panel-search:focus-within { border-color: hsl(var(--brand-border)); background: hsl(var(--background) / .9); }
+.panel-search input { min-width: 0; height: 26px; border: 0; outline: 0; background: transparent; color: hsl(var(--foreground)); font-size: calc(11px * var(--ui-scale, 1)); }
+.panel-search input::placeholder { color: hsl(var(--muted-foreground)); }
+.panel-tool { flex: none; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--muted) / .5); color: hsl(var(--muted-foreground)); cursor: pointer; }
+.panel-tool:hover:not(:disabled) { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft)); color: hsl(var(--primary)); }
+.panel-tool:disabled { opacity: .5; cursor: default; }

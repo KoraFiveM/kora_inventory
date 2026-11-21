@@ -138,3 +138,7 @@ Evidence is denied entirely if `containers.evidence.access` is not a function. A
 - [Containers](./containers.md)
 - [Events and callbacks](./events.md)
 - [Configuration](./configuration.md)
+
+## Searching a player's bag
+
+Evidence moves work on a player's inventory slots only; the contents of a bag the player carries are a separate inventory and are not part of a seize. To let an officer look inside a bag during a search, use the search settings and the `openTargetContainer` intent described in [Containers and evidence](./containers.md).

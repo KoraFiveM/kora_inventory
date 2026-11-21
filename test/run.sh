@@ -39,6 +39,9 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/qb_callbacks.lua
 "${LUA:-lua}" test/smoke/use_item.lua
 "${LUA:-lua}" test/smoke/busy_use.lua
+"${LUA:-lua}" test/smoke/combine.lua
+"${LUA:-lua}" test/smoke/combine_guards.lua
+"${LUA:-lua}" test/smoke/audit_creation_paths.lua
 "${LUA:-lua}" test/smoke/no_builtin_consumables.lua
 "${LUA:-lua}" test/smoke/audit_guards.lua
 "${LUA:-lua}" test/smoke/hotbar.lua
@@ -73,6 +76,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/shop_blip_fallback.lua
 "${LUA:-lua}" test/smoke/ammo.lua
 "${LUA:-lua}" test/smoke/ammo_info.lua
+"${LUA:-lua}" test/smoke/weapon_upkeep.lua
 "${LUA:-lua}" test/smoke/parachute.lua
 "${LUA:-lua}" test/smoke/vendingmachine.lua
 "${LUA:-lua}" test/smoke/vendingmachine_client.lua
@@ -84,3 +88,17 @@ cd "$(dirname "$0")/.."
 
 "${LUA:-lua}" test/smoke/player_exchange.lua
 "${LUA:-lua}" test/smoke/trunk_cargo.lua
+"${LUA:-lua}" test/smoke/config_schema.lua
+"${LUA:-lua}" test/smoke/organize.lua
+"${LUA:-lua}" test/smoke/organize_intent.lua
+"${LUA:-lua}" test/smoke/organize_search.lua
+"${LUA:-lua}" test/smoke/organize_decay.lua
+"${LUA:-lua}" test/smoke/internal_keys.lua
+"${LUA:-lua}" test/smoke/search_containers.lua
+"${LUA:-lua}" test/smoke/water_damage.lua
+"${LUA:-lua}" test/smoke/decay.lua
+"${LUA:-lua}" test/smoke/audit_log.lua
+"${LUA:-lua}" test/smoke/audit_ring.lua
+"${LUA:-lua}" test/smoke/omnipack.lua
+"${LUA:-lua}" test/smoke/trade.lua
+"${LUA:-lua}" test/smoke/controls.lua

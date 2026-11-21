@@ -1,8 +1,9 @@
 /* Quality-of-life additions. kora_theme tokens only. */
 .slot-dimmed { opacity: .28; filter: saturate(.4); }
 
-.category-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 1px 10px; }
-.category-chip { padding: 2px 9px; border: 1px solid hsl(var(--border)); border-radius: 999px; background: hsl(var(--muted) / .5); color: hsl(var(--muted-foreground)); font-size: calc(10px * var(--ui-scale, 1)); font-weight: 650; cursor: pointer; }
+.category-chips { display: flex; flex-wrap: nowrap; gap: 5px; margin: 0 1px 10px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; }
+.category-chips::-webkit-scrollbar { display: none; }
+.category-chip { flex: none; white-space: nowrap; padding: 2px 9px; border: 1px solid hsl(var(--border)); border-radius: 999px; background: hsl(var(--muted) / .5); color: hsl(var(--muted-foreground)); font-size: calc(10px * var(--ui-scale, 1)); font-weight: 650; cursor: pointer; }
 .category-chip:hover { color: hsl(var(--foreground)); }
 .category-chip-active { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft)); color: hsl(var(--primary)); }
 

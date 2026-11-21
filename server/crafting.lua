@@ -390,6 +390,9 @@ function weapons.prepareMetadata(name, metadata)
     end
     info.durability = roundDurability(Kora.util.clamp(durability, 0, 100))
     info.quality = info.durability
+    -- A jam is a plain boolean set only by server/weapon_upkeep.lua; anything
+    -- else (including a client-shaped value) is dropped, never persisted.
+    info.jammed = info.jammed == true or nil
     local ammo = math.floor(tonumber(info.ammo) or 0)
     local ammoCap = math.max(0, math.floor(tonumber(weaponConfig.maxAmmo) or 10000))
     ammo = Kora.util.clamp(ammo, 0, ammoCap)
@@ -674,6 +677,11 @@ function crafting.craft(src, recipeId, context, amount)
         for _, output in ipairs(recipe.outputs) do
             scaledOutputs[#scaledOutputs + 1] = scaledEntry(output, parsedAmount)
         end
+        if internal.auditAdd then
+            for _, output in ipairs(scaledOutputs) do
+                internal.auditAdd('craft', src, inventoryKey, itemName(output.name or output.item), output.amount, recipe.id, owner())
+            end
+        end
         local result = #scaledOutputs == 1 and scaledOutputs[1] or scaledOutputs
         TriggerEvent('kora_inventory:server:crafted', src, recipe.id, result)
         return true, result
@@ -733,6 +741,12 @@ function weapons.setState(src, slot, changes)
             end
             local ammoCap = math.max(0, math.floor(tonumber(weaponConfig.maxAmmo) or 10000))
             info.ammo = Kora.util.clamp(math.floor(ammo), 0, ammoCap)
+        end
+        if changes.jammed ~= nil then
+            if type(changes.jammed) ~= 'boolean' then
+                return false, 'invalid weapon jam state'
+            end
+            info.jammed = changes.jammed or nil
         end
         if changes.components ~= nil then
             local components, componentErr = normaliseComponents(item.name, changes.components)
@@ -829,6 +843,11 @@ end
 local function fireWeaponRound(src, slot, wear)
     local fired
     local ok, stateOrErr = replaceWeaponState(src, slot, function(info, item)
+        -- A jammed weapon cannot fire; checked inside the same transaction as
+        -- the round so a shot reported after a jam can never consume ammo.
+        if info.jammed == true then
+            return false, 'weapon is jammed'
+        end
         local bullets = type(info.loadedBullets) == 'table' and copy(info.loadedBullets) or {}
         if #bullets < 1 then
             return false, 'weapon is empty'

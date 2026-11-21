@@ -185,12 +185,81 @@ local function playerSetPath(src, path, value)
     return table.unpack(results, 1, results.n)
 end
 
+-- Feature functions that need this file's locals (item audit, omnipack take)
+-- live on one table: the main chunk is at Lua's 200-local limit.
+local ext = {}
+
 local function recordAudit(action, src, details)
     audit[#audit + 1] = { at = os.time(), action = action, source = src, details = inventory.copy(details or {}) }
     if #audit > config.auditLimit then
         table.remove(audit, 1)
     end
     TriggerEvent('kora_inventory:server:audit', action, src, details)
+end
+
+---Item-creation audit (server/audit_log.lua). The ONE helper every creation
+---path calls: `action` is 'add', 'purchase', 'craft', 'exchange', 'omnipack',
+---'set' ... `src` is the player the items went to / were bought by (nil for a
+---script filling a stash). The invoking resource is whatever the export
+---boundary captured for this coroutine, else `resource`, else kora_inventory.
+---Never raises and never waits on SQL: a failure here must not undo an add.
+---@param action string
+---@param src integer|nil
+---@param inventoryKey string|nil
+---@param name string
+---@param amount integer
+---@param reason string|nil
+---@param resource string|nil
+function ext.auditAdd(action, src, inventoryKey, name, amount, reason, resource)
+    local log = inventory.auditLog
+    if not log or not log.enabled() then
+        return
+    end
+    local called, err = pcall(function()
+        if not src and type(inventoryKey) == 'string' then
+            src = tonumber(inventoryKey:match('^player:(%d+)$'))
+        end
+        local data = src and playerData(src) or nil
+        log.record({
+            action = action,
+            source = src,
+            citizenid = data and data.citizenid or nil,
+            item = name,
+            amount = amount,
+            inventory = inventoryKey or (src and playerKey(src)) or nil,
+            reason = reason,
+            resource = log.invoker(resource),
+        })
+    end)
+    if not called then
+        Kora.logging.warn('audit.record_failed', 'Item audit entry failed', { error = tostring(err) })
+    end
+end
+
+---Audit the items a wholesale replacement ADDED (per name: new total minus old
+---total, when positive). Used only by the public SetInventory/SetStashItems
+---paths, where a script can mint items without calling AddItem.
+function ext.auditSetDiff(src, inventoryKey, before, after, reason)
+    local log = inventory.auditLog
+    if not log or not log.enabled() or type(after) ~= 'table' then
+        return
+    end
+    local function totals(items)
+        local sums = {}
+        for _, item in pairs(items or {}) do
+            if type(item) == 'table' and type(item.name) == 'string' then
+                sums[item.name] = (sums[item.name] or 0) + (tonumber(item.amount or item.count) or 0)
+            end
+        end
+        return sums
+    end
+    local old, new = totals(before), totals(after)
+    for name, total in pairs(new) do
+        local gained = total - (old[name] or 0)
+        if gained > 0 then
+            ext.auditAdd('set', src, inventoryKey, name, gained, reason)
+        end
+    end
 end
 
 local canonicalItemFields = {
@@ -220,12 +289,56 @@ local function copyItemExtensions(target, source)
     end
 end
 
+-- Item decay (shared/decay.lua, runtime in server/decay.lua). One table, not one
+-- local per helper: this file is close to Lua's 200-locals-per-function limit.
+-- These helpers only stamp, merge and pause/resume; deciding that an item has
+-- spoiled is the runtime's job. All of them are no-ops while
+-- Config.kora_inventory.decay is off.
+local decayHelpers = {}
+
+---Stamp an item that has no stamp yet (createdAt / decayLifetime).
+function decayHelpers.stamp(item, def)
+    local decay = inventory.decay
+    if not decay then return end
+    local cfg = decay.config()
+    if not decay.enabled(cfg) then return end
+    local rule = decay.rule(item.name, def, cfg)
+    if rule then
+        decay.stampItem(item, rule, os.time(), false)
+    end
+end
+
+---Pause or resume an item for the inventory type it is being placed into
+---(nil = a player inventory, which never pauses). Stamped items only.
+function decayHelpers.place(item, inventoryType)
+    local decay = inventory.decay
+    if not decay then return end
+    local cfg = decay.config()
+    if decay.enabled(cfg) then
+        decay.placeItem(item, decay.paused(cfg, inventoryType), os.time())
+    end
+end
+
+function decayHelpers.merge(target, incoming)
+    local decay = inventory.decay
+    if decay and decay.enabled(decay.config()) then
+        decay.mergeItems(target, incoming, os.time(), decay.mergePolicy(decay.config()))
+    end
+end
+
+---Purchases and shop stock never inherit a decay stamp: a bought item starts
+---fresh (the add path stamps it) and shelf stock does not age.
+function decayHelpers.strip(info)
+    local decay = inventory.decay
+    return decay and decay.strip(info) or info
+end
+
 local function buildItem(name, amount, slot, metadata)
     local def = itemDef(name)
     if not def then
         return nil, 'unknown item'
     end
-    return {
+    local built = {
         slot = slot,
         name = def.name or tostring(name):lower(),
         amount = amount,
@@ -253,6 +366,8 @@ local function buildItem(name, amount, slot, metadata)
         useTime = math.max(0, math.floor(tonumber(def.useTime) or 0)),
         created = os.time(),
     }
+    decayHelpers.stamp(built, def)
+    return built
 end
 
 -- Resolve presentation from the committed instance and the current definition,
@@ -587,6 +702,8 @@ local presentationFields = {
     description = true,
     image = true,
     imageUrl = true,
+    -- Shown as the red "Jammed" badge (view field `jammed`), not a raw row.
+    jammed = true,
 }
 
 local function displayLabel(key)
@@ -596,7 +713,9 @@ end
 local function appendDisplayMetadata(displayed, metadata, topLevel)
     local keys = {}
     for key in pairs(metadata) do
-        if key ~= 'show' and not (topLevel and presentationFields[key]) then
+        -- Decay stamps (createdAt, ...) are bookkeeping, never a metadata row.
+        local decayKey = topLevel and inventory.decay and inventory.decay.KEYS[key]
+        if key ~= 'show' and not (topLevel and presentationFields[key]) and not decayKey then
             keys[#keys + 1] = key
         end
     end
@@ -742,8 +861,54 @@ local function applyAmmoInfo(item, def, metadata, settings)
     end
 end
 
-local function viewItems(source)
+-- Another player's pockets are being looked at (search / rob / police): their
+-- portable containers are concealed in that view. The owner's own view and
+-- every non-player inventory are never touched.
+function ext.searchedBy(inv, viewer)
+    return inv ~= nil and inv.type == 'player' and viewer ~= nil and inv.source ~= nil and inv.source ~= viewer
+end
+
+---View-only `decay` field + optional inspector row. Never persisted: it is
+---set on the view copy only, after any value the record carried is cleared.
+function decayHelpers.apply(item, def, metadata, settings)
+    item.decay = nil
+    if not settings then
+        return
+    end
+    local decay = inventory.decay
+    local rule = decay.rule(item.name, def, settings.cfg)
+    local field = rule and decay.viewField(metadata, rule, settings.now)
+    if not field then
+        return
+    end
+    item.decay = field
+    if settings.inspector then
+        item.displayMeta[#item.displayMeta + 1] = {
+            key = 'decayRemaining',
+            label = inventory.text('inventory.decay_expires', 'Expires in'),
+            value = field.remaining > 0 and decay.format(field.remaining)
+                or inventory.text('inventory.decay_spoiled', 'Spoiled'),
+        }
+    end
+end
+
+function decayHelpers.settings()
+    local decay = inventory.decay
+    local cfg = decay and decay.config()
+    if not decay or not decay.enabled(cfg) then
+        return nil
+    end
+    local inspector, slot = cfg.showInInspector ~= false, cfg.showOnSlot ~= false
+    if not inspector and not slot then
+        return nil
+    end
+    return { cfg = cfg, now = os.time(), inspector = inspector }
+end
+
+local function viewItems(source, searched, shelf)
     local items = inventory.copy(source or {})
+    -- Shelf stock (shops) never ages, so it carries no decay fields.
+    local decayView = not shelf and decayHelpers.settings() or nil
     -- One registry lookup per distinct item name instead of one cross-resource
     -- export call per slot: a move builds several views, and every slot of a
     -- stack-heavy inventory used to cost its own getShared round trip.
@@ -766,6 +931,10 @@ local function viewItems(source)
         -- Trusted server integrations may attach bookkeeping to durable stock.
         -- It is authority state, not item metadata, and must never reach NUI.
         item.serverData = nil
+        -- View-only fields are always recomputed here, never trusted from a record.
+        item.closedContainer, item.openable, item.waterDamaged = nil, nil, nil
+        local concealed = searched and inventory.containers and inventory.containers.concealForSearch
+            and inventory.containers.concealForSearch(item)
         local def = item and cachedDef(item.name)
         if def then
             item.image = def.image or item.image
@@ -784,21 +953,45 @@ local function viewItems(source)
         item.description = effective.description
 
         appendDisplayMetadata(item.displayMeta, metadata, true)
+        if inventory.waterDamage and inventory.waterDamage.decorate then
+            inventory.waterDamage.decorate(item, metadata)
+        end
         applyAmmoInfo(item, def, metadata, ammoSettings)
+        -- View-only: a jammed weapon is flagged for the UI badge. Always
+        -- recomputed from the stored metadata, never taken from a record.
+        item.jammed = metadata.jammed == true or nil
+        decayHelpers.apply(item, def, metadata, decayView)
         -- Player items can have been created by kora_core or loaded from an older
         -- persisted shape. Weapon type and the live handler table are
         -- authoritative so the UI does not hide their Use action.
         item.useable = (def and (def.type == 'weapon' or def.useable == true)) or hasUseable(item.name)
+        if concealed and item.closedContainer then
+            -- A closed bag has no Use action for the searcher; opening it is the
+            -- separate openTargetContainer intent (item.openable).
+            item.useable, item.container = false, false
+        end
     end
     return items
 end
 
-local function view(inventoryKey)
+local function view(inventoryKey, viewer)
     local inv = getInventory(inventoryKey)
     if not inv then
         return nil
     end
-    local items = viewItems(inv.items)
+    -- Item decay is evaluated lazily whenever an inventory is viewed: stamp
+    -- unseen items and spoil expired ones before the view is built. Returns
+    -- true when it changed the inventory, so re-read it.
+    local decayRuntime = inventory.decayRuntime
+    if decayRuntime and decayRuntime.refresh(inventoryKey, inv) then
+        inv = getInventory(inventoryKey) or inv
+    end
+    local items = viewItems(inv.items, ext.searchedBy(inv, viewer), inv.type == 'shop')
+    -- The omnipack's stock IS its items table: never send ~1000 rows twice.
+    local stock
+    if not inv.omnipack then
+        stock = inv.stock and viewItems(inv.stock) or nil
+    end
     return {
         id = inv.id,
         key = inv.key,
@@ -809,21 +1002,28 @@ local function view(inventoryKey)
         weight = inventory.totalWeight(inv.items),
         revision = revision(inventoryKey),
         items = items,
-        stock = inv.stock and viewItems(inv.stock) or nil,
+        stock = stock,
+        omnipack = inv.omnipack == true or nil,
     }
 end
 
-local function patchView(inventoryKey)
-    return { key = inventoryKey, revision = revision(inventoryKey), inventory = view(inventoryKey) }
+local function patchView(inventoryKey, viewer)
+    return { key = inventoryKey, revision = revision(inventoryKey), inventory = view(inventoryKey, viewer) }
 end
 
 local function broadcast(inventoryKey)
-    local update
+    -- One patch per kind of viewer: the owner (and every non-player inventory)
+    -- gets the full view, anyone searching a player's pockets the concealed one.
+    local updates, current = {}, nil
     for src, session in pairs(sessions) do
+        if session.primary == inventoryKey or session.secondary == inventoryKey then
+            current = current or getInventory(inventoryKey)
+        end
         if (session.primary == inventoryKey or session.secondary == inventoryKey)
-            and sameDropBucket(src, getInventory(inventoryKey)) then
-            update = update or patchView(inventoryKey)
-            TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, update)
+            and sameDropBucket(src, current) then
+            local variant = ext.searchedBy(current, src) and 'searched' or 'plain'
+            updates[variant] = updates[variant] or patchView(inventoryKey, src)
+            TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, updates[variant])
             -- Legacy qb-inventory dependants listen for this to re-read their
             -- own PlayerData after a change. kora_inventory's own client bridge
             -- treats it as a refresh request, and third-party scripts that only
@@ -882,6 +1082,7 @@ local function addSecondary(inv, name, amount, slot, metadata, exactSlot)
     if not item then
         return false, err
     end
+    decayHelpers.place(item, inv.type)
     local currentWeight = inventory.totalWeight(inv.items)
     if currentWeight + inventory.itemWeight(item) > inv.maxWeight then
         return false, 'over weight'
@@ -902,6 +1103,8 @@ local function addSecondary(inv, name, amount, slot, metadata, exactSlot)
     local stack = slot and inventory.canStack(inv.items[slot], item) and slot
         or not exactSlot and inventory.stackSlot(inv.items, item)
     if stack then
+        -- The merged stack spoils with its oldest member (decay.mergePolicy).
+        decayHelpers.merge(inv.items[stack], item)
         inv.items[stack].amount = inv.items[stack].amount + amount
         return true, stack
     end
@@ -979,6 +1182,7 @@ local function addPlayer(src, name, amount, slot, metadata, reason, exactSlot)
     if not item then
         return false, err
     end
+    decayHelpers.place(item, nil)
     if inventory.totalWeight(items) + inventory.itemWeight(item) > config.playerMaxWeight then
         return false, 'over weight'
     end
@@ -1023,6 +1227,7 @@ local function addPlayer(src, name, amount, slot, metadata, reason, exactSlot)
     local stack = slot and inventory.canStack(items[slot], item) and slot or not exactSlot and inventory.stackSlot(items, item)
     if stack then
         local nextItem = inventory.copy(items[stack])
+        decayHelpers.merge(nextItem, item)
         nextItem.amount = nextItem.amount + amount
         local ok, err = playerSetPath(src, { 'items', stack }, nextItem)
         return ok, err, ok and nextItem or nil
@@ -1707,8 +1912,12 @@ local function open(src, secondaryKey, opts)
     finishHooks(hookHandle, true)
     local token = ('%s:%d:%d'):format(src, now(), math.random(100000, 999999))
     sessions[src] = { token = token, primary = primary, secondary = secondaryKey, expires = now() + config.sessionTtl }
-    local payload =
-        { token = token, primary = view(primary), secondary = view(secondaryKey), expires = sessions[src].expires }
+    local payload = {
+        token = token,
+        primary = view(primary, src),
+        secondary = view(secondaryKey, src),
+        expires = sessions[src].expires,
+    }
     TriggerClientEvent('kora_inventory:client:sessionOpened', src, payload)
     TriggerEvent('kora_inventory:server:sessionOpened', src, payload)
     return true, payload
@@ -1725,7 +1934,7 @@ local function openSelf(src)
     end
     local token = ('%s:%d:%d'):format(src, now(), math.random(100000, 999999))
     sessions[src] = { token = token, primary = primary, secondary = nil, expires = now() + config.sessionTtl }
-    local payload = { token = token, primary = view(primary), secondary = nil, expires = sessions[src].expires }
+    local payload = { token = token, primary = view(primary, src), secondary = nil, expires = sessions[src].expires }
     TriggerClientEvent('kora_inventory:client:sessionOpened', src, payload)
     TriggerEvent('kora_inventory:server:sessionOpened', src, payload)
     return true, payload
@@ -1841,6 +2050,12 @@ local function transfer(src, request)
     -- hooks and locks, so a no-op can never hold the client's request open.
     if fromKey == toKey and toSlot == fromSlot then
         return true, { fromRevision = revision(fromKey), toRevision = revision(toKey) }
+    end
+    -- A spoiled item is converted/removed instead of moved; the committed
+    -- change is broadcast, so the client re-syncs from the patch.
+    local decayRuntime = inventory.decayRuntime
+    if decayRuntime and (decayRuntime.guard(fromKey, fromSlot, src) or (toSlot and decayRuntime.guard(toKey, toSlot, src))) then
+        return false, 'item has spoiled'
     end
     local ownKey = playerKey(src)
     if (fromKey == ownKey and isSlotBusy(src, fromSlot)) or (toKey == ownKey and isSlotBusy(src, toSlot)) then
@@ -2431,6 +2646,73 @@ local function intentGive(src, request)
     end)
 end
 
+---Admin omnipack take (a `buy` intent against the generated omnipack shop).
+---Same validation as a purchase -- lease, both revisions, access (whose policy
+---is the ACE), routing bucket, distance -- and the ACE is checked AGAIN here
+---on every take, so a revoked permission stops the very next intent. The item
+---name comes from the server's own catalogue slot, never from the browser; the
+---browser only picks a slot and an amount (bounded by omnipack.maxAmount).
+---Stock is infinite and free, so nothing is decremented or re-broadcast for the
+---shop; only the admin's own inventory changes.
+function ext.omnipackTake(src, request, session, shopKey)
+    local omnipack = inventory.omnipack
+    local allowed, denied = false, 'not authorised'
+    if omnipack then
+        allowed, denied = omnipack.allowed(src)
+    end
+    if not allowed then
+        close(src, 'access denied')
+        return false, denied or 'not authorised'
+    end
+    local slot = math.floor(tonumber(request.payload.slot) or 0)
+    -- Strict: a whole number from 1 to omnipack.maxAmount. Unlike a shop buy,
+    -- a missing or non-numeric amount is not silently read as 1.
+    local requested = request.payload.amount
+    if type(requested) ~= 'number' or requested ~= requested or requested % 1 ~= 0 then
+        return false, 'invalid amount'
+    end
+    local count = requested >= 1 and requested <= omnipack.maxAmount() and math.floor(requested) or nil
+    if not count then
+        return false, 'invalid amount'
+    end
+    return lock({ session.primary }, function()
+        local _, shop, player = validSession(
+            src, request.token, shopKey, session.primary, request.secondaryRevision, request.primaryRevision
+        )
+        if not shop then
+            return false, player
+        end
+        if shop.omnipack ~= true then
+            return false, 'secondary inventory is not the omnipack'
+        end
+        local entry = (shop.stock or shop.items)[slot]
+        if not entry or type(entry.name) ~= 'string' then
+            return false, 'unknown item'
+        end
+        -- The registry is the authority at use time: an item removed since the
+        -- catalogue was built, or one that is not registered at all, is refused.
+        if not itemDef(entry.name) then
+            return false, 'unknown item'
+        end
+        if cashItemsActive and isCashItemName(entry.name) then
+            return false, 'cash cannot be taken from the omnipack'
+        end
+        local _, hookInfo = createItemHook(src, playerKey(src), entry.name, count, {})
+        -- addPlayer gives every weapon a fresh serial (prepareMetadata) and a
+        -- multi-take of a unique item one serial each.
+        local added, addErr, addedItem = addPlayer(src, entry.name, count, nil, hookInfo, 'omnipack')
+        if not added then
+            return false, addErr
+        end
+        bump(session.primary)
+        broadcast(session.primary)
+        recordAudit('omnipack', src, { item = entry.name, amount = count })
+        ext.auditAdd('omnipack', src, playerKey(src), entry.name, count, 'omnipack')
+        showItemBox(src, entry.name, count, 'add', addedItem)
+        return true
+    end)
+end
+
 local function intentBuy(src, request)
     local session = sessions[src]
     if not session or type(request.payload) ~= 'table' then
@@ -2439,6 +2721,10 @@ local function intentBuy(src, request)
     local shopKey = request.payload.inventory or request.payload.shopInventory or session.secondary
     if shopKey ~= session.secondary then
         return false, 'shop is not in this session'
+    end
+    local sessionShop = inventories[shopKey]
+    if sessionShop and sessionShop.omnipack == true then
+        return ext.omnipackTake(src, request, session, shopKey)
     end
     local _, shop, player =
         validSession(src, request.token, shopKey, session.primary, request.secondaryRevision, request.primaryRevision)
@@ -2472,7 +2758,7 @@ local function intentBuy(src, request)
         if not currentItem or currentItem.amount < count then
             return false, 'out of stock'
         end
-        local purchaseInfo = inventory.copy(currentItem.info or {})
+        local purchaseInfo = decayHelpers.strip(inventory.copy(currentItem.info or {}))
         if
             inventory.weapons
             and inventory.weapons.isWeapon
@@ -2526,6 +2812,7 @@ local function intentBuy(src, request)
             price = price * count,
             serverData = inventory.copy(currentItem.serverData),
         })
+        ext.auditAdd('purchase', src, playerKey(src), currentItem.name, count, 'shop:' .. tostring(currentShop.id))
         showItemBox(src, currentItem.name, count, 'purchase', addedItem)
         notifyPurchase(src, currentShop, currentItem.name, count, total)
         TriggerEvent('kora_inventory:server:itemPurchased', src, {
@@ -2558,11 +2845,291 @@ local function intentSync(src, request)
         return true
     end
     session.lastSync = stamp
-    TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, patchView(session.primary))
+    TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, patchView(session.primary, src))
     if session.secondary then
-        TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, patchView(session.secondary))
+        TriggerClientEvent('kora_inventory:client:sessionPatched', src, session.token, patchView(session.secondary, src))
     end
     return true
+end
+
+-- Sort / Stack all. Wrapped in a block so its helpers add no file-level locals
+-- (this file is close to Lua's limit of 200 locals per function).
+do
+local lastOrganize = {}
+
+---True while any of the player's useables is still running (the mid-use lock).
+---Organizing is refused for that whole time, not just for the slot in use.
+---@param src integer
+---@return boolean
+local function isAnyUseBusy(src)
+    if config.blockWhileBusy == false or not busySlots[src] then
+        return false
+    end
+    for slot in pairs(busySlots[src]) do
+        if isSlotBusy(src, slot) then
+            return true
+        end
+    end
+    return false
+end
+
+---Category of an item for Sort, read from the live item definition.
+local function organizeCategory(item)
+    local def = itemDef(item.name) or {}
+    if def.type == 'weapon' or def.weapon == true or item.type == 'weapon' then
+        return 'weapon'
+    end
+    if def.ammoType ~= nil or def.ammotype ~= nil or def.type == 'ammo' or item.type == 'ammo' then
+        return 'ammo'
+    end
+    if item.useable == true or def.useable == true then
+        return 'useable'
+    end
+    return 'other'
+end
+
+---Largest stack of an item, from an optional `maxStack` on its definition.
+local function organizeMaxStack(item)
+    local def = itemDef(item.name)
+    return def and tonumber(def.maxStack) or nil
+end
+
+---Sort / Stack all for one panel of the session. Validated exactly like a
+---move (lease, both revisions, access, routing bucket, distance through
+---validSession), re-validated under the inventory lock, and committed through
+---the same funnel moves use: a single kora_core setPath for the player
+---inventory, an in-place replacement for a secondary one. The browser names
+---only an inventory the session was granted and a mode; the plan is computed
+---from server state, so no item, slot or amount ever comes from the client.
+local function intentOrganize(src, request)
+    local settings = config.organize
+    local session = sessions[src]
+    if type(settings) ~= 'table' or settings.enabled == false then
+        return false, 'organizing is disabled'
+    end
+    if not session or type(request.payload) ~= 'table' then
+        return false, 'invalid session action'
+    end
+    local mode = request.payload.mode
+    if mode ~= 'sort' and mode ~= 'stack' then
+        return false, 'invalid organize mode'
+    end
+    if settings[mode] == false then
+        return false, 'organizing is disabled'
+    end
+    local targetKey = request.payload.inventory or session.primary
+    if targetKey ~= session.primary and targetKey ~= session.secondary then
+        return false, 'inventory not in session'
+    end
+    local expected = targetKey == session.primary and request.primaryRevision or request.secondaryRevision
+    local _, target, targetErr = validSession(src, request.token, targetKey, targetKey, expected, expected)
+    if not target then
+        return false, targetErr or 'stale inventory'
+    end
+    -- Both revisions of the session, from the client bridge's envelope and from
+    -- the browser's own payload, must still be current for every inventory
+    -- named. The payload's `revision` is the player's, `secondaryRevision` the
+    -- second panel's (the same shape a move carries).
+    local function stale(inventoryKey, ...)
+        if not inventoryKey then
+            return false
+        end
+        local values = table.pack(...)
+        for index = 1, values.n do
+            local value = values[index]
+            if value ~= nil and tonumber(value) ~= revision(inventoryKey) then
+                return true
+            end
+        end
+        return false
+    end
+    if stale(session.primary, request.primaryRevision, request.payload.revision)
+        or stale(session.secondary, request.secondaryRevision, request.payload.secondaryRevision) then
+        return false, 'stale inventory'
+    end
+    if target.type == 'shop' then
+        return false, 'shop inventories cannot be organized'
+    end
+    -- A searched / robbed player's pockets are a secondary panel too. The
+    -- commit below writes the plan into a player inventory, so organizing one
+    -- is only ever allowed for the caller's own.
+    if target.type == 'player' and target.source ~= src then
+        return false, 'cannot organize another player\'s inventory'
+    end
+    if target.blocked or target.durablePending then
+        return false, 'inventory is locked'
+    end
+    if isAnyUseBusy(target.type == 'player' and target.source or src) then
+        notifyBusyBlocked(src)
+        return false, BUSY_ERROR
+    end
+    local stamp = now()
+    local cooldown = math.max(0, tonumber(settings.cooldownMs) or 1000)
+    if lastOrganize[src] and stamp - lastOrganize[src] < cooldown then
+        return false, 'organizing too quickly'
+    end
+    lastOrganize[src] = stamp
+
+    return lock({ targetKey }, function()
+        -- Revalidate inside the critical section.
+        local _, current, currentErr = validSession(src, request.token, targetKey, targetKey, expected, expected)
+        if not current then
+            return false, currentErr or 'stale session'
+        end
+        if current.type == 'shop' or current.blocked or current.durablePending then
+            return false, 'inventory is locked'
+        end
+        if current.type == 'player' and current.source ~= src then
+            return false, 'cannot organize another player\'s inventory'
+        end
+        local keep = 0
+        if current.type == 'player' and settings.keepHotbar ~= false then
+            keep = math.max(0, math.min(current.slots, math.floor(tonumber(config.hotbarSlots) or 5)))
+        end
+        local plan, planErr = inventory.organize.plan(current.items, current.slots, mode, {
+            keepSlots = keep,
+            order = type(settings.sortOrder) == 'table' and settings.sortOrder or nil,
+            classify = organizeCategory,
+            maxStack = organizeMaxStack,
+            merge = decayHelpers.merge,
+        })
+        if not plan then
+            return false, planErr
+        end
+        if not plan.changed then
+            -- Nothing to do. Re-send the (unchanged) panel anyway so a browser
+            -- waiting for the confirming patch is never left hanging.
+            broadcast(targetKey)
+            return true, { changed = false, revision = revision(targetKey) }
+        end
+        -- Weight never changes; refuse rather than commit a plan that would.
+        if math.abs(inventory.totalWeight(plan.items) - inventory.totalWeight(current.items)) > 1e-6 then
+            return false, 'plan mismatch'
+        end
+        if current.type == 'player' then
+            local ok, err = playerSetPath(current.source, { 'items' }, plan.items)
+            if not ok then
+                return false, err or 'inventory write failed'
+            end
+        else
+            -- Same table, new contents: other code may hold the reference.
+            for slot in pairs(current.items) do
+                current.items[slot] = nil
+            end
+            for slot, item in pairs(plan.items) do
+                current.items[slot] = item
+            end
+        end
+        bump(targetKey)
+        broadcast(targetKey)
+        recordAudit('organize', src, { inventory = targetKey, mode = mode })
+        return true, { changed = true, revision = revision(targetKey) }
+    end)
+end
+
+inventory._organize = {
+    intent = intentOrganize,
+    forget = function(src) lastOrganize[src] = nil end,
+}
+end
+
+-- Searcher opens a bag in the inventory of the player they are searching.
+-- The payload carries ONLY `{ inventory, slot }`: the inventory must be the
+-- secondary granted to this session, and everything else (the target player,
+-- the real item in that slot, that it is a configured portable container
+-- bound to that player, range, bucket and search policy) is resolved here and
+-- in containers.openForSearcher. A container id, owner, target or item record
+-- in the payload is refused, never read.
+function ext.intentOpenTargetContainer(src, request)
+    local session, payload = sessions[src], request.payload
+    if not session or type(payload) ~= 'table' then
+        return false, 'invalid session action'
+    end
+    for field in pairs(payload) do
+        if field ~= 'inventory' and field ~= 'slot' then
+            return false, 'invalid request'
+        end
+    end
+    local containerApi = inventory.containers
+    if not containerApi or not containerApi.openForSearcher then
+        return false, 'containers unavailable'
+    end
+    if type(config.search) ~= 'table' or config.search.openContainers ~= true then
+        return false, 'opening containers is disabled'
+    end
+    if not session.secondary or payload.inventory ~= session.secondary then
+        return false, 'inventory not in session'
+    end
+    -- Exactly the checks a move out of this inventory gets: lease, cuffed /
+    -- downed, access, both revisions.
+    local _, target, primary = validSession(
+        src, request.token, session.secondary, session.primary, request.secondaryRevision, request.primaryRevision
+    )
+    if not target then
+        return false, primary
+    end
+    if target.type ~= 'player' or not target.source or target.source == src then
+        return false, 'not a searched player inventory'
+    end
+    local slot = math.floor(tonumber(payload.slot) or 0)
+    if slot < 1 or slot > target.slots or not target.items[slot] then
+        return false, 'invalid item slot'
+    end
+    local itemName, targetSrc = target.items[slot].name, target.source
+    -- The opening delay is enforced HERE, not by the browser or client: the bar
+    -- runs on the searcher's client through a server callback, and an answer
+    -- that comes back sooner than the bar can run is a refusal (same rule as
+    -- combine and the weapon upkeep bars). The wait yields, so everything is
+    -- re-validated and the slot re-resolved before anything opens.
+    local openTime = math.min(20000, math.max(0, math.floor(tonumber(config.search.openTime) or 0)))
+    if openTime > 0 then
+        ext.openingBag = ext.openingBag or {}
+        if ext.openingBag[src] then
+            return false, 'already opening a container'
+        end
+        ext.openingBag[src] = true
+        local token, secondaryKey = session.token, session.secondary
+        local ran, passed, reason = pcall(function()
+            local startedAt = GetGameTimer()
+            local called, finished = pcall(Kora.callback.trigger, src, 'kora_inventory:client:combineProgress', {
+                time = openTime,
+                label = Kora.lang('inventory.opening_bag'),
+            })
+            if not called or finished ~= true then
+                return false, 'cancelled'
+            end
+            if GetGameTimer() - startedAt < openTime - 500 then
+                return false, 'cancelled'
+            end
+            local after = sessions[src]
+            if not after or after.token ~= token or after.secondary ~= secondaryKey then
+                return false, 'stale session'
+            end
+            local _, fresh, freshErr = validSession(src, token, secondaryKey, after.primary, nil, nil)
+            if not fresh then
+                return false, freshErr or 'stale session'
+            end
+            if fresh.type ~= 'player' or fresh.source ~= targetSrc or not fresh.items[slot]
+                or fresh.items[slot].name ~= itemName then
+                return false, 'invalid item slot'
+            end
+            return true
+        end)
+        ext.openingBag[src] = nil
+        if not ran then
+            return false, 'open failed'
+        end
+        if not passed then
+            return false, reason
+        end
+    end
+    local ok, result = containerApi.openForSearcher(src, targetSrc, slot)
+    if not ok then
+        return false, result
+    end
+    recordAudit('search-open-container', src, { target = targetSrc, item = itemName, slot = slot })
+    TriggerEvent('kora_inventory:server:searchedContainer', src, targetSrc, itemName)
+    return true, { preventClose = true }
 end
 
 local function handleIntent(src, request)
@@ -2583,6 +3150,27 @@ local function handleIntent(src, request)
     end
     if request.action == 'sync' then
         return intentSync(src, request)
+    end
+    if request.action == 'organize' then
+        return inventory._organize.intent(src, request)
+    end
+    if request.action == 'combine' then
+        -- Implemented in server/combine.lua (loaded after this file); resolved
+        -- per call so the module stays optional.
+        local combine = inventory.combine
+        if not combine or not combine.intent then
+            return false, 'unsupported intent'
+        end
+        return combine.intent(src, request)
+    end
+    if request.action == 'openTargetContainer' then
+        return ext.intentOpenTargetContainer(src, request)
+    end
+    -- Two-player trade (server/trade.lua). Same envelope and session lease as
+    -- the intents above; the trade module re-validates the token with
+    -- validSession and never accepts an item record.
+    if request.action == 'trade' and inventory.trade and inventory.trade.intent then
+        return inventory.trade.intent(src, request)
     end
     return false, 'unsupported intent'
 end
@@ -2664,6 +3252,7 @@ local function addItem(src, name, amount, slot, info, reason)
             bump(playerKey(src))
             broadcast(playerKey(src))
             recordAudit('add', src, { item = name, amount = amount, reason = reason })
+            ext.auditAdd('add', src, playerKey(src), name, amount, reason)
             showItemBox(src, name, amount, 'add', added)
         end
         return done, why
@@ -2695,6 +3284,7 @@ local function removeItem(src, name, amount, slot, reason)
                 bump(playerKey(src))
                 broadcast(playerKey(src))
                 recordAudit('remove', src, { item = name, amount = amount, slot = slot, reason = reason })
+                ext.auditAdd('remove', src, playerKey(src), name, amount, reason)
                 showItemBox(src, name, amount, 'remove', removed)
             end
             return ok, err
@@ -2720,13 +3310,14 @@ local function removeItem(src, name, amount, slot, reason)
         bump(playerKey(src))
         broadcast(playerKey(src))
         recordAudit('remove', src, { item = name, amount = amount, reason = reason })
+        ext.auditAdd('remove', src, playerKey(src), name, amount, reason)
         for _, part in ipairs(planned) do
             showItemBox(src, name, part.amount, 'remove', part.item)
         end
         return true
     end)
 end
-local function itemNameKey(name)
+function ext.itemNameKey(name)
     return type(name) == 'string' and name:lower() or nil
 end
 
@@ -2734,12 +3325,12 @@ end
 ---@param name string
 ---@return table|nil item
 local function getItemByName(src, name)
-    local wanted = itemNameKey(name)
+    local wanted = ext.itemNameKey(name)
     if not wanted then
         return nil
     end
     for _, item in pairs(playerItems(src)) do
-        if itemNameKey(item.name) == wanted then
+        if ext.itemNameKey(item.name) == wanted then
             return item
         end
     end
@@ -2748,12 +3339,12 @@ end
 ---@param name string
 ---@return table[] items
 local function getItemsByName(src, name)
-    local wanted, out = itemNameKey(name), {}
+    local wanted, out = ext.itemNameKey(name), {}
     if not wanted then
         return out
     end
     for _, item in pairs(playerItems(src)) do
-        if itemNameKey(item.name) == wanted then
+        if ext.itemNameKey(item.name) == wanted then
             out[#out + 1] = item
         end
     end
@@ -2771,10 +3362,10 @@ end
 local function getItemCount(src, names)
     local wanted, total = {}, 0
     if type(names) == 'string' then
-        wanted[itemNameKey(names)] = true
+        wanted[ext.itemNameKey(names)] = true
     elseif type(names) == 'table' then
         for _, name in pairs(names) do
-            local key = itemNameKey(name)
+            local key = ext.itemNameKey(name)
             if key then
                 wanted[key] = true
             end
@@ -2783,7 +3374,7 @@ local function getItemCount(src, names)
         return 0
     end
     for _, item in pairs(playerItems(src)) do
-        if wanted[itemNameKey(item.name)] then
+        if wanted[ext.itemNameKey(item.name)] then
             total = total + (tonumber(item.amount) or 0)
         end
     end
@@ -2799,12 +3390,12 @@ local function hasItem(src, names, amount)
     end
     local counts = {}
     for _, item in pairs(playerItems(src)) do
-        local name = itemNameKey(item.name)
+        local name = ext.itemNameKey(item.name)
         counts[name] = (counts[name] or 0) + (tonumber(item.amount) or 0)
     end
     local isArray = #names > 0
     for key, value in pairs(names) do
-        local name = itemNameKey(isArray and value or key)
+        local name = ext.itemNameKey(isArray and value or key)
         local required = isArray and (tonumber(amount) or 1) or (tonumber(value) or 1)
         if not name or (counts[name] or 0) < required then
             return false
@@ -2866,10 +3457,10 @@ end
 local function clearInventory(src, keep)
     local keeps = {}
     if type(keep) == 'string' then
-        keeps[itemNameKey(keep)] = true
+        keeps[ext.itemNameKey(keep)] = true
     elseif type(keep) == 'table' then
         for key, value in pairs(keep) do
-            keeps[itemNameKey(type(key) == 'number' and value or key)] = true
+            keeps[ext.itemNameKey(type(key) == 'number' and value or key)] = true
         end
     end
     if cashItemsActive then
@@ -2877,7 +3468,7 @@ local function clearInventory(src, keep)
     end
     return lock({ playerKey(src) }, function()
         for slot, item in pairs(playerItems(src)) do
-            if not keeps[itemNameKey(item.name)] then
+            if not keeps[ext.itemNameKey(item.name)] then
                 local ok, err = playerSetPath(src, { 'items', slot }, nil)
                 if not ok then
                     return false, err
@@ -2988,7 +3579,12 @@ local function setItems(src, newItems)
     if cashItemsActive then
         return false, 'SetInventory is unavailable while cash is an item'
     end
-    return replacePlayerItems(src, newItems)
+    local before = inventory.auditLog and inventory.auditLog.enabled() and inventory.copy(playerItems(src)) or nil
+    local ok, err = replacePlayerItems(src, newItems)
+    if ok and before then
+        ext.auditSetDiff(src, playerKey(src), before, newItems, 'SetInventory')
+    end
+    return ok, err
 end
 
 local useables, builtInUseables = {}, {}
@@ -3038,7 +3634,7 @@ local function setBuiltInUseable(name, handler, kind)
         builtInUseableKinds[name] = builtInUseableKinds[name] or {}
         builtInUseableKinds[name][kind] = handler
         local handlers = builtInUseableKinds[name]
-        builtInUseables[name] = handlers.weapon or handlers.ammo
+        builtInUseables[name] = handlers.weapon or handlers.ammo or handlers.upkeep
         if not builtInUseables[name] then
             builtInUseableKinds[name] = nil
         end
@@ -3082,6 +3678,11 @@ useItem = function(src, slotOrName)
     if not item then
         return false, 'item not found'
     end
+    -- A spoiled item cannot be used: it is converted/removed instead.
+    local decayRuntime = inventory.decayRuntime
+    if decayRuntime and decayRuntime.guard(playerKey(src), item.slot, src) then
+        return false, 'item has spoiled'
+    end
     if isDowned(src) and not downedItemAllowed(item.name) then
         notifyDownedBlocked(src)
         return false, 'you cannot use items while downed'
@@ -3089,6 +3690,10 @@ useItem = function(src, slotOrName)
     if isCuffed(src) then
         notifyCuffedBlocked(src)
         return false, 'you cannot use items while cuffed'
+    end
+    -- Water damaged electronics stay unusable until repaired (waterDamage config).
+    if inventory.waterDamage and inventory.waterDamage.blocksUse(src, item) then
+        return false, 'this item is water damaged'
     end
     local allowed, err, useHandle = runHooks('usingItem', src, {
         itemName = item.name,
@@ -3116,6 +3721,13 @@ useItem = function(src, slotOrName)
             return true
         end
         return false, result
+    end
+    -- The repair item clears a water damaged item instead of running its own
+    -- handler, but only while something is actually damaged; otherwise it falls
+    -- through and behaves as it always did.
+    if inventory.waterDamage and inventory.waterDamage.tryRepair(src, item) then
+        TriggerEvent('kora_inventory:server:usedItem', src, item.name, item)
+        return true
     end
     local handler = useables[item.name] or builtInUseables[item.name]
     if handler then
@@ -3173,7 +3785,12 @@ end
 local function stashSet(identifier, items)
     local inv = secondary('stash', identifier)
     return lock({ inv.key }, function()
-        return setInventoryItems(inv.key, inventory.copy(items or {}))
+        local before = inventory.auditLog and inventory.auditLog.enabled() and inventory.copy(inv.items) or nil
+        local ok, err = setInventoryItems(inv.key, inventory.copy(items or {}))
+        if ok and before then
+            ext.auditSetDiff(nil, inv.key, before, items, 'SetStashItems')
+        end
+        return ok, err
     end)
 end
 -- Shop stock accessors. A shop is registered with its opening stock, but until
@@ -3242,6 +3859,10 @@ dropCreate = function(coords, items, bucket, reservedId)
     if not id then
         id = reserveDropId()
     end
+    -- Items put on the ground start their decay pause when pauseIn.drop is on.
+    for _, dropped in pairs(items or {}) do
+        decayHelpers.place(dropped, 'drop')
+    end
     local inv = secondary('drop', id, {
         label = 'Ground drop',
         coords = coords,
@@ -3278,7 +3899,7 @@ end
 ---
 ---IDs and coordinates only; contents remain behind open's access checks.
 ---@return table[]
-local function dropList(src)
+function ext.dropList(src)
     local out = {}
     for _, inv in pairs(inventories) do
         if inv.type == 'drop' and inv.coords and sameDropBucket(src, inv) then
@@ -3290,7 +3911,7 @@ end
 
 Kora.callback.register('kora_inventory:server:drops', function(src)
     local bucket = GetPlayerRoutingBucket(src)
-    local list = dropList(src)
+    local list = ext.dropList(src)
     if dropViewers[src] ~= nil and dropViewers[src] ~= bucket then
         TriggerClientEvent('kora_inventory:client:dropsUpdated', src, list)
     end
@@ -3326,7 +3947,7 @@ local function dropTake(src, id, slot, amount)
 end
 
 -- Ox-style inventory constructors and shops.
-local function refreshRegistration(inv, opts, skipDirty)
+function ext.refreshRegistration(inv, opts, skipDirty)
     inv.label = opts.label or inv.label
     inv.slots = math.floor(tonumber(opts.slots) or inv.slots)
     inv.maxWeight = tonumber(opts.maxWeight or opts.maxweight) or inv.maxWeight
@@ -3378,7 +3999,7 @@ local function registerStash(id, label, slots, maxWeight, owner, groups, coords,
     if inv.policyOwner then return inv.key end
     -- Re-registration retains contents but refreshes the live access boundary.
     -- This matters for resources whose fixtures can be edited at runtime.
-    refreshRegistration(inv, opts)
+    ext.refreshRegistration(inv, opts)
     return inv.key
 end
 
@@ -3409,7 +4030,7 @@ local function registerStashPolicy(id, options, callback)
         if inv.policyOwner and inv.policyOwner ~= owner then return false, 'stash policy belongs to another resource' end
         if inv.durablePending then return false, 'inventory recovery is being reconciled' end
         local prepared = inventory.copy(inv)
-        refreshRegistration(prepared, options, true)
+        ext.refreshRegistration(prepared, options, true)
         prepared.access, prepared.accessRequired, prepared.policyOwner = callback, true, owner
         inv.access, inv.accessRequired, inv.policyOwner = nil, true, owner
         local saved, err = persistence.save(prepared)
@@ -3496,6 +4117,8 @@ local function normaliseShopStock(rows, slots)
         if not item then
             return nil, ('invalid shop item in slot %d: %s'):format(slot, tostring(err))
         end
+        -- Shelf stock never ages; a purchase is stamped by the player add path.
+        if inventory.decay then inventory.decay.unstampItem(item) end
         item.price = price
         entries[slot] = item
     end
@@ -3518,7 +4141,7 @@ local function registerShop(id, data)
     end
     data.slots = slots
     local inv, restored = secondary('shop', id, data)
-    refreshRegistration(inv, data)
+    ext.refreshRegistration(inv, data)
     if not restored then
         inv.stock = initial
         inv.items = inv.stock -- a shop is rendered as an inventory; stock is its authoritative slot table.
@@ -3603,6 +4226,10 @@ local function buyItem(src, shopId, slot, count)
     if not shop then
         return false, 'shop not found'
     end
+    -- The omnipack has its own validated take path (intentOmnipackTake).
+    if shop.omnipack == true then
+        return false, 'shop not found'
+    end
     local ok, opened = open(src, shop.key)
     if not ok then
         return false, opened
@@ -3620,7 +4247,7 @@ local function buyItem(src, shopId, slot, count)
             return false, 'out of stock'
         end
         price = tonumber(item.price or (shop.prices and shop.prices[item.name])) or 0
-        local purchaseInfo = inventory.copy(item.info or {})
+        local purchaseInfo = decayHelpers.strip(inventory.copy(item.info or {}))
         if
             inventory.weapons
             and inventory.weapons.isWeapon
@@ -3671,6 +4298,7 @@ local function buyItem(src, shopId, slot, count)
             price = price * count,
             serverData = inventory.copy(item.serverData),
         })
+        ext.auditAdd('purchase', src, playerKey(src), item.name, count, 'shop:' .. tostring(shopId))
         TriggerEvent('kora_inventory:server:itemPurchased', src, {
             shopId = shopId,
             itemName = item.name,
@@ -3988,6 +4616,7 @@ inventory.internal = {
     canAdd = canAddToInventory,
     addTo = addTo,
     addSecondary = addSecondary,
+    auditAdd = ext.auditAdd,
     removeFrom = removeFrom,
     buildItem = buildItem,
     itemDef = itemDef,
@@ -4011,9 +4640,33 @@ inventory.internal = {
     end,
     close = close,
     canAccess = canAccess,
+    -- For server/trade.lua: the session lease check every intent uses, the
+    -- single kora_core item write (own-write tracked), audit, receipts and the
+    -- physical cash policy. Server-only; never reachable from a client.
+    validSession = validSession,
+    playerSetPath = playerSetPath,
+    recordAudit = recordAudit,
+    showItemBox = showItemBox,
+    cashPolicy = cashPolicy,
     isDowned = isDowned,
     isCuffed = isCuffed,
     isSlotBusy = isSlotBusy,
+    -- Mid-use lock for server/combine.lua, which waits on a client progress
+    -- bar the way a useable handler does: the slot stays locked against
+    -- drop/give/move until it clears (or config.busyTimeout passes).
+    setSlotBusy = function(src, slot, busy)
+        if config.blockWhileBusy == false or type(slot) ~= 'number' then
+            return
+        end
+        if busy then
+            busySlots[src] = busySlots[src] or {}
+            busySlots[src][slot] = GetGameTimer()
+        elseif busySlots[src] then
+            busySlots[src][slot] = nil
+        end
+    end,
+    notifyBusyBlocked = notifyBusyBlocked,
+    busyError = BUSY_ERROR,
     sameDropBucket = sameDropBucket,
     hasUseable = hasUseable,
     setBuiltInUseable = setBuiltInUseable,
@@ -4048,6 +4701,10 @@ inventory.internal = {
     config = config,
     persistence = inventory.persistence,
 }
+
+-- Hook for server/decay.lua (lazy expiry + sweep); recordAudit, showItemBox
+-- and playerSetPath are already in the table literal above.
+inventory.internal.removeEmptyDrop = removeEmptyDrop
 
 -- The schema event precedes yielding restoreAll. Consumers that depend on
 -- inventories being authoritative must wait for both phases.
@@ -4434,8 +5091,21 @@ local physicalCashApi = {
     physicalCashImport = physicalCashImport,
     physicalCashCanImport = physicalCashCanImport,
 }
+-- Capture the calling resource where each export ENTERS: deeper in the call
+-- (and after any yield) GetInvokingResource() no longer names the caller, so
+-- the audit log reads it from this per-coroutine context instead.
+-- Only the exports that can create (or, optionally, remove) items are wrapped,
+-- so read-only exports pay nothing.
+do
+local captureInvoker = inventory.auditLog and inventory.auditLog.wrapExport or function(fn) return fn end
+local auditedExports = {
+    addItem = true, AddItem = true, removeItem = true, RemoveItem = true,
+    setItems = true, SetInventory = true, stashSet = true, SetStashItems = true,
+    buyItem = true, BuyItem = true,
+}
 for name, fn in pairs(api) do
-    exports(name, fn)
+    exports(name, auditedExports[name] and captureInvoker(fn) or fn)
+end
 end
 for name, fn in pairs(physicalCashApi) do
     exports(name, fn)
@@ -4512,7 +5182,8 @@ local function timedRequest(action, src, handler, request)
     local called, ok, result, extra = pcall(handler, src, request)
     local elapsed = GetGameTimer() - started
     local threshold = tonumber(config.slowRequestMs) or 0
-    if threshold > 0 and elapsed >= threshold then
+    -- Opening a searched bag runs its progress bar inside the request.
+    if threshold > 0 and elapsed >= threshold and not (type(request) == 'table' and request.action == 'openTargetContainer') then
         Kora.logging.warn('request.slow', 'Slow inventory request', { action = action, playerId = src, elapsedMs = elapsed })
     end
     return called, ok, result, extra
@@ -4595,7 +5266,7 @@ AddEventHandler('kora_inventory:server:persistenceReady', function()
         if current then
             if current._registered then
                 inv.temporary = current.temporary
-                refreshRegistration(inv, current)
+                ext.refreshRegistration(inv, current)
                 if current.accessRequired and not current.access then
                     -- Keep a required callback unless re-registration removed it.
                     inv.accessRequired = true
@@ -4646,6 +5317,7 @@ end)
 
 AddEventHandler('playerDropped', function()
     busySlots[source], lastBusyNotify[source] = nil, nil
+    inventory._organize.forget(source)
     dropViewers[source] = nil
     close(source, 'disconnected')
 end)
@@ -4713,7 +5385,7 @@ CreateThread(function()
             local current = GetPlayerRoutingBucket(src)
             if current ~= bucket then
                 dropViewers[src] = current
-                TriggerClientEvent('kora_inventory:client:dropsUpdated', src, dropList(src))
+                TriggerClientEvent('kora_inventory:client:dropsUpdated', src, ext.dropList(src))
             end
         end
     end

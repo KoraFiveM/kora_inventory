@@ -1,4 +1,5 @@
 import type { LayoutId } from "@/lib/layoutIds"
+import type { CombineRecipe } from "@/lib/combine"
 
 export interface NuiWireMessage<T = unknown> {
     action: string
@@ -24,6 +25,8 @@ export interface InventoryItem {
     info?: Record<string, unknown>
     displayMeta?: Array<{ key: string; label: string; value: unknown }>
     durability?: number
+    /** Weapons only: the server marked this weapon jammed (weapons.jams). View-only, never sent by the browser. */
+    jammed?: boolean
     price?: number
     stack?: boolean
     /** Instance-unique items (weapons, serialled items) never stack. */
@@ -31,6 +34,12 @@ export interface InventoryItem {
     /** Set by the browser on an item it painted ahead of the server; never sent by it. */
     pending?: boolean
     container?: boolean
+    /** View-only (search): a bag in another player's inventory whose contents were not sent. */
+    closedContainer?: boolean
+    /** View-only (search): the server would let this viewer open the closed bag. */
+    openable?: boolean
+    /** View-only (waterDamage): electronics that stopped working until repaired. */
+    waterDamaged?: boolean
     useable?: boolean
     /** Ms the client runs kora_lib's progress bar for before a use resolves. */
     useTime?: number
@@ -44,6 +53,17 @@ export interface InventoryItem {
     rounds?: number
     /** Ammo items only: labels of the weapons it fits (may end in a "+N more" entry). */
     fits?: string[]
+    /** Items that decay (decay.enabled): seconds of life left and 0..1 of it. Server-computed, view-only. */
+    decay?: { remaining: number; fraction: number }
+}
+
+/** Item decay presentation (Config.kora_inventory.decay). The server decides which items carry `decay`. */
+export interface DecayConfig {
+    enabled: boolean
+    /** Draw the freshness bar on the slot. */
+    showOnSlot: boolean
+    /** Bar turns --warning below this fraction of life left (and --destructive below 10%). */
+    warnBelow: number
 }
 
 export interface InventoryView {
@@ -54,6 +74,8 @@ export interface InventoryView {
     maxWeight?: number
     weight?: number
     items: Record<string, InventoryItem> | InventoryItem[]
+    /** Admin omnipack: a free, infinite, read-only catalogue (search + paging in the panel). */
+    omnipack?: boolean
 }
 
 export interface SessionSnapshot {
@@ -77,7 +99,7 @@ export interface SessionPatch {
 export interface IntentPayload {
     sessionId: string
     token: string
-    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync"
+    intent: "close" | "move" | "use" | "drop" | "give" | "buy" | "split" | "action" | "sync" | "organize" | "combine" | "openTargetContainer" | "trade" | "tradeRequest"
     payload: Record<string, unknown>
     /** Lets the Lua bridge answer the fetch at once and deliver the verdict as `kora_inventory:nui:intentResult`. */
     requestId?: number
@@ -100,6 +122,33 @@ export interface ItemBoxReceipt {
     action: "add" | "purchase" | "remove" | "use"
     imageOverride?: boolean
     duration?: number
+}
+
+/** Sort / Stack all / per-panel search switches (Config.kora_inventory.organize). */
+export interface OrganizeConfig {
+    /** Master switch; false hides every organize control. */
+    enabled: boolean
+    /** Show the Sort button. */
+    sort: boolean
+    /** Show the Stack all button. */
+    stack: boolean
+    /** Show a search box in every panel header. */
+    panelSearch: boolean
+}
+
+/** First-time tip card (Config.kora_inventory.ui.tips). */
+export interface TipsConfig {
+    enabled: boolean
+    /** The card appears on at most this many openings of the inventory. */
+    maxShows: number
+}
+
+/** Native controls overlay toggle (Config.kora_inventory.ui.controls). */
+export interface ControlsConfig {
+    /** Show the keyboard button in the top bar. */
+    button: boolean
+    /** Show the overlay on the first opening, before the player has chosen. */
+    defaultVisible: boolean
 }
 
 export type RightClickMode = "split" | "menu" | "none"
@@ -130,6 +179,8 @@ export interface QuickSlotsMessage {
     enabled?: boolean
     hideWhenMissing?: boolean
     showKeyHints?: boolean
+    /** Presentation of the side drawer; the player's own toggle (localStorage) wins after the first use. */
+    drawer?: { startCollapsed?: boolean }
     slots?: QuickSlotEntry[]
 }
 
@@ -198,10 +249,115 @@ export interface UiConfig {
     weightWarnings?: { enabled?: boolean; warnAt?: number; dangerAt?: number }
     /** Hover tooltip on filled slots (Config.kora_inventory.ui.tooltips). */
     tooltips?: boolean
+    /** Sort / Stack all buttons and per-panel search (Config.kora_inventory.organize). */
+    organize?: Partial<OrganizeConfig>
+    /** First-time tip card (Config.kora_inventory.ui.tips). */
+    tips?: Partial<TipsConfig>
+    /** Controls overlay toggle (Config.kora_inventory.ui.controls). */
+    controls?: Partial<ControlsConfig>
+    /** Drag-to-combine presentation list: item names + label only (Config.kora_inventory.combine). */
+    combine?: { enabled?: boolean; recipes?: CombineRecipe[] }
+    /** Item decay presentation (Config.kora_inventory.decay). */
+    decay?: Partial<DecayConfig>
+    /** Player trade presentation (Config.kora_inventory.trade); the server enforces all of it. */
+    trade?: Partial<TradeUiConfig>
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string
         /** Tried in order for `<localPath>/<name>.<ext>`. */
         extensions?: string[]
     }
+}
+
+/** One row of the item-creation audit log (server/audit_log.lua). Read-only. */
+export interface AuditRow {
+    at: number
+    action: string
+    citizenid?: string
+    source?: number
+    item?: string
+    amount?: number
+    inventory?: string
+    resource?: string
+    reason?: string
+}
+
+export interface AuditSummaryRow {
+    name: string
+    amount: number
+    count: number
+}
+
+export type AuditRange = "1h" | "24h" | "7d"
+
+/** The filter the viewer sends; the server normalises and re-checks everything. */
+export interface AuditFilter {
+    player: string
+    item: string
+    resource: string
+    range: AuditRange
+    page: number
+}
+
+export interface AuditResult {
+    error?: string
+    rows: AuditRow[]
+    hasMore: boolean
+    page: number
+    pageSize: number
+    source?: "database" | "memory"
+    summary?: { resources: AuditSummaryRow[]; items: AuditSummaryRow[] }
+}
+
+/** Config.kora_inventory.trade as the page needs it. */
+export interface TradeUiConfig {
+    enabled: boolean
+    /** Offer slots drawn per side. */
+    slots: number
+    allowCash: boolean
+}
+
+/** One offered stack as the server describes it. Partner offers carry display fields only (no raw metadata). */
+export interface TradeOffer {
+    /** The offerer's own inventory slot this offer points at. */
+    slot: number
+    amount: number
+    name: string
+    label?: string
+    image?: string
+    imageUrl?: string
+    imageOverride?: boolean
+    weight?: number
+    description?: string
+    displayMeta?: Array<{ key: string; label: string; value: unknown }>
+    unique?: boolean
+}
+
+export interface TradeSide {
+    offers: TradeOffer[]
+    cash: number
+    ready: boolean
+    confirmed: boolean
+    /** Own side only: the cash the server says you hold. */
+    balance?: number
+}
+
+export type TradePhase = "open" | "locked" | "committing"
+
+/** `kora_inventory:nui:trade`: the server's view of the trade for this player. */
+export interface TradeView {
+    id: string
+    phase: TradePhase
+    /** Echoed back on Ready/Confirm; a mismatch means the player has not seen the latest offers. */
+    revision: number
+    slots: number
+    allowCash: boolean
+    you: TradeSide
+    them: TradeSide
+    /** Milliseconds until Confirm is accepted, when locked. */
+    confirmInMs?: number
+    confirmDelayMs?: number
+    /** Milliseconds until the trade is cancelled for running too long. */
+    endsInMs?: number
+    lastError?: string
 }

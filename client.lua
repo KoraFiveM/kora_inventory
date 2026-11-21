@@ -331,7 +331,51 @@ local function submitIntent(intent)
         TriggerEvent('kora_inventory:client:requestGiveTarget', pendingGive.id)
         return true
     end
-    if action == 'use' or action == 'drop' or action == 'buy' or action == 'sync' then
+    if action == 'openTargetContainer' then
+        -- Open a bag in the searched player's inventory. Only the inventory id
+        -- of this session's secondary and a slot leave the client; the server
+        -- resolves the target, the real item, and every policy check.
+        local search = (Config.kora_inventory or {}).search
+        local slot = math.floor(tonumber(payload.slot) or 0)
+        local secondary = session.secondary
+        if type(search) ~= 'table' or search.openContainers ~= true then
+            reject('opening containers is disabled')
+            return false, 'opening containers is disabled'
+        end
+        if not secondary or payload.inventory ~= secondary.key or slot < 1 then
+            reject('invalid item slot')
+            return false, 'invalid item slot'
+        end
+        -- The opening delay (search.openTime) is a progress bar the SERVER runs
+        -- on this client (kora_inventory:client:combineProgress) and enforces.
+        local called, ok, result = pcall(callServer, 'intent', 'kora_inventory:server:intent', {
+            token = session.token,
+            action = 'openTargetContainer',
+            payload = { inventory = secondary.key, slot = slot },
+            primaryRevision = session.primary and session.primary.revision,
+            secondaryRevision = secondary.revision,
+        })
+        if not called then
+            ok, result = false, 'inventory request failed'
+        end
+        -- A success replaces the session (the bag opens as the new secondary).
+        if not session or session.token ~= requestToken then
+            return false, 'stale session'
+        end
+        if not ok then
+            reject(result or 'inventory request failed')
+        end
+        return ok == true, result
+    end
+    -- The Trade button: the partner is resolved locally by client/trade.lua
+    -- (via give_target) and never reaches the browser.
+    if action == 'tradeRequest' then
+        TriggerEvent('kora_inventory:client:startTrade')
+        return true
+    end
+    -- 'trade' (offer/ready/confirm/cancel inside an open trade) rides the same
+    -- validated intent transport; server/trade.lua checks the lease and state.
+    if action == 'use' or action == 'drop' or action == 'buy' or action == 'sync' or action == 'organize' or action == 'combine' or action == 'trade' then
         local slot = action == 'use' and math.floor(tonumber(payload.slot) or 0)
         local item = slot and session.primary.items and session.primary.items[slot]
         local clearedBusy = item and item.preventClose ~= true

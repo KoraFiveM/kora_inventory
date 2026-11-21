@@ -1,11 +1,15 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { Droplets, Lock } from "lucide-react"
 import { useDrag, useDragDropManager, useDrop } from "react-dnd"
 import { UiConfigContext } from "@/context"
+import { slotDecay } from "@/lib/decay"
 import { useLocale } from "@/lib/locales"
+import { isClosedBag, isWaterDamaged } from "@/lib/search"
 import { SlotUiContext } from "@/slotUi"
 import type { DragSlot, SlotTarget } from "@/lib/inventory"
 import type { InventoryItem, InventoryView } from "@/lib/types"
 import { ItemArtwork } from "./ItemArtwork"
+import { JammedBadge } from "./JammedBadge"
 import { SLOT_DRAG_TYPE } from "./dnd"
 import { SlotTooltip } from "./SlotTooltip"
 
@@ -29,13 +33,15 @@ export interface SlotProps {
     hotbar?: boolean
     /** The last slot of that range, which closes the outline on the right. */
     lastHotbar?: boolean
+    /** Amount of this stack offered in an open trade. */
+    offered?: number
 }
 
 /** React DnD's TouchBackend uses global CEF input listeners for both touch and
  * mouse. Unlike HTML5 DnD or source pointer-capture, it resolves the actual
  * destination slot after the cursor leaves the source element. */
-export function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, dimmed }: SlotProps) {
-    const { quickTransfer, modifierDrag, tooltips, inspectorDecimals } = useContext(UiConfigContext)
+export function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, dimmed, offered }: SlotProps) {
+    const { quickTransfer, modifierDrag, tooltips, inspectorDecimals, decay: decayConfig } = useContext(UiConfigContext)
     const dndManager = useDragDropManager()
     // Ctrl/Alt as they were when the gesture began; read when the drag item is built.
     const modifiers = useRef<DragSlot["modifiers"]>(undefined)
@@ -45,6 +51,8 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
     const hideTip = useCallback(() => { window.clearTimeout(tipTimer.current); setTip(undefined) }, [])
     useEffect(() => () => window.clearTimeout(tipTimer.current), [])
     const t = useLocale()
+    // Freshness bar for decaying items (server-computed `item.decay`; shops never carry it).
+    const decay = inventory.type === "shop" ? undefined : slotDecay(item, decayConfig, t)
     const slotUi = useContext(SlotUiContext)
     const flashing = slotUi.flash?.inventoryId === inventory.id && slotUi.flash.slot === index
     const target = useMemo<SlotTarget>(() => ({ inventoryId: inventory.id, slot: index }), [index, inventory.id])
@@ -80,6 +88,9 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
         inventory.type === "shop" && "slot-priced",
         // Painted ahead of the server and not confirmed yet: dimmed until its patch lands.
         item?.pending && "slot-pending",
+        // Search: a bag in another player's pockets, contents not sent / water damaged electronics.
+        isClosedBag(item) && "slot-closed-bag",
+        isWaterDamaged(item) && "slot-water-damaged",
         // Accent outline on the hotbar range. `hotbar` is decided by the panel,
         // not here: the range only means anything on the player's own
         // inventory, and a stash's first five slots are not bound to anything.
@@ -91,6 +102,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
         flashing && `slot-flash slot-flash-${(slotUi.flash?.nonce ?? 0) % 2}`,
         item && slotUi.isCompatible(item) && "slot-compatible",
         isOver && canDrop && "slot-move-target", isOver && !canDrop && "slot-drop-invalid",
+        item && offered && "slot-offered",
     ].filter(Boolean).join(" ")
 
     return <button
@@ -159,6 +171,11 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
                 {inventory.type === "shop" && typeof item.price === "number" && <span className="item-price">${item.price.toLocaleString()}</span>}
             </span>
             <span className="item-amount">×{item.amount}</span>
+            <JammedBadge item={item} className="jammed-badge-slot" />
+            {isClosedBag(item) && <span className="closed-bag-overlay" role="img" aria-label={t("ui.closed_bag")} title={t("ui.closed_bag")}><Lock size={14} aria-hidden /><em>{t("ui.closed")}</em></span>}
+            {isWaterDamaged(item) && <span className="water-badge" role="img" aria-label={t("ui.water_damaged")} title={t("ui.water_damaged")}><Droplets size={11} aria-hidden /></span>}
+            {decay && <span className={`decay-bar decay-${decay.level}`} title={decay.label} role="progressbar" aria-label={decay.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(decay.fraction * 100)}><i style={{ width: `${Math.round(decay.fraction * 100)}%` }} /></span>}
+            {offered ? <span className="slot-offered-badge" title={t("ui.trade_offered", { amount: offered })}>{offered}</span> : null}
             {typeof item.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, item.durability))}%` }} /></span>}
         </>}
         {tip && item && !isDragging && <SlotTooltip item={item} x={tip.x} y={tip.y} decimals={inspectorDecimals} />}

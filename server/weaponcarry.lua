@@ -340,6 +340,10 @@ RegisterNetEvent('kora_inventory:server:weaponToggled', function(slot)
     pending[src] = nil
     equipped[src] = request.action == 'draw' and { slot = request.slot, name = request.name } or nil
     publish(src)
+    -- A weapon drawn while jammed has to arrive at the client already blocked.
+    if equipped[src] and inventory.weaponUpkeep then
+        inventory.weaponUpkeep.syncDrawn(src)
+    end
 end)
 
 ---The client's weapon left their hands without a holster action -- a weapon
@@ -397,6 +401,10 @@ RegisterNetEvent('kora_inventory:server:weaponAmmoConsumed', function(slot, amou
         return
     end
     local state = inventory.weapons and inventory.weapons.getState and inventory.weapons.getState(src, slot)
+    -- A jammed weapon fires nothing, so there is no round to account for.
+    if state and state.jammed == true then
+        return
+    end
     local current = math.floor(tonumber(state and state.ammo) or 0)
     local rounds = current - amount
     if rounds <= 0 or not inventory.weapons then
@@ -428,6 +436,9 @@ RegisterNetEvent('kora_inventory:server:weaponAmmoConsumed', function(slot, amou
     local wear = shotWear(holding.name, consumed)
     if wear > 0 and inventory.weapons.consumeDurability then
         inventory.weapons.consumeDurability(src, slot, wear)
+    end
+    if consumed > 0 and inventory.weaponUpkeep then
+        inventory.weaponUpkeep.afterShots(src, holding, consumed)
     end
 end)
 
@@ -479,6 +490,9 @@ RegisterNetEvent('kora_inventory:server:weaponFired', function()
     end
     lastShotAt[src] = now
     TriggerEvent('kora_inventory:server:weaponRoundFired', src, round)
+    if inventory.weaponUpkeep then
+        inventory.weaponUpkeep.afterShots(src, holding, 1)
+    end
 end)
 
 -- Every player item write funnels through kora_core's setPath, which fires this

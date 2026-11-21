@@ -43,25 +43,35 @@ When `Config.kora_inventory.weapons.ammoInfo.enabled` is on, views (including sh
 | `rounds` | integer | Ammo items only: rounds per item. |
 | `fits` | array of string | Ammo items only, when `showCompatible` is on and a weapon matches: sorted weapon labels, at most 12, plus a final "+N more" entry. |
 
+When `Config.kora_inventory.decay.enabled` is on, items that decay also carry one more server-computed, view-only field (never stored, recomputed on every view, never accepted from the page). Shop stock never carries it.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `decay` | table | `{ remaining, fraction }`: whole seconds of life left and the share of the item's lifetime left, 0 to 1. Sent when `decay.showOnSlot` or `decay.showInInspector` is on. With `showInInspector` the item's `displayMeta` also gets a row `{ key = 'decayRemaining', label = 'Expires in', value = '1h 20m' }`. The page draws a freshness bar on the slot (`--warning` below `decay.warnBelow`, `--destructive` below 10%) whose tooltip reads "Expires in 1h 20m". |
+
 | Option | Type | Description |
 | --- | --- | --- |
-| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, rightClick, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice, quickTransfer, modifierDrag, quickAmounts, filters, tooltips, weightWarnings }`, derived from `Config.kora_inventory.ui`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. Pushed on resource start and on every session open. |
+| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, rightClick, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice, quickTransfer, modifierDrag, quickAmounts, filters, tooltips, weightWarnings, organize, tips, controls, combine, decay, trade }`, derived from `Config.kora_inventory.ui`, `Config.kora_inventory.organize`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. `controls` is `{ button, defaultVisible }` from `Config.kora_inventory.ui.controls`. `decay` is `{ enabled, showOnSlot, warnBelow }` from `Config.kora_inventory.decay`, also presentation only. Pushed on resource start and on every session open. |
 | `kora_inventory:nui:layout` | table | The player's window placement from kora_hud's `/ui` editor: `{ x, y, scale, placed, playerSide, useForTransfer, layout? }`. Offsets and scale are clamped. `layout` is the player's chosen inventory layout, one of `classic`, `loadout`, `compact`, `dock`; any other value is dropped, and the page also checks it against the allowed set. Pushed when the editor applies or resets the layout and on every session open. |
 | `kora_inventory:nui:locales` | table | Flat key/value map for the React UI, resolved on the client with `Kora.lang()` from `locales/en.lua`. Pushed two seconds after the client resource starts so the page's message listener is ready. |
 | `kora_inventory:nui:sessionOpened` | table | `{ sessionId, token, revision, secondaryRevision, player, secondary?, expires }`. `player` and `secondary` are views `{ id (the inventory key), key, type, label, slots, maxWeight, weight, revision, items, stock? }`. |
 | `kora_inventory:nui:sessionPatched` | table | `{ sessionId, revision?, secondaryRevision?, player?, secondary?, snapshot? }`: the changed view replaces the page's copy. |
 | `kora_inventory:nui:sessionClosed` | table | `{ sessionId, reason }`. |
+| `kora_inventory:nui:auditOpen` | table | `{ filter }` with optional `player`, `item`, `resource`, `range`. Opens the read-only `/invaudit` overlay (not a session). |
+| `kora_inventory:nui:auditClose` | table | Closes the audit overlay. |
 | `kora_inventory:nui:intentResult` | table | `{ requestId, ok, error? }`: the deferred verdict of an intent. |
 | `kora_inventory:nui:itemBox` | table | Item receipt `{ name, label, image, imageUrl, amount, action, imageOverride, duration }` with `action` `add`, `purchase`, `remove` or `use`. |
 | `kora_inventory:nui:giveAvailability` | table | `{ available }`: whether a nearby give recipient exists. No names or ids are ever sent. |
 | `kora_inventory:nui:hotbar` | table | `{ slots, seconds, bottom }` for the on-screen hotbar overlay (U key). `slots[i]` is `{ slot, name?, label?, amount?, image?, imageUrl? }`. When `quickSlots.inHotbarHud` is on the payload also carries `quick`, the resolved quick slots that have an item: `{ id, slotLabel, slot, name, label, amount, total?, key, pinned, image?, imageUrl? }`, where `label` is the item's label, `slotLabel` the quick slot's label and `amount` the total for linked ammunition. |
-| `kora_inventory:nui:quickSlots` | table | `{ enabled, hideWhenMissing, showKeyHints, slots }` where `slots` is the resolved quick slot list in config order: `{ id, label, slot, name, total, pinned, key, linked }`. `slot` and `name` are nil when nothing resolves; `slot` is a real inventory slot (the page reads the item from its own copy of the player view). `total` is only set for linked ammunition. `pinned` is true when a local pin chose the item. `key` is the key label currently bound in Settings, Key Bindings (`''` when unbound). `linked` marks slots that cannot be pinned. Sent on every session open and again when the items, the drawn weapon or a pin change and the result differs. With `quickSlots.enabled = false` the only message is `{ enabled = false }`, sent once after start. |
+| `kora_inventory:nui:quickSlots` | table | `{ enabled, hideWhenMissing, showKeyHints, drawer, slots }`. `drawer` is `{ startCollapsed }` (from `quickSlots.drawer.startCollapsed`): whether the side drawer opens collapsed until the player toggles it. `slots` is `slots` the resolved quick slot list in config order: `{ id, label, slot, name, total, pinned, key, linked }`. `slot` and `name` are nil when nothing resolves; `slot` is a real inventory slot (the page reads the item from its own copy of the player view). `total` is only set for linked ammunition. `pinned` is true when a local pin chose the item. `key` is the key label currently bound in Settings, Key Bindings (`''` when unbound). `linked` marks slots that cannot be pinned. Sent on every session open and again when the items, the drawn weapon or a pin change and the result differs. With `quickSlots.enabled = false` the only message is `{ enabled = false }`, sent once after start. |
 | `kora_inventory:nui:hotbarPosition` | table | `{ bottom }` pixels from the screen bottom; resent when the player enters or leaves a vehicle. |
+| `kora_inventory:nui:trade` | table | The open trade as the server describes it to this player: `{ id, phase, revision, slots, allowCash, you, them, confirmInMs, confirmDelayMs, endsInMs, lastError }`. While one is present the page renders the trade window as the secondary panel in every layout. See [Player trades](./trade.md). |
+| `kora_inventory:nui:tradeEnded` | table | `{ id, reason, completed }`: the trade window for that id closes. |
 | `kora_inventory:nui:rejected` | table | Listened to by the page (`{ reason }`) but not sent by the bundled bridge, which shows refusals through `Kora.notify` instead. |
 
 ## Functions
 
-The two entries below are the NUI callbacks. The messages sent to the page are listed under Messages.
+The entries below are the NUI callbacks. The messages sent to the page are listed under Messages.
 
 ### `RegisterNUICallback('kora_inventory:nui:intent', function(data, cb) end)`
 
@@ -71,12 +81,12 @@ The only way the page changes anything. Validates the envelope, calls `submitInt
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `data` | table | `{ sessionId, token, intent, payload, requestId? }`. `intent` must be one of `close`, `move`, `use`, `drop`, `give`, `buy`, `sync`, `split`, `action`; `payload` must be a table. (`action` and unknown shapes are then refused by the transport as `unsupported intent`.) |
+| `data` | table | `{ sessionId, token, intent, payload, requestId? }`. `intent` must be one of `close`, `move`, `use`, `drop`, `give`, `buy`, `sync`, `organize`, `combine`, `split`, `action`; `payload` must be a table. (`action` and unknown shapes are then refused by the transport as `unsupported intent`.) |
 
 **Returns**
 
 - **cb(&#123; ok, error? &#125;)**
-- **With direct transport and a `requestId`: `cb({ ok = true, pending = true, requestId })` first, then the verdict message. Invalid envelopes answer `{ ok = false, error = 'invalid intent' }`. An unanswered non-`use` request answers `timeout` after `moveTimeoutMs`.**
+- **With direct transport and a `requestId`: `cb({ ok = true, pending = true, requestId })` first, then the verdict message. Invalid envelopes answer `{ ok = false, error = 'invalid intent' }`. An unanswered request other than `use` and `combine` answers `timeout` after `moveTimeoutMs`.**
 
 **Example**
 
@@ -149,6 +159,40 @@ await fetch('https://kora_inventory/kora_inventory:pinQuickSlot', { method: 'POS
 { ok: true }
 ```
 
+### `RegisterNUICallback('kora_inventory:controls', function(data, cb) end)`
+
+The page asks to show or hide GTA's native instructional buttons (the controls overlay, drawn bottom-right of the screen without NUI focus, through kora_lib's `Kora.instructional`). This is client-local presentation: it is answered on the client and never forwarded to the server. Registered always; it shows nothing unless an inventory session is open and `ui.controls.button` is not `false`.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `data` | table | `{ show }`. Only the boolean `true` shows the overlay; anything else hides it. |
+
+The button list is built from the current config at call time, so only enabled features appear: Esc (close), Enter (use selected), left mouse (drag to move or stack, drag outside to drop, double-click to use), right mouse (split stack or item menu, per `ui.rightClick`; omitted for `none`), Shift (quick transfer, with `ui.quickTransfer`), and Ctrl and Alt (move half and move one, with `ui.modifierDrag`). Labels come from `inventory.controls_*` in `locales/en.lua`.
+
+The overlay is always hidden when the inventory session closes, when the `/ui` editor opens and when the resource stops. The page keeps the player's choice in its own `localStorage` key `kora_inventory:controlsVisible` and asks again after each session opens.
+
+**Returns**
+
+- **cb(&#123; ok = true, visible = true &#125;)** when the overlay is shown or refreshed.
+- **cb(&#123; ok = true, visible = false &#125;)** when it is hidden, or when it was refused (no session, or the button is disabled).
+- **cb(&#123; ok = false &#125;)** if kora_lib could not show it.
+
+**Example**
+
+```lua
+await fetch('https://kora_inventory/kora_inventory:controls', { method: 'POST', body: JSON.stringify({ show: true }) })
+```
+
+**Representative console output**
+
+```text
+{ ok: true, visible: true }
+```
+
+The window no longer has a footer of keyboard hint chips or a "Revision" label. The layouts keep a footer slot that stays empty unless the first-time tip card or a short "Updating inventory…" status (while a move waits for the server) has something to show; the keyboard button in the top bar replaces the hints.
+
 ## Common use cases
 
 - Replacing the bundled UI with a custom page.
@@ -156,7 +200,7 @@ await fetch('https://kora_inventory/kora_inventory:pinQuickSlot', { method: 'POS
 
 ## Limits and related APIs
 
-The page can only send the nine allowed intents (the quick slot pin is a separate local callback that never reaches the server). It never receives other players' names or ids and cannot mutate state: every verdict comes from the server. Presentation settings are pushed one way and never read back. The `kora_inventory:nui:rejected` message is accepted by the bundled page but not emitted by the bundled bridge.
+The page can only send the ten allowed intents (the quick slot pin is a separate local callback that never reaches the server). It never receives other players' names or ids and cannot mutate state: every verdict comes from the server. Presentation settings are pushed one way and never read back. The `kora_inventory:nui:rejected` message is accepted by the bundled page but not emitted by the bundled bridge.
 
 ## Related guides
 
@@ -168,7 +212,7 @@ The page can only send the nine allowed intents (the quick slot pin is a separat
 
 Facts below were written from the current code of this resource; they add to, and where noted refine, the reference above.
 
-kora_inventory ships a React NUI (`web/`, built into `web/build/`, served by `ui_page`). The NUI is only a renderer: `server.lua` is the sole authority and contains no NUI call, callback, `SendNUIMessage` or focus call. `client/ui.lua` owns the NUI page and focus, accepts only these NUI intents (`close`, `move`, `use`, `drop`, `give`, `buy`, `sync`, `split`, `action`) and forwards them as a restricted envelope to the local event `kora_inventory:client:submitIntent`. `client.lua` attaches the current token and revisions before sending anything to the server.
+kora_inventory ships a React NUI (`web/`, built into `web/build/`, served by `ui_page`). The NUI is only a renderer: `server.lua` is the sole authority and contains no NUI call, callback, `SendNUIMessage` or focus call. `client/ui.lua` owns the NUI page and focus, accepts only these NUI intents (`close`, `move`, `use`, `drop`, `give`, `buy`, `sync`, `organize`, `split`, `action`) and forwards them as a restricted envelope to the local event `kora_inventory:client:submitIntent`. `client.lua` attaches the current token and revisions before sending anything to the server.
 
 Another renderer can replace it: use the client exports `openInventory`, `closeInventory`, `submitIntent`, `getCurrentSession` and listen to the `kora_inventory:ui:*` events (see [Events](./events.md)).
 
@@ -179,6 +223,23 @@ The client receives a short-lived token only after the server has resolved and a
 ### Using items from the UI and hotbar
 
 Double-clicking a slot, the Use or Buy button and Enter on a selected item all run one `activateItem`. Number keys use slots `1..hotbarSlots` with the panel closed. Both go through `KoraInventory.useGate`, which runs the `useTime` progress bar before any request is sent.
+
+### Combining items (the `combine` intent)
+
+Dropping one item onto a different item in the player's own inventory asks "Combine / Cancel" when the pushed `combine` list pairs the two names; otherwise the drop is an ordinary move. Choosing Combine sends:
+
+```lua
+{ sessionId = ..., token = ..., intent = 'combine', requestId = 9,
+  payload = { inventory = 'player:12', fromSlot = 1, toSlot = 2, revision = 41 } }
+```
+
+The page names no recipe, item, amount or result. The server validates the session lease, the revision, access, cuffed and downed state and the busy-slot lock exactly as for `use`, re-reads both slots, takes the recipe from its own registry and answers with the verdict. Like `use`, it may wait on a progress bar, so the bridge does not apply `moveTimeoutMs` to it. The page pushes the presentation list inside `kora_inventory:nui:config` as `combine = { enabled, recipes = { { a, b, label } } }`: item names and label only, no amounts. See [Crafting](./crafting.md#combining-items-by-dragging).
+
+### Admin audit overlay and omnipack
+
+The `/invaudit` overlay (`web/src/components/AuditViewer.tsx`, bridge in `client/admin_ui.lua`) is a separate component, not an inventory session: it has no token, lease or inventory and shares only NUI focus handling with `client/ui.lua` (`KoraInventory.ui.focus`). The server opens it with the net event `kora_inventory:client:auditOpen` after checking the audit ACE. The page posts filters to `kora_inventory:audit:query`; the client forwards them to the server callback `kora_inventory:server:auditQuery`, which re-checks the ACE on every request and returns a page of 100 rows plus a last-hour summary. `kora_inventory:audit:close` releases focus. It is read-only and refused while an inventory session holds the focus.
+
+The omnipack is an ordinary shop session; its view carries `omnipack = true`, is sent once on open (no `stock` copy), and the panel adds its own search box and draws 120 matches at a time with a "Show more" button, keeping each item's real slot number. Takes use the normal `buy` intent.
 
 ### Presentation config (`Config.kora_inventory.ui`)
 
@@ -203,6 +264,9 @@ The only config sent to the browser (`kora_inventory:nui:config`, at start and o
 | `filters` | `true` | Category chips (All, Weapons, Ammo, Consumables, Other) that dim non-matching slots; the search box dims in the player panel. |
 | `weightWarnings` | `{ enabled = true, warnAt = 0.75, dangerAt = 0.95 }` | Weight bar turns warning-coloured and then destructive near capacity. |
 | `tooltips` | `true` | Hover tooltip on filled slots. |
+| `organize` | `{ enabled = true, sort = true, stack = true, panelSearch = true }` | Which of the per-panel Sort and Stack all buttons and the panel search box to draw. `sort` and `stack` are already combined with `enabled`. Presentation only: the server enforces `organize.*` itself. |
+| `tips` | `{ enabled = true, maxShows = 5 }` | The first-time tip card: shown on at most `maxShows` openings (1 to 50). |
+| `controls` | `{ button = true, defaultVisible = false }` | Keyboard button in the top bar that toggles the native controls overlay (see the `kora_inventory:controls` callback). `button = false` hides it and the overlay is never shown. Applied the next time the inventory opens. |
 | `optimisticMoves` | `true` | Paint a move or purchase immediately and undo it if the server refuses or does not answer within `moveTimeoutMs`. The server validates every move either way. |
 | `queueMoves` | `true` | With `optimisticMoves`, queue up to eight further drags while one is pending. |
 | `directTransport` | `true` | Send requests as `kora_inventory:server:call` and receive `kora_inventory:client:callResult` instead of kora_lib callbacks. The `kora_inventory:server:transfer` and `intent` callbacks stay registered for third-party renderers. |
@@ -211,6 +275,14 @@ The only config sent to the browser (`kora_inventory:nui:config`, at start and o
 | `images` | see [Items](./items.md) | Artwork resolution. |
 
 `hotbarSlots` is sent alongside so the outline and the keys cannot disagree. Top-level `Config.Inspector`, `Config.Slots` and `Config.Hotbar` also style the UI. The inspector's text is selectable only when `Config.Inspector.allowCopy` is true; its Copy button copies the item as JSON.
+
+### The `organize` intent
+
+Sort and Stack all send `{ intent = 'organize', payload = { inventory = '<id the session granted>', mode = 'sort' | 'stack', revision = <player revision>, secondaryRevision = <second panel revision> } }`. Only the inventory id, the mode and the two revisions the page is looking at travel; the server plans the result from its own state and answers with the usual verdict (`ok`, or an error such as `stale inventory`, `organizing too quickly` or `shop inventories cannot be organized`). The refreshed inventory arrives as an ordinary `kora_inventory:nui:sessionPatched` message, and a request that changes nothing still re-sends the panel so the page is never left waiting. Validation is described under [organizing a panel](./inventories.md#organizing-a-panel-the-organize-intent).
+
+### First-time tips
+
+When `ui.tips.enabled` is on, the page shows a small card at the bottom of the window on at most `ui.tips.maxShows` openings. It only offers tips for features that are enabled in the pushed config (`quickTransfer`, `modifierDrag`, `rightClick`, the quick slots message, `organize`, and `playerLayoutChoice` with more than one allowed layout), cycles with Next, and hides for good with Got it. Progress is kept in the browser's `localStorage` key `kora_inventory:tips` as `{ seen: string[], dismissed: boolean, opens: number }` (`opens` counts the openings used against `maxShows`). Nothing about tips is sent to the server.
 
 ### Weapon and ammo highlight
 
@@ -259,12 +331,26 @@ The chosen id is set on the window element as the `data-layout` attribute (`main
 
 | Layout | Arrangement |
 |---|---|
-| `classic` | Top bar, then personal inventory, inspector and secondary inventory in three columns, shortcut bar underneath. Quick slots, when shown, sit beside the personal panel. |
-| `loadout` | Character-loadout window. Transfer view has three columns: pockets, a centre column with the quick-slot strip over the inspector, and the secondary inventory. Solo view is pockets plus the centre column, which only takes room while it has quick slots or a selected item; the window stays anchored on the pockets, so selecting an item grows it sideways instead of shifting the grid. With the personal side set to right (or the window moved to the right half in solo view) the columns are mirrored. |
-| `compact` | A narrow single column (about 520 px at scale 1) for minimal screen use: top bar, quick-slot strip across the top, the player grid with five columns (so the hotbar range stays on one row), and in transfer view the secondary inventory under it behind a divider. Each panel scrolls independently. The inspector is a popover beside the window (on the left when the personal side is right or the window sits on the right), shown only while an item is selected. The search box is hidden. |
-| `dock` | A full-height panel docked to the left screen edge (the right edge when the personal side is right), about 460 px wide at scale 1. The `/ui` scale applies; the centre-based position offsets do not. Tabs on top: "Pockets" and, when a secondary inventory is open, its label with an item-count badge. Pockets is always the default tab; it never switches by itself when a secondary opens. While dragging an item, resting on a tab for a moment switches to it so the item can be dropped into the other panel. The quick-slot strip is pinned under the tabs, and the inspector slides up over the bottom of the dock when an item is selected. |
+| `classic` | Top bar, then personal inventory, inspector and secondary inventory in three columns, shortcut bar underneath. Quick slots, when shown, hang in a drawer on the outside edge of the window (see below). |
+| `loadout` | Character-loadout window. Transfer view has three columns: pockets, a fixed-width centre column (about 300 px at scale 1) holding the Loadout panel with the item inspector under it, and the secondary inventory. Solo view is pockets plus the centre column: the Loadout panel on top and the inspector below it only while an item is selected. The window is exactly as wide as the columns it shows, with no empty frame area, and stays anchored on the pockets, so selecting an item grows it sideways instead of shifting the grid. With the personal side set to right (or the window moved to the right half in solo view) the columns are mirrored. |
+| `compact` | A narrow single column (about 520 px at scale 1) for minimal screen use: top bar, the player grid with five columns (so the hotbar range stays on one row), and in transfer view the secondary inventory under it behind a divider. Each panel scrolls independently. The inspector is a popover beside the window (on the left when the personal side is right or the window sits on the right), shown only while an item is selected. The search box is hidden. |
+| `dock` | A full-height panel docked to the left screen edge (the right edge when the personal side is right), about 460 px wide at scale 1. The `/ui` scale applies; the centre-based position offsets do not. Tabs on top: "Pockets" and, when a secondary inventory is open, its label with an item-count badge. Pockets is always the default tab; it never switches by itself when a secondary opens. While dragging an item, resting on a tab for a moment switches to it so the item can be dropped into the other panel. The quick-slot drawer hangs on the inner edge, the side facing the screen centre, and the inspector slides up over the bottom of the dock when an item is selected. |
 
-Quick slots are optional: when nothing is configured to show, the layouts render no strip and no empty frame.
+Quick slots are optional: when nothing is configured to show, the layouts render no drawer, no panel and no empty frame. If the loadout layout has no quick slots its centre column is just the inspector in transfer view, and disappears in solo view while nothing is selected.
+
+### Quick-slot presentations
+
+`LayoutProps.renderQuickSlots(position, options)` builds the quick slots for a layout. `position` is one of:
+
+| Position | What it draws |
+|---|---|
+| `drawer` | Used by `classic`, `compact` and `dock`. A vertical drawer attached to the outside edge of the window (same panel background and border as the window, rounded on its outer corners, no border where it joins), top-aligned just under the top bar. Tiles stack vertically, about 64 px square at scale 1, with the item art, the quick slot label, the key hint and the count. A handle tab on the drawer's outer edge folds it into a slim strip and expands it again with a short slide (no animation with prefers-reduced-motion). The handle is a button with `aria-expanded` and the labels `ui.quick_drawer_collapse` and `ui.quick_drawer_expand`. The collapsed state is remembered in the browser's localStorage under `kora_inventory:quickDrawerCollapsed`; until the player first toggles it, `quickSlots.drawer.startCollapsed` decides. With nothing to show there is no drawer at all, no handle and no frame. |
+| `panel` | Used by `loadout`. The Loadout panel: a header and one full-width row per quick slot with the item art, the quick slot label above the item label, and on the right the count (ammo shows magazines, a weapon that reports loaded rounds shows them) and the key hint. Unresolved slots (with `hideWhenMissing` off) are dashed placeholder rows. |
+| `side`, `top`, `bottom` | The original small-tile strips, kept for compatibility. No bundled layout uses them. |
+
+Every presentation behaves the same: click selects the real item and flashes its slot, double-click uses it, dragging moves the real item, dropping an item pins it and right-click unpins a pinned slot.
+
+The drawer prefers a side per layout (`options.side`): the left edge in `classic` and `compact`, the right edge when the personal side is right, or in solo view when the inspector opens on the left (so the two never overlap). In `dock` it is the inner edge. If the preferred edge would run off the screen (for example the window was moved far to the left in the `/ui` editor) and the other edge has room, the drawer moves to the other edge. The on-screen nudge counts the drawer as part of the window, so window and drawer stay on screen together.
 
 The registry lives in `web/src/layouts/`: `types.ts` (the `LayoutProps` contract), one component per layout (`ClassicLayout.tsx`, `LoadoutLayout.tsx`, `CompactLayout.tsx`, `DockLayout.tsx`) and `index.ts` (the `LAYOUTS` map and `resolveLayout`). To add a layout, write a component that takes `LayoutProps`, attach `shellRef`, `shellStyle` and `data-layout` to its main element, register it in `LAYOUTS`, and add its id to `LAYOUT_IDS` in `web/src/lib/layoutIds.ts` and to the whitelist in `client/ui.lua`. Layout-specific styles live in `web/src/styles/layouts.css`, scoped under `.inventory-shell[data-layout="..."]` and limited to kora_theme tokens. A layout that floats the inspector (compact, dock) uses `LayoutProps.drawerInspector`, the inspector in drawer form with a close button, which is null until an item is selected. Layouts never talk to the server or to the bridge, so they add no new authority.
 

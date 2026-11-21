@@ -23,6 +23,13 @@ local config = Config.kora_inventory
 local settings = type(config.quickSlots) == 'table' and config.quickSlots or { enabled = false }
 local NUI_MESSAGE = 'kora_inventory:nui:quickSlots'
 
+-- Presentation flags are read at call time so a live /config change applies on
+-- the next push; `enabled` and `slots` are captured once at file load.
+local function liveSettings()
+    local current = Config.kora_inventory.quickSlots
+    return type(current) == 'table' and current or settings
+end
+
 local function send(action, data)
     -- client/ui.lua loads after this file; look its bridge up at call time.
     local ui = KoraInventory and KoraInventory.ui
@@ -189,8 +196,9 @@ function api.push(force)
     lastSignature = sig
     send(NUI_MESSAGE, {
         enabled = true,
-        hideWhenMissing = settings.hideWhenMissing ~= false,
-        showKeyHints = settings.showKeyHints ~= false,
+        hideWhenMissing = liveSettings().hideWhenMissing ~= false,
+        showKeyHints = liveSettings().showKeyHints ~= false,
+        drawer = { startCollapsed = type(liveSettings().drawer) == 'table' and liveSettings().drawer.startCollapsed == true },
         slots = resolved,
     })
 end
@@ -199,7 +207,7 @@ end
 ---the `kora_inventory:nui:hotbar` payload). Only slots with an item are listed.
 ---@return table[]|nil
 function api.hud()
-    if settings.inHotbarHud == false then
+    if liveSettings().inHotbarHud == false then
         return nil
     end
     local data = exports.kora_core:getPlayerData()

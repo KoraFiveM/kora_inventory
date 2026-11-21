@@ -74,7 +74,11 @@ Details: [Shops](./api/shops.md), [Stashes and drops](./api/stashes.md).
 
 ## Crafting and weapons (server)
 
-`RegisterCraftRecipe`, `RemoveCraftRecipe`, `GetCraftRecipe`, `CanCraftRecipe`, `CanCraftItems`, `CraftItem`, `RegisterCraftHook`, `RemoveCraftHook` (see [Crafting](./api/crafting.md)); `PrepareWeaponMetadata`, `GetWeaponState`, `SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, `SetWeaponComponents`, `LoadWeaponRounds`, `FireWeaponRound`, `GetCarriedWeapons`, `GetEquippedWeapon`, `StartTrainingWeapon`, `StopTrainingWeapon` (see [Weapons](./api/weapons.md)).
+`RegisterCraftRecipe`, `RemoveCraftRecipe`, `GetCraftRecipe`, `CanCraftRecipe`, `CanCraftItems`, `CraftItem`, `RegisterCraftHook`, `RemoveCraftHook` (see [Crafting](./api/crafting.md)); `PrepareWeaponMetadata`, `GetWeaponState`, `SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, `SetWeaponComponents`, `LoadWeaponRounds`, `FireWeaponRound`, `GetCarriedWeapons`, `GetEquippedWeapon`, `StartTrainingWeapon`, `StopTrainingWeapon`, `repairWeaponAt` (see [Weapons](./api/weapons.md)).
+
+## Combining items (server)
+
+`registerCombination(recipe)` returns `true, id` or `false, reason`; `removeCombination(id)` returns `true` or `false, reason` and only the owning resource may remove a recipe. See [Crafting](./api/crafting.md#combining-items-by-dragging).
 
 ## Exchanges and items (server)
 
@@ -88,6 +92,8 @@ Details: [Shops](./api/shops.md), [Stashes and drops](./api/stashes.md).
 
 Not for general use: `physicalCashGet`, `physicalCashAdd`, `physicalCashRemove`, `physicalCashSet`, `physicalCashTransfer`, `physicalCashImport`, `physicalCashCanImport` (private bridge for kora_core's physical cash), `PhoneItemTransaction` / `phoneItemTransaction`, `getPersistenceStatus`, and `deleteLegacyPoliceTrash`.
 
+`openOmnipack(source)` (server) opens the admin omnipack for a player and returns `true`, or `false` and a reason. It checks the `omnipack.ace` permission of that player, so a resource cannot open it for someone without the permission. See [Commands](./commands.md).
+
 ## Client exports
 
 | Export | Notes |
@@ -98,6 +104,7 @@ Not for general use: `physicalCashGet`, `physicalCashAdd`, `physicalCashRemove`,
 | `getCurrentSession()` | |
 | `HasItem(names, amount?)` | Reads the local session snapshot. |
 | `giveTargetAvailable`, `requestGiveTarget`, `cancelGiveTarget` | Give-target selection used by the UI bridge. |
+| `requestTrade()` | Asks the nearest player to trade, like `/trade`. See [Player trades](./api/trade.md). |
 | `getConfigWeaponAttachments()` | Legacy `qb-weapons` attachment config, derived from the configured component allow-lists. |
 | `fftVersion()`, `fftAction(action, item, amount)` | Only when FFT hooks are enabled, see [FFT hooks](./fft.md). |
 

@@ -79,6 +79,7 @@ Core limits and session behaviour.
 | `playerMaxWeight` | integer | Default `120000` grams. Maximum carried weight. |
 | `hotbarSlots` | integer | Default `5`. Slots `1..hotbarSlots` double as the hotbar: number keys 1 to N are bound to them, and weapon carry in `hotbar` mode treats them as openly carried. `0` disables the key binds. Read once at start. |
 | `quickSlots` | table | Quick slots: shortcuts to items that stay in the normal inventory. See [Quick slots](#quick-slots-configkora_inventoryquickslots) below. |
+| `organize` | table | Sort and Stack all buttons and per-panel search. See [Sort and Stack all](#sort-and-stack-all-configkora_inventoryorganize) below. |
 | `defaultSlots` | integer | Default `50`. Slot count for secondary inventories that do not specify `slots`. Also the slot count of ground drops. |
 | `defaultMaxWeight` | integer | Default `100000` grams. Capacity for secondary inventories that do not specify `maxWeight`. |
 | `interactionDistance` | number | Default `3.0` metres. Default reach for secondary inventories, player inspection and give targets. |
@@ -88,7 +89,22 @@ Core limits and session behaviour.
 | `sessionSliding` | boolean | Default `true`. Every request renews the lease, making it an idle timeout. `false` makes it a hard limit counted from opening. Live-editable. |
 | `slowRequestMs` | number | Default `250`. Log a "slow ... request" line when answering a move, buy, drop or use takes this many ms. `0` turns it off. Live-editable (0 to 10000). |
 | `dropDistance` | number | Default `2.0` metres. Reach used for drop inventories. |
-| `auditLimit` | integer | Default `1000`. Entries kept in the in-memory audit ring; older entries are discarded. Every entry also fires `kora_inventory:server:audit`. |
+| `auditLimit` | integer | Default `1000`. Entries kept in the in-memory audit ring (also the in-memory item-creation entries behind `/invaudit` when the database is off); older entries are discarded. Every entry also fires `kora_inventory:server:audit`. |
+| `audit.enabled` | boolean | Default `true`. Records every item creation (see [Item-creation audit log](./persistence.md#item-creation-audit-log)). Live-editable. |
+| `audit.persist` | boolean | Default `true`. Writes entries to `kora_inventory_audit`. `false` keeps only the in-memory ring. Live-editable. |
+| `audit.flushSeconds` | number | Default `10` (1 to 300). Seconds between batched database writes; 200 queued rows also trigger one. Live-editable. |
+| `audit.retentionDays` | number | Default `14` (1 to 365). Older rows are pruned at start and hourly. Live-editable. |
+| `audit.trackRemovals` | boolean | Default `false`. Also log `RemoveItem` removals. Live-editable. |
+| `audit.ace` | string | Default `kora_inventory.audit`. ACE needed for `/invaudit`; checked on every request. Live-editable. |
+| `audit.command` | string | Default `invaudit`. Command name, read at start. |
+| `audit.anomaly.enabled` | boolean | Default `true`. Counts item amounts added per invoking resource (other than kora_inventory itself) and per player inside the window; crossing a limit logs a warning and fires `kora_inventory:server:auditAnomaly` once per window per key. Omnipack takes and `remove` entries are not counted. Live-editable. |
+| `audit.anomaly.windowSeconds` | number | Default `300` (10 to 3600). Length of the rolling window and minimum gap between repeat alerts for one key. Live-editable. |
+| `audit.anomaly.perResourceThreshold` | number | Default `500`. Total item amount one resource may add in the window before an alert. Live-editable. |
+| `audit.anomaly.perPlayerThreshold` | number | Default `200`. Total item amount one player may receive in the window before an alert. Live-editable. |
+| `omnipack.enabled` | boolean | Default `true`. Enables `/omnipack` and the `openOmnipack` export. When `false`, opening and taking are refused immediately. Live-editable. |
+| `omnipack.command` | string | Default `omnipack`. Command name, read at start. |
+| `omnipack.ace` | string | Default `kora_inventory.omnipack`. ACE needed to open and to take; checked on every take. Live-editable. |
+| `omnipack.maxAmount` | number | Default `100` (1 to 10000). Largest single take of one item. Live-editable. |
 | `exchangeCallers` | table | Default `{ kora_drugs = true }`. Resource names allowed to call `ExecutePlayerExchange` and `GetPlayerExchange`. |
 | `requireSameBucket` | boolean | Default `true`. Players may only use drops, players and other inventories in their own routing bucket. |
 
@@ -152,6 +168,8 @@ The only settings that cross into the browser. Nothing here is authority. Most a
 | `ui.filters` | boolean | Default `true`. Category chips on each panel and the search box dim non-matching slots in the player panel. Slots are never hidden or reordered. |
 | `ui.weightWarnings` | table | Default `{ enabled = true, warnAt = 0.75, dangerAt = 0.95 }`. The weight bar turns warning-coloured at `warnAt` and destructive at `dangerAt` (fractions of max weight, 0.01 to 1). |
 | `ui.tooltips` | boolean | Default `true`. Hover tooltip (after about 350 ms) with label, amount, weight, durability, display rows and description. |
+| `ui.tips` | table | Default `{ enabled = true, maxShows = 5 }`. A small dismissible tip card at the bottom of the window for players new to the inventory. It appears on at most `maxShows` openings (1 to 50), cycling through short tips about features that are switched on in this table (drag out to drop, Shift+click, Ctrl/Alt drag, right-click as configured by `ui.rightClick`, quick slots, Sort and Stack all, and the layout choice in the `/ui` editor). Next shows another tip; Got it hides the card for good. Progress is kept in the player's own browser storage under `kora_inventory:tips`. It is never shown while an item is being dragged. Applied the next time the inventory opens. |
+| `ui.controls` | table | Default `{ button = true, defaultVisible = false }`. `button` shows a keyboard button in the inventory's top bar that toggles GTA's native instructional buttons (bottom-right of the screen) listing Esc, Enter, the mouse and the Shift, Ctrl and Alt modifiers for the features that are switched on; `false` removes the button and the overlay is never shown. `defaultVisible` shows it on a player's first opening, until they use the button (their own choice is then kept in their browser storage under `kora_inventory:controlsVisible`). It is hidden whenever the inventory closes. Client-side presentation only. Applied the next time the inventory opens. |
 | `ui.optimisticMoves` | boolean | Default `true`. Paint a move or purchase at once, dimmed until the server confirms, and undo it with a notice if refused or unanswered. |
 | `ui.queueMoves` | boolean | Default `true`. Queue drags made while a move is pending. Needs `optimisticMoves`. |
 | `ui.directTransport` | boolean | Default `true`. Send move/buy/drop/use requests as one direct net event (`kora_inventory:server:call`) instead of kora_lib callbacks. Same handlers and checks either way. |
@@ -175,6 +193,39 @@ Optional physical cash and the item notification boxes.
 | `itemBoxes.showPurchases` | boolean | Default `true`. Receipts for shop purchases. |
 | `itemBoxes.showRemovals` | boolean | Default `true`. Receipts for `RemoveItem`. |
 | `itemBoxes.showUses` | boolean | Default `false`. Receipts for item use. Off by default because a consuming use already draws a removal receipt. |
+
+### Item decay (decay)
+
+Items spoil in real time and are converted or removed when fully decayed. Shipped off. Rules, stamping and the paused-storage behaviour are described under [Item decay](./items.md#item-decay). Every key below is read at call time and applies live; the presentation keys reach the page the next time a player opens their inventory.
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `decay.enabled` | boolean | Default `false`. Master switch. Off stamps nothing, spoils nothing and removes every decay view field. |
+| `decay.defaultAction` | string | Default `'convert'`. `'convert'` turns a spoiled item into its rule's `into` item (same slot and amount) and removes it when the rule has none. `'remove'` always removes. |
+| `decay.items` | map | Default `sandwich` and `burger` (172800 s, into `garbage`) and `water_bottle` (604800 s, removed). Per item name: `lifetime` in seconds of real time and optional `into` item name. Wins over a `decay` field on the kora_core item definition; `false` exempts an item. A lifetime is stamped on each item when it is created, so edits apply to new items. Server-only. |
+| `decay.showInInspector` | boolean | Default `true`. Adds an "Expires in 1h 20m" row to the item inspector and tooltip. |
+| `decay.showOnSlot` | boolean | Default `true`. Draws a thin freshness bar on the slot of decaying items. |
+| `decay.warnBelow` | number | Default `0.25`. Fraction of life left below which the bar uses the warning colour. Below 0.1 it always uses the destructive colour. |
+| `decay.sweepSeconds` | integer | Default `300`. Seconds between sweeps of online players' inventories. `0` turns the sweep off (items then spoil only when viewed, used or moved). Values from 1 to 29 behave as 30. Server-only. |
+| `decay.mergePolicy` | string | Default `'oldest'`. `'oldest'`: differently aged stacks merge and spoil with the oldest member (the stamps are ignored by the stack check). `'separate'`: items stack only when their stamps are identical. |
+| `decay.pauseIn.stash` | boolean | Default `false`. When true, time does not count while an item sits in a stash. Server-only. |
+| `decay.pauseIn.trunk` | boolean | Default `false`. Same for vehicle trunks. |
+| `decay.pauseIn.glovebox` | boolean | Default `false`. Same for vehicle gloveboxes. |
+| `decay.pauseIn.container` | boolean | Default `false`. Same for portable containers. |
+| `decay.pauseIn.drop` | boolean | Default `false`. Same for ground drops. |
+### Player trades (trade)
+
+The two-sided confirmed trade window. See [Player trades](./trade.md). All keys are editable in `/config`; every key except `command` is read when it is used, so a change applies at once (`slots` and `allowCash` reach the window the next time the inventory opens). `distance`, `requestTimeout`, `confirmDelay`, `maxDuration` and `requestCooldown` are server-only.
+
+| `trade.enabled` | boolean | Default `true`. Turns trading on. Off hides the Trade button, refuses new requests and ends any open trade. |
+| `trade.slots` | integer | Default `8`. Offer slots per side (1 to 32). |
+| `trade.allowCash` | boolean | Default `true`. Each side may add cash: the cash account, or the cash item when `cash.asItem` is on. |
+| `trade.distance` | number | Default `3.0` metres. How close the players must be to request, keep open and complete a trade. |
+| `trade.requestTimeout` | integer | Default `20` seconds. Time the asked player has to answer. |
+| `trade.confirmDelay` | integer | Default `3` seconds. After both press Ready the offers freeze this long before Confirm is accepted. |
+| `trade.maxDuration` | integer | Default `300` seconds. An open trade is cancelled with no changes after this long. |
+| `trade.requestCooldown` | integer | Default `10` seconds. Minimum gap between trade requests from one player. |
+| `trade.command` | string | Default `'trade'`. Chat command that requests a trade with the nearest player; empty for none. Read when the resource starts. |
 
 ### Persistence (persistence)
 
@@ -246,6 +297,30 @@ Item-bound containers and police evidence. Server-only domains: no client event 
 | `containers.evidence.requireSameBucket` | boolean | Default `true`. |
 | `containers.evidence.access` | function | Shipped as a function that allows only an on-duty `police` job (via `exports.kora_core:getJob`). Signature `(source, action, context)`; return true to grant or false, reason to deny. Evidence is denied entirely when this is not a function. `action` is `open`, `seize` or `release`. |
 
+### Searching players (search)
+
+What a searcher sees and may open when they open another player's inventory. See [Containers and evidence](./containers.md).
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `search.hideContainerContents` | boolean | Default `true`. Live. Portable containers in a searched player's inventory are shown closed: no container id and nothing about their contents is sent to the searcher. Off shows them like ordinary items. |
+| `search.openContainers` | boolean | Default `true`. Live. Lets a searcher open a searched player's bag with the `openTargetContainer` intent. The server re-checks the session, slot, range, bucket and search policy. Off refuses every such request and the view stops offering Open. |
+| `search.openTime` | integer | Default `2000`. Live. Milliseconds of progress bar the searcher must complete before the bag opens (0 to 20000). The server runs the bar on the searcher's client and enforces the minimum elapsed time, then re-validates the session and slot before opening. |
+
+### Water damage (waterDamage)
+
+Electronics damaged by swimming. See [Items and metadata](./items.md).
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `waterDamage.enabled` | boolean | Default `false`. Live. Master switch. |
+| `waterDamage.swimSeconds` | integer | Default `3`. Live. Seconds of swimming before the client reports (1 to 120). The server still accepts one report per player every 10 seconds. |
+| `waterDamage.items` | table | Default `phone`, `iphone`, `samsungphone` at `chance = 1.0` and `radio` at `chance = 0.5`. Live. Item name to `{ chance = 0..1 }`, rolled once per carried stack per report. |
+| `waterDamage.mode` | string | Default `flag`. Live. `flag`, `convert` or `remove`; anything else behaves like `flag`. |
+| `waterDamage.into` | string \| nil | Default `nil`. Live. Item used by `convert`; an unknown or missing item falls back to `flag`. Swimming is self-reported, so never use an item worth more than the original (use junk such as garbage). |
+| `waterDamage.repairItem` | string | Default `electronickit`. Live. Using it repairs the first water damaged pocket item and consumes one. |
+| `waterDamage.protectedBy` | table | Default `{ 'paperbag' }`. Reserved, no effect yet: items inside any portable container are already never damaged. |
+
 ### Crafting, weapons and weapon carry
 
 Server-owned recipes, weapon metadata rules, ballistics and the visible carried-weapon system.
@@ -270,6 +345,23 @@ Server-owned recipes, weapon metadata rules, ballistics and the visible carried-
 | `weapons.durability.multipliers` | table | Default `{}`. Per-weapon wear multipliers, for example `weapon_carbinerifle = 1.25`. |
 | `weapons.durability.excluded` | table | Default `{}`. Weapons that never wear, for example `weapon_stungun = true`. |
 | `weapons.components` | table | Default `{}`. Allow-list `weapon item name -> { component item names }` (a `default` row applies to weapons without their own). A weapon with no row accepts no components. |
+| `weapons.jams.enabled` | boolean | Default `false`. Accepted shots can jam the weapon. Live. |
+| `weapons.jams.baseChance` | number | Default `0.002`. Jam chance per accepted shot at 100 percent durability (0 to 1). Live. |
+| `weapons.jams.lowDurabilityChance` | number | Default `0.03`. Jam chance per accepted shot at or below `lowDurabilityBelow`. Live. |
+| `weapons.jams.lowDurabilityBelow` | number | Default `30`. Durability percent where the chance reaches `lowDurabilityChance`; blended linearly above it. Live. |
+| `weapons.jams.clearTime` | integer | Default `1500` ms. Server-run progress bar for clearing a jam. Live. |
+| `weapons.jams.excluded` | table | Default `{}`. Weapons that never jam, for example `weapon_revolver = true`. Melee, throwables and weapons with no `ammotype` never jam regardless. |
+| `weapons.repair.enabled` | boolean | Default `true`. Registers the kit and cleaning use handlers. Applies after a restart. |
+| `weapons.repair.maxDurability` | number | Default `100`. Ceiling for kits, cleaning and counters (never above 100). Live. |
+| `weapons.repair.kits` | table | Default `repairkit = { restore = 25, time = 4000 }`, `advancedrepairkit = { restore = 60, time = 6000 }`. Item name to durability points restored and progress bar milliseconds. Only listed names get a built-in handler. `restore` and `time` are live; adding or removing a name applies after a restart. |
+| `weapons.repair.cleaning.item` | string | Default `'cleaningkit'`. Item that cleans the drawn weapon. Applies after a restart. |
+| `weapons.repair.cleaning.clearsJam` | boolean | Default `true`. Cleaning also clears a jam. Live. |
+| `weapons.repair.cleaning.restore` | number | Default `5`. Durability points a cleaning restores. Live. |
+| `weapons.repair.cleaning.time` | integer | Default `3000` ms. Cleaning progress bar. Live. |
+| `weapons.repair.counters.enabled` | boolean | Default `false`. Repair counters. Zones are registered at start, so a change applies after a restart. |
+| `weapons.repair.counters.pricePerPoint` | number | Default `15`. Price per missing durability point, rounded up. Live. |
+| `weapons.repair.counters.account` | string | Default `'cash'`. `'cash'` or `'bank'` (anything else is treated as cash). Live. |
+| `weapons.repair.counters.locations` | table | Default `{}`. List of `{ coords = vec3(x, y, z), distance = 2.5, bucket = 0, label = 'Weapon repairs' }`. Edited in `config.lua` only. A commented example sits beside the Ammu-Nation coordinates. |
 | `weaponCarry.enabled` | boolean | Default `true`. Render owned, undrawn weapons on the body for every nearby client. Presentation and pacing only. |
 | `weaponCarry.visibility` | string | Default `'hotbar'`. `'all'` renders every carryable weapon; `'hotbar'` only slots 1..hotbarSlots. |
 | `weaponCarry.drawTime` | integer | Default `900` ms. Draw duration; `0` restores instant toggling and skips the animation. |
@@ -282,6 +374,18 @@ Server-owned recipes, weapon metadata rules, ballistics and the visible carried-
 | `weaponCarry.attachments` | table | Per-tier lists of `{ bone, pos, rot }` positions taken in order; a weapon with no free position is not rendered. Defaults use bone 24817 (spine). |
 | `weaponCarry.weapons` | table | Per-item overrides: `tier = false` stops carrying; `bone`, `pos`, `rot` override the position; `model` renders a prop instead. Default excludes `weapon_petrolcan` and `weapon_fireextinguisher`. |
 | `weaponCarry.components` | table | Default `{}`. Maps a component item name to the GTA component name rendered on the carried weapon. Only entries here reach clients. |
+
+### Drag to combine (combine)
+
+Lets a player drop one item onto another in their own inventory to combine them. The server holds the only recipe registry; the page is only told each pair's item names and label. All of these are in the `/config` editor, and the server reads them on every attempt, so changes apply without a restart (players see the popover change the next time they open their inventory). See [Crafting](./crafting.md#combining-items-by-dragging).
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `combine.enabled` | boolean | Default `true`. Off: no popover, the `combine` intent is refused, and dropping one item on another swaps or stacks them as usual. Live. |
+| `combine.progress` | boolean | Default `true`. Server only. Off: every recipe completes at once even if it has a `time`. Live. |
+| `combine.recipes` | list of tables | The pairs players can combine. Each row has `a`, `b` (item names, either drag order), `result`, `amount` (default `1`), `consumeA`, `consumeB` (default `1`; `0` keeps the item), `time` (progress bar milliseconds, default `0`) and `label`. Default: one row, `rolling_paper` + `weed` = `joint`, `time = 2500`, `label = 'Roll a joint'`. A row with a bad shape or an unsupported field is skipped and reported in the server log. Live; it is an advanced list in the `/config` editor. |
+
+Other resources add recipes at runtime with `registerCombination`; a pair already listed here cannot be registered again.
 
 ### Bundled shop files (config/shops/*.lua)
 
@@ -310,7 +414,13 @@ With `cash.asItem = true` kora_inventory registers with kora_core (`registerPhys
 
 ## Live editing
 
-Settings registered through `Kora.config` carry a scope (server or client) and a `live` flag: vehicle switches, door switches, UI toggles, `hotbarSeconds`, `slowRequestMs`, `sessionSliding`, `groundOffset` and `showTargetHints` apply on the next use or open. The vehicle class table, weapon components and carried-weapon components are edited through the config editor but apply after a restart. `Config` is replaced by the adopted copy at the end of `config.lua`, so scripts keep reading `Config.kora_inventory` as normal.
+Settings registered through `Kora.config` carry a scope (server or client) and a `live` flag: vehicle switches, door switches, UI toggles, every `decay` key, `hotbarSeconds`, `slowRequestMs`, `sessionSliding`, `groundOffset` and `showTargetHints` apply on the next use or open. The vehicle class table, weapon components and carried-weapon components are edited through the config editor but apply after a restart. `Config` is replaced by the adopted copy at the end of `config.lua`, so scripts keep reading `Config.kora_inventory` as normal.
+
+## Layouts, quick slots, ammo info and trunk cargo in /config
+
+These keys are registered in `config/schema/core_features.lua` and appear in the in-game `/config` editor: `ui.layout`, `ui.layouts.*`, `ui.playerLayoutChoice`, `ui.rightClick`, `ui.quickTransfer`, `ui.modifierDrag`, `ui.quickAmounts`, `ui.filters`, `ui.tooltips`, `ui.weightWarnings.*`, `quickSlots.*`, `weapons.ammoInfo.*` and `vehicles.trunkCargo.*`. Layout and interface switches apply the next time a player opens their inventory; `quickSlots.hideWhenMissing`, `showKeyHints` and `inHotbarHud` apply on the next quick slot update; `ammoInfo.*` applies on the next inventory view; trunk cargo `enabled`, `drawDistance` and `maxProps` apply within a second or two.
+
+Restart required: `quickSlots.enabled` (its keybinds are registered once at start), `vehicles.trunkCargo.fallbackModel`, `models` and `bounds`. The `quickSlots.slots` list is not editable in `/config`; change it in `config.lua`.
 
 ## Tables that other files re-read
 
@@ -339,7 +449,7 @@ Keys that exist in `config.lua` but are not listed in the reference tables above
 | `stackableWeapons` | table | `weapon_grenade`, `weapon_molotov` | Weapons that stack in one slot instead of one slot each (no serial). Only affects items added afterwards. |
 | `ui.playerLayout` | boolean | `true` | Register the window with kora_hud's `/ui` editor so players can move, resize (75-125 %) and pick a side. Needs `kora_hud`. |
 | `ui.playerLayoutTransfer` | boolean | `false` | Default for "Use my position for stashes and trunks". |
-| `ui.layout` | string | `'classic'` | Server default inventory layout: `classic` (original three columns), `loadout` (pockets, quick slots over the inspector, other inventory), `compact` (narrow single column, inspector as a popover) or `dock` (full-height edge panel with tabs; see [NUI and UI](./nui.md)). An unknown value falls back to `classic`. Applied the next time the inventory opens. |
+| `ui.layout` | string | `'classic'` | Server default inventory layout: `classic` (original three columns), `loadout` (pockets, the Loadout panel over the inspector, other inventory), `compact` (narrow single column, inspector as a popover) or `dock` (full-height edge panel with tabs; see [NUI and UI](./nui.md)). An unknown value falls back to `classic`. Applied the next time the inventory opens. |
 | `ui.layouts` | table | all four `true` | Which layouts may be used and picked, for example `classic = true, dock = false`. Only an explicit `false` disables one; if all are `false`, `classic` stays available. |
 | `ui.playerLayoutChoice` | boolean | `true` | Players choose their layout in kora_hud's `/ui` editor ("Inventory layout", listing only the allowed layouts). `false` gives everyone `ui.layout`. Needs `ui.playerLayout` and `kora_hud`. |
 | `vehicles.gloveboxRequireSeated` | boolean | `true` | The server requires the player to be seated in the vehicle for the glovebox. |
@@ -348,15 +458,32 @@ Keys that exist in `config.lua` but are not listed in the reference tables above
 
 See also [Installation](../installation.md) and [Commands and keybinds](../commands.md).
 
+## Sort and Stack all (`Config.kora_inventory.organize`)
+
+Every inventory panel except shops (player, stash, trunk, glovebox, container and ground drop) gets a Sort button, a Stack all button and its own search box in its header. Sort and Stack all are server operations (the `organize` intent, see [Opening inventories and sessions](./inventories.md#organizing-a-panel-the-organize-intent)); the search box only dims non-matching slots in that panel and never reaches the server. Config is read on every request, so the server applies a change at once; the buttons appear or disappear the next time a player opens the inventory.
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `organize.enabled` | boolean | Default `true`. Master switch. When off the server refuses every `organize` intent and the buttons are hidden. |
+| `organize.stack` | boolean | Default `true`. Allow Stack all: merge stackable stacks of the same item with identical metadata into the lowest slot, never above an item definition's optional `maxStack`. Unique items never merge. |
+| `organize.sort` | boolean | Default `true`. Allow Sort: stack, then reorder by `sortOrder`, then label (case-insensitive), then item name, then original slot. |
+| `organize.keepHotbar` | boolean | Default `true`. In a player inventory slots `1..hotbarSlots` are never moved or emptied, so hotbar keys and visible weapon carry keep working. A matching loose stack can still be added to a hotbar stack. Other inventories have no protected slots. |
+| `organize.cooldownMs` | integer | Default `1000`. Minimum milliseconds between two organizes by one player (0 to 60000). |
+| `organize.sortOrder` | string[] | Default `{ 'weapon', 'ammo', 'useable', 'other' }`. Category order for Sort. A weapon is an item whose definition is a weapon, ammo has an `ammoType` (or type `ammo`), useable has a use action; a category left out of the list sorts last. |
+| `organize.panelSearch` | boolean | Default `true`. Show the per-panel search box. The top bar search keeps dimming the player panel as before. |
+
+The `/config` editor entries live in `config/schema/organize.lua` (`config/schema/tips.lua` for `ui.tips`, and `config/schema/controls.lua` for `ui.controls`; both controls keys are live).
+
 ## Quick slots (`Config.kora_inventory.quickSlots`)
 
-Quick slots are shortcuts, not physical slots. Items stay wherever they are in the player's normal inventory (slots `1..playerSlots`). A quick slot is a pointer that resolves to the real slot of a matching item. It is shown at the side of the inventory, can be included in the U-key on-screen hotbar, and can have a hotkey. Nothing new is stored on the server and the server gains no new authority: a hotkey uses the resolved item through the same path as the number-key hotbar. The settings are read when the client starts, so restart the resource after editing them.
+Quick slots are shortcuts, not physical slots. Items stay wherever they are in the player's normal inventory (slots `1..playerSlots`). A quick slot is a pointer that resolves to the real slot of a matching item. It is shown in a drawer on the side of the inventory window (a Loadout panel in the loadout layout), can be included in the U-key on-screen hotbar, and can have a hotkey. Nothing new is stored on the server and the server gains no new authority: a hotkey uses the resolved item through the same path as the number-key hotbar. The settings are read when the client starts, so restart the resource after editing them.
 
 | Option | Type | Description |
 | --- | --- | --- |
 | `quickSlots.enabled` | boolean | Default `true`. `false` registers no keybinds and no NUI callback, and the client sends the page a single `enabled = false` message. |
 | `quickSlots.hideWhenMissing` | boolean | Default `true`. `true` hides quick slots that resolve to no item; `false` makes the page show greyed placeholders. Sent to the page. |
 | `quickSlots.showKeyHints` | boolean | Default `true`. The page shows the bound key on each quick slot. Sent to the page. |
+| `quickSlots.drawer` | table | `{ startCollapsed = false }`. The quick slots hang in a drawer on the window's edge (classic, compact and dock layouts). `startCollapsed = true` opens the drawer as a slim strip. Once a player uses the drawer handle their choice is remembered on their own machine and wins over this value. Sent to the page. |
 | `quickSlots.inHotbarHud` | boolean | Default `true`. Adds the resolved quick slots to the U-key on-screen hotbar payload as `quick`. |
 | `quickSlots.reloadFromPockets` | boolean | Default `true`. Informational. Ammunition is always loaded through the normal ammo use path, which the server validates against the drawn weapon. |
 | `quickSlots.slots` | table | Ordered list of quick slots, see below. |
@@ -385,6 +512,7 @@ Pins are stored in the player's own client key-value storage, per character (kor
 quickSlots = {
     enabled = true,
     hideWhenMissing = false,
+    drawer = { startCollapsed = true },
     slots = {
         { id = 'weapon',  label = 'Weapon',  accepts = { type = 'weapon' }, key = '' },
         { id = 'sidearm', label = 'Sidearm', accepts = { type = 'weapon', weapontype = 'Pistol' }, key = '' },

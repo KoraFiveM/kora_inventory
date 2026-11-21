@@ -5,44 +5,40 @@
 
 /* ---- shared ------------------------------------------------------------ */
 
-/* The quick-slot strip's wrapper has no frame of its own. A strip that renders
-   nothing leaves it childless, and a childless wrapper must take no room. */
-.inventory-shell[data-layout] .layout-quick { min-width: 0; flex: none; }
-.inventory-shell[data-layout] .layout-quick:empty { display: none; }
-
 /* Panels that stand in for a column: scroll inside themselves, not the shell. */
 .inventory-shell[data-layout] :is(.compact-pane, .dock-pane) { min-height: 0; min-width: 0; display: grid; grid-template-rows: minmax(0, 1fr); }
 .inventory-shell[data-layout] :is(.compact-pane, .dock-pane) > .inventory-panel { height: 100%; }
 
 /* ---- loadout ----------------------------------------------------------- */
 
-.inventory-shell[data-layout="loadout"] { --loadout-pockets: calc(400px * var(--ui-scale, 1)); }
-.inventory-shell[data-layout="loadout"] .loadout-main { min-height: 0; display: grid; grid-template-columns: minmax(310px, 1fr) minmax(250px, 300px) minmax(310px, 1fr); gap: 14px; }
-/* Centre column: quick slots on top, the inspector fills what is left. */
+.inventory-shell[data-layout="loadout"] { --loadout-pockets: calc(400px * var(--ui-scale, 1)); --loadout-centre: calc(300px * var(--ui-scale, 1)); }
+.inventory-shell[data-layout="loadout"] .loadout-main { min-height: 0; display: grid; grid-template-columns: minmax(310px, 1fr) var(--loadout-centre) minmax(310px, 1fr); gap: 14px; }
+/* Centre column: the Loadout panel on top, the inspector fills what is left. */
 .inventory-shell[data-layout="loadout"] .loadout-centre { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
-.inventory-shell[data-layout="loadout"] .loadout-main:not(.loadout-main-solo) .loadout-centre > .item-detail { flex: 1 1 0; min-height: 0; }
+.inventory-shell[data-layout="loadout"] .loadout-centre:empty { display: none; }
+.inventory-shell[data-layout="loadout"] .loadout-centre > .item-detail { flex: 1 1 0; min-height: 0; }
 
 /* Solo: pockets plus a centre column that only takes room while it has
-   content. The window is anchored on the pockets (not on its own centre), so
-   selecting an item grows the frame sideways instead of shifting the grid. */
+   content. The window is exactly pockets + gap + column wide (max-content of
+   fixed-basis flex items), so no empty frame area is ever painted. It is
+   anchored on the pockets (not on its own centre), so selecting an item grows
+   the frame sideways instead of shifting the grid. */
 .inventory-shell[data-layout="loadout"].inventory-shell-solo {
-  width: fit-content;
+  width: max-content;
   max-width: 96%;
-  transform-origin: calc(14px + var(--loadout-pockets) / 2) 50%;
-  transform: translate(calc(-14px - var(--loadout-pockets) / 2 + var(--layout-x, 0px)), calc(-50% + var(--layout-y, 0px))) scale(var(--layout-scale, 1));
+  transform-origin: calc(15px + var(--loadout-pockets) / 2) 50%;
+  transform: translate(calc(-15px - var(--loadout-pockets) / 2 + var(--layout-x, 0px)), calc(-50% + var(--layout-y, 0px))) scale(var(--layout-scale, 1));
 }
 .inventory-shell[data-layout="loadout"].inventory-shell-solo.inventory-shell-drawer-left {
-  transform-origin: calc(100% - 14px - var(--loadout-pockets) / 2) 50%;
-  transform: translate(calc(-100% + 14px + var(--loadout-pockets) / 2 + var(--layout-x, 0px)), calc(-50% + var(--layout-y, 0px))) scale(var(--layout-scale, 1));
+  transform-origin: calc(100% - 15px - var(--loadout-pockets) / 2) 50%;
+  transform: translate(calc(-100% + 15px + var(--loadout-pockets) / 2 + var(--layout-x, 0px)), calc(-50% + var(--layout-y, 0px))) scale(var(--layout-scale, 1));
 }
-.inventory-shell[data-layout="loadout"] .loadout-main-solo { grid-template-columns: var(--loadout-pockets) auto; gap: 0; }
-.inventory-shell[data-layout="loadout"].inventory-shell-drawer-left .loadout-main-solo { grid-template-columns: auto var(--loadout-pockets); }
-.inventory-shell[data-layout="loadout"] .loadout-main-solo .loadout-centre { align-self: start; max-height: 70vh; }
-.inventory-shell[data-layout="loadout"] .loadout-main-solo .loadout-centre > * { width: calc(290px * var(--ui-scale, 1)); margin-left: 14px; }
-.inventory-shell[data-layout="loadout"].inventory-shell-drawer-left .loadout-main-solo .loadout-centre > * { margin-left: 0; margin-right: 14px; }
+.inventory-shell[data-layout="loadout"] .loadout-main-solo { display: flex; gap: 14px; }
+.inventory-shell[data-layout="loadout"] .loadout-main-solo > .inventory-stage { flex: 0 0 var(--loadout-pockets); }
+.inventory-shell[data-layout="loadout"] .loadout-main-solo > .loadout-centre { flex: 0 0 var(--loadout-centre); align-self: stretch; }
 /* The solo inspector is a drawer by default (absolute, beside the window);
    here it is simply the second item of the centre column. */
-.inventory-shell[data-layout="loadout"] .item-detail-drawer { position: relative; top: auto; right: auto; left: auto; width: auto; height: auto; max-height: 60vh; flex: 0 1 auto; }
+.inventory-shell[data-layout="loadout"] .item-detail-drawer { position: relative; top: auto; right: auto; left: auto; width: auto; height: auto; max-height: 60vh; flex: 1 1 auto; min-height: 0; animation: none; }
 
 /* ---- compact ----------------------------------------------------------- */
 
@@ -70,7 +66,6 @@
 .inventory-shell[data-layout="compact"] .compact-pane { flex: 0 1 auto; }
 .inventory-shell[data-layout="compact"].layout-transfer .compact-pane { flex: 1 1 0; }
 .inventory-shell[data-layout="compact"] .compact-divider { flex: none; height: 0; margin: 10px 4px; border-top: 1px solid hsl(var(--border-strong) / .82); }
-.inventory-shell[data-layout="compact"] .shortcut-bar { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 2px 12px; font-size: calc(11px * var(--ui-scale, 1)); flex: none; }
 
 /* Inspector popover: beside the window, top-aligned, never a column. */
 .inventory-shell[data-layout="compact"] .compact-popover { position: absolute; z-index: 3; top: 0; left: calc(100% + 12px); width: calc(290px * var(--ui-scale, 1)); max-height: 70vh; display: grid; grid-template-rows: minmax(0, 1fr); animation: compact-popover-in 160ms ease-out both; }
@@ -104,7 +99,6 @@
 .inventory-shell[data-layout="dock"] .inventory-topbar { grid-template-columns: auto minmax(0, 1fr) auto; }
 .inventory-shell[data-layout="dock"] .session-state { display: none; }
 .inventory-shell[data-layout="dock"] .search { grid-column: auto; grid-row: auto; }
-.inventory-shell[data-layout="dock"] .shortcut-bar { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 2px 12px; font-size: calc(11px * var(--ui-scale, 1)); flex: none; }
 
 .inventory-shell[data-layout="dock"] .dock-tabs { flex: none; display: flex; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid hsl(var(--border) / .85); }
 .inventory-shell[data-layout="dock"] .dock-tab { flex: 1 1 0; min-width: 0; height: 36px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 10px; border: 1px solid hsl(var(--border)); border-radius: 9px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .62); font: inherit; font-size: calc(12px * var(--ui-scale, 1)); font-weight: 750; cursor: pointer; transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }

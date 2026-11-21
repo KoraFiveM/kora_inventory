@@ -285,11 +285,75 @@ exports.kora_inventory:RemoveCraftHook(id)
 true
 ```
 
+## Combining items by dragging
+
+Separate from the station-based recipes above, players can combine two items in their own inventory by dragging one onto the other (for example rolling paper onto weed to make a joint). It lives in `server/combine.lua` and is configured by `Config.kora_inventory.combine` (see [Configuration](./configuration.md)).
+
+How a combine runs:
+
+1. In the player's own inventory the player drops item A onto a slot that holds a different item B. If a recipe pairs the two, the page shows a small popover ("Roll a joint? Combine / Cancel") instead of swapping the slots. With no recipe, or `combine.enabled = false`, the drop swaps or stacks exactly as before. Dropping onto a slot in another inventory (a stash, a trunk, a shop) never combines.
+2. Choosing Combine sends the `combine` intent with only the inventory id, the two slots and the revision. See [NUI contract](./nui.md).
+3. The server runs the same session, lease, revision, access, cuffed and downed checks as `use` and `drop`, then re-reads both slots and finds the recipe in its own registry. Anything the page says about recipes, items, amounts or results is ignored.
+4. It checks that both stacks hold what the recipe consumes, and that the result fits (slot and weight) before any progress bar starts.
+5. If the recipe has a `time` above 0 and `combine.progress` is on, the server asks the client to show the kora_lib progress bar and waits, the way the parachute does. Both slots are locked against drop, give, move, use and another combine until it ends. A cancelled bar, a client that never answers, or one that answers faster than the bar can run, combines nothing.
+6. It then re-validates that both slots still hold the same items (same name and metadata, enough of each), removes A and B and adds the result in one locked step, and puts everything back if any part fails. A combine that cannot finish leaves the inventory exactly as it was.
+7. A successful combine is recorded with `recordAudit('combine', ...)` and raises the local server event `kora_inventory:server:combined`.
+
+Recipes are order independent: a recipe for `rolling_paper` + `weed` also applies when `weed` is dragged onto `rolling_paper`, and each item pays its own amount (`consumeA` for `a`, `consumeB` for `b`) whichever way round the drag went. Only one recipe may exist per pair of items.
+
+Recipe fields (in `Config.kora_inventory.combine.recipes`, or passed to `registerCombination`):
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `a`, `b` | string | The two item names. Required. |
+| `result` | string | The item given. Required. |
+| `amount` | integer | How many of `result` are given. Default `1`, up to `10000`. |
+| `consumeA`, `consumeB` | integer | How many of `a` and `b` are used up. Default `1`; `0` keeps that item (a tool). |
+| `time` | integer | Progress bar milliseconds, `0` to `20000`. Default `0` (instant). |
+| `label` | string | The popover question and the progress bar text. Default `Combine`. |
+| `id` | string | Optional, for `registerCombination` only. Letters, digits, `_`, `.`, `:`, `+` and `-`, up to 96 characters. |
+
+Unknown fields are refused rather than ignored, so a recipe that asks for a `job` check is rejected instead of being offered to everyone.
+
+### `exports.kora_inventory:registerCombination(recipe)`
+
+Adds a recipe at runtime. Server only; there is no net event for it.
+
+**Returns**
+
+- `true, id` on success. The id is the one passed in `recipe.id`, or `first+second` (the two item names in alphabetical order).
+- `false, reason` when the shape is wrong, an item does not exist in kora_core, the id is already registered, or the pair already has a recipe (in config or from another resource).
+
+```lua
+local ok, id = exports.kora_inventory:registerCombination({
+    id = 'upgrade_repair_kit',
+    a = 'repairkit',
+    b = 'electronickit',
+    result = 'advancedrepairkit',
+    amount = 1,
+    consumeA = 1,
+    consumeB = 1,
+    time = 3000,
+    label = 'Upgrade the repair kit',
+})
+```
+
+Registered recipes are removed when the resource that added them stops, and are not persisted. Players see a newly registered pair in the popover the next time they open their inventory.
+
+### `exports.kora_inventory:removeCombination(id)`
+
+Removes a recipe added with `registerCombination`. Only the resource that added it may remove it. Returns `true`, or `false, reason` (`unknown combination`, `not combination owner`). Recipes from `Config.kora_inventory.combine.recipes` cannot be removed this way; edit the config.
+
+### `kora_inventory:server:combined`
+
+`AddEventHandler('kora_inventory:server:combined', function(src, info) end)` is raised after a combine commits. `info` is `{ recipe, result, amount }`. See [Events and callbacks](./events.md).
+
 ## Common use cases
 
 - Workbenches, kitchens and drug labs with server-defined recipes.
 - Batch crafting limited by `maxBatchAmount`.
 - Pre-checking capacity before charging money for a service.
+- Drag-to-combine pairs such as rolling paper and weed, added from config or with `registerCombination`.
 
 ## Limits and related APIs
 

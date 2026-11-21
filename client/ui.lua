@@ -7,6 +7,19 @@ local function localeText(key, fallback, vars)
     return text and text(key, fallback, vars) or fallback
 end
 
+-- Controls overlay (client/controls.lua): optional, so the bridge also loads
+-- without it. Presentation only.
+local function controlsApi()
+    return KoraInventory and KoraInventory.controls
+end
+
+local function hideControls()
+    local controls = controlsApi()
+    if controls and controls.hide then
+        controls.hide()
+    end
+end
+
 local activeSession
 local activeToken
 local activePlayerId
@@ -21,8 +34,16 @@ local allowedIntents = {
     give = true,
     buy = true,
     sync = true,
+    organize = true,
     split = true,
     action = true,
+    combine = true,
+    -- Search: open a bag in the searched player's inventory (inventory + slot only).
+    openTargetContainer = true,
+    -- Player trade: offer/unoffer/cash/ready/unready/confirm/cancel, and the
+    -- Trade button (resolved locally, see client/trade.lua).
+    trade = true,
+    tradeRequest = true,
 }
 
 local function send(action, data)
@@ -33,7 +54,21 @@ end
 -- modules that only render (client/quickslots.lua) send through this rather
 -- than calling SendNUIMessage themselves.
 KoraInventory = KoraInventory or {}
-KoraInventory.ui = { send = send }
+KoraInventory.ui = {
+    send = send,
+    -- Taking/releasing NUI focus for overlays that are not an inventory
+    -- session (client/admin_ui.lua). Refused while a session holds the focus.
+    focus = function(on)
+        if on and activeSession then
+            return false
+        end
+        SetNuiFocus(on == true, on == true)
+        return true
+    end,
+    sessionActive = function()
+        return activeSession ~= nil
+    end,
+}
 
 local function pushTheme()
     KoraTheme.refresh()
@@ -57,9 +92,24 @@ local UI_LOCALE_KEYS = {
     'select_item_help', 'close', 'use_selected', 'move_or_stack', 'drop',
     'split_dialog', 'split_title', 'move_how_many', 'cancel', 'split',
     'quick_slots', 'quick_slot_item', 'quick_slot_empty', 'quick_slot_pinned', 'quick_slot_key',
-    'quick_slot_unpin', 'quick_slot_pin_failed', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
+    'quick_slot_unpin', 'quick_slot_pin_failed', 'quick_drawer_collapse', 'quick_drawer_expand', 'loadout', 'quick_slot_loaded', 'quick_slot_mags', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
     'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
-    'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type',
+    'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type', 'jammed',
+    'sort_panel', 'stack_panel', 'panel_search', 'panel_search_placeholder',
+    'controls_show', 'controls_hide', 'tip_controls',
+    'tips_title', 'tip_next', 'tip_got_it', 'tip_drag_drop', 'tip_quick_transfer', 'tip_modifier_drag',
+    'tip_right_click_split', 'tip_right_click_menu', 'tip_quick_slot', 'tip_organize', 'tip_layout',
+    'combine', 'combine_title', 'combine_items',
+    'closed_bag', 'closed', 'open_bag', 'water_damaged',
+    'decay_expires_in', 'decay_spoiled',
+    -- Admin audit viewer and omnipack search (client/admin_ui.lua, InventoryPanel).
+    'audit_title', 'audit_close', 'audit_filter_player', 'audit_filter_item', 'audit_filter_resource', 'audit_range', 'audit_range_1h', 'audit_range_24h', 'audit_range_7d', 'audit_search', 'audit_top_resources', 'audit_top_items', 'audit_col_time', 'audit_col_action', 'audit_col_player', 'audit_col_item', 'audit_col_amount', 'audit_col_inventory', 'audit_col_resource', 'audit_col_reason', 'audit_empty', 'audit_loading', 'audit_prev', 'audit_next', 'audit_page', 'audit_error', 'audit_memory_only', 'omnipack_search', 'omnipack_show_more', 'omnipack_empty',
+    'trade', 'trade_request', 'trade_you_offer', 'trade_they_offer', 'trade_cash', 'trade_cash_balance',
+    'trade_set_cash', 'trade_ready', 'trade_unready', 'trade_confirm', 'trade_cancel', 'trade_waiting',
+    'trade_partner_ready', 'trade_partner_not_ready', 'trade_partner_confirmed', 'trade_countdown',
+    'trade_locked', 'trade_drop_here', 'trade_remove_offer', 'trade_offer_amount', 'trade_offer',
+    'trade_empty_offer', 'trade_nothing_offered', 'trade_you_ready', 'trade_you_confirmed', 'trade_ends_in',
+    'trade_offered',
 }
 
 local function pushLocales()
@@ -146,6 +196,45 @@ local function rightClickMode(ui)
     return ui.rightClickSplit == false and 'none' or 'split'
 end
 
+local function organizeConfig()
+    local organize = Config.kora_inventory.organize
+    organize = type(organize) == 'table' and organize or {}
+    local enabled = organize.enabled ~= false
+    return {
+        enabled = enabled,
+        sort = enabled and organize.sort ~= false,
+        stack = enabled and organize.stack ~= false,
+        panelSearch = organize.panelSearch ~= false,
+    }
+end
+
+local function tipsConfig()
+    local tips = ((Config.kora_inventory.ui or {}).tips)
+    tips = type(tips) == 'table' and tips or {}
+    return {
+        enabled = tips.enabled ~= false,
+        maxShows = math.floor(Kora.util.clamp(tonumber(tips.maxShows) or 5, 1, 50)),
+    }
+end
+
+local function controlsConfig()
+    local controls = controlsApi()
+    if controls and controls.settings then
+        return controls.settings(Config.kora_inventory.ui)
+    end
+    return { button = true, defaultVisible = false }
+end
+
+-- Read on every push so a live config edit applies on the next open.
+local function decayPresentation()
+    local decay = Config.kora_inventory.decay or {}
+    return {
+        enabled = decay.enabled == true,
+        showOnSlot = decay.showOnSlot ~= false,
+        warnBelow = Kora.util.clamp(tonumber(decay.warnBelow) or 0.25, 0.0, 1.0),
+    }
+end
+
 local function pushConfig()
     local ui = Config.kora_inventory.ui or {}
     local ammoInfo = (Config.kora_inventory.weapons or {}).ammoInfo or {}
@@ -186,6 +275,8 @@ local function pushConfig()
         -- Read on every push so a live config change applies on the next open.
         scale = Kora.util.clamp(tonumber(ui.scale) or 1.0, 0.5, 2.0),
         images = ui.images,
+        -- Item decay presentation (the server decides which items carry `decay`).
+        decay = decayPresentation(),
         inspectorDecimals = Kora.util.clamp(math.floor(tonumber((Config.Inspector or {}).decimals) or 1), 0, 3),
         -- Selectable inspector text + Copy button (item as JSON, incl. metadata).
         inspectorCopy = (Config.Inspector or {}).allowCopy ~= false,
@@ -203,6 +294,28 @@ local function pushConfig()
         filters = ui.filters ~= false,
         tooltips = ui.tooltips ~= false,
         weightWarnings = weightWarnings(),
+        -- Sort / Stack all buttons and per-panel search. The server enforces
+        -- the same switches; these only decide what is drawn.
+        organize = organizeConfig(),
+        -- First-time tip card (shown at most maxShows openings per player).
+        tips = tipsConfig(),
+        -- Toggle button for the native controls overlay (client/controls.lua).
+        controls = controlsConfig(),
+        -- Drag-to-combine: recipe names + labels only (client/combine.lua). The
+        -- server decides which recipe applies and what it costs.
+        combine = KoraInventory.combinePresentation and KoraInventory.combinePresentation()
+            or { enabled = false, recipes = {} },
+        -- Player trade presentation: whether the Trade button shows, how many
+        -- offer slots to draw and whether the cash field exists. The server
+        -- enforces all three on every trade action regardless.
+        trade = (function()
+            local trade = type(Config.kora_inventory.trade) == 'table' and Config.kora_inventory.trade or {}
+            return {
+                enabled = trade.enabled ~= false,
+                slots = math.floor(Kora.util.clamp(tonumber(trade.slots) or 8, 1, 32)),
+                allowCash = trade.allowCash ~= false,
+            }
+        end)(),
     })
 end
 
@@ -258,6 +371,9 @@ local function closeSession(reason)
     if not activeSession then
         return
     end
+
+    -- The native overlay must never outlive the window it describes.
+    hideControls()
 
     send('kora_inventory:nui:sessionClosed', {
         sessionId = activeSession,
@@ -573,7 +689,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
             delivered = true
             send('kora_inventory:nui:intentResult', { requestId = requestId, ok = ok == true, error = ok and nil or err })
         end
-        if data.intent ~= 'use' then
+        if data.intent ~= 'use' and data.intent ~= 'combine' and data.intent ~= 'openTargetContainer' then
             SetTimeout(moveTimeoutMs(), function()
                 deliver(false, 'timeout')
             end)
@@ -602,7 +718,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
     -- so cb runs exactly once and never later than the move deadline: if the
     -- server round trip is still outstanding then, the browser is answered
     -- { ok = false, error = 'timeout' } and the late result is dropped (the UI
-    -- rolls back and asks for a resync). `use` is exempt: it may wait on a
+    -- rolls back and asks for a resync). `use` and `combine` are exempt: they may wait on a
     -- progress bar.
     local answered = false
     local function reply(result)
@@ -612,7 +728,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
         answered = true
         cb(result)
     end
-    if data.intent ~= 'use' then
+    if data.intent ~= 'use' and data.intent ~= 'combine' and data.intent ~= 'openTargetContainer' then
         SetTimeout(moveTimeoutMs(), function()
             reply({ ok = false, error = 'timeout' })
         end)
@@ -646,6 +762,26 @@ RegisterNUICallback('kora_inventory:nui:close', function(data, cb)
         })
     end
     cb({ ok = true })
+end)
+
+-- Show/hide the native controls overlay. Client-local presentation: nothing is
+-- forwarded to the server. Only an open inventory session may show it, only
+-- while ui.controls.button is on, and the button list is built from the config
+-- as it is now, so only enabled features are listed.
+RegisterNUICallback('kora_inventory:controls', function(data, cb)
+    local controls = controlsApi()
+    local wanted = type(data) == 'table' and data.show == true
+    if not controls then
+        cb({ ok = false, error = 'controls unavailable' })
+        return
+    end
+    local ui = (Config.kora_inventory or {}).ui or {}
+    if wanted and activeSession and controls.settings(ui).button then
+        cb({ ok = controls.show(ui), visible = controls.isVisible() })
+        return
+    end
+    controls.hide()
+    cb({ ok = true, visible = false })
 end)
 
 -- Quick slot pins are a local display preference (client KVP, per character).
@@ -733,6 +869,7 @@ AddEventHandler('kora_hud:ui:ready', registerWithEditor)
 -- The /ui editor takes NUI focus; an open inventory closes through the normal
 -- close intent (the server ends the session) rather than sitting under it.
 AddEventHandler('kora_hud:ui:editing', function(active)
+    if active == true then hideControls() end
     if active ~= true or not activeSession or type(activeToken) ~= 'string' then return end
     TriggerEvent('kora_inventory:client:submitIntent', {
         sessionId = activeSession,
@@ -761,6 +898,8 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then
+        -- kora_lib also hides a stopped resource's displays; be explicit.
+        hideControls()
         closeSession('resource_stop')
     end
 end)

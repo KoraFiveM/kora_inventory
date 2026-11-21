@@ -61,6 +61,7 @@ Read by kora_inventory through `buildItem`, `effectiveItem`, the use flow, ammo 
 | `weapontype` | string | Weapons only: `Melee`, `Pistol`, `SMG`, `Shotgun`, `Rifle`, `Sniper`, `LMG`, `Heavy`, `Throwable`, `Equipment`. Picks the carry tier and draw animation. |
 | `damageModifier` | number | Weapons only: damage multiplier applied while the weapon is drawn (negative falls back to 1.0). |
 | `disableCriticalHits` | boolean | Weapons only: turns off critical hits while drawn. |
+| `decay` | table | Optional decay rule: `{ lifetime = seconds, into = 'item_name' }`. Honoured only while `Config.kora_inventory.decay.enabled` is on, and a `decay.items` entry for the same item wins over it. See [Item decay](#item-decay). |
 | `stack` | boolean | ox-style flag read only by the ox item translation: `false` behaves like `unique = true`. |
 | `close, consume, client, server` | any | ox-style fields preserved on the record and returned by `Items()`: `close` mirrors `shouldClose`, `consume` is the amount a use consumes (default 1), `client`/`server` tables are copied. They do not change inventory behaviour by themselves. |
 
@@ -92,12 +93,52 @@ Any key can be stored. These change behaviour or display.
 | `image` | string | `info.image` overrides the definition image. `https://` and `nui://` values are used as-is; other values are filenames looked up in `kora_inventory/images`. |
 | `imageUrl` | string | Preserved for compatibility, but ignored by the built-in artwork renderer. |
 | `show` | boolean | Put `show = true` on a nested table to display its children in the inspector. Plain (non-table) values at the top level are always listed; other nested tables are hidden. |
-| `containerId` | string | Set by the container module when a portable container is bound to this unique item. Never accept it from a client. |
+| `containerId` | string | Set by the container module when a portable container is bound to this unique item. Never accept it from a client. It is removed from the view another player gets when searching you. |
+| `waterDamaged` | boolean | Set by the water damage feature (`waterDamage.mode = 'flag'`). A flagged item cannot be used until it is repaired; see Water damage below. Shown as a badge and an inspector row; the view fields are recomputed from this metadata and never accepted from a client. |
+| `createdAt, decayLifetime, decayPausedAt` | integer | Item decay bookkeeping written by the server (see [Item decay](#item-decay)). Never shown as inspector rows, ignored by the stack check under the default merge policy, and never to be accepted from a client. |
 | `serial, durability, quality, ammo, loadedBullets, tint, components` | mixed | Canonical weapon metadata managed by `PrepareWeaponMetadata` and the weapon exports. `quality` mirrors `durability`. |
+
+## Water damage
+
+`Config.kora_inventory.waterDamage` (off by default) lets swimming ruin electronics. The client reports with no payload that its player has been swimming for `swimSeconds` (a one second tick that only runs while the feature is on). The server accepts at most one report per player every 10 seconds, then rolls each configured item (`items`, default `phone`, `iphone`, `samsungphone`, `radio`) in that player's pockets with its `chance`. Items inside a portable container are never rolled.
+
+- `mode = 'flag'` sets `info.waterDamaged = true`. The item cannot be used (the player is told "This item is water damaged.") until it is repaired. An item already flagged is not rolled again.
+- `mode = 'convert'` replaces the item with `into` (for example `garbage`). If `into` is not set or is not a known item the item is flagged instead; it is never deleted by mistake.
+- `mode = 'remove'` deletes the item. An unknown mode behaves like `flag`.
+- Using `repairItem` (default `electronickit`) repairs the first water damaged item in the player's pockets (lowest slot) and consumes one repair item. There is no choice menu because this stack has no kora_lib menu API. When nothing is damaged the repair item behaves as it always did.
+- With the feature turned off, flags are ignored and flagged items can be used again.
+
+Each roll is per stack, so a stack of three radios is damaged or spared together. `protectedBy` is reserved and currently has no effect; containers already protect their contents.
 
 ## Stacking
 
 Two instances stack when they have the same name, neither is unique, and their `info` tables are equal. Equality is a shallow comparison: nested table values are compared by reference, so items whose metadata contains a nested table do not stack with each other. A stack is filled into the lowest matching slot first; otherwise the first free slot is used.
+
+With item decay on, the three decay stamps in `info` are left out of this comparison (merge policy `oldest`, the default), so aged and fresh copies of the same item still stack. The merged stack takes the oldest stamp. Under the merge policy `separate` the stamps take part in the comparison and only identically stamped items stack. See [Item decay](#item-decay).
+
+## Item decay
+
+Items can spoil in real time. When an item is fully decayed it is converted into another item (a sandwich becomes garbage, keeping slot and amount) or removed. The feature ships switched off (`Config.kora_inventory.decay.enabled = false`) so a live server does not suddenly lose its food; turn it on in `/config`. Keys are listed in [Configuration](./configuration.md#item-decay-decay).
+
+How it works:
+
+- **Rules.** `decay.items.<name> = { lifetime = seconds, into = 'item' }` gives an item a lifetime in seconds of real time. `into` names the item it converts to (amount kept); leave it out to remove the item. An item definition may carry the same table as a `decay` field; a `decay.items` entry wins over it, and `decay.items.<name> = false` exempts the item. `defaultAction = 'remove'` removes every spoiled item and ignores `into`.
+- **Stamp.** When a decaying item is created or added (`AddItem`, purchases, crafting, transfers, anything that goes through the one item builder) the server stores `info.createdAt` (Unix time) and `info.decayLifetime` (the lifetime it was created with) if absent. The stamped lifetime stays with that instance, so editing a lifetime in the config only affects items created afterwards. Items already in inventories without a stamp are stamped the first time the server sees them: nothing spoils retroactively. Shop stock is never stamped and a purchase always starts fresh.
+- **Evaluation is lazy.** Remaining life is `lifetime - (now - createdAt)`, computed when an inventory is viewed, when an item in it is used or moved, and by a sweep (`decay.sweepSeconds`, default 300, 0 = off) that visits ONLINE players' inventories only, a few per tick. There are no per-item timers. A spoiled item is converted or removed through the normal write path, the revision is bumped and the change is broadcast, an audit entry `decay` is recorded, the owner gets the usual item receipts (a removal and, for a conversion, an addition, subject to `itemBoxes`), and the post-commit server event `kora_inventory:server:itemDecayed` fires with `{ inventory, item, amount, slot, action, into }`. Using or moving a spoiled item is refused with `item has spoiled` after it has been converted or removed. A slot whose use handler is still running is never spoiled mid-use.
+- **Stacking.** With `mergePolicy = 'oldest'` (default) differently aged stacks merge and the whole stack spoils with its oldest member, so decay is never silently reset by stacking fresh food onto old. With `'separate'` items only stack when their stamps are identical.
+- **Paused storage.** `pauseIn.stash`, `trunk`, `glovebox`, `container` and `drop` freeze time for items kept there, like a fridge. Moving an item in records `info.decayPausedAt`; moving it out shifts `createdAt` forward by the time spent, so that time never counted. Player inventories always count. Turning a pause on or off applies to items already stored at their next evaluation.
+- **View fields.** Views carry a view-only `decay = { remaining = seconds, fraction = 0 to 1 }` on decaying items (never stored) and, with `showInInspector`, an inspector row "Expires in 1h 20m". The browser draws a thin freshness bar on the slot with `showOnSlot`. See [NUI contract](./nui.md).
+
+```lua
+-- Server-owner rule in config.lua (or the /config editor)
+Config.kora_inventory.decay.enabled = true
+Config.kora_inventory.decay.items.bread = { lifetime = 86400, into = 'garbage' }
+
+-- Or on a kora_core item definition
+{ name = 'apple', label = 'Apple', weight = 100, decay = { lifetime = 3600 } }
+```
+
+The pure maths (remaining life, merge, pause and resume shifting) lives in `shared/decay.lua`; the runtime in `server/decay.lua`. Neither has a client entry point: a client cannot stamp, age or spoil an item.
 
 ## Weight
 

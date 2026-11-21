@@ -15,6 +15,7 @@ export interface ItemContextMenuProps {
     busy: boolean
     onClose: () => void
     onUse: (inventory: InventoryView, item: InventoryItem) => void
+    onOpenBag: (inventory: InventoryView, item: InventoryItem) => void
     onSplit: (inventory: InventoryView, item: InventoryItem) => void
     onDrop: (inventory: InventoryView, item: InventoryItem) => void
     onGive: (inventory: InventoryView, item: InventoryItem) => void
@@ -28,7 +29,7 @@ export interface ItemContextMenuProps {
  * coordinates. Escape and outside clicks close it; the session hook also drops
  * it on every server patch so it can never act on a stack that changed.
  */
-export function ItemContextMenu({ target, playerId, giveAvailable, busy, onClose, onUse, onSplit, onDrop, onGive, onCopy }: ItemContextMenuProps) {
+export function ItemContextMenu({ target, playerId, giveAvailable, busy, onClose, onUse, onOpenBag, onSplit, onDrop, onGive, onCopy }: ItemContextMenuProps) {
     const t = useLocale()
     const { inspectorCopy, ammoInfo } = useContext(UiConfigContext)
     const { inventory, item } = target
@@ -63,13 +64,14 @@ export function ItemContextMenu({ target, playerId, giveAvailable, busy, onClose
         if (entry === "ammo") { setView("ammo"); return }
         onClose()
         if (entry === "use") onUse(inventory, item)
+        else if (entry === "open") onOpenBag(inventory, item)
         else if (entry === "split") onSplit(inventory, item)
         else if (entry === "drop") onDrop(inventory, item)
         else if (entry === "give") onGive(inventory, item)
         else onCopy(inventory, item)
     }
     const labels: Record<MenuEntry, string> = {
-        use: t("ui.menu_use"), split: t("ui.menu_split"), drop: t("ui.menu_drop"),
+        use: t("ui.menu_use"), open: t("ui.open_bag"), split: t("ui.menu_split"), drop: t("ui.menu_drop"),
         give: t("ui.menu_give"), ammo: t("ui.menu_ammo_info"), copy: t("ui.menu_copy"),
     }
     if (entries.length === 0) return null

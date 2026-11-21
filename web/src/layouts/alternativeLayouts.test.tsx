@@ -111,19 +111,19 @@ describe("loadout, compact and dock layouts", () => {
                 expect(host.querySelector('[data-testid="secondary"]')).not.toBeNull()
             })
 
-            it("leaves no quick-slot frame when the strip renders nothing", () => {
+            it("leaves nothing behind when the quick slots render nothing", () => {
                 render(id, withSecondary({ renderQuickSlots: () => null }))
+                expect(host.querySelector('[data-testid="quick"]')).toBeNull()
                 expect(host.querySelector(".layout-quick")).toBeNull()
                 render(id, { renderQuickSlots: () => false })
                 expect(host.querySelector(".layout-quick")).toBeNull()
             })
 
-            it("renders the quick-slot strip in a frameless wrapper", () => {
-                const positions: string[] = []
-                render(id, { renderQuickSlots: (position) => { positions.push(position); return quick } })
-                expect(host.querySelectorAll(".layout-quick")).toHaveLength(1)
-                expect(host.querySelector(".layout-quick")!.contains(q("quick"))).toBe(true)
-                expect(positions).toEqual([{ loadout: "side", compact: "top", dock: "top" }[id]])
+            it("asks for the right presentation", () => {
+                const calls: Array<[string, unknown]> = []
+                render(id, { renderQuickSlots: (position, options) => { calls.push([position, options?.side]); return quick } })
+                expect(calls[0][0]).toBe({ loadout: "panel", compact: "drawer", dock: "drawer" }[id])
+                expect(q("quick")).not.toBeNull()
             })
         })
     }
@@ -134,7 +134,31 @@ describe("loadout, compact and dock layouts", () => {
             render("loadout", withSecondary({ renderQuickSlots: () => quick }))
             expect(order()).toEqual(["inventory-stage-player", "loadout-centre", "inventory-stage-secondary"])
             const centre = host.querySelector(".loadout-centre")!
-            expect(Array.from(centre.children).map((c) => c.getAttribute("data-testid") ?? c.className)).toEqual(["layout-quick", "inspector"])
+            expect(Array.from(centre.children).map((c) => c.getAttribute("data-testid") ?? c.className)).toEqual(["quick", "inspector"])
+        })
+        it("never uses the drawer: the panel replaces it", () => {
+            const positions: string[] = []
+            render("loadout", withSecondary({ renderQuickSlots: (position) => { positions.push(position); return null } }))
+            render("loadout", { renderQuickSlots: (position) => { positions.push(position); return null } })
+            expect(new Set(positions)).toEqual(new Set(["panel"]))
+        })
+        it("transfer without quick slots: the centre column is just the inspector", () => {
+            render("loadout", withSecondary())
+            const centre = host.querySelector(".loadout-centre")!
+            expect(Array.from(centre.children).map((c) => c.getAttribute("data-testid"))).toEqual(["inspector"])
+            expect(host.querySelector(".loadout-main")!.children).toHaveLength(3)
+        })
+        it("solo without quick slots or a selection leaves an empty centre column that the stylesheet hides", () => {
+            render("loadout")
+            expect(host.querySelector(".loadout-main-solo")).not.toBeNull()
+            expect(host.querySelector(".loadout-centre")!.childNodes).toHaveLength(0)
+        })
+        it("solo: the Loadout panel on top and the inspector under it only when something is selected", () => {
+            render("loadout", { renderQuickSlots: () => quick })
+            expect(Array.from(host.querySelector(".loadout-centre")!.children).map((c) => c.getAttribute("data-testid"))).toEqual(["quick"])
+            render("loadout", { renderQuickSlots: () => quick, inspector: <aside data-testid="inspector" /> })
+            expect(Array.from(host.querySelector(".loadout-centre")!.children).map((c) => c.getAttribute("data-testid"))).toEqual(["quick", "inspector"])
+            expect(host.querySelector(".loadout-main-solo")!.children).toHaveLength(2)
         })
         it("swaps the columns when the personal side is right", () => {
             render("loadout", withSecondary({ playerLayout: { ...DEFAULT_PLAYER_LAYOUT, playerSide: "right" } }))
@@ -148,6 +172,33 @@ describe("loadout, compact and dock layouts", () => {
             expect(order()).toEqual(["loadout-centre", "inventory-stage-player"])
             expect(shell().className).toContain("inventory-shell-drawer-left")
             expect(host.querySelector(".loadout-centre")!.contains(q("inspector"))).toBe(true)
+        })
+    })
+
+    describe("drawer placement", () => {
+        const sides = (id: LayoutId, overrides: Partial<LayoutProps> = {}) => {
+            const seen: unknown[] = []
+            render(id, { ...overrides, renderQuickSlots: (_position, options) => { seen.push(options?.side); return null } })
+            return seen[0]
+        }
+        it("classic hangs it on the left, and on the right for the right-hand personal side", () => {
+            expect(sides("classic")).toBe("left")
+            expect(sides("classic", withSecondary())).toBe("left")
+            expect(sides("classic", withSecondary({ playerLayout: { ...DEFAULT_PLAYER_LAYOUT, playerSide: "right" } }))).toBe("right")
+        })
+        it("classic as a direct child of the shell, not inside a wrapper", () => {
+            render("classic", { renderQuickSlots: () => <div data-testid="quick" /> })
+            expect(q("quick")!.parentElement).toBe(shell())
+            expect(host.querySelector(".inventory-stage-player")!.contains(q("quick"))).toBe(false)
+        })
+        it("compact keeps the drawer off the side the inspector popover opens on", () => {
+            expect(sides("compact")).toBe("left")
+            expect(sides("compact", { drawerLeft: true })).toBe("right")
+            expect(sides("compact", withSecondary({ playerLayout: { ...DEFAULT_PLAYER_LAYOUT, playerSide: "right" } }))).toBe("right")
+        })
+        it("dock hangs it on the inner edge, facing the screen centre", () => {
+            expect(sides("dock")).toBe("right")
+            expect(sides("dock", { playerLayout: { ...DEFAULT_PLAYER_LAYOUT, playerSide: "right" } })).toBe("left")
         })
     })
 

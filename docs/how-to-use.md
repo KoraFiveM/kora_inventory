@@ -15,7 +15,7 @@ Kora Inventory is a set of server exports plus a client session layer. Your reso
 - **Item definitions live in kora_core's shared registry** (`items` and `weapons`). kora_inventory looks a definition up every time it needs one (`exports.kora_core:getShared('items', name)`), so items you register at runtime work immediately.
 - **The NUI is only a renderer.** The bundled page sends intents through `client/ui.lua`; `server.lua` validates the session token, both inventory revisions, access, routing bucket and distance before changing anything.
 - **Weights are in grams.** The default player limit `120000` is 120 kg. `slots` are counted per inventory. Slots `1..hotbarSlots` (5 by default) double as the hotbar.
-- **Quick slots are shortcuts, not slots.** The side rail of the inventory shows a Weapon, Ammo, Phone and Radio shortcut by default. Each points at an item that stays where it is in your inventory. Pin a different item to a shortcut from the page, or leave it to pick the drawn weapon and then the first matching item. Bind a key to a shortcut under Settings, Key Bindings, FiveM (`Quick slot: Weapon` and so on) to draw, holster, load or use it without opening the inventory. See [Configuration](./api/configuration.md) to change which shortcuts exist.
+- **Quick slots are shortcuts, not slots.** A drawer on the edge of the inventory window shows a Weapon, Ammo, Phone and Radio shortcut by default. Each points at an item that stays where it is in your inventory. Pin a different item to a shortcut from the page, or leave it to pick the drawn weapon and then the first matching item. Bind a key to a shortcut under Settings, Key Bindings, FiveM (`Quick slot: Weapon` and so on) to draw, holster, load or use it without opening the inventory. See [Configuration](./api/configuration.md) to change which shortcuts exist.
 
 ## Inventory types
 
@@ -34,7 +34,7 @@ Every inventory has a key of the form `kind:id`. The kinds that exist in code ar
 
 ## Pick an inventory layout
 
-The window has four layouts: `classic` (the original three-column window), `loadout` (pockets, a centre column with quick slots and the item inspector, then the other inventory), `compact` (a narrow single column with the inspector as a popover) and `dock` (a full-height panel on the screen edge with Pockets and other-inventory tabs). With kora_hud installed, players choose one in the `/ui` editor under "Inventory layout"; it is applied the next time the inventory opens. Server owners set the default with `Config.kora_inventory.ui.layout`, can switch layouts off with `ui.layouts`, and can stop players choosing with `ui.playerLayoutChoice = false` (see [Configuration](./api/configuration.md)). Every layout uses the same slots, drag and drop and server checks. See [NUI and UI](./api/nui.md) for how each one is arranged.
+The window has four layouts: `classic` (the original three-column window), `loadout` (pockets, a centre Loadout panel with the item inspector under it, then the other inventory), `compact` (a narrow single column with the inspector as a popover) and `dock` (a full-height panel on the screen edge with Pockets and other-inventory tabs). With kora_hud installed, players choose one in the `/ui` editor under "Inventory layout"; it is applied the next time the inventory opens. Server owners set the default with `Config.kora_inventory.ui.layout`, can switch layouts off with `ui.layouts`, and can stop players choosing with `ui.playerLayoutChoice = false` (see [Configuration](./api/configuration.md)). Every layout uses the same slots, drag and drop and server checks. See [NUI and UI](./api/nui.md) for how each one is arranged.
 
 ## Calling the exports
 
@@ -117,6 +117,20 @@ exports.kora_inventory:createUseable('lockpick_adv', function(src, item)
 end)
 ```
 
+## Add weapon jams, repair kits and repair counters
+
+Weapon upkeep is configured under `weapons.jams` and `weapons.repair` in `config.lua` (or live in `/config`). Jams ship off; repair kits and cleaning are on and use the existing `repairkit`, `advancedrepairkit` and `cleaningkit` items.
+
+```lua title="config.lua"
+Config.kora_inventory.weapons.jams.enabled = true
+Config.kora_inventory.weapons.repair.counters.enabled = true
+Config.kora_inventory.weapons.repair.counters.locations = {
+    { coords = vec3(809.49, -2157.27, 29.62), distance = 2.5, bucket = 0, label = 'Weapon repairs' },
+}
+```
+
+Players draw a weapon first: kits, cleaning and counters all act on the drawn weapon. When a weapon jams, firing is blocked and the hint appears; hold R to clear it. At a counter, select the interaction once to see the price and again to confirm. To repair from your own script, call `exports.kora_inventory:repairWeaponAt(src, counterIndex)` or `SetWeaponState` after your own checks. See [Weapons](./api/weapons.md).
+
 ## Create a shop
 
 A shop is registered once on the server. Give it `coords` (one point or a list) or an `access` callback, otherwise a client can request it from anywhere. Stock rows need a real item name, an amount and a price.
@@ -154,11 +168,42 @@ Players open it with `exports.kora_inventory:openInventory('stash', 'pd_armoury'
 
 ## Quick slots and the right-click menu
 
-Quick slots are shortcuts to items you already carry, shown as a strip beside your own inventory. They are not extra slots: clicking a tile selects the real item and flashes its slot, double-clicking uses it, and dragging a tile moves or drops the real item like any other.
+Quick slots are shortcuts to items you already carry, shown in a drawer pulled out of the side of the inventory window (in the loadout layout they are the Loadout panel in the middle instead). They are not extra slots: clicking a tile selects the real item and flashes its slot, double-clicking uses it, and dragging a tile moves or drops the real item like any other.
 
 To pin an item to a quick slot, drag it from your inventory onto the tile. Right-click a pinned tile to unpin it. The ammo shortcut follows your equipped weapon and cannot be pinned. A tile with no matching item is hidden, or shown greyed out when `quickSlots.hideWhenMissing` is off.
 
+The small tab on the outer edge of the drawer folds it into a slim strip and opens it again; the game remembers your choice. Server owners can start it folded with `quickSlots.drawer.startCollapsed`. If the window sits too close to the screen edge for the drawer, it appears on the other side.
+
 Set `Config.kora_inventory.ui.rightClick` to choose what right-click does on an item: `split` (the default) opens the split dialog, `menu` opens a context menu with Use, Split, Drop, Give, Ammo info and Copy as they apply, and `none` does nothing. While a weapon is selected the matching ammo is outlined, and while ammo is selected the weapons that take it are outlined. See [NUI contract](./api/nui.md) for details.
+
+## Combine two items by dragging
+
+Players can drag one item onto another in their own inventory to combine them. With the shipped config, dropping rolling paper on weed (or weed on rolling paper) asks "Roll a joint? Combine / Cancel"; Combine shows a progress bar and then swaps one of each for a joint. Pairs with no recipe swap or stack as usual, and nothing combines between your inventory and a stash, trunk or shop.
+
+Add or change recipes under `Config.kora_inventory.combine.recipes` (also editable in `/config`), or from another resource:
+
+```lua
+exports.kora_inventory:registerCombination({
+    a = 'repairkit', b = 'electronickit', result = 'advancedrepairkit',
+    consumeA = 1, consumeB = 1, time = 3000, label = 'Upgrade the repair kit',
+})
+```
+
+Both items and the result must be real kora_core items. A combine fails, and nothing is consumed, if the result does not fit your weight or slots, the progress bar is cancelled, or the items change while it runs. Set `combine.enabled = false` to turn the whole feature off. See [Crafting](./api/crafting.md#combining-items-by-dragging) for every field.
+
+## Searching a player and water damage
+
+When you search another player (police or admin tools that grant `playerInspection`), their bags and backpacks appear as closed bags with a padlock and "Closed". Nothing about what is inside is shown. If `search.openContainers` is on, select the bag and press Open bag (or choose Open in the right-click menu); after the progress bar the bag opens. Closing it takes you back to the player's inventory. Turn `search.hideContainerContents` off to show bags like any other item.
+
+With `waterDamage.enabled` on, swimming can ruin the phone, iPhone, Samsung phone and radio in your pockets (not the ones in a bag). A damaged item shows a droplet badge and a "Condition: Water damaged" row, and cannot be used. Use an electronic kit to repair one; it takes one kit per item.
+
+## Let items spoil
+
+Food and other perishables can expire in real time. In the `/config` editor open kora_inventory, then Item decay, and switch on **Enable item decay**. It is off by default so existing servers do not lose items unexpectedly.
+
+Choose which items spoil under **Decaying items**: the lifetime in seconds (86400 is one day) and, optionally, the item it turns into (a sandwich becomes garbage; with nothing set the item is removed). Items players already carry start their clock the first time the server sees them, so nothing spoils retroactively.
+
+Players see a thin bar on the slot that turns amber and then red as the item runs out, and an "Expires in 1h 20m" row in the inspector. Spoilage is checked when an inventory is opened, an item is used or moved, and every few minutes for players who are online. You can freeze time inside stashes, trunks, gloveboxes, containers or ground drops (a fridge) with the pause switches. See [Items](./api/items.md#item-decay) for the rules and [Configuration](./api/configuration.md#item-decay-decay) for every key.
 
 ## Failure results and what they mean
 
@@ -182,6 +227,19 @@ Most server functions return `ok, reason`. The reason is a short string; branch 
 - Player inspection, evidence, vehicle storage and stash policies are default-deny callbacks supplied by trusted resources.
 - A busy slot (use handler running or progress bar active) cannot be dropped, given or moved, so an item cannot be used and kept.
 
+## Admin tools: audit log and omnipack
+
+Two ACE-gated tools help staff. Grant the permissions in `server.cfg` (see [Commands](./commands.md#convars-and-aces)):
+
+```cfg
+add_ace group.admin kora_inventory.audit allow
+add_ace group.admin kora_inventory.omnipack allow
+```
+
+**Finding duplicated items or a broken script.** Every item that is created in an inventory (script `AddItem`, shop purchase, craft, exchange, omnipack) is logged with the resource that did it, kept for 14 days (`audit.retentionDays`). Run `/invaudit`, filter by player (citizen id or server id), item, script or time (last hour, 24 hours, 7 days) and read the newest-first table. The "top scripts / top items in the last hour" summary shows at a glance which script is creating the most. If a script or player adds an unusual amount in five minutes, the server logs a warning and fires `kora_inventory:server:auditAnomaly` (see [Events](./api/events.md)); thresholds are under `audit.anomaly`. On the server console `invaudit resource=kora_drugs` prints the same summary as log lines.
+
+**Spawning items for testing or support.** `/omnipack` opens a free shop of every registered item and weapon. Use the search box, then drag an item to your inventory or select it, pick an amount and press the take button. Weapons get a fresh serial, and every take is written to the audit log as `omnipack`, so staff-spawned items are never mistaken for duplication.
+
 ## Inventory shortcuts for players
 
 These are presentation features of the window; each can be switched off under `Config.kora_inventory.ui` (see the configuration page). The server validates every resulting move.
@@ -192,11 +250,23 @@ These are presentation features of the window; each can be switched off under `C
 - Category chips on each panel dim items outside the chosen category. Slot numbers never change. The search box also dims non-matching items in your own inventory.
 - The weight bar turns amber at 75 percent of capacity and red at 95 percent (`ui.weightWarnings`).
 - Hovering a filled slot for a moment shows a tooltip with the item details.
+- Each panel header (your pockets, stashes, trunks, gloveboxes, containers and ground drops, but not shops) has a Sort button, a Stack all button and its own search box. Stack all merges partial stacks of the same item with identical metadata; Sort stacks and then orders by weapons, ammo, useable items and the rest, then by name. Weapons and other unique items are never merged, your hotbar slots stay where they are, and weight never changes. Sorting is refused while you are using an item, and there is a short cooldown (`organize`).
+- Press the keyboard button in the top bar to show the controls: GTA's own on-screen button prompts appear bottom-right of the screen (Esc closes, Enter uses, left mouse drags, right mouse splits or opens the menu, Shift, Ctrl and Alt for quick transfer, half and one) and stay in sync with the features you have switched on. Press it again to hide them. They always disappear when the inventory closes, and your choice is remembered (`ui.controls`).
+- The first few times you open the inventory a small tip card at the bottom suggests features you may not have found yet. Next shows another tip, Got it hides it for good (`ui.tips`).
+
+## Trade with another player
+
+1. Stand next to the other player (within `trade.distance`, 3 m by default) and press **Trade** in the top bar of your inventory, type `/trade`, or use the trade key if you bound one. With several players nearby, point at the right one.
+2. The other player accepts the "Trade request" dialog within 20 seconds.
+3. Both inventories open with the trade window beside them. Drag items onto **You offer** (or Shift+click them); for a stack you choose how many. Type an amount in **Cash** and press **Set** if you want to add money. Right-click an offer, or drag it away, to take it back.
+4. Check **They offer**, then press **Ready**. When both are ready the offers lock for a 3 second countdown; then both press **Confirm trade**.
+
+Nothing leaves your inventory until both have confirmed. If either side changes anything, or either inventory changes, both have to press Ready again. Closing your inventory, walking away or pressing **Cancel trade** ends the trade with no changes. Server owners tune it under `Config.kora_inventory.trade`; developers see [Player trades](./api/trade.md).
 
 ## Limitations worth knowing
 
 - The container, evidence and vehicle-storage modules are Lua tables inside the resource (`KoraInventory.containers`, `KoraInventory.evidence`, `KoraInventory.vehicles`). They are not exported; other resources reach them through configuration callbacks and the exports listed under their modules.
-- The audit trail is an in-memory ring (`Config.kora_inventory.auditLimit`) plus the `kora_inventory:server:audit` event. The `kora_inventory_audit` table is created but nothing in the resource writes to it.
+- The generic audit trail is an in-memory ring (`Config.kora_inventory.auditLimit`) plus the `kora_inventory:server:audit` event. Item creations are also persisted to `kora_inventory_audit` for 14 days (see [Admin tools](#admin-tools-audit-log-and-omnipack)); moves, gives and drops are not.
 - Player inventory size and weight come from config only; the ox compat `SetSlotCount` / `SetMaxWeight` refuse player inventories.
 - Shop stock changed with `SetShopItems` is not price-validated; rows without a `price` sell for the shop's `prices[name]` or for free.
 - Access callbacks can only deny with a generic `access denied` for stashes and shops; the reason string they return is not shown to the player.

@@ -25,12 +25,20 @@ dependency 'kora_target'
 shared_scripts {
     '@kora_lib/init.lua',
     'config.lua',
+    -- Per-feature /config editor schema (Kora.config descriptors), one file per
+    -- feature so they never collide; then the single adopt call.
+    'config/schema/*.lua',
+    'config/adopt.lua',
     'config/shops/ammunation.lua',
     'config/shops/vendingmachine.lua',
     'config/shops/liquorstore.lua',
     'config/shops/convenience.lua',
     'shared.lua',
+    -- Pure sort / stack-all planner used by the `organize` intent. No state.
+    'shared/organize.lua',
     'shared/trunk_cargo.lua',
+    -- Pure item decay maths (stamps, remaining life, merge/pause rules).
+    'shared/decay.lua',
     -- Pure quick slot resolver (pointers to real inventory slots). No state.
     'shared/quickslots.lua',
 }
@@ -41,20 +49,41 @@ server_scripts {
     -- import. It is deliberately loaded before the inventory authority.
     'server/schema.lua',
     'server/persistence.lua',
+    -- Item-creation audit log. Before server.lua: the export wrappers there
+    -- capture the invoking resource through it.
+    'server/audit_log.lua',
     'server.lua',
+    -- Admin tools: the omnipack catalogue/open path and the /invaudit and
+    -- /omnipack commands (ACE-gated; see docs/security.md).
+    'server/omnipack.lua',
+    'server/admin_tools.lua',
     'server/recovery.lua',
+    -- Item decay runtime (lazy expiry through the mutation funnel + sweep).
+    'server/decay.lua',
     'server/exchange.lua',
+    -- Two-player confirmed trade: the pure rules (no natives), then the
+    -- wiring onto the inventory authority, intents and net events.
+    'server/trade_state.lua',
+    'server/trade.lua',
     'server/crafting.lua',
     -- Weapon/consumable use handlers.  This follows crafting.lua because the
     -- ammunition loader uses its server-only per-round ballistics API.
     'server/useables.lua',
+    -- Drag-to-combine recipes and the `combine` intent handler (resolves
+    -- crafting.lua's capacity check per call, so it only needs server.lua).
+    'server/combine.lua',
     'server/vehicles.lua',
     'server/trunk_cargo.lua',
     'server/containers.lua',
+    -- Water damage for electronics (Config.kora_inventory.waterDamage, off by default).
+    'server/water_damage.lua',
     -- Visible weapon carry + draw/holster pacing. Loads after useables.lua,
     -- whose weapon handler delegates to it at call time, and after
     -- crafting.lua so weapon metadata rules are already in place.
     'server/weaponcarry.lua',
+    -- Weapon jams, repair kits, cleaning and repair counters. Acts on the
+    -- weapon weaponcarry.lua records as drawn, so it loads after it.
+    'server/weapon_upkeep.lua',
     -- Narrow adapter for the legacy qb-weapons event/callback names.  This
     -- comes after the authoritative weapon modules so it can resolve slots,
     -- ammunition and durability from kora_inventory state rather than trusting
@@ -99,6 +128,8 @@ client_scripts {
     -- Inventory-key access to glovebox/trunk; intent only, the server resolves the vehicle.
     'client/vehicles.lua',
     'client/trunk_cargo.lua',
+    -- Reports (payload-free) that the local player has been swimming.
+    'client/water_damage.lua',
     -- ALT-menu trunk/hood toggles and the /trunk and /hood commands.
     'client/vehicle_doors.lua',
     'client/shops/ammunation.lua',
@@ -114,12 +145,26 @@ client_scripts {
     -- only routes requested targets through client.lua's validated transport.
     'client/compat.lua',
     'client/compat/ox.lua',
+    -- Native instructional-buttons overlay (controls toggle); loads before ui.lua,
+    -- which hides it whenever the session closes.
+    'client/controls.lua',
     'client/ui.lua',
+    -- /invaudit overlay (read-only admin viewer); reuses ui.lua's NUI focus.
+    'client/admin_ui.lua',
+    -- Trade request/answer prompt, /trade and its keybind; renders the
+    -- server's trade view through client/ui.lua. Intent only.
+    'client/trade.lua',
     'client/useables.lua',
+    -- Progress bar for the `combine` intent and the recipe list the browser
+    -- may show a confirm popover for (names and labels only).
+    'client/combine.lua',
     -- Renders every player's carried weapons from the server-set state bag,
     -- and plays out the draw/holster this client was asked for. It owns the
     -- weapon half of the old client/useables.lua toggle.
     'client/weaponcarry.lua',
+    -- Jam blocking/clear key, upkeep progress bar and repair counter targets.
+    -- Presentation and intents only; see the file header.
+    'client/weapon_upkeep.lua',
     -- Legacy qb-weapons client events, translated into the server-owned
     -- kora_inventory weapon lifecycle above.
     'client/compat/qb_weapons.lua',

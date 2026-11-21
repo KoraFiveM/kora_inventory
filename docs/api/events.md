@@ -34,6 +34,34 @@ Local events fire after the action has committed, from inside the inventory's ow
 
 Each entry shows how to subscribe, the arguments, where the event is raised and what the handler may do.
 
+#### `AddEventHandler('kora_inventory:server:auditAnomaly', function(info) end)`
+
+Local server event raised when the item-creation audit sees unusual volume: the total item amount added by one invoking resource (other than kora_inventory itself) or received by one player inside `audit.anomaly.windowSeconds` reached `perResourceThreshold` or `perPlayerThreshold`. It fires once per window per resource or player and a `Kora.logging.warn` line (`audit.anomaly`) is written at the same time. Use it to post to Discord. Omnipack takes and removals are not counted. Raised from `server/audit_log.lua`.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `info.kind` | string | `resource` or `player`. |
+| `info.key` | string | `resource:<name>` or `player:<citizenid or srcN>`. |
+| `info.count` | integer | Total item amount inside the window. |
+| `info.threshold` | integer | The limit that was crossed. |
+| `info.windowSeconds` | integer | The window length. |
+| `info.resource`, `info.citizenid`, `info.source`, `info.item` | string \| integer \| nil | The add that crossed the limit. |
+| `info.at` | integer | Unix time of the alert. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+AddEventHandler('kora_inventory:server:auditAnomaly', function(info)
+    exports.my_logs:send('inventory', ('%s added %d items in %ds (limit %d)'):format(info.key, info.count, info.windowSeconds, info.threshold))
+end)
+```
+
 #### `AddEventHandler('kora_inventory:server:audit', function(action, src, details) end)`
 
 Local event raised for every audited action. The same entries are kept in the in-memory ring (`auditLimit`). Raised from `recordAudit` in server.lua.
@@ -184,6 +212,37 @@ end)
 The till gains the amount paid.
 ```
 
+#### `AddEventHandler('kora_inventory:server:itemDecayed', function(src, decayed) end)`
+
+Local event raised after a decaying item has been converted or removed because it spoiled (see [Item decay](./items.md#item-decay)). Raised from the decay runtime once the change is committed, broadcast and audited. Only fires while `Config.kora_inventory.decay.enabled` is on.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `src` | integer or nil | The owner for a player inventory, otherwise the player who triggered the check (may be nil). |
+| `decayed` | table | `{ inventory, item, amount, slot, action, into }`: the inventory key, the spoiled item name and stack size, its slot, `action` (`convert` or `remove`) and, for a conversion, the item it became. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+AddEventHandler('kora_inventory:server:itemDecayed', function(src, decayed)
+    if decayed.action == 'convert' and decayed.into == 'garbage' then
+        -- e.g. make the player's character smell
+    end
+end)
+```
+
+**Representative console output**
+
+```text
+Two sandwiches in slot 3 became garbage.
+```
+
 #### `AddEventHandler('kora_inventory:server:usedItem', function(src, itemName, item) end)`
 
 Local event raised after a registered handler returned success. Also raised for built-in handlers such as weapon draws. Not raised for portable containers (see `openedContainer`) or for refused or failed uses. Raised from `useItem`.
@@ -270,6 +329,31 @@ end)
 
 ```text
 Runs only when no useable handler exists for `old_radio`.
+```
+
+#### `AddEventHandler('kora_inventory:server:combined', function(src, info) end)`
+
+Local event raised after a drag-to-combine commits (see [Crafting](./crafting.md#combining-items-by-dragging)). Raised from `server/combine.lua`.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `src` | integer | Player. |
+| `info` | table | `{ recipe, result, amount }`: the recipe id, the item given and how many. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+AddEventHandler('kora_inventory:server:combined', function(src, info)
+    if info.result == 'joint' then
+        giveXp(src, 'rolling')
+    end
+end)
 ```
 
 #### `AddEventHandler('kora_inventory:server:crafted', function(src, recipeId, result) end)`
@@ -389,6 +473,18 @@ end)
 ```text
 The range script scores a shot.
 ```
+
+#### `AddEventHandler('kora_inventory:server:searchedContainer', function(searcher, target, itemName) end)`
+
+Local event raised after a searcher opened a bag in another player's inventory through the `openTargetContainer` intent. No return value; the open is already committed.
+
+#### `AddEventHandler('kora_inventory:server:waterDamaged', function(src, outcomes) end)`
+
+Local event raised after a water damage report damaged items. `outcomes` is a list of `{ slot, name, label, mode }`. No return value.
+
+#### `RegisterNetEvent('kora_inventory:server:waterExposure', function() end)  -- client: TriggerServerEvent`
+
+Payload-free report that the sender has been swimming. Everything sent is ignored. Accepted at most once per player every 10 seconds and only while `waterDamage.enabled` is on; it can only affect the sender's own items.
 
 #### `AddEventHandler('kora_inventory:server:evidenceMoved', function(action, source, target, evidenceId, item) end)`
 
@@ -627,7 +723,7 @@ Two items move to slot 5 of the stash; both inventories are patched.
 
 #### `RegisterNetEvent('kora_inventory:server:intent', function(request) end)  -- client: TriggerServerEvent`
 
-Net event for session intents `use`, `drop`, `give`, `buy` and `sync`. The same handler is registered as a callback. Failures return as `kora_inventory:client:rejected`. The `give` request is sent by `client.lua` after the recipient is resolved locally.
+Net event for session intents `use`, `drop`, `give`, `buy`, `sync` and `openTargetContainer` (open a bag in the player you are searching; payload exactly `{ inventory, slot }`, see [Containers and evidence](./containers.md)). The same handler is registered as a callback. Failures return as `kora_inventory:client:rejected`. The `give` request is sent by `client.lua` after the recipient is resolved locally.
 
 **Parameters**
 
@@ -761,6 +857,99 @@ TriggerServerEvent('kora_inventory:server:weaponFired')
 One round is removed server-side and `weaponRoundFired` fires.
 ```
 
+#### `RegisterNetEvent('kora_inventory:server:clearJam', function() end)  -- client: TriggerServerEvent`
+
+Net event, payload-free: the client asks to clear the jam on the weapon it holds. The server resolves the weapon from its own equipped record (any argument is ignored), runs a `weapons.jams.clearTime` progress bar through a kora_lib callback with minimum-elapsed enforcement, then clears `info.jammed`. Ignored while downed or cuffed, or when nothing is drawn or jammed.
+
+**Parameters**
+
+
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+-- client
+TriggerServerEvent('kora_inventory:server:clearJam')
+```
+
+**Representative console output**
+
+```text
+A progress bar runs; the jam is cleared and the client is told with kora_inventory:client:weaponJamState.
+```
+
+#### `RegisterNetEvent('kora_inventory:server:repairConfirm', function(counterIndex) end)  -- client: TriggerServerEvent`
+
+Net event: confirms a weapon repair quoted by the `kora_inventory:server:repairQuote` callback. Only the counter index is sent; it is honoured only against the live quote the server issued for that counter, and the position, routing bucket and price are re-checked before payment.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `counterIndex` | integer | 1-based index into `weapons.repair.counters.locations`. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+-- client, after the quote notification
+TriggerServerEvent('kora_inventory:server:repairConfirm', 1)
+```
+
+**Representative console output**
+
+```text
+The account is charged once and the drawn weapon is restored to the maximum durability.
+```
+
+#### `RegisterNetEvent('kora_inventory:client:weaponJamState', function(state) end)`
+
+Server to client: `{ slot, jammed }` for the weapon slot whose jam state changed (and, after a draw is confirmed, for the drawn weapon). The client blocks firing and shows the hint while the drawn slot is jammed. Presentation only; the server rejects shots from a jammed weapon regardless.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `state` | table | `{ slot = integer, jammed = boolean }`. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+-- sent by the server when a weapon jams or is cleared
+```
+
+#### `AddEventHandler('kora_inventory:server:weaponJammed', function(src, weaponName) end)`
+
+Local server event raised when an accepted shot jams the player's drawn weapon.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `src` | integer | Player. |
+| `weaponName` | string | The drawn weapon item name. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+AddEventHandler('kora_inventory:server:weaponJammed', function(src, weaponName) end)
+```
+
 #### `RegisterNetEvent('kora_inventory:server:weaponAmmoConsumed', function(slot, amount) end)  -- client: TriggerServerEvent`
 
 Legacy path used when ballistics are disabled: the client reports the ped's remaining ammo. It can only lower the stored ammo of the equipped weapon in that slot.
@@ -871,7 +1060,7 @@ Every `kora_inventory:client:*` net handler starts with a `GetInvokingResource()
 ### Writing a custom renderer
 
 1. **Listen to the local UI events** — `kora_inventory:ui:sessionOpened`, `sessionPatched`, `sessionClosed` and `rejected` carry the session state.
-2. **Send intents** — Trigger `kora_inventory:client:submitIntent` or call the `submitIntent` export with a `move`, `use`, `drop`, `give`, `buy`, `sync` or `close` intent.
+2. **Send intents** — Trigger `kora_inventory:client:submitIntent` or call the `submitIntent` export with a `move`, `use`, `drop`, `give`, `buy`, `sync`, `openTargetContainer` or `close` intent.
 3. **Never hold authority** — Treat every view as a read-only snapshot; the server decides.
 
 ### Terms used on this page
@@ -1519,6 +1708,14 @@ Names the sections above do not list. All come from the current code of this res
 | `qb-inventory:server:GetCurrentDrops`, `createDrop`, `attemptPurchase`, `giveItem` | callbacks | qb-inventory compatibility, see [Compatibility](../compatibility.md). |
 | `qb-weapons:server:GetConfig`, `weapon:server:GetWeaponAmmo`, `qb-weapons:server:RepairWeapon`, `RemoveAttachment` | callbacks | Legacy qb-weapons callbacks. The repair and attachment ones refuse. |
 | `kora_inventory:weaponCarry` | player state bag | Written by the server: carried weapon list; clients only render it. |
+| `kora_inventory:server:tradeRequest` | net event (client to server) | `(targetServerId)`: ask a nearby player to trade. See [Player trades](./trade.md). |
+| `kora_inventory:server:tradeRespond` | net event (client to server) | `(tradeId, accepted)`: the invited player's answer; `accepted` must be a boolean. |
+| `kora_inventory:server:tradeCancel` | net event (client to server) | `(tradeId)`: end a trade the sender is in. |
+| `kora_inventory:client:tradeInvite` | net event (server to client) | `(tradeId, timeoutMs)`: shows the accept/decline dialog. |
+| `kora_inventory:client:tradeState` | net event (server to client) | `(view)`: the trade as this player sees it; relayed to the page as `kora_inventory:nui:trade`. |
+| `kora_inventory:client:tradeEnded` | net event (server to client) | `(tradeId, reason, completed)`; relayed to the page as `kora_inventory:nui:tradeEnded`. |
+| `kora_inventory:server:tradeCompleted` | server local event | `(tradeId, sourceA, sourceB, summary)` after a committed trade; `summary[source]` is `{ gave, cash }`. Each traded stack also fires `kora_inventory:server:itemsMoved` with `action = 'trade'`, and each player gets a `trade` audit entry. |
+| `kora_inventory:client:startTrade` | client local event | Starts a trade request with the nearest player (the page's Trade button goes through it). |
 | `fftSession` | state | Read only with [FFT hooks](../fft.md). |
 
 The server also listens for `kora_core:server:inventoryChanged`, `kora_core:server:playerLoaded`, `QBCore:Server:OnPlayerUnload` and `playerDropped`. Metadata read for blocks: `isdead`, `inlaststand`, `ishandcuffed`; state read: `koraCuffed`, `kora_vehiclekeys:locked`.

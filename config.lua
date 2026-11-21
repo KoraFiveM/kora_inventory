@@ -103,6 +103,33 @@ Config.kora_inventory = {
     -- inventory is closed; the only visual is the accent outline on those
     -- slots inside the open panel (ui.showHotbar). 0 disables the key binds.
     hotbarSlots = 5,
+    -- Sort and Stack-all buttons on every inventory panel header (player,
+    -- stash, trunk, glovebox, container, drop; never shops). Both are server
+    -- operations: the `organize` intent is validated exactly like a move
+    -- (session, revisions, access, routing bucket, distance), runs under the
+    -- inventory lock and never creates, destroys or merges different items.
+    -- Read on every request, so changes apply without a restart (the buttons
+    -- themselves appear the next time the inventory opens).
+    organize = {
+        enabled = true,
+        -- 'stack': merge stackable stacks of the same item with identical
+        -- metadata into the lowest slots (unique items never merge).
+        stack = true,
+        -- 'sort': stack, then reorder by sortOrder, label, name, original slot.
+        sort = true,
+        -- Player inventory only: slots 1..hotbarSlots are never moved or
+        -- emptied, so hotbar keys and visible weapon carry do not change.
+        -- (Their stacks may still grow when the same item is stacked in.)
+        keepHotbar = true,
+        -- Minimum milliseconds between two organizes by the same player.
+        cooldownMs = 1000,
+        -- Category order for Sort. Categories: 'weapon', 'ammo', 'useable',
+        -- 'other'. A category left out sorts last.
+        sortOrder = { 'weapon', 'ammo', 'useable', 'other' },
+        -- A small search box in every panel header that dims non-matching
+        -- slots in that panel. Browser-only.
+        panelSearch = true,
+    },
     -- Quick slots are SHORTCUTS, not physical slots. Items stay wherever they
     -- are in the normal inventory; a quick slot is a pointer that resolves to
     -- the real slot of a matching item. It is shown at the side of the
@@ -123,6 +150,11 @@ Config.kora_inventory = {
         hideWhenMissing = true,
         -- Show the bound key on each quick slot in the UI.
         showKeyHints = true,
+        -- The quick slots are drawn in a drawer on the side of the inventory
+        -- window (classic, compact and dock layouts). startCollapsed = true
+        -- opens it as a slim strip; once the player toggles the handle, their
+        -- choice is remembered on their own machine and wins over this.
+        drawer = { startCollapsed = false },
         -- Include resolved quick slots in the U-key on-screen hotbar.
         inHotbarHud = true,
         -- Informational: ammunition is always loaded through the normal ammo
@@ -219,10 +251,76 @@ Config.kora_inventory = {
     -- purchase made from the inventory shop UI. The item box receipt is separate
     -- (itemBoxes.showPurchases) and does not say what was charged.
     purchaseNotify = true,
+    -- Two-sided confirmed trade window between two nearby players. A player
+    -- asks with the inventory's Trade button, /trade or the (unbound) trade
+    -- keybind; the other accepts or declines. Both then offer items and cash.
+    -- Offers are references to the items in each inventory -- nothing moves
+    -- until both players have pressed Ready, waited `confirmDelay` seconds and
+    -- pressed Confirm. Any change to either side, or to either inventory,
+    -- clears both players' Ready. The server re-checks everything (players,
+    -- distance, bucket, items, cash, room) and swaps it all at once, or
+    -- nothing at all. Read on every action, so /config changes apply at once
+    -- (an open trade is ended when `enabled` turns off). `command` is read
+    -- when the resource starts.
+    trade = {
+        enabled = true,
+        slots = 8, -- offer slots per side (1-32)
+        allowCash = true, -- each side may add cash (the cash account, or the cash item when cash.asItem is on)
+        distance = 3.0, -- metres the two players must stay within
+        requestTimeout = 20, -- seconds the other player has to answer a request
+        confirmDelay = 3, -- seconds offers are frozen after both press Ready before Confirm is accepted
+        maxDuration = 300, -- seconds a trade window may stay open before it is cancelled
+        requestCooldown = 10, -- seconds between trade requests from the same player
+        command = 'trade', -- chat command that requests a trade with the nearest player; '' for none
+    },
     -- Opening another player's inventory is denied by default. Supply a
     -- trusted server callback here (or register one at runtime) to opt into
     -- police/admin/consent rules; proximity alone is never authority.
     playerInspection = { access = nil },
+    -- What a searcher sees when they open ANOTHER player's inventory (search,
+    -- rob, police). Server-side; the browser only renders what it is sent.
+    search = {
+        -- Portable containers (bags) in the searched player's inventory are
+        -- shown closed: no bound container id and nothing about their contents.
+        -- A bag's own weight never includes its contents, so no weight leaks.
+        hideContainerContents = true,
+        -- Let the searcher open a searched player's bag (openTargetContainer
+        -- intent). Needs the normal search permission; the server re-checks
+        -- the session, the slot, the target's range/bucket and policy.
+        openContainers = true,
+        -- Milliseconds of progress bar the searcher must complete before the bag
+        -- opens (0..20000, 0 = instant). The SERVER runs the bar on the
+        -- searcher's client and refuses an answer that comes back too early.
+        openTime = 2000,
+    },
+    -- Water damage for electronics. Off by default. The client reports (payload
+    -- free) that its own player has been swimming; the server rolls each
+    -- configured item in that player's own pockets.
+    waterDamage = {
+        enabled = false,
+        -- Seconds in the water before the client reports it.
+        swimSeconds = 3,
+        -- Item name -> { chance = 0..1 } per report. Defaults are existing items.
+        items = {
+            phone = { chance = 1.0 },
+            iphone = { chance = 1.0 },
+            samsungphone = { chance = 1.0 },
+            radio = { chance = 0.5 },
+        },
+        -- 'flag' marks info.waterDamaged (item cannot be used until repaired),
+        -- 'convert' turns the item into `into`, 'remove' deletes it.
+        mode = 'flag',
+        -- Item name used by mode = 'convert' (e.g. 'garbage'). WARNING: the
+        -- swim report is self-reported (it can only harm the sender, who can
+        -- trigger it at will), so `into` must NEVER be worth more than the
+        -- original item. Use junk such as garbage.
+        into = nil,
+        -- Using this item clears the flag from a damaged item (one is consumed).
+        repairItem = 'electronickit',
+        -- Item names that protect what is stored in them. Portable containers
+        -- protect their contents automatically; only pockets are rolled.
+        protectedBy = { 'paperbag' },
+    },
     -- Milliseconds an open inventory may sit unused before the server closes it
     -- (the lease). With sessionSliding on, every request the player makes renews
     -- it, so it is an idle timeout. Off, it is a hard limit counted from the
@@ -396,6 +494,25 @@ Config.kora_inventory = {
         -- default; only read when moveTimeoutMs is absent from your config.
         -- moveTimeout = 10,
 
+        -- Small dismissible tip card at the bottom of the inventory window for
+        -- players who are new to it. Shown on at most `maxShows` openings,
+        -- cycling through short tips about features that are switched on; the
+        -- player can press Got it to hide it forever. Progress is kept on the
+        -- player's own machine. Applied the next time the inventory opens.
+        tips = { enabled = true, maxShows = 5 },
+
+        -- Controls overlay. A keyboard button in the inventory's top bar shows
+        -- GTA's native instructional buttons (bottom-right of the screen) listing
+        -- what Esc, Enter, the mouse and the Shift / Ctrl / Alt modifiers do, for
+        -- the features that are switched on. It is client-side presentation only.
+        --   button         - show the toggle button. false hides it and the overlay
+        --                    is never shown.
+        --   defaultVisible - show the overlay on the first opening, before the
+        --                    player has pressed the button (their own choice is
+        --                    remembered on their machine afterwards).
+        -- Applied the next time the inventory opens.
+        controls = { button = true, defaultVisible = false },
+
         -- Local item artwork. Definition image filenames and per-item
         -- `info.image` filenames resolve under localPath. A full https:// or
         -- nui:// value in info.image is used directly.
@@ -405,6 +522,51 @@ Config.kora_inventory = {
         },
     },
     auditLimit = 1000,
+    -- Item-creation audit log: which script (resource) or player created which
+    -- items, to find duplication and badly written scripts. Every item ADD
+    -- (AddItem/addItem exports, qb/ox compat, shop purchases, crafting,
+    -- exchange, omnipack) is recorded with the invoking resource captured where
+    -- the export enters. Transfers between inventories are not creations and
+    -- are not logged here. Admins read it with /invaudit (ACE below).
+    audit = {
+        enabled = true,
+        -- Write rows to the kora_inventory_audit table. false keeps only the
+        -- in-memory ring (Config.kora_inventory.auditLimit entries).
+        persist = true,
+        -- Queued rows are written in one batch every flushSeconds, or as soon
+        -- as 200 are waiting, so an item add never waits on SQL.
+        flushSeconds = 10,
+        -- Rows older than this are pruned (once an hour and at start).
+        retentionDays = 14,
+        -- Also log removals (AddItem's counterpart). Off by default: removals
+        -- are far more frequent and rarely explain a duplication.
+        trackRemovals = false,
+        -- ACE permission needed for /invaudit and its data requests.
+        ace = 'kora_inventory.audit',
+        command = 'invaudit',
+        -- Rolling counters of item AMOUNTS added by one invoking resource
+        -- (other than kora_inventory itself) and by one player inside
+        -- windowSeconds. Crossing a threshold logs one warning and fires
+        -- kora_inventory:server:auditAnomaly, once per window per key.
+        anomaly = {
+            enabled = true,
+            windowSeconds = 300,
+            perResourceThreshold = 500,
+            perPlayerThreshold = 200,
+        },
+    },
+    -- Admin "omnipack": a read-only shop listing every registered item and
+    -- weapon at price 0 and infinite stock. Taking an item adds it to the
+    -- admin's inventory through the normal add path (weapons get a fresh
+    -- serial) and is recorded in the audit log as 'omnipack'. The server checks
+    -- the ACE on open and again on every take.
+    omnipack = {
+        enabled = true,
+        command = 'omnipack',
+        ace = 'kora_inventory.omnipack',
+        -- Largest single take (the amount picker is bounded by this).
+        maxAmount = 100,
+    },
     -- Trusted server domains only; client intent must be validated by the caller.
     exchangeCallers = { kora_drugs = true },
     requireSameBucket = true,
@@ -436,6 +598,53 @@ Config.kora_inventory = {
         -- through RemoveItem, so uses stay opt-in to avoid two receipts for
         -- one action. Enable this for useables that are not consumed.
         showUses = false,
+    },
+    -- Item decay / expiry. Items spoil in real time (os.time seconds) and, once
+    -- fully decayed, are removed or converted into another item (sandwich ->
+    -- garbage). The server checks lazily: when an inventory is viewed, an item is
+    -- used or moved, and in a low-frequency sweep of ONLINE players' inventories;
+    -- there are no per-item timers. Shipped OFF so a live server's food does not
+    -- suddenly vanish; turn it on in /config.
+    decay = {
+        enabled = false,
+        -- 'convert' turns a spoiled item into its `into` item (same slot and
+        -- amount) and removes it when no `into` is set. 'remove' always removes.
+        defaultAction = 'convert',
+        -- Per item name: lifetime = seconds of real time; into = item to convert
+        -- to (keeps the amount), nil or '' = remove. An entry here wins over a
+        -- `decay = { lifetime = ..., into = ... }` field on the kora_core item
+        -- definition. Set an entry to false to exempt an item.
+        items = {
+            sandwich = { lifetime = 172800, into = 'garbage' },
+            burger = { lifetime = 172800, into = 'garbage' },
+            water_bottle = { lifetime = 604800 },
+        },
+        -- Show an "Expires in 1h 20m" row in the item inspector.
+        showInInspector = true,
+        -- Show a thin freshness bar on the inventory slot.
+        showOnSlot = true,
+        -- The bar turns --warning below this fraction of life left (0..1) and
+        -- --destructive below 10%.
+        warnBelow = 0.25,
+        -- Seconds between sweeps of online players' inventories so items spoil
+        -- even if never opened. 0 = off (items then spoil only when viewed,
+        -- used or moved). Minimum 30 when on.
+        sweepSeconds = 300,
+        -- Stacks of the same item with different ages: 'oldest' merges them and
+        -- the whole stack spoils with its oldest member (the stamps are ignored
+        -- by the stack check); 'separate' keeps differently aged items in
+        -- separate stacks.
+        mergePolicy = 'oldest',
+        -- Inventory types where time does NOT count (true = frozen while the
+        -- item sits there; the time spent is not counted when it comes out).
+        -- Player inventories always count.
+        pauseIn = {
+            stash = false,
+            trunk = false,
+            glovebox = false,
+            container = false,
+            drop = false,
+        },
     },
     persistence = {
         -- Secondary inventories only. Player items are kora_core-owned and are never
@@ -645,6 +854,40 @@ Config.kora_inventory = {
     crafting = {
         maxBatchAmount = 100,
     },
+    -- Drag one item of the player's own inventory onto another to combine them
+    -- (for example rolling paper + weed = joint). Recipes are order independent:
+    -- a + b is the same as b + a. The server holds the only recipe registry
+    -- (these entries plus those other resources add with the registerCombination
+    -- export); the browser only learns each pair's names and label so it can
+    -- ask "Roll a joint? Combine / Cancel" instead of swapping the two slots.
+    -- Read when a combine is attempted, so edits apply without a restart.
+    combine = {
+        -- Master switch. Off: no popover, the combine intent is refused and
+        -- dropping one item on another swaps or stacks them as before.
+        enabled = true,
+        -- Show the kora_lib progress bar for recipes with a time above 0. Off:
+        -- every combine completes at once.
+        progress = true,
+        -- a, b:      the two item names (any order; they must be different
+        --            slots, and may be the same item).
+        -- result:    the item name produced, `amount` of it (default 1).
+        -- consumeA/consumeB: how many of a / b are used up (default 1; 0 keeps
+        --            that item, for example a tool).
+        -- time:      progress bar milliseconds (0 = instant, default 0).
+        -- label:     the question and the progress bar text.
+        recipes = {
+            {
+                a = 'rolling_paper',
+                b = 'weed',
+                result = 'joint',
+                amount = 1,
+                consumeA = 1,
+                consumeB = 1,
+                time = 2500,
+                label = 'Roll a joint',
+            },
+        },
+    },
     weapons = {
         defaultDurability = 100,
         maxAmmo = 10000,
@@ -689,6 +932,63 @@ Config.kora_inventory = {
         -- Explicit allow-lists. An absent weapon (and absent `default`) has
         -- no allowed components, preventing arbitrary client metadata.
         components = {},
+        -- Weapon jams (server-authoritative; see server/weapon_upkeep.lua).
+        -- When the SERVER accepts a shot it rolls a jam chance that rises from
+        -- `baseChance` (weapon at 100% durability) to `lowDurabilityChance`
+        -- (at or below `lowDurabilityBelow` percent). A jam is stored on the
+        -- weapon (`info.jammed`), shots are refused while it is set, and the
+        -- player clears it by holding the clear-jam key (default R): the
+        -- server runs a `clearTime` progress bar on the weapon it knows is
+        -- drawn. Melee, throwables, weapons that take no ammo and anything in
+        -- `excluded` ([weapon_name] = true) never jam. Off by default.
+        jams = {
+            enabled = false,
+            baseChance = 0.002,         -- per accepted shot at full durability (0.002 = 0.2%)
+            lowDurabilityChance = 0.03, -- per accepted shot at/below `lowDurabilityBelow`
+            lowDurabilityBelow = 30,    -- durability percent where the chance tops out
+            clearTime = 1500,           -- ms of progress bar to clear a jam
+            excluded = {
+                -- weapon_revolver = true,
+            },
+        },
+        -- Repair kits, cleaning and repair counters. All of them act on the
+        -- weapon the SERVER knows the player has drawn; nothing about the
+        -- weapon is ever taken from the client.
+        repair = {
+            -- false leaves every kit and the cleaning item to other resources.
+            enabled = true,
+            -- Durability never goes above this (hard ceiling 100).
+            maxDurability = 100,
+            -- Kit items. Only names listed here get a built-in use handler, so
+            -- other resources' usables are never hijacked. `restore` is
+            -- durability points, `time` is the progress bar in ms. Set a kit
+            -- to false (or remove it) to hand the item to another resource
+            -- (takes effect after a restart; an item another resource
+            -- registers with its own handler always wins).
+            kits = {
+                repairkit = { restore = 25, time = 4000 },
+                advancedrepairkit = { restore = 60, time = 6000 },
+            },
+            -- Cleaning item: clears a jam (when `clearsJam`) and restores a
+            -- little durability. One item is consumed per use.
+            cleaning = { item = 'cleaningkit', clearsJam = true, restore = 5, time = 3000 },
+            -- Repair counters: pay `pricePerPoint` per missing durability point
+            -- (rounded up) to restore the drawn weapon to maxDurability. The
+            -- server checks the player is at the counter (distance and
+            -- routing bucket) and charges `account` ('cash' or 'bank').
+            -- Counter points live here only; the client uses the same list
+            -- purely to draw the interaction.
+            counters = {
+                enabled = false,
+                pricePerPoint = 15,
+                account = 'cash',
+                -- Example beside the Cypress Flats Ammu-Nation counter (the x/y/z
+                -- in config/shops/ammunation.lua; shift it a step so it does not
+                -- sit on top of the shop target):
+                -- { coords = vec3(809.49, -2157.27, 29.62), distance = 2.5, bucket = 0, label = 'Weapon repairs' },
+                locations = {},
+            },
+        },
     },
     -- Visible weapon carry. A weapon a player owns but is not currently
     -- holding is rendered on their body for every nearby client, and drawing
@@ -1018,5 +1318,6 @@ if Kora and Kora.config and Kora.config.adopt then
         live = true,
     })
 
-    Config = Kora.config.adopt(Config)
+    -- Config = Kora.config.adopt(Config) now runs in config/adopt.lua, after the
+    -- per-feature schema files in config/schema/*.lua have registered theirs.
 end
