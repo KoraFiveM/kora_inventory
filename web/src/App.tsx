@@ -35,7 +35,7 @@ function InventoryApp() {
     const layoutId = resolveLayout(uiConfig, shell.playerLayout)
     const Layout = LAYOUTS[layoutId]
 
-    const panelHandlers = { selected, busy: locked, canDropSlot: s.canDropSlot, onDrop: s.dropSlot, onDragEnd: noop, onSelect: s.selectSlot, onActivate: s.activateItem, onSplit: s.promptSplit }
+    const panelHandlers = { selected, busy: locked, canDropSlot: s.canDropSlot, onDrop: s.dropSlot, onDragEnd: noop, onSelect: s.selectSlot, onActivate: s.activateItem, onSplit: s.promptSplit, onQuickTransfer: s.quickTransfer }
     const layoutProps: LayoutProps = {
         layoutId,
         session,
@@ -53,7 +53,7 @@ function InventoryApp() {
         onClearSelection: s.clearSelection,
         dragPreview: <DragPreview session={session} />,
         topbar: <TopBar transfer={Boolean(session.secondary)} query={s.query} onQueryChange={s.setQuery} error={s.error} onClose={s.close} />,
-        playerPanel: <InventoryPanel inventory={session.player} isPlayer {...panelHandlers} />,
+        playerPanel: <InventoryPanel inventory={session.player} isPlayer query={s.query} {...panelHandlers} />,
         // Solo layout starts as the player's inventory alone. Its inspector is a
         // drawer, mounted only after selection, so an idle personal inventory does
         // not reserve a permanently empty actions column.
@@ -65,6 +65,7 @@ function InventoryApp() {
             movePending={s.movePending}
             giveAvailable={s.giveAvailable}
             inspectorCopy={uiConfig.inspectorCopy}
+            quickAmounts={uiConfig.quickAmounts}
             inspectorDecimals={uiConfig.inspectorDecimals}
             copyState={s.copyState}
             selectedMax={s.selectedMax}

@@ -325,6 +325,21 @@ Config.kora_inventory = {
         -- Applied the next time the inventory opens.
         rightClickSplit = true,
 
+        -- Quality-of-life presentation flags. Browser-only: the server still
+        -- validates every resulting move. Applied the next time the inventory opens.
+        -- Shift+click moves a whole stack to the other open inventory.
+        quickTransfer = true,
+        -- Ctrl+drag moves half a stack, Alt+drag moves one.
+        modifierDrag = true,
+        -- 1 / 5 / 10 / half / All buttons beside the amount slider.
+        quickAmounts = true,
+        -- Category chips (All, Weapons, Ammo, Consumables, Other) that dim non-matching slots.
+        filters = true,
+        -- Hover tooltip on filled slots.
+        tooltips = true,
+        -- Weight bar turns amber at warnAt and red at dangerAt (fractions of max weight).
+        weightWarnings = { enabled = true, warnAt = 0.75, dangerAt = 0.95 },
+
         -- Paint a drag-and-drop move or a shop purchase in the browser straight
         -- away instead of waiting for the server's reply, then reconcile with
         -- the server's own inventory. The painted item is dimmed (and dashed)

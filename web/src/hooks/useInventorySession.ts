@@ -11,6 +11,8 @@ import { predictBuy, predictMove, refreshedInventories, restoreInventories, type
 import { createIntentResults } from "@/lib/intentResults"
 import { createMoveQueue, isNoopMove, type MoveJob, type MoveQueue } from "@/lib/moveQueue"
 import { useLocale } from "@/lib/locales"
+import { modifierDragAmount } from "@/lib/modifierDrag"
+import { pickTransferSlot } from "@/lib/quickTransfer"
 import { copyText, itemCopyText } from "@/lib/clipboard"
 
 // Drags that may wait behind an unanswered request before further ones are refused.
@@ -24,6 +26,12 @@ function mergeLayouts(current: ResolvedUiConfig["layouts"], pushed: UiConfig["la
         if (isLayoutId(id) && typeof allowed === "boolean") next[id] = allowed
     }
     return next
+}
+
+function mergeWeightWarnings(current: ResolvedUiConfig["weightWarnings"], pushed: UiConfig["weightWarnings"]): ResolvedUiConfig["weightWarnings"] {
+    if (!pushed || typeof pushed !== "object") return current
+    const ratio = (value: unknown, fallback: number) => Number.isFinite(value) && Number(value) > 0 ? Number(value) : fallback
+    return { enabled: pushed.enabled ?? current.enabled, warnAt: ratio(pushed.warnAt, current.warnAt), dangerAt: ratio(pushed.dangerAt, current.dangerAt) }
 }
 
 /**
@@ -129,6 +137,12 @@ export function useInventorySession() {
             layout: isLayoutId(config.layout) ? config.layout : current.layout,
             layouts: mergeLayouts(current.layouts, config.layouts),
             playerLayoutChoice: typeof config.playerLayoutChoice === "boolean" ? config.playerLayoutChoice : current.playerLayoutChoice,
+            quickTransfer: config.quickTransfer ?? current.quickTransfer,
+            modifierDrag: config.modifierDrag ?? current.modifierDrag,
+            quickAmounts: config.quickAmounts ?? current.quickAmounts,
+            filters: config.filters ?? current.filters,
+            tooltips: config.tooltips ?? current.tooltips,
+            weightWarnings: mergeWeightWarnings(current.weightWarnings, config.weightWarnings),
         }))
     })
     useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom }) => {
@@ -264,7 +278,9 @@ export function useInventorySession() {
         if (!source || !session || !canDropSlot(source, target)) return
         const sourceInventory = findInventory(session, source.inventoryId)
         const targetInventory = findInventory(session, target.inventoryId)
-        const amount = selected?.inventory.id === source.inventoryId && selected.item.slot === source.slot ? selectedCount : undefined
+        const sourceItem = findItem(sourceInventory, source.slot)
+        const modified = configRef.current.modifierDrag && sourceItem ? modifierDragAmount(source.modifiers, sourceItem.amount) : undefined
+        const amount = modified ?? (selected?.inventory.id === source.inventoryId && selected.item.slot === source.slot ? selectedCount : undefined)
         if (sourceInventory && targetInventory) move(sourceInventory.id, source.slot, targetInventory.id, target.slot, amount)
     }, [canDropSlot, move, selected, selectedCount, session])
 
@@ -302,6 +318,22 @@ export function useInventorySession() {
             return { inventory, item }
         })
     }, [locked])
+
+    // Shift+click: the whole stack to the other open inventory. From a shop it is
+    // a buy of one, exactly like dragging out of a shop; a shop is never a target.
+    const quickTransfer = useCallback((inventory: InventoryView, item: InventoryItem) => {
+        const current = sessionRef.current
+        if (!configRef.current.quickTransfer || !current) return
+        const from = findInventory(current, inventory.id)
+        const stack = findItem(from, item.slot)
+        if (!from || !stack) return
+        const other = from.id === current.player.id ? current.secondary : current.player
+        if (!other) { setError(t("ui.no_other_inventory")); return }
+        if (other.type === "shop") { setError(t("ui.shop_read_only")); return }
+        const slot = pickTransferSlot(other, stack)
+        if (!slot) { setError(t("ui.no_room_other")); return }
+        move(from.id, stack.slot, other.id, slot)
+    }, [move, t])
 
     const dropOut = useCallback((source: DragSlot) => {
         if (source.inventoryId !== sessionRef.current?.player.id) return
@@ -409,7 +441,7 @@ export function useInventorySession() {
         query, setQuery, itemBoxes, hotbar,
         selectedMax, selectedCount, setSelectedAmount, copyState, copySelected,
         splitTarget, confirmSplit, cancelSplit: () => setSplitTarget(undefined),
-        canDropSlot, dropSlot, dropOut, selectSlot, promptSplit, activateItem,
+        canDropSlot, dropSlot, dropOut, quickTransfer, selectSlot, promptSplit, activateItem,
         split, use, buy, submit, close, clearSelection: () => setSelected(undefined),
     }
 }

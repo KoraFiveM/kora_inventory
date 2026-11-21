@@ -1,10 +1,12 @@
-import { useCallback, useMemo, useRef } from "react"
-import { useDrag, useDrop } from "react-dnd"
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { useDrag, useDragDropManager, useDrop } from "react-dnd"
+import { UiConfigContext } from "@/context"
 import { useLocale } from "@/lib/locales"
 import type { DragSlot, SlotTarget } from "@/lib/inventory"
 import type { InventoryItem, InventoryView } from "@/lib/types"
 import { ItemArtwork } from "./ItemArtwork"
 import { SLOT_DRAG_TYPE } from "./dnd"
+import { SlotTooltip } from "./SlotTooltip"
 
 export interface SlotProps {
     item?: InventoryItem
@@ -18,6 +20,10 @@ export interface SlotProps {
     onSelect: (item?: InventoryItem) => void
     onActivate: (item: InventoryItem) => void
     onSplit: (inventory: InventoryView, item: InventoryItem) => void
+    /** Shift+click on a filled slot (Config ui.quickTransfer). */
+    onQuickTransfer?: (inventory: InventoryView, item: InventoryItem) => void
+    /** Filtered out by a category chip or the search box: drawn faint, never hidden. */
+    dimmed?: boolean
     /** Part of the hotbar range, so it carries the accent outline. */
     hotbar?: boolean
     /** The last slot of that range, which closes the outline on the right. */
@@ -27,13 +33,22 @@ export interface SlotProps {
 /** React DnD's TouchBackend uses global CEF input listeners for both touch and
  * mouse. Unlike HTML5 DnD or source pointer-capture, it resolves the actual
  * destination slot after the cursor leaves the source element. */
-export function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit }: SlotProps) {
+export function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, dimmed }: SlotProps) {
+    const { quickTransfer, modifierDrag, tooltips, inspectorDecimals } = useContext(UiConfigContext)
+    const dndManager = useDragDropManager()
+    // Ctrl/Alt as they were when the gesture began; read when the drag item is built.
+    const modifiers = useRef<DragSlot["modifiers"]>(undefined)
+    const [tip, setTip] = useState<{ x: number; y: number } | undefined>()
+    const tipTimer = useRef<number>()
+    const cursor = useRef({ x: 0, y: 0 })
+    const hideTip = useCallback(() => { window.clearTimeout(tipTimer.current); setTip(undefined) }, [])
+    useEffect(() => () => window.clearTimeout(tipTimer.current), [])
     const t = useLocale()
     const target = useMemo<SlotTarget>(() => ({ inventoryId: inventory.id, slot: index }), [index, inventory.id])
     const suppressClick = useRef(false)
     const [{ isDragging }, dragRef] = useDrag<DragSlot, SlotTarget, { isDragging: boolean }>(() => ({
         type: SLOT_DRAG_TYPE,
-        item: { inventoryId: inventory.id, slot: index },
+        item: () => ({ inventoryId: inventory.id, slot: index, modifiers: modifierDrag ? modifiers.current : undefined }),
         canDrag: Boolean(item) && !busy,
         end: () => {
             // CEF emits a click after mouse-up. A drag must not become a
@@ -42,7 +57,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
             onDragEnd()
         },
         collect: (monitor) => ({ isDragging: monitor.isDragging() }),
-    }), [busy, index, inventory.id, item, onDragEnd])
+    }), [busy, index, inventory.id, item, modifierDrag, onDragEnd])
     const [{ isOver, canDrop }, dropRef] = useDrop<DragSlot, SlotTarget, { isOver: boolean; canDrop: boolean }>(() => ({
         accept: SLOT_DRAG_TYPE,
         canDrop: (source) => Boolean(source) && !busy && canDropSlot(source, target),
@@ -68,6 +83,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
         hotbar && "slot-hotbar",
         hotbar && index === 1 && "slot-hotbar-first",
         hotbar && lastHotbar && "slot-hotbar-last",
+        dimmed && "slot-dimmed",
         isOver && canDrop && "slot-move-target", isOver && !canDrop && "slot-drop-invalid",
     ].filter(Boolean).join(" ")
 
@@ -82,9 +98,32 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
         data-pending={item?.pending || undefined}
         // A new gesture starts clean: a drag that ended without a click (released
         // on another slot, or outside the window) must not swallow the next real click.
-        onMouseDown={() => { suppressClick.current = false }}
-        onClick={() => {
+        onMouseDown={(event) => {
+            suppressClick.current = false
+            modifiers.current = { ctrl: event.ctrlKey, alt: event.altKey }
+            hideTip()
+        }}
+        onMouseEnter={() => {
+            if (!tooltips || !item) return
+            window.clearTimeout(tipTimer.current)
+            tipTimer.current = window.setTimeout(() => {
+                // Never over a drag or an open context menu.
+                if (dndManager.getMonitor().isDragging() || document.querySelector("[data-context-menu], .context-menu")) return
+                setTip({ ...cursor.current })
+            }, 350)
+        }}
+        onMouseMove={(event) => {
+            cursor.current = { x: event.clientX, y: event.clientY }
+            if (tip) { if (dndManager.getMonitor().isDragging()) hideTip(); else setTip(cursor.current) }
+        }}
+        onMouseLeave={hideTip}
+        onClick={(event) => {
             if (suppressClick.current) { suppressClick.current = false; return }
+            if (quickTransfer && event.shiftKey && item && onQuickTransfer) {
+                event.preventDefault()
+                if (!busy) onQuickTransfer(inventory, item)
+                return
+            }
             if (!busy) onSelect(item)
         }}
         onDoubleClick={() => {
@@ -95,6 +134,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
         onContextMenu={(event) => {
             if (!item || busy) return
             event.preventDefault()
+            hideTip()
             onSplit(inventory, item)
         }}
         onKeyDown={(event) => {
@@ -113,5 +153,6 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
             <span className="item-amount">×{item.amount}</span>
             {typeof item.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, item.durability))}%` }} /></span>}
         </>}
+        {tip && item && !isDragging && <SlotTooltip item={item} x={tip.x} y={tip.y} decimals={inspectorDecimals} />}
     </button>
 }

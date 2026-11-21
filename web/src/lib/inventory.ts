@@ -1,7 +1,7 @@
 import type { InventoryItem, InventoryView, SessionPatch, SessionSnapshot } from "@/lib/types"
 
 /** What a drag carries: the slot it started from. */
-export interface DragSlot { inventoryId: string; slot: number }
+export interface DragSlot { inventoryId: string; slot: number; /** Ctrl/Alt held when the drag started. */ modifiers?: { ctrl?: boolean; alt?: boolean } }
 /** Where a drag can land. */
 export interface SlotTarget { inventoryId: string; slot: number }
 /** The inspected item together with the inventory it sits in. */
