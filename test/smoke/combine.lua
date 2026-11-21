@@ -136,6 +136,7 @@ KoraInventory = {
         end,
     },
 }
+dofile('shared.lua')
 dofile('server/combine.lua')
 local combine = KoraInventory.combine
 

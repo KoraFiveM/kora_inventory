@@ -26,6 +26,10 @@ local shop = assert(
 
 local approvals = {} -- source -> GetGameTimer() expiry
 
+local function sessionTtl()
+    return Config.kora_inventory.sessionTtl or 120000
+end
+
 local function hasValidCoords(coords)
     return type(coords) == 'table'
         and type(coords.x) == 'number'
@@ -50,7 +54,7 @@ local function access(source, inventory, opts)
             return false, 'not at a vending machine'
         end
         approvals[source] = {
-            expires = GetGameTimer() + (Config.kora_inventory.sessionTtl or 120000),
+            expires = GetGameTimer() + sessionTtl(),
             coords = { x = opts.coords.x, y = opts.coords.y, z = opts.coords.z },
         }
         return true
@@ -70,7 +74,7 @@ local function access(source, inventory, opts)
     -- window with the session lease (Config.kora_inventory.sessionSliding) so a long
     -- purchase is not cut off by an approval that only counted from the open.
     if Config.kora_inventory.sessionSliding ~= false then
-        approval.expires = GetGameTimer() + (Config.kora_inventory.sessionTtl or 120000)
+        approval.expires = GetGameTimer() + sessionTtl()
     end
     return true
 end
