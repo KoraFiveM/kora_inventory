@@ -1,3 +1,5 @@
+import type { LayoutId } from "@/lib/layoutIds"
+
 export interface NuiWireMessage<T = unknown> {
     action: string
     data: T
@@ -122,6 +124,12 @@ export interface UiConfig {
     moveTimeoutMs?: number
     /** The bridge delivers verdicts as messages instead of holding the fetch (Config.kora_inventory.ui.directTransport). */
     directTransport?: boolean
+    /** Server default inventory layout (Config.kora_inventory.ui.layout). */
+    layout?: LayoutId
+    /** Which layouts may be used; a missing key counts as allowed (Config.kora_inventory.ui.layouts). */
+    layouts?: Partial<Record<LayoutId, boolean>>
+    /** The player's own layout choice from the /ui editor is honoured (Config.kora_inventory.ui.playerLayoutChoice). */
+    playerLayoutChoice?: boolean
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string
