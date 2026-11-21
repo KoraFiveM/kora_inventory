@@ -59,6 +59,7 @@ DoesEntityExist = function(entity) return entity == 101 end
 GetPlayerRoutingBucket = function(source) return source == 7 and player.bucket or -1 end
 GetEntityCoords = function(entity) return entity == 101 and player.coords or nil end
 
+dofile('test/shop_location_policy.lua')
 local L = dofile('server/shops/liquorstore.lua')
 H.equal(captured.id, 'liquorstore', 'server registers the fixed shop id')
 H.equal(captured.data.inventory, shop.inventory, 'server uses declared stock rows without client data')
