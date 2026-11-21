@@ -259,6 +259,20 @@ Config.kora_inventory = {
         -- personal inventory. Size and side apply either way.
         playerLayoutTransfer = false,
 
+        -- Inventory layout the NUI renders: 'classic' (the original window),
+        -- 'loadout', 'compact' or 'dock'. This is the server default; players
+        -- can override it when playerLayoutChoice is on. Unknown values fall
+        -- back to 'classic'. Applied the next time the inventory opens.
+        layout = 'classic',
+        -- Which layouts players may pick (and the server layout may use). A
+        -- layout set to false is hidden from the picker; if every entry is
+        -- false, 'classic' stays available.
+        layouts = { classic = true, loadout = true, compact = true, dock = true },
+        -- Players choose their layout in kora_hud's /ui editor ("Inventory
+        -- layout"). false = everyone gets `layout` above. Needs playerLayout =
+        -- true and kora_hud.
+        playerLayoutChoice = true,
+
         -- Right-clicking a stack of 2 or more in your own or a stash inventory
         -- opens an in-page "split" dialog (amount, Split, Cancel; Escape or a
         -- click outside cancels). Set to false to make right-click do nothing.

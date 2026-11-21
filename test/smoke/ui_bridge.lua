@@ -314,6 +314,72 @@ H.equal(messages[#messages].data.scale, 1, 'a reset restores the default layout'
 H.equal(Config.kora_inventory.ui.playerLayout, true, 'the /ui registration defaults on')
 H.equal(Config.kora_inventory.ui.playerLayoutTransfer, false, 'stashes use the default layout by default')
 
+-- Layout registry: server default, allowed set and the player's choice.
+H.equal(Config.kora_inventory.ui.layout, 'classic', 'the server layout defaults to classic')
+H.equal(Config.kora_inventory.ui.playerLayoutChoice, true, 'players may choose a layout by default')
+for _, id in ipairs({ 'classic', 'loadout', 'compact', 'dock' }) do
+    H.equal(Config.kora_inventory.ui.layouts[id], true, id .. ' layout is allowed by default')
+end
+H.ok(source:find('playerLayoutChoice = ui.playerLayoutChoice ~= false', 1, true), 'playerLayoutChoice is pushed to the NUI on every config push')
+handlers['kora_inventory:ui:sessionOpened']({ token = 'L', primary = view('player:1', 1) })
+local function lastConfig()
+    for i = #messages, 1, -1 do
+        if messages[i].action == 'kora_inventory:nui:config' then return messages[i].data end
+    end
+end
+local pushed = lastConfig()
+H.ok(pushed ~= nil, 'opening a session pushes the config')
+H.equal(pushed.layout, 'classic', 'the server layout reaches the NUI')
+H.equal(pushed.layouts.dock, true, 'the allowed layouts reach the NUI')
+H.equal(pushed.playerLayoutChoice, true, 'the player choice flag reaches the NUI')
+local uiCfg = Config.kora_inventory.ui
+local savedUi = { layout = uiCfg.layout, layouts = uiCfg.layouts, choice = uiCfg.playerLayoutChoice }
+uiCfg.layout, uiCfg.layouts, uiCfg.playerLayoutChoice = 'bogus', { dock = false, compact = 'yes' }, false
+handlers['kora_inventory:ui:sessionOpened']({ token = 'L2', primary = view('player:1', 1) })
+pushed = lastConfig()
+H.equal(pushed.layout, 'classic', 'an unknown layout falls back to classic')
+H.equal(pushed.layouts.dock, false, 'a layout set to false is not allowed')
+H.equal(pushed.layouts.compact, true, 'only an explicit false disables a layout (booleans only)')
+H.equal(pushed.playerLayoutChoice, false, 'playerLayoutChoice = false is pushed')
+uiCfg.layouts = { classic = false, loadout = false, compact = false, dock = false }
+handlers['kora_inventory:ui:sessionOpened']({ token = 'L3', primary = view('player:1', 1) })
+H.equal(lastConfig().layouts.classic, true, 'classic stays allowed when everything is disabled')
+uiCfg.layout, uiCfg.layouts, uiCfg.playerLayoutChoice = savedUi.layout, savedUi.layouts, savedUi.choice
+
+-- The editor registration carries the picker (allowed layouts only).
+local savedExports, savedState = exports, GetResourceState
+local registeredElement
+exports = setmetatable({}, { __index = function() return { registerUiElement = function(_, element) registeredElement = element end } end })
+GetResourceState = function() return 'started' end
+local function layoutSetting()
+    registeredElement = nil
+    handlers['kora_hud:ui:ready']()
+    for _, setting in ipairs(registeredElement and registeredElement.settings or {}) do
+        if setting.key == 'layout' then return setting end
+    end
+end
+local picker = layoutSetting()
+H.ok(picker ~= nil, 'the /ui editor offers an inventory layout picker')
+H.equal(picker.type, 'select', 'the picker is a select')
+H.equal(picker.default, 'classic', 'the picker defaults to the server layout')
+H.equal(#picker.options, 4, 'every allowed layout is an option')
+H.equal(picker.options[2].label, 'Loadout', 'options carry display labels')
+uiCfg.layouts = { classic = true, loadout = false, compact = true, dock = false }
+picker = layoutSetting()
+H.equal(#picker.options, 2, 'disallowed layouts are not offered')
+H.equal(picker.options[2].value, 'compact', 'the remaining options keep their order')
+uiCfg.playerLayoutChoice = false
+H.equal(layoutSetting(), nil, 'playerLayoutChoice = false hides the picker')
+uiCfg.layouts, uiCfg.playerLayoutChoice = savedUi.layouts, savedUi.choice
+exports, GetResourceState = savedExports, savedState
+
+handlers['kora_hud:ui:apply']('kora_inventory', 'inventory', { settings = { layout = 'dock' } })
+H.equal(messages[#messages].data.layout, 'dock', 'a known layout choice reaches the NUI')
+handlers['kora_hud:ui:apply']('kora_inventory', 'inventory', { settings = { layout = '../evil' } })
+H.equal(messages[#messages].data.layout, nil, 'an unknown layout choice is dropped')
+handlers['kora_hud:ui:apply']('kora_inventory', 'inventory', nil)
+H.equal(messages[#messages].data.layout, nil, 'a reset carries no layout choice')
+
 local closeIntents = {}
 TriggerEvent = function(name, payload) if name == 'kora_inventory:client:submitIntent' then closeIntents[#closeIntents + 1] = payload end end
 handlers['kora_inventory:ui:sessionOpened']({ token = 'E', primary = view('player:1', 1) })

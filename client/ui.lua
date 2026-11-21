@@ -93,6 +93,38 @@ local function moveTimeoutMs()
     return math.floor(math.max(500, math.min(60000, ms or (directTransport() and 6000 or 1500))))
 end
 
+-- Inventory layouts the NUI knows (web/src/layouts). Anything else is treated
+-- as 'classic' here and again in the page.
+local LAYOUT_IDS = { 'classic', 'loadout', 'compact', 'dock' }
+local LAYOUT_LABELS = { classic = 'Classic', loadout = 'Loadout', compact = 'Compact', dock = 'Dock' }
+local LAYOUT_KNOWN = {}
+for _, id in ipairs(LAYOUT_IDS) do LAYOUT_KNOWN[id] = true end
+
+local function knownLayout(value)
+    if type(value) == 'string' and LAYOUT_KNOWN[value] then return value end
+    return nil
+end
+
+local function serverLayout()
+    local ui = ((Config.kora_inventory or {}).ui) or {}
+    return knownLayout(ui.layout) or 'classic'
+end
+
+-- Which layouts players may pick: booleans only, missing = allowed, and an
+-- empty result still allows 'classic' so there is always something to render.
+local function allowedLayouts()
+    local ui = ((Config.kora_inventory or {}).ui) or {}
+    local configured = type(ui.layouts) == 'table' and ui.layouts or {}
+    local allowed = {}
+    for _, id in ipairs(LAYOUT_IDS) do
+        allowed[id] = configured[id] ~= false
+    end
+    local any = false
+    for _, id in ipairs(LAYOUT_IDS) do any = any or allowed[id] end
+    if not any then allowed.classic = true end
+    return allowed
+end
+
 local function pushConfig()
     local ui = Config.kora_inventory.ui or {}
 
@@ -118,6 +150,11 @@ local function pushConfig()
         inspectorCopy = (Config.Inspector or {}).allowCopy ~= false,
         -- Slot border thickness in CSS px.
         slotBorderWidth = math.max(1, math.min(4, tonumber((Config.Slots or {}).borderWidth) or 2)),
+        -- Layout registry (web/src/layouts): server default, which ones may be
+        -- picked, and whether players may choose in kora_hud's /ui editor.
+        layout = serverLayout(),
+        layouts = allowedLayouts(),
+        playerLayoutChoice = ui.playerLayoutChoice ~= false,
     })
 end
 
@@ -136,6 +173,8 @@ local function defaultPlayerLayout()
         x = 0, y = 0, scale = 1, placed = false,
         playerSide = 'left',
         useForTransfer = uiConfig().playerLayoutTransfer == true,
+        -- nil: the server's Config.kora_inventory.ui.layout applies.
+        layout = nil,
     }
 end
 local playerLayout = defaultPlayerLayout()
@@ -160,6 +199,8 @@ local function setPlayerLayout(layout)
             placed = layout.placed == true,
             playerSide = settings.playerSide == 'right' and 'right' or 'left',
             useForTransfer = type(settings.useForTransfer) == 'boolean' and settings.useForTransfer or defaults.useForTransfer,
+            -- Whitelisted here; the page also checks it against the allowed set.
+            layout = knownLayout(settings.layout),
         }
     end
     send('kora_inventory:nui:layout', playerLayout)
@@ -550,6 +591,32 @@ local function editorWanted()
         and type(GetResourceState) == 'function' and GetResourceState('kora_hud') == 'started'
 end
 
+local function editorSettings()
+    local settings = {
+        { key = 'playerSide', label = 'Personal inventory side (stash/trunk view)', type = 'select',
+          default = 'left', options = { { value = 'left', label = 'Left' }, { value = 'right', label = 'Right' } } },
+        { key = 'useForTransfer', label = 'Use my position for stashes and trunks', type = 'toggle',
+          default = uiConfig().playerLayoutTransfer == true,
+          description = 'Off: stashes, trunks and gloveboxes open centred in the default two-panel layout.' },
+    }
+    if uiConfig().playerLayoutChoice ~= false then
+        local allowed, options = allowedLayouts(), {}
+        for _, id in ipairs(LAYOUT_IDS) do
+            if allowed[id] then options[#options + 1] = { value = id, label = LAYOUT_LABELS[id] } end
+        end
+        -- A choice of one is no choice: only offer the picker when there is one.
+        if #options > 1 then
+            local default = serverLayout()
+            if not allowed[default] then default = options[1].value end
+            settings[#settings + 1] = {
+                key = 'layout', label = 'Inventory layout', type = 'select',
+                default = default, options = options,
+            }
+        end
+    end
+    return settings
+end
+
 -- The editor box is the personal inventory window at its default size,
 -- centred (~540x670 px of the shared 1920x1080 root). The transfer view is
 -- larger, but it is centred on the same point and scales from it too.
@@ -567,13 +634,7 @@ local function registerWithEditor()
             hideable = false,
             scaleMin = 0.75,
             scaleMax = 1.25,
-            settings = {
-                { key = 'playerSide', label = 'Personal inventory side (stash/trunk view)', type = 'select',
-                  default = 'left', options = { { value = 'left', label = 'Left' }, { value = 'right', label = 'Right' } } },
-                { key = 'useForTransfer', label = 'Use my position for stashes and trunks', type = 'toggle',
-                  default = uiConfig().playerLayoutTransfer == true,
-                  description = 'Off: stashes, trunks and gloveboxes open centred in the default two-panel layout.' },
-            },
+            settings = editorSettings(),
         })
     end)
 end

@@ -5,7 +5,18 @@ describe("player layout", () => {
     it("clamps and defaults every field", () => {
         expect(normalizePlayerLayout(null)).toEqual(DEFAULT_PLAYER_LAYOUT)
         expect(normalizePlayerLayout({ x: 9, y: "a", scale: 4, playerSide: "up", useForTransfer: "yes" }))
-            .toEqual({ x: 1, y: 0, scale: 1.25, playerSide: "left", useForTransfer: false })
+            .toEqual({ x: 1, y: 0, scale: 1.25, playerSide: "left", useForTransfer: false, layout: undefined })
+    })
+
+    it("accepts only known layout ids", () => {
+        expect(DEFAULT_PLAYER_LAYOUT.layout).toBeUndefined()
+        for (const id of ["classic", "loadout", "compact", "dock"]) {
+            expect(normalizePlayerLayout({ layout: id }).layout).toBe(id)
+        }
+        for (const bad of ["Classic", "../evil", "", 4, null, {}, undefined]) {
+            expect(normalizePlayerLayout({ layout: bad }).layout).toBeUndefined()
+        }
+        expect(normalizePlayerLayout({ layout: "dock", x: 0.5 })).toMatchObject({ layout: "dock", x: 0.5 })
     })
 
     it("keeps the transfer view centred unless the player opted in", () => {

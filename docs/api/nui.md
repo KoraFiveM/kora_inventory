@@ -36,7 +36,8 @@ Each is `{ action, data }`. Items in views are keyed by slot and include `label`
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `kora_inventory:nui:config` | table | `{ hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth }`, derived from `Config.kora_inventory.ui`, `Config.Inspector` and `Config.Slots`. Pushed on resource start and on every session open. |
+| `kora_inventory:nui:config` | table | `{ hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice }`, derived from `Config.kora_inventory.ui`, `Config.Inspector` and `Config.Slots`. Pushed on resource start and on every session open. |
+| `kora_inventory:nui:layout` | table | The player's window placement from kora_hud's `/ui` editor: `{ x, y, scale, placed, playerSide, useForTransfer, layout? }`. Offsets and scale are clamped. `layout` is the player's chosen inventory layout, one of `classic`, `loadout`, `compact`, `dock`; any other value is dropped, and the page also checks it against the allowed set. Pushed when the editor applies or resets the layout and on every session open. |
 | `kora_inventory:nui:locales` | table | Flat key/value map for the React UI, resolved on the client with `Kora.lang()` from `locales/en.lua`. Pushed two seconds after the client resource starts so the page's message listener is ready. |
 | `kora_inventory:nui:sessionOpened` | table | `{ sessionId, token, revision, secondaryRevision, player, secondary?, expires }`. `player` and `secondary` are views `{ id (the inventory key), key, type, label, slots, maxWeight, weight, revision, items, stock? }`. |
 | `kora_inventory:nui:sessionPatched` | table | `{ sessionId, revision?, secondaryRevision?, player?, secondary?, snapshot? }`: the changed view replaces the page's copy. |
@@ -154,6 +155,9 @@ The only config sent to the browser (`kora_inventory:nui:config`, at start and o
 | `scale` | `1.0` | Size multiplier for text and slots (0.5-2.0). Live. |
 | `playerLayout` | `true` | Register the window with kora_hud's `/ui` editor so players can move, resize (75-125 %) and pick a side. Needs `kora_hud`. |
 | `playerLayoutTransfer` | `false` | Default for "Use my position for stashes and trunks". |
+| `layout` | `'classic'` | Server default layout: `classic`, `loadout`, `compact` or `dock`. Unknown values are sent as `classic`. |
+| `layouts` | all `true` | Which layouts may be used. Sent as booleans only; if none is enabled, `classic` stays enabled. |
+| `playerLayoutChoice` | `true` | Add an "Inventory layout" select to the `/ui` editor and honour the player's choice. Needs `playerLayout` and `kora_hud`. |
 | `rightClickSplit` | `true` | Right-click on a stack of two or more opens the split dialog. |
 | `optimisticMoves` | `true` | Paint a move or purchase immediately and undo it if the server refuses or does not answer within `moveTimeoutMs`. The server validates every move either way. |
 | `queueMoves` | `true` | With `optimisticMoves`, queue up to eight further drags while one is pending. |
@@ -163,6 +167,14 @@ The only config sent to the browser (`kora_inventory:nui:config`, at start and o
 | `images` | see [Items](./items.md) | Artwork resolution. |
 
 `hotbarSlots` is sent alongside so the outline and the keys cannot disagree. Top-level `Config.Inspector`, `Config.Slots` and `Config.Hotbar` also style the UI. The inspector's text is selectable only when `Config.Inspector.allowCopy` is true; its Copy button copies the item as JSON.
+
+### Layouts
+
+The window is rendered by one of several layouts, chosen by the page from the pushed config and the player's `kora_inventory:nui:layout` message. The rule, in order: the player's layout if `playerLayoutChoice` is on and that layout is allowed; otherwise the server `layout` if it is allowed; otherwise `classic`. A layout missing from `layouts` counts as allowed, only an explicit `false` hides it.
+
+The chosen id is set on the window element as the `data-layout` attribute (`main.inventory-shell`), so stylesheets can target one layout, for example `data-layout="dock"`. Every layout keeps the same shared pieces (slots, panels, inspector, top bar, shortcut bar), the same drag and drop, and the same intents; a layout only arranges them. The `classic` layout is the original window and is unchanged. In the current build `loadout`, `compact` and `dock` still render the classic arrangement, so choosing them changes only the `data-layout` attribute until they are implemented.
+
+The registry lives in `web/src/layouts/`: `types.ts` (the `LayoutProps` contract), `ClassicLayout.tsx` and `index.ts` (the `LAYOUTS` map and `resolveLayout`). To add a layout, write a component that takes `LayoutProps`, attach `shellRef`, `shellStyle` and `data-layout` to its main element, register it in `LAYOUTS`, and add its id to `LAYOUT_IDS` in `web/src/lib/layoutIds.ts` and to the whitelist in `client/ui.lua`. Layouts never talk to the server or to the bridge, so they add no new authority.
 
 ### Item receipts and notifications
 
