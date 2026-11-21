@@ -40,6 +40,8 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/use_item.lua
 "${LUA:-lua}" test/smoke/busy_use.lua
 "${LUA:-lua}" test/smoke/combine.lua
+"${LUA:-lua}" test/smoke/combine_guards.lua
+"${LUA:-lua}" test/smoke/audit_creation_paths.lua
 "${LUA:-lua}" test/smoke/no_builtin_consumables.lua
 "${LUA:-lua}" test/smoke/audit_guards.lua
 "${LUA:-lua}" test/smoke/hotbar.lua

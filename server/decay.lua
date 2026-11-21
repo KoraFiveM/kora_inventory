@@ -202,6 +202,10 @@ function R.process(inventoryKey, inv, viewer)
                 I.showItemBox(owner, outcome.into, outcome.amount, 'add', outcome.created)
             end
         end
+        -- The converted item is a creation: item-creation audit (audit_log.lua).
+        if outcome.created and I.auditAdd then
+            I.auditAdd('decay', owner, inventoryKey, outcome.into, outcome.amount, 'decay:' .. tostring(outcome.item))
+        end
         TriggerEvent('kora_inventory:server:itemDecayed', owner or viewer, {
             inventory = inventoryKey, item = outcome.item, amount = outcome.amount, slot = outcome.slot,
             action = outcome.action, into = outcome.into,
