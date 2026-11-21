@@ -33,11 +33,6 @@ function persistence.committed(inv)
     dirty[('%s:%s'):format(inv.type, tostring(inv.id))] = nil
 end
 
-local LEVELS = { ['1'] = 'error', ['2'] = 'info', ['3'] = 'warn' }
-local function log(level, event, message, fields)
-    return Kora.logging[LEVELS[level] or 'info'](event, message, fields)
-end
-
 local function fnv1a(str)
     local hash, prime = 0xCBF29CE484222325, 0x100000001B3
     for i = 1, #str do
@@ -130,7 +125,6 @@ local function safeProperties(inv)
         stock = inv.stock,
         prices = inv.prices,
         currency = inv.currency,
-        access = nil,
         accessRequired = inv.accessRequired == true or not not inv.access,
         policyOwner = inv.policyOwner,
         blocked = inv.blocked == true,
@@ -292,7 +286,7 @@ function persistence.flush()
             end
         else
             failed[#failed + 1] = { key = inventoryKey, error = err }
-            log('1', 'persistence.save_failed', 'Inventory save failed', { inventoryKey = inventoryKey, error = tostring(err) })
+            Kora.logging.error('persistence.save_failed', 'Inventory save failed', { inventoryKey = inventoryKey, error = tostring(err) })
         end
     end
     return #failed == 0, failed
@@ -357,7 +351,7 @@ function persistence.deleteLegacyPoliceTrash()
     -- A locking read on the write pool waits for the original transaction even
     -- if its COMMIT acknowledgement was lost. Never release old dirty snapshots
     -- until this attempt's commit/rollback is known; another UUID is not ours.
-    log('3', 'persistence.policetrash_pending', 'Policetrash deletion is awaiting durable reconciliation')
+    Kora.logging.warn('persistence.policetrash_pending', 'Policetrash deletion is awaiting durable reconciliation')
     while true do
         local readOK, snapshot = pcall(Kora.sql.transactionChecked, {
             { query = [[SELECT `source_checksum` FROM `kora_inventory_migration_rows`
@@ -456,27 +450,6 @@ function persistence.restoreAll()
         end
     end
     return restored, rejected
-end
-
-function persistence.audit(action, actor, inv, details)
-    if not state.ready then
-        return false, state.lastError
-    end
-    local encoded = encode(details or {})
-    if not encoded then
-        return false, 'could not encode audit details'
-    end
-    return db(
-        [[INSERT INTO `kora_inventory_audit` (`actor`,`action`,`inventory_type`,`inventory_id`,`details`)
-        VALUES (?,?,?,?,?)]],
-        {
-            actor and tostring(actor) or nil,
-            tostring(action),
-            inv and inv.type or nil,
-            inv and tostring(inv.id) or nil,
-            encoded,
-        }
-    )
 end
 
 -- Item-creation audit storage (driven by server/audit_log.lua, which batches).
@@ -705,7 +678,7 @@ local function quarantine(source, sourceKey, raw, reason)
     return ok, err
 end
 
-local function setMigrationState(source, status, report, err)
+local function setMigrationState(source, status)
     return db(
         [[INSERT INTO `kora_inventory_migration_state`
         (`source_name`,`status`,`last_started_at`,`last_finished_at`,`imported_count`,`skipped_count`,`quarantined_count`,`last_error`)
@@ -716,12 +689,11 @@ local function setMigrationState(source, status, report, err)
     )
 end
 
-local function finishMigrationState(source, status, report, err)
+local function finishMigrationState(source, status, report)
     return db(
         [[UPDATE `kora_inventory_migration_state` SET `status`=?, `last_finished_at`=CURRENT_TIMESTAMP,
         `imported_count`=?, `skipped_count`=?, `quarantined_count`=?, `last_error`=? WHERE `source_name`=?]],
-        -- `err` sits mid-array and is nil on success, which would leave a hole.
-        { status, report.imported, report.skipped, report.quarantined, err or Kora.sql.NULL, source }
+        { status, report.imported, report.skipped, report.quarantined, Kora.sql.NULL, source }
     )
 end
 
@@ -735,9 +707,7 @@ local function emitProgress(report, source, phase, row)
     )
 end
 
-local function importLegacyRowUnlocked(source, defaultType, row, opts, report)
-    local id = tostring(row.legacy_id or '')
-    local kind = cleanType(defaultType == 'kind' and row.legacy_type or defaultType)
+local function importLegacyRowUnlocked(source, kind, id, row, opts, report)
     local sourceKey = ('%s:%s'):format(kind, id)
     if id == '' or #id > 128 then
         report.quarantined = report.quarantined + 1
@@ -795,7 +765,6 @@ local function importLegacyRowUnlocked(source, defaultType, row, opts, report)
         maxWeight = tonumber(row.legacy_max_weight) or Config.kora_inventory.defaultMaxWeight,
         revision = 0,
         items = items,
-        legacy = { source = source, key = sourceKey },
     })
     if not saved then
         error(('could not import %s: %s'):format(sourceKey, tostring(saveErr)))
@@ -812,7 +781,7 @@ local function importLegacyRow(source, defaultType, row, opts, report)
     local id = tostring(row.legacy_id or '')
     local kind = cleanType(defaultType == 'kind' and row.legacy_type or defaultType)
     local ok, err = persistence.withLock(kind, id, function()
-        importLegacyRowUnlocked(source, defaultType, row, opts, report)
+        importLegacyRowUnlocked(source, kind, id, row, opts, report)
         return true
     end)
     if not ok then error(err) end
@@ -843,7 +812,7 @@ function persistence.migrateLegacy(opts)
                     report.skipped = report.skipped + 1
                 else
                     if not opts.dryRun then
-                        setMigrationState(source, 'running', sourceReport)
+                        setMigrationState(source, 'running')
                     end
                     for index, row in ipairs(rows) do
                         local before =
@@ -868,7 +837,7 @@ function persistence.migrateLegacy(opts)
     state.migrating = false
     if not ok then
         state.lastError = result
-        log('1', 'persistence.legacy_migration_failed', 'Legacy migration failed', { error = tostring(result) })
+        Kora.logging.error('persistence.legacy_migration_failed', 'Legacy migration failed', { error = tostring(result) })
         return nil, result
     end
     state.lastMigration = result
@@ -883,7 +852,7 @@ function persistence.verifyMigration()
     if not rows then
         return nil, err
     end
-    local report = { checked = #rows, malformed = {}, state = {} }
+    local report = { checked = #rows, malformed = {} }
     for _, row in ipairs(rows) do
         local _, itemErr = persistence.normaliseItems(row.items)
         if itemErr then
@@ -902,30 +871,48 @@ end
 local function bootstrap()
     if not persistenceConfig.enabled then
         state.ready = true
-        log('3', 'persistence.disabled', 'Secondary persistence disabled by configuration')
+        Kora.logging.warn('persistence.disabled', 'Secondary persistence disabled by configuration')
         return
     end
     local sqlReady, readyErr = Kora.sql.ready(60000)
     if not sqlReady then
         state.lastError = readyErr or 'kora_sql did not become ready'
-        log('1', 'persistence.sql_not_ready', 'Secondary persistence unavailable', { error = tostring(state.lastError) })
+        Kora.logging.error('persistence.sql_not_ready', 'Secondary persistence unavailable', { error = tostring(state.lastError) })
         return
     end
     local reports, migrationErr = Kora.sql.ensureTables(KoraInventorySchema)
     if migrationErr then
         state.lastError = migrationErr
-        log('1', 'schema.setup_failed', 'Secondary-inventory schema setup failed', { error = tostring(migrationErr) })
+        Kora.logging.error('schema.setup_failed', 'Secondary-inventory schema setup failed', { error = tostring(migrationErr) })
         return
     end
     for _, report in ipairs(type(reports) == 'table' and reports or {}) do
         for _, warning in ipairs(type(report) == 'table' and report.warnings or {}) do
-            log('3', 'schema.warning', 'Secondary-inventory schema warning', { warning = tostring(warning) })
+            Kora.logging.warn('schema.warning', 'Secondary-inventory schema warning', { warning = tostring(warning) })
         end
     end
     state.ready = true
-    log('2', 'schema.ready', 'Secondary-inventory schema ready')
+    Kora.logging.info('schema.ready', 'Secondary-inventory schema ready')
     TriggerEvent('kora_inventory:server:persistenceReady', reports)
 end
+
+local MIGRATE_ACTIONS = {
+    ['dry-run'] = {
+        options = { dryRun = true },
+        done = { 'migrate.dry_run_complete', 'Legacy migration dry run complete' },
+        failed = { 'migrate.dry_run_failed', 'Legacy migration dry run failed' },
+    },
+    run = {
+        options = {},
+        done = { 'migrate.run_complete', 'Legacy migration complete' },
+        failed = { 'migrate.run_failed', 'Legacy migration failed' },
+    },
+    retry = {
+        options = { retry = true },
+        done = { 'migrate.retry_complete', 'Legacy migration retry complete' },
+        failed = { 'migrate.retry_failed', 'Legacy migration retry failed' },
+    },
+}
 
 RegisterCommand('kora_inventory-migrate', function(source, args)
     if source ~= 0 and not IsPlayerAceAllowed(source, 'command.kora_inventory') then
@@ -933,40 +920,25 @@ RegisterCommand('kora_inventory-migrate', function(source, args)
     end
     local action = (args[1] or 'help'):lower()
     CreateThread(function()
-        if action == 'dry-run' then
-            local report, err = persistence.migrateLegacy({ dryRun = true })
+        local migrate = MIGRATE_ACTIONS[action]
+        if migrate then
+            local report, err = persistence.migrateLegacy(migrate.options)
             if report then
-                log('2', 'migrate.dry_run_complete', 'Legacy migration dry run complete',
+                Kora.logging.info(migrate.done[1], migrate.done[2],
                     { imported = report.imported, skipped = report.skipped, quarantined = report.quarantined })
             else
-                log('1', 'migrate.dry_run_failed', 'Legacy migration dry run failed', { error = tostring(err) })
-            end
-        elseif action == 'run' then
-            local report, err = persistence.migrateLegacy({})
-            if report then
-                log('2', 'migrate.run_complete', 'Legacy migration complete',
-                    { imported = report.imported, skipped = report.skipped, quarantined = report.quarantined })
-            else
-                log('1', 'migrate.run_failed', 'Legacy migration failed', { error = tostring(err) })
-            end
-        elseif action == 'retry' then
-            local report, err = persistence.migrateLegacy({ retry = true })
-            if report then
-                log('2', 'migrate.retry_complete', 'Legacy migration retry complete',
-                    { imported = report.imported, skipped = report.skipped, quarantined = report.quarantined })
-            else
-                log('1', 'migrate.retry_failed', 'Legacy migration retry failed', { error = tostring(err) })
+                Kora.logging.error(migrate.failed[1], migrate.failed[2], { error = tostring(err) })
             end
         elseif action == 'verify' then
             local report, err = persistence.verifyMigration()
             if report then
-                log('2', 'migrate.verify_complete', 'Legacy migration verification complete',
+                Kora.logging.info('migrate.verify_complete', 'Legacy migration verification complete',
                     { checked = report.checked, malformed = #report.malformed })
             else
-                log('1', 'migrate.verify_failed', 'Legacy migration verification failed', { error = tostring(err) })
+                Kora.logging.error('migrate.verify_failed', 'Legacy migration verification failed', { error = tostring(err) })
             end
         else
-            log('3', 'migrate.usage', 'Usage: kora_inventory-migrate dry-run|run|retry|verify')
+            Kora.logging.warn('migrate.usage', 'Usage: kora_inventory-migrate dry-run|run|retry|verify')
         end
     end)
 end, true)

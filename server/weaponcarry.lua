@@ -35,8 +35,8 @@ local STATE_KEY = 'kora_inventory:weaponCarry'
 -- also drawn on their back. Confirmed by the client after the draw animation
 -- completes, and cleared when they put it away, die, or drop.
 local equipped = {}
--- src -> { slot, name, action, expires }: the one toggle this server asked
--- for. A confirmation that does not match it is ignored.
+-- src -> { [slot] = { slot, name, action, expires } }: the toggles this server
+-- asked for, one per slot. A confirmation that does not match one is ignored.
 local pending = {}
 -- Temporary server-issued range weapons are not inventory items. Their finite
 -- round count still lives here so training resources never trust a client
@@ -247,7 +247,8 @@ end
 ---confirms below, so a cancelled draw leaves the player exactly as they were.
 ---@param src integer
 ---@param item table  -- already re-resolved from PlayerData by useItem
----@return boolean, table|string
+---@return boolean ok
+---@return string? reason
 local function toggle(src, item)
     local slot = math.floor(tonumber(item.slot) or 0)
     if slot <= 0 then
@@ -323,6 +324,9 @@ RegisterNetEvent('kora_inventory:server:weaponToggled', function(slot)
     end
     if GetGameTimer() > request.expires then
         pending[src][slot] = nil
+        if next(pending[src]) == nil then
+            pending[src] = nil
+        end
         return
     end
 
@@ -522,20 +526,22 @@ AddEventHandler('kora_core:server:inventoryChanged', function(src, path, value)
     end
 end)
 
-AddEventHandler('playerDropped', function()
-    local src = source
+local function resetPlayer(src)
     trainingOwnership.untrack(src)
     stopTraining(src)
     equipped[src], pending[src], lastShotAt[src] = nil, nil, nil
+end
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    resetPlayer(src)
 end)
 
 -- Logout / character switch: the next character must not inherit the drawn
 -- weapon or the back props (the client strips its side on the same event).
 AddEventHandler('QBCore:Server:OnPlayerUnload', function(src)
     src = tonumber(src) or source
-    trainingOwnership.untrack(src)
-    stopTraining(src)
-    equipped[src], pending[src], lastShotAt[src] = nil, nil, nil
+    resetPlayer(src)
     local player = Player(src)
     if player and player.state then
         player.state:set(STATE_KEY, false, true)
@@ -545,9 +551,7 @@ end)
 AddEventHandler('kora_core:server:playerLoaded', function(src)
     -- A fresh spawn holds nothing, whatever a previous session left behind,
     -- and the bag has to be seeded before any client can render it.
-    trainingOwnership.untrack(src)
-    stopTraining(src)
-    equipped[src], pending[src], lastShotAt[src] = nil, nil, nil
+    resetPlayer(src)
     publish(src)
 end)
 
@@ -571,7 +575,6 @@ inventory.weaponCarry = {
     carryRule = carryRule,
     drawDuration = drawDuration,
     shotWear = shotWear,
-    damageSettings = damageSettings,
     stateKey = STATE_KEY,
     ---@param src integer
     ---@return table|nil  -- { slot, name, components? } or nil when empty-handed

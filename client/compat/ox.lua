@@ -316,13 +316,6 @@ local ox = {
         end
         return sharedItems()
     end,
-    ItemList = function(name)
-        if name then
-            local def = itemDef(name)
-            return def and KoraInventory.toOxItemDef(def, itemName(name)) or nil
-        end
-        return sharedItems()
-    end,
     setStashTarget = function(id, owner)
         -- Upstream stores this in a local and its SECONDARY-inventory keybind
         -- opens it (src/client.lua:819). kora_inventory owns no secondary keybind
@@ -454,6 +447,8 @@ local ox = {
     -- Deliberate no-op.
     setGetPlayerNameMethod = function() end,
 }
+
+ox.ItemList = ox.Items
 
 -- Upstream tracks the weapon ITS OWN equip flow armed (src/client.lua:10).
 -- kora_inventory records no equip state -- client/useables.lua just toggles the

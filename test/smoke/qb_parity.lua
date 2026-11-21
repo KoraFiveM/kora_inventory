@@ -19,6 +19,7 @@ env.Kora = {
         return position and ((position.x - point.x)^2 + (position.y - point.y)^2 + (position.z - point.z)^2) <= distance^2
     end },
     sql = {},
+    logging = dofile('test/logging_spy.lua').logging,
 }
 env.Core = {
     util = {}, player = {}, money = {}, compat = {},

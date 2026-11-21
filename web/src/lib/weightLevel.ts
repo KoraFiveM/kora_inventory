@@ -1,4 +1,4 @@
-export type WeightLevel = "ok" | "warn" | "danger"
+type WeightLevel = "ok" | "warn" | "danger"
 
 export function weightLevel(weight: number, maxWeight: number, warnAt: number, dangerAt: number): WeightLevel {
     if (!(maxWeight > 0) || !Number.isFinite(weight)) return "ok"

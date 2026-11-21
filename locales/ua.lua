@@ -36,7 +36,6 @@ return {
     },
     ui = {
         inventory_label = 'Інвентар',
-        revision = 'Ревізія %{revision}',
         slot_item = '%{item}, слот %{slot}',
         slot_number = 'Слот %{slot}',
         split_amount = 'Розділити %{amount} / %{remaining}',
@@ -94,10 +93,6 @@ return {
         open_secondary_inventory = 'Відкрийте сховище, магазин, контейнер або інвентар іншого гравця, щоб скористатися цією панеллю.',
         hidden_by_search = '«%{item}» приховано поточним пошуком.',
         select_item_help = 'Виберіть предмет, щоб побачити подробиці. Перетягуйте його між слотами, щоб перемістити чи скласти в стос, або за межі вікна, щоб викинути.',
-        close = 'Закрити',
-        use_selected = 'Використати вибране',
-        move_or_stack = 'Перемістити або скласти',
-        drop = 'Викинути',
         split_dialog = 'Розділити «%{item}»',
         split_title = 'Розділити «%{item}»',
         move_how_many = 'Скільки перемістити? (1–%{amount})',

@@ -1,11 +1,6 @@
 import { useLayoutEffect, useEffect, useRef, useState } from "react"
 import { useNuiEvent } from "@/lib/useNuiEvent"
-import { DEFAULT_PLAYER_LAYOUT, drawerPlacement, layoutOffsetPx, normalizePlayerLayout, onScreenNudge, type PlayerLayout } from "@/lib/playerLayout"
-
-/** Same factor main.tsx scales the root by. */
-function rootScale() {
-    return Math.min(2, Math.max(0.5, Math.min(window.innerWidth / 1920, window.innerHeight / 1080)))
-}
+import { DEFAULT_PLAYER_LAYOUT, drawerPlacement, layoutOffsetPx, normalizePlayerLayout, onScreenNudge, rootScale, type PlayerLayout } from "@/lib/playerLayout"
 
 /**
  * The player's window placement from kora_hud's /ui editor (relayed by

@@ -17,7 +17,7 @@ export function asSlots(items: InventoryView["items"]): InventoryItem[] {
     )
 }
 
-export function mergeInventory(current: InventoryView | undefined, patch: Partial<InventoryView> | null | undefined) {
+function mergeInventory(current: InventoryView | undefined, patch: Partial<InventoryView> | null | undefined) {
     if (patch === null) return undefined
     if (patch === undefined) return current
     if (!current) return patch as InventoryView | undefined

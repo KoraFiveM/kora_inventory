@@ -9,7 +9,9 @@ Config.showTargetHints = nil
 
 -- Prefix of newly generated weapon serials (`KORA-WEAPONPISTOL50-<time>-<n>`).
 -- Upper-cased and reduced to A-Z0-9, max 12 characters; empty falls back to
--- KORA. Existing items keep the serial they already have.
+-- KORA. Existing items keep the serial they already have. The legacy
+-- weapons.serialPrefix is still honoured, but only while this is left at KORA
+-- (or empty) and it is set to something other than 'QB'.
 Config.SerialPrefix = 'KORA'
 
 -- Item inspector number formatting. Decimals shown for fractional metadata
@@ -891,8 +893,6 @@ Config.kora_inventory = {
     weapons = {
         defaultDurability = 100,
         maxAmmo = 10000,
-        -- Deprecated alias of Config.SerialPrefix; only read when that is left at
-        -- its default and this is set to something other than 'QB'.
         -- Ammunition is not merely an integer.  Every loaded round is a
         -- discrete record on its weapon (`info.loadedBullets`), so loading a
         -- 12-round magazine creates exactly 12 traceable rounds.  The
@@ -901,7 +901,7 @@ Config.kora_inventory = {
             enabled = true,
             maxLoadedRounds = 240, -- hard metadata cap; keep this close to the weapons used on your server
             shotCooldown = 65, -- client/server floor between native shot reports
-            casingOffset = 0.75, -- metres behind/alongside the shooter for the recovered casing marker
+            casingOffset = 0.75, -- metres behind/alongside the shooter for the recovered casing marker; not read by this resource's own scripts
         },
         -- "Which ammo does this gun take?" Presentation only: the server adds
         -- `ammo` to weapon views and `ammoType`/`rounds`/`fits` to ammo views,

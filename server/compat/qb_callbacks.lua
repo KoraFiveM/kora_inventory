@@ -232,7 +232,7 @@ Kora.callback.register('qb-inventory:server:attemptPurchase', function(src, data
     if type(data) ~= 'table' or type(data.item) ~= 'table' then
         return false
     end
-    local amount = count(data.amount, nil)
+    local amount = count(data.amount)
     if not amount then
         return false
     end
@@ -363,6 +363,3 @@ Kora.callback.register('qb-inventory:server:giveItem', function(src, target, ite
         end)
     )
 end)
-
-inventory.compat = inventory.compat or {}
-inventory.compat.koraCallbacks = { drops = bridgeDrops }

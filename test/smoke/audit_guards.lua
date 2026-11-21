@@ -15,6 +15,7 @@ Kora = {
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
     callback = { register = function(name, fn) KoraCallbacks[name] = fn end },
     sql = {},
+    util = { deepClone = dofile('test/deep_clone.lua') },
     notify = { send = function() end },
     lang = function(key) return key end,
     distance = { player = function() return true end },

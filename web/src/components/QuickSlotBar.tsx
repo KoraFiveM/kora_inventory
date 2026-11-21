@@ -12,7 +12,7 @@ export type QuickSlotPosition = "side" | "top" | "bottom" | "drawer" | "panel"
 export type QuickSlotSide = "left" | "right"
 
 /** localStorage key of the player's own drawer choice; it wins over `quickSlots.drawer.startCollapsed`. */
-export const DRAWER_COLLAPSED_KEY = "kora_inventory:quickDrawerCollapsed"
+const DRAWER_COLLAPSED_KEY = "kora_inventory:quickDrawerCollapsed"
 
 function readCollapsed(fallback: boolean): boolean {
     try {
@@ -47,7 +47,7 @@ export interface QuickSlotBarProps {
 }
 
 /** A player slot can be pinned to a tile unless the tile is linked (ammo) or the window is busy. */
-export function canPinTo(tile: Pick<QuickTile, "linked">, source: DragSlot | undefined, playerId: string, busy: boolean): boolean {
+function canPinTo(tile: Pick<QuickTile, "linked">, source: DragSlot | undefined, playerId: string, busy: boolean): boolean {
     return Boolean(source) && !busy && !tile.linked && source!.inventoryId === playerId
 }
 

@@ -151,9 +151,9 @@ h2 { margin-bottom: 0; font-size: calc(15px * var(--ui-scale, 1)); font-weight: 
 /* Same thickness as the slot border (Config.Slots.borderWidth). The diagonal
    pair on the end slots fills their rounded corners, where the straight edge
    shadows alone thin out to a hairline. */
-.slot-hotbar { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset 0 0 0 1px var(--slot-ring, transparent); }
-.slot-hotbar-first { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset var(--slot-border-width, 1px) 0 0 hsl(var(--brand-border)), inset var(--slot-border-width, 1px) var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset var(--slot-border-width, 1px) calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset 0 0 0 1px var(--slot-ring, transparent); }
-.slot-hotbar-last { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset calc(-1 * var(--slot-border-width, 1px)) 0 0 hsl(var(--brand-border)), inset calc(-1 * var(--slot-border-width, 1px)) var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset calc(-1 * var(--slot-border-width, 1px)) calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset 0 0 0 1px var(--slot-ring, transparent); }
+.slot-hotbar { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)); }
+.slot-hotbar-first { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset var(--slot-border-width, 1px) 0 0 hsl(var(--brand-border)), inset var(--slot-border-width, 1px) var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset var(--slot-border-width, 1px) calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)); }
+.slot-hotbar-last { box-shadow: inset 0 var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset 0 calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)), inset calc(-1 * var(--slot-border-width, 1px)) 0 0 hsl(var(--brand-border)), inset calc(-1 * var(--slot-border-width, 1px)) var(--slot-border-width, 1px) 0 hsl(var(--brand-border)), inset calc(-1 * var(--slot-border-width, 1px)) calc(-1 * var(--slot-border-width, 1px)) 0 hsl(var(--brand-border)); }
 /* A selected or targeted hotbar slot keeps its own state shadow: the state is
    transient and needs to win, and the accent frame is still visible on the
    slots either side of it. */
@@ -298,6 +298,6 @@ kbd { border: 1px solid hsl(var(--border-strong)); border-radius: 4px; padding: 
 .split-dialog h3 { margin: 0; font-size: calc(15px * var(--ui-scale, 1)); font-weight: 600; }
 .split-dialog label { display: grid; gap: 6px; }
 .split-dialog input { padding: 6px 8px; border: 0; border-radius: var(--radius-sm); color: inherit; background: hsl(var(--surface-raised)); font: inherit; }
-.split-error { margin: 0; color: hsl(var(--destructive, 0 80% 60%)); }
+.split-error { margin: 0; color: hsl(var(--destructive)); }
 .split-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .split-actions button { padding: 6px 12px; color: inherit; }

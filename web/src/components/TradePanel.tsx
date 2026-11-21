@@ -12,7 +12,7 @@ import { ItemArtwork } from "./ItemArtwork"
 import { SLOT_DRAG_TYPE, TRADE_OFFER_DRAG_TYPE } from "./dnd"
 
 /** Asks how many of a stack to offer (window.prompt would freeze CEF). */
-export function TradeAmountDialog({ item, onConfirm, onCancel }: { item: InventoryItem; onConfirm: (amount: number) => void; onCancel: () => void }) {
+function TradeAmountDialog({ item, onConfirm, onCancel }: { item: InventoryItem; onConfirm: (amount: number) => void; onCancel: () => void }) {
     const t = useLocale()
     const label = item.label ?? item.name
     const [value, setValue] = useState(String(Math.floor(item.amount)))

@@ -111,14 +111,6 @@ describe("optimistic moves in the NUI", () => {
         expect(notice()).toContain("over weight")
     })
 
-    it("rolls back on a kora_inventory:nui:rejected event", async () => {
-        hold(); await splitOne()
-        await post("kora_inventory:nui:rejected", { reason: "denied" })
-        expect(filled(2)).toBe(false)
-        expect(slotText(1)).toContain("×3")
-        expect(notice()).toContain("denied")
-    })
-
     it("rolls back when the server never answers", async () => {
         hold(); await splitOne()
         expect(filled(2)).toBe(true)

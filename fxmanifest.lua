@@ -66,8 +66,8 @@ server_scripts {
     'server/trade_state.lua',
     'server/trade.lua',
     'server/crafting.lua',
-    -- Weapon/consumable use handlers.  This follows crafting.lua because the
-    -- ammunition loader uses its server-only per-round ballistics API.
+    -- Weapon/consumable use handlers.  The ammunition loader looks up
+    -- crafting.lua's server-only per-round ballistics API at call time.
     'server/useables.lua',
     -- Drag-to-combine recipes and the `combine` intent handler (resolves
     -- crafting.lua's capacity check per call, so it only needs server.lua).
@@ -145,8 +145,8 @@ client_scripts {
     -- only routes requested targets through client.lua's validated transport.
     'client/compat.lua',
     'client/compat/ox.lua',
-    -- Native instructional-buttons overlay (controls toggle); loads before ui.lua,
-    -- which hides it whenever the session closes.
+    -- Native instructional-buttons overlay (controls toggle); ui.lua looks it up
+    -- at call time to hide it whenever the session closes.
     'client/controls.lua',
     'client/ui.lua',
     -- /invaudit overlay (read-only admin viewer); reuses ui.lua's NUI focus.

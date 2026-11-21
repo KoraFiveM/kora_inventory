@@ -17,6 +17,8 @@ Kora = {
         onChange = function(name, callback) cacheHandlers[name] = callback end,
     },
     progressbar = { start = function() return true end },
+    -- client/weaponcarry.lua subscribes to state-bag changes at load time.
+    state = { onChange = function() end },
 }
 RegisterNetEvent = function(name, callback) events[name] = callback end
 AddEventHandler = function(name, callback) handlers[name] = callback end

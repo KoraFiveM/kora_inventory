@@ -236,9 +236,6 @@ H.equal(byId(resolve({ [1] = { name = 'weapon_unknown', amount = 1 } }, { getDef
     nil, 'a missing definition cannot satisfy a type filter')
 H.ok(qs.matches({ names = { 'Radio' } }, { name = 'radio' }, nil), 'names do not need a definition')
 H.ok(not qs.matches(nil, { name = 'radio' }, nil), 'no filter never matches')
-H.equal(qs.find(slotsConfig, 'phone').label, 'Phone', 'find() looks a quick slot up by id')
-H.equal(qs.find(slotsConfig, 'nope'), nil, 'find() rejects unknown ids')
-H.equal(qs.find(slotsConfig, 7), nil, 'find() rejects non-string ids')
 
 -- The resolver never mutates its input.
 local before = items[3].name

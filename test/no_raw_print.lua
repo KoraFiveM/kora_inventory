@@ -15,7 +15,7 @@ local function allowed(path)
     end
     return false
 end
-local p = io.popen([[find . -type f \( -name '*.lua' -o -name '*.js' \) -not -path './node_modules/*' -not -path './.git/*' -not -path './test/*' -not -path './tests/*' -not -path '*/build/*' -not -path '*/dist/*' -not -name '*.min.js' | sed 's|^\./||' | sort]])
+local p = io.popen([[find . -type f \( -name '*.lua' -o -name '*.js' \) -not -path '*/node_modules/*' -not -path './.git/*' -not -path './test/*' -not -path './tests/*' -not -path '*/build/*' -not -path '*/dist/*' -not -name '*.min.js' | sed 's|^\./||' | sort]])
 local bad = {}
 for path in p:lines() do
     if not allowed(path) then

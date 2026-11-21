@@ -162,7 +162,7 @@ local function rollItems(src)
     local outcomes = {}
     for _, slot in ipairs(sortedSlots(inv.items)) do
         local item = inv.items[slot]
-        local chance = item and chanceFor(item.name)
+        local chance = chanceFor(item.name)
         local alreadyFlagged = mode == 'flag' and type(item.info or item.metadata) == 'table'
             and (item.info or item.metadata).waterDamaged == true
         -- chance 0 never rolls; chance 1 always damages.
@@ -314,5 +314,3 @@ if type(AddEventHandler) == 'function' then
         lastReport[source] = nil
     end)
 end
-
-return waterDamage

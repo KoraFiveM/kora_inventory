@@ -8,7 +8,7 @@ import type { InventoryItem, UiConfig } from "@/lib/types"
  * plain identifier is rejected outright rather than escaped -- item names are
  * already constrained to that shape, so there is nothing legitimate to lose.
  */
-export function localImageUrl(base: string | undefined, name: string, extension: string) {
+function localImageUrl(base: string | undefined, name: string, extension: string) {
     if (!base) return undefined
     if (!/^[a-z0-9_-]+$/i.test(name)) return undefined
     if (!/^[a-z0-9]+$/i.test(extension)) return undefined

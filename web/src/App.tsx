@@ -75,7 +75,7 @@ function InventoryApp() {
             onUse={s.use}
             onOpenBag={s.openBag}
             onSplitSelected={s.split}
-            onSubmit={(intent, payload) => s.submit(intent, payload)}
+            onSubmit={s.submit}
         />
     const layoutProps: LayoutProps = {
         layoutId,

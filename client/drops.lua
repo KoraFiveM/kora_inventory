@@ -8,13 +8,10 @@
 -- prop, moving it, or inventing one client-side therefore gains nothing: a
 -- player who never sees a bag can still open the drop, and a player who sees a
 -- fabricated one opens nothing.
---
--- Before this, `kora_inventory:client:dropCreated` had no listener at all: a
--- dropped item became an inventory at a coordinate with nothing to walk up to.
 
 local dropConfig = (Config.kora_inventory and Config.kora_inventory.drops) or {}
 
--- id -> { entity = number|nil, target = integer }
+-- id -> { coords = table, entity = number|nil, target = integer }
 local drops = {}
 local dropGeneration = 0
 
@@ -228,7 +225,7 @@ AddEventHandler('onClientResourceStop', function(resource)
         return
     end
 
-    -- Kora.entities and Kora.interact both clean up their own resource's handles on
-    -- stop, so this only has to drop the bookkeeping.
+    -- Kora.entities removes this resource's bag props on stop, so this only has to
+    -- drop the bookkeeping; the kora_target zones are not removed here.
     drops = {}
 end)

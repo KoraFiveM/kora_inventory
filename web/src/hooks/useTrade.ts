@@ -4,7 +4,7 @@ import type { InventoryItem, SessionSnapshot, TradeView } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
 /** How often an open trade window renews the inventory lease (well under sessionTtl). */
-export const TRADE_KEEPALIVE_MS = 30_000
+const TRADE_KEEPALIVE_MS = 30_000
 
 type Submit = (intent: "trade" | "tradeRequest", payload?: Record<string, unknown>) => void
 

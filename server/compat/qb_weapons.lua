@@ -12,6 +12,10 @@ local internal = assert(inventory.internal, 'kora_inventory internal authority m
 local api = assert(inventory.api, 'kora_inventory api missing')
 local weapons = assert(inventory.weapons, 'kora_inventory weapon state missing')
 
+local function invokedByResource()
+    return type(GetInvokingResource) == 'function' and GetInvokingResource()
+end
+
 local function slotOf(value)
     local slot = math.floor(tonumber(type(value) == 'table' and value.slot or value) or 0)
     return slot > 0 and slot or nil
@@ -46,14 +50,6 @@ local function equippedAt(src, value)
     return item, slot
 end
 
-local function weaponAmmo(src, legacy)
-    local _, slot = itemAt(src, legacy)
-    if not slot then
-        return 0
-    end
-    return math.floor(tonumber(weapons.getState(src, slot).ammo) or 0)
-end
-
 -- Current qb-weapons asks this callback while reconstructing its client state.
 -- kora_inventory has no repair-point config of its own, so an empty configuration
 -- is the compatible, no-hang response for a left-over caller.
@@ -82,7 +78,7 @@ Kora.callback.register('qb-weapons:server:RemoveAttachment', function()
 end)
 
 RegisterNetEvent('kora_inventory:server:legacyWeaponUse', function(value)
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     local src = source
@@ -93,13 +89,13 @@ RegisterNetEvent('kora_inventory:server:legacyWeaponUse', function(value)
 end)
 
 RegisterNetEvent('kora_inventory:server:legacyWeaponHolster', function()
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     local src = source
     local carrying = inventory.weaponCarry and inventory.weaponCarry.equippedWeapon(src)
     local item = carrying and itemAt(src, carrying.slot)
-    if item and inventory.weaponCarry then
+    if item then
         inventory.weaponCarry.toggle(src, item)
     end
 end)
@@ -108,7 +104,7 @@ end)
 -- count can only make our durable amount go DOWN; magazine use is the only
 -- route that can add rounds, and it does so server-side in useables.lua.
 RegisterNetEvent('qb-weapons:server:UpdateWeaponAmmo', function(legacy, amount)
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     local src = source
@@ -127,7 +123,7 @@ end)
 -- weapon. It can never improve quality; repairs must go through a server-side
 -- gameplay policy and SetWeaponState.
 RegisterNetEvent('qb-weapons:server:UpdateWeaponQuality', function(legacy, amount)
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     local src = source
@@ -142,7 +138,7 @@ end)
 -- arbitrary client HP value, which would let anyone repair their own weapon.
 -- The similarly shaped SetWeaponState export is server-only by design.
 RegisterNetEvent('qb-weapons:server:SetWeaponQuality', function()
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
 end)
@@ -152,7 +148,7 @@ end)
 -- its name, amount or metadata. This is equivalent to pressing Use in the
 -- current inventory and therefore inherits the drawn-weapon/ammo-type checks.
 RegisterNetEvent('qb-weapons:server:removeWeaponAmmoItem', function(legacy)
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     local src = source
@@ -173,10 +169,7 @@ end)
 -- resource-local repair table which no longer exists, so rejecting it is
 -- safer than accepting a client-selected repair point/item.
 RegisterNetEvent('qb-weapons:server:TakeBackWeapon', function()
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
 end)
-
-inventory.compat = inventory.compat or {}
-inventory.compat.koraWeapons = { itemAt = itemAt, equippedAt = equippedAt, weaponAmmo = weaponAmmo }

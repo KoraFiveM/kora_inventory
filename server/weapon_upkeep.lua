@@ -363,7 +363,6 @@ local function classify(name)
     end
     return nil
 end
-upkeep.classify = classify
 
 local function upkeepUseable(src, item)
     local kind, settings = classify(item.name)
@@ -435,7 +434,6 @@ local function upkeepUseable(src, item)
     end
     return true
 end
-upkeep.useItem = upkeepUseable
 
 local function refreshUpkeepUseable(name, def)
     -- Registered only for names the owner listed; an item another resource
@@ -583,11 +581,7 @@ exports('repairWeaponAt', function(src, counterIndex)
 end)
 
 Kora.callback.register('kora_inventory:server:repairQuote', function(src, counterIndex)
-    local ok, result = upkeep.quoteRepair(src, counterIndex)
-    if not ok then
-        return false, result
-    end
-    return true, result
+    return upkeep.quoteRepair(src, counterIndex)
 end)
 
 -- The confirm carries only the counter index. It is honoured only against a
