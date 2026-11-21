@@ -3,6 +3,9 @@ local H = dofile('test/harness.lua')
 local coreRoot = '../kora_core/'
 local mocks = dofile(coreRoot .. 'test/mocks.lua')
 local mock = mocks.install()
+-- The core mock's Kora.util lacks deepClone, which shared.lua's inventory.copy calls.
+Kora.util.deepClone = dofile('test/deep_clone.lua')
+Kora.util.clamp = function(value, min, max) return math.max(min, math.min(max, value)) end
 local clock, invoking = 1000, nil
 GetGameTimer = function() return clock end
 GetInvokingResource = function() return invoking end

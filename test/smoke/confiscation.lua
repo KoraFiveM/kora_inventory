@@ -27,6 +27,8 @@ env.Kora = {
     callback = { register = function(name, fn) callbacks[name] = fn end },
     compat = { provideExport = function(identity, name, fn) aliases[identity .. ':' .. name] = fn end },
     sql = {},
+    util = { deepClone = dofile('test/deep_clone.lua') },
+    logging = dofile('test/logging_spy.lua').logging,
 }
 env.GetCurrentResourceName = function() return 'kora_inventory' end
 env.GetInvokingResource = function() return nil end
