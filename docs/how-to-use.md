@@ -147,6 +147,14 @@ exports.kora_inventory:RegisterStash('pd_armoury', 'PD Armoury', 60, 250000,
 
 Players open it with `exports.kora_inventory:openInventory('stash', 'pd_armoury')` from the client. For a per-citizen stash (apartment storage) pass `true` as the owner and open it from the server with `exports.kora_inventory:OpenInventory(src, id)`.
 
+## Quick slots and the right-click menu
+
+Quick slots are shortcuts to items you already carry, shown as a strip beside your own inventory. They are not extra slots: clicking a tile selects the real item and flashes its slot, double-clicking uses it, and dragging a tile moves or drops the real item like any other.
+
+To pin an item to a quick slot, drag it from your inventory onto the tile. Right-click a pinned tile to unpin it. The ammo shortcut follows your equipped weapon and cannot be pinned. A tile with no matching item is hidden, or shown greyed out when `quickSlots.hideWhenMissing` is off.
+
+Set `Config.kora_inventory.ui.rightClick` to choose what right-click does on an item: `split` (the default) opens the split dialog, `menu` opens a context menu with Use, Split, Drop, Give, Ammo info and Copy as they apply, and `none` does nothing. While a weapon is selected the matching ammo is outlined, and while ammo is selected the weapons that take it are outlined. See [NUI contract](./api/nui.md) for details.
+
 ## Failure results and what they mean
 
 Most server functions return `ok, reason`. The reason is a short string; branch on `ok`, not on the text, except for the vocabularies called out in the compat modules.

@@ -37,6 +37,8 @@ H.ok(source:find('scale = Kora.util.clamp(tonumber(ui.scale) or 1.0, 0.5, 2.0)',
 
 H.equal(Config.kora_inventory.ui.rightClickSplit, true, 'right-click split defaults on')
 H.ok(source:find('rightClickSplit = ui.rightClickSplit ~= false', 1, true), 'rightClickSplit is pushed to the NUI on every config push')
+H.equal(Config.kora_inventory.ui.rightClick, 'split', 'right-click defaults to the split dialog')
+H.ok(source:find('rightClick = rightClickMode(ui),', 1, true), 'rightClick is pushed to the NUI on every config push')
 
 H.equal(Config.kora_inventory.ui.optimisticMoves, true, 'optimistic moves default on')
 H.ok(source:find('optimisticMoves = ui.optimisticMoves ~= false', 1, true), 'optimisticMoves is pushed to the NUI on every config push')
@@ -345,6 +347,23 @@ uiCfg.layouts = { classic = false, loadout = false, compact = false, dock = fals
 handlers['kora_inventory:ui:sessionOpened']({ token = 'L3', primary = view('player:1', 1) })
 H.equal(lastConfig().layouts.classic, true, 'classic stays allowed when everything is disabled')
 uiCfg.layout, uiCfg.layouts, uiCfg.playerLayoutChoice = savedUi.layout, savedUi.layouts, savedUi.choice
+
+-- Right-click mode: valid values pass through, anything else falls back to the legacy boolean.
+H.equal(lastConfig().rightClick, 'split', 'the right-click mode reaches the NUI')
+local savedClick = { mode = uiCfg.rightClick, split = uiCfg.rightClickSplit }
+uiCfg.rightClick = 'menu'
+handlers['kora_inventory:ui:sessionOpened']({ token = 'R1', primary = view('player:1', 1) })
+H.equal(lastConfig().rightClick, 'menu', 'rightClick = menu is pushed')
+uiCfg.rightClick = 'none'
+handlers['kora_inventory:ui:sessionOpened']({ token = 'R2', primary = view('player:1', 1) })
+H.equal(lastConfig().rightClick, 'none', 'rightClick = none is pushed')
+uiCfg.rightClick, uiCfg.rightClickSplit = 'bogus', false
+handlers['kora_inventory:ui:sessionOpened']({ token = 'R3', primary = view('player:1', 1) })
+H.equal(lastConfig().rightClick, 'none', 'an invalid rightClick falls back to the legacy false = none')
+uiCfg.rightClick, uiCfg.rightClickSplit = nil, true
+handlers['kora_inventory:ui:sessionOpened']({ token = 'R4', primary = view('player:1', 1) })
+H.equal(lastConfig().rightClick, 'split', 'an absent rightClick falls back to the legacy true = split')
+uiCfg.rightClick, uiCfg.rightClickSplit = savedClick.mode, savedClick.split
 
 -- The editor registration carries the picker (allowed layouts only).
 local savedExports, savedState = exports, GetResourceState

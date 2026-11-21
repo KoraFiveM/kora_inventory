@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef } from "react"
+import { useCallback, useContext, useMemo, useRef } from "react"
 import { useDrag, useDrop } from "react-dnd"
 import { useLocale } from "@/lib/locales"
+import { SlotUiContext } from "@/slotUi"
 import type { DragSlot, SlotTarget } from "@/lib/inventory"
 import type { InventoryItem, InventoryView } from "@/lib/types"
 import { ItemArtwork } from "./ItemArtwork"
@@ -29,6 +30,8 @@ export interface SlotProps {
  * destination slot after the cursor leaves the source element. */
 export function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit }: SlotProps) {
     const t = useLocale()
+    const slotUi = useContext(SlotUiContext)
+    const flashing = slotUi.flash?.inventoryId === inventory.id && slotUi.flash.slot === index
     const target = useMemo<SlotTarget>(() => ({ inventoryId: inventory.id, slot: index }), [index, inventory.id])
     const suppressClick = useRef(false)
     const [{ isDragging }, dragRef] = useDrag<DragSlot, SlotTarget, { isDragging: boolean }>(() => ({
@@ -68,6 +71,9 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
         hotbar && "slot-hotbar",
         hotbar && index === 1 && "slot-hotbar-first",
         hotbar && lastHotbar && "slot-hotbar-last",
+        // Quick slot click: pulse the real slot. The parity class restarts the animation on a repeat.
+        flashing && `slot-flash slot-flash-${(slotUi.flash?.nonce ?? 0) % 2}`,
+        item && slotUi.isCompatible(item) && "slot-compatible",
         isOver && canDrop && "slot-move-target", isOver && !canDrop && "slot-drop-invalid",
     ].filter(Boolean).join(" ")
 
@@ -95,7 +101,9 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
         onContextMenu={(event) => {
             if (!item || busy) return
             event.preventDefault()
-            onSplit(inventory, item)
+            // `menu` mode owns right-click; otherwise it stays the split dialog (or nothing).
+            if (slotUi.openMenu) slotUi.openMenu({ x: event.clientX, y: event.clientY }, inventory, item)
+            else onSplit(inventory, item)
         }}
         onKeyDown={(event) => {
             if (event.key !== "Enter" && event.key !== " ") return

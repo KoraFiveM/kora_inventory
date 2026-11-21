@@ -279,6 +279,16 @@ Config.kora_inventory = {
         -- Applied the next time the inventory opens.
         rightClickSplit = true,
 
+        -- What right-clicking an item does (this replaces rightClickSplit,
+        -- which is only read when `rightClick` is absent or invalid):
+        --   'split' - the split dialog described above (default)
+        --   'menu'  - a small context menu at the cursor with Use, Split,
+        --             Drop, Give, Ammo info (see weapons.ammoInfo) and Copy,
+        --             showing only what applies to that item
+        --   'none'  - right-click does nothing
+        -- Applied the next time the inventory opens.
+        rightClick = 'split',
+
         -- Paint a drag-and-drop move or a shop purchase in the browser straight
         -- away instead of waiting for the server's reply, then reconcile with
         -- the server's own inventory. The painted item is dimmed (and dashed)

@@ -50,6 +50,10 @@ local UI_LOCALE_KEYS = {
     'no_secondary_inventory', 'open_secondary_inventory', 'hidden_by_search',
     'select_item_help', 'close', 'use_selected', 'move_or_stack', 'drop',
     'split_dialog', 'split_title', 'move_how_many', 'cancel', 'split',
+    'quick_slots', 'quick_slot_item', 'quick_slot_empty', 'quick_slot_pinned', 'quick_slot_key',
+    'quick_slot_unpin', 'quick_slot_pin_failed', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
+    'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
+    'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type',
 }
 
 local function pushLocales()
@@ -125,6 +129,17 @@ local function allowedLayouts()
     return allowed
 end
 
+-- 'split' (the dialog), 'menu' (a context menu) or 'none'. The legacy boolean
+-- rightClickSplit is only read when `rightClick` is absent or invalid.
+local RIGHT_CLICK_MODES = { split = true, menu = true, none = true }
+
+local function rightClickMode(ui)
+    if type(ui.rightClick) == 'string' and RIGHT_CLICK_MODES[ui.rightClick] then
+        return ui.rightClick
+    end
+    return ui.rightClickSplit == false and 'none' or 'split'
+end
+
 local function pushConfig()
     local ui = Config.kora_inventory.ui or {}
     local ammoInfo = (Config.kora_inventory.weapons or {}).ammoInfo or {}
@@ -145,6 +160,7 @@ local function pushConfig()
         centreWhenSolo = ui.centreWhenSolo ~= false,
         showHotbar = ui.showHotbar ~= false,
         rightClickSplit = ui.rightClickSplit ~= false,
+        rightClick = rightClickMode(ui),
         optimisticMoves = ui.optimisticMoves ~= false,
         -- Drags made while a move is awaiting the server are queued rather than
         -- refused (only meaningful with optimisticMoves).

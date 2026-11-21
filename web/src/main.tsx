@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client"
 import App from "./App"
 import { LocaleProvider } from "./lib/locales"
 import "./styles.css"
+import "./styles/quickslots.css"
 import "./lib/fft"
 
 const scaleNui = () => {
