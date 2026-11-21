@@ -146,6 +146,7 @@ local deps = {
     end,
     beforeCommit = function()
         if hooks.beforeCommitRefuse then return false, 'hook refused' end
+        if hooks.duringHook then hooks.duringHook() end
         return true, nil, 'handle'
     end,
     afterCommit = function() end,
@@ -573,6 +574,32 @@ failingCase('disabled at commit time', function()
     settingsTable.enabled = false
 end, true, 'trading is disabled')
 
+-- A hook that yields while an outside writer changes an inventory: nothing
+-- is written, and a player leaving during the hook ends the trade.
+do
+    local trade = standard()
+    readyBoth(trade)
+    clock = clock + 3000
+    machine.confirm(1, trade.id, trade.revision)
+    hooks.writes = 0
+    hooks.duringHook = function() world[2].items[5] = item('water', 1, 5) end
+    H.equal(machine.confirm(2, trade.id, trade.revision), false, 'inventory changed during a hook refuses the commit')
+    H.equal(hooks.writes, 0, 'no slot was written')
+    H.equal(world[1].items[2].info.serial, 'SER-1', 'the pistol stayed with its owner')
+    hooks.duringHook = nil
+
+    trade = standard()
+    readyBoth(trade)
+    clock = clock + 3000
+    machine.confirm(1, trade.id, trade.revision)
+    hooks.writes = 0
+    hooks.duringHook = function() world[2].online = false end
+    H.equal(machine.confirm(2, trade.id, trade.revision), false, 'a player leaving during a hook refuses the commit')
+    H.equal(hooks.writes, 0, 'no slot was written after the player left')
+    H.equal(machine.get(trade.id), nil, 'and the trade ends')
+    hooks.duringHook = nil
+end
+
 -- Snapshot taken at Ready: an item swapped for an identical-looking one
 -- (same name/amount, different metadata) after locking blocks the commit
 -- even if the revision was not bumped.
@@ -587,6 +614,68 @@ do
     local found
     for _, entry in pairs(world[2].items) do if entry.name == 'pistol' then found = true end end
     H.equal(found, nil, 'swapped weapon never reached the partner')
+end
+
+-- ---- deterministic fuzz: conservation and all-or-nothing ----------------
+do
+    local seed = 12345
+    local function rand(n)
+        seed = (seed * 1103515245 + 12345) % 2147483648
+        return seed % n + 1
+    end
+    local names = { 'bread', 'water', 'pistol', 'gold', 'rock' }
+    local committedCount, refusedCount = 0, 0
+    for round = 1, 300 do
+        fresh()
+        hooks.cashMode = rand(3) == 1 and 'item' or 'ledger'
+        for _, src in ipairs({ 1, 2 }) do
+            world[src].cash = rand(400)
+            for slot = 1, 5 do
+                if rand(3) > 1 then
+                    local name = names[rand(#names)]
+                    local amount = DEFS[name].unique and 1 or rand(6)
+                    world[src].items[slot] = item(name, amount, slot, rand(2) == 1 and { tag = rand(3) } or {})
+                end
+            end
+            if hooks.cashMode == 'item' and rand(2) == 1 then
+                for slot = 1, 5 do
+                    if not world[src].items[slot] then world[src].items[slot] = item('cash', rand(300), slot) break end
+                end
+            end
+        end
+        local trade = openTrade()
+        for _, src in ipairs({ 1, 2 }) do
+            for _ = 1, rand(4) do
+                local slot = rand(5)
+                local stack = world[src].items[slot]
+                if stack then machine.offer(src, trade.id, slot, rand(stack.amount)) end
+            end
+            if rand(2) == 1 then machine.setCash(src, trade.id, rand(200)) end
+        end
+        if machine.ready(1, trade.id, trade.revision) and machine.ready(2, trade.id, trade.revision) then
+            clock = clock + 3000
+            machine.confirm(1, trade.id, trade.revision)
+            local fault = rand(6)
+            hooks.writes = 0
+            hooks.failWriteAt = fault == 1 and rand(4) or nil
+            hooks.transferFails = fault == 2
+            hooks.lockBusy = fault == 3
+            local before, snap = totals(), snapshotWorld()
+            local cashItems = cashItemBalance(1) + cashItemBalance(2)
+            local ok = machine.confirm(2, trade.id, trade.revision)
+            sameTotals(before, totals(), 'fuzz round ' .. round)
+            H.equal(cashItemBalance(1) + cashItemBalance(2), cashItems, 'fuzz round ' .. round .. ': physical cash conserved')
+            if ok then
+                committedCount = committedCount + 1
+            else
+                refusedCount = refusedCount + 1
+                untouched(snap, 'fuzz round ' .. round)
+            end
+            hooks.failWriteAt, hooks.transferFails, hooks.lockBusy = nil, false, false
+        end
+    end
+    H.ok(committedCount > 20, 'fuzz committed a fair number of trades (' .. committedCount .. ')')
+    H.ok(refusedCount > 20, 'fuzz refused a fair number of trades (' .. refusedCount .. ')')
 end
 
 -- ---- physical cash (item mode) -------------------------------------------

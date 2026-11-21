@@ -855,11 +855,23 @@ function TradeState.new(deps)
             end
             handle = hookHandle
         end
-        local function fail(message)
+        local function fail(message, fatal)
             if deps.afterCommit then
                 pcall(deps.afterCommit, handle, false)
             end
-            return false, message, false
+            return false, message, fatal == true
+        end
+        -- A hook may yield. Our locks keep kora_inventory's own writers out,
+        -- but re-check presence and that neither inventory moved underneath
+        -- the plan before writing anything.
+        local late = presenceProblem(trade.a, trade.b, settings().distance)
+        if late then
+            return fail(late, true)
+        end
+        for _, src in ipairs({ trade.a, trade.b }) do
+            if not TradeState.same(deps.items(src) or {}, originals[src]) then
+                return fail('offered item changed')
+            end
         end
         local written = {}
         for _, src in ipairs({ trade.a, trade.b }) do
