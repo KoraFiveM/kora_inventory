@@ -30,7 +30,7 @@ export interface Prediction {
     before: Map<string, InventoryView>
 }
 
-const sameMetadata = (a: InventoryItem, b: InventoryItem) => JSON.stringify(a.metadata ?? {}) === JSON.stringify(b.metadata ?? {})
+const sameMetadata = (a: InventoryItem, b: InventoryItem) => JSON.stringify(a.info ?? a.metadata ?? {}) === JSON.stringify(b.info ?? b.metadata ?? {})
 
 /** The server's stack rule: same name and metadata, and neither side unique or opted out. */
 const stacks = (a: InventoryItem, b: InventoryItem) =>

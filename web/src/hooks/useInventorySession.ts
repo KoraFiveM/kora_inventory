@@ -224,12 +224,6 @@ export function useInventorySession() {
         setCombineTarget(undefined)
         updateSession((current) => current?.sessionId === sessionId ? null : current)
     })
-    useNuiEvent<{ reason?: string }>("kora_inventory:nui:rejected", ({ reason }) => {
-        const message = reason ?? t("ui.action_rejected")
-        // Settles the request in flight (once); with nothing in flight it is only a notice.
-        if (queue.pending) queue.reject(message)
-        else setError(message)
-    })
     useNuiEvent<{ requestId?: number; ok?: boolean; error?: string }>("kora_inventory:nui:intentResult", ({ requestId, ok, error }) => {
         if (typeof requestId !== "number") return
         results.current.deliver(requestId, ok === true ? { ok: true } : { ok: false, error: error === "timeout" ? t("ui.inventory_timeout") : error })
