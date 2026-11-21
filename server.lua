@@ -901,20 +901,18 @@ local function viewItems(source, searched, shelf)
     -- One registry lookup per distinct item name instead of one cross-resource
     -- export call per slot: a move builds several views, and every slot of a
     -- stack-heavy inventory used to cost its own getShared round trip.
-    local lookup, definitions = itemDef, {}
+    local definitions = {}
     local function cachedDef(name)
         if type(name) ~= 'string' then
-            return lookup(name)
+            return itemDef(name)
         end
         local def = definitions[name]
         if def == nil then
-            def = lookup(name) or false
+            def = itemDef(name) or false
             definitions[name] = def
         end
         return def or nil
     end
-    -- Older player records may predate the definition image filename. Resolve
-    -- it from the current core registry at render time without a migration.
     local ammoSettings = ammoInfoConfig()
     for _, item in pairs(items) do
         -- Trusted server integrations may attach bookkeeping to durable stock.
@@ -924,7 +922,9 @@ local function viewItems(source, searched, shelf)
         item.closedContainer, item.openable, item.waterDamaged = nil, nil, nil
         local concealed = searched and inventory.containers and inventory.containers.concealForSearch
             and inventory.containers.concealForSearch(item)
-        local def = item and cachedDef(item.name)
+        -- Older player records may predate the definition image filename. Resolve
+        -- it from the current core registry at render time without a migration.
+        local def = cachedDef(item.name)
         if def then
             item.image = def.image or item.image
             item.imageUrl = def.imageUrl or item.imageUrl
@@ -1144,7 +1144,7 @@ local function removeSecondary(inv, slot, amount)
     return true, nil, removed
 end
 
-local function addPlayer(src, name, amount, slot, metadata, reason, exactSlot)
+local function addPlayer(src, name, amount, slot, metadata, _, exactSlot)
     if slot then
         slot = inventory.validSlot(slot, config.playerSlots)
         if not slot then return false, 'invalid slot' end
@@ -1381,7 +1381,6 @@ local function physicalCashSet(src, account, amount, reason)
     if amount < 0 then
         return false, 'invalid cash amount'
     end
-    local current = physicalCashBalance(src, policy)
     return lock({ playerKey(src) }, function()
         local lockedCurrent = physicalCashBalance(src, policy)
         if amount == lockedCurrent then
@@ -1586,7 +1585,7 @@ local function matchesPattern(value, pattern)
     return ok and found ~= nil
 end
 
-local function hookInventoryFilter(filter, hook, payload, fromInventory, toInventory)
+local function hookInventoryFilter(filter, _, payload, fromInventory, toInventory)
     if #filter > 0 then
         for i = 1, #filter do
             if matchesPattern(fromInventory, filter[i]) or matchesPattern(toInventory, filter[i]) then
@@ -2769,7 +2768,7 @@ local function intentBuy(src, request)
                 return false, payErr
             end
         end
-        local hookOK, hookInfo = createItemHook(src, playerKey(src), currentItem.name, count, purchaseInfo)
+        local _, hookInfo = createItemHook(src, playerKey(src), currentItem.name, count, purchaseInfo)
         local added, addErr, addedItem = addPlayer(src, currentItem.name, count, nil, hookInfo, 'purchase')
         finishHooks(buyHandle, added == true)
         if not added then
@@ -4125,11 +4124,10 @@ local function registerShop(id, data)
     ext.refreshRegistration(inv, data)
     if not restored then
         inv.stock = initial
-        inv.items = inv.stock -- a shop is rendered as an inventory; stock is its authoritative slot table.
     else
         inv.stock = inv.stock or inv.items
-        inv.items = inv.stock -- one table, as above; never render a stale copy.
     end
+    inv.items = inv.stock -- a shop is rendered as an inventory; stock is its authoritative slot table, never a stale copy.
     inv.prices = data.prices or inv.prices or {}
     if inventory.persistence and inventory.persistence.markDirty then
         inventory.persistence.markDirty(inv)
@@ -4220,7 +4218,7 @@ local function buyItem(src, shopId, slot, count)
     if not item or not count or item.amount < count then
         return false, 'out of stock'
     end
-    local price = tonumber(item.price or (shop.prices and shop.prices[item.name])) or 0
+    local price
     return lock({ shop.key, playerKey(src) }, function()
         shop = getInventory(key('shop', shopId))
         item = shop and (shop.stock or shop.items)[slot] or nil
@@ -4257,7 +4255,7 @@ local function buyItem(src, shopId, slot, count)
                 return false, payErr
             end
         end
-        local hookOK, hookInfo = createItemHook(src, playerKey(src), item.name, count, purchaseInfo)
+        local _, hookInfo = createItemHook(src, playerKey(src), item.name, count, purchaseInfo)
         local added, addErr = addPlayer(src, item.name, count, nil, hookInfo)
         finishHooks(buyHandle, added == true)
         if not added then
@@ -4306,11 +4304,11 @@ local function importOxItems(definitions, opts)
         return 0, { ['*'] = 'invalid_definitions' }
     end
     local overwrite = type(opts) == 'table' and opts.overwrite == true
-    for key, def in pairs(definitions) do
-        local name = type(key) == 'string' and key or type(def) == 'table' and def.name or nil
+    for defKey, def in pairs(definitions) do
+        local name = type(defKey) == 'string' and defKey or type(def) == 'table' and def.name or nil
         local record, err = inventory.fromOxItemDef(name, def)
         if not record then
-            errors[tostring(name or key)] = err
+            errors[tostring(name or defKey)] = err
         elseif not overwrite and itemDef(record.name) then
             errors[record.name] = 'already_registered'
         else
@@ -4335,9 +4333,8 @@ end
 ---@return string hookId
 local function registerHook(eventName, callback, options)
     assert(type(eventName) == 'string', 'eventName and callback are required')
-    if callback == nil and type(options) == 'table' then
-        -- ox: `registerHook(event, nil, options)` hooks only the post-event.
-    else
+    -- ox: `registerHook(event, nil, options)` hooks only the post-event.
+    if not (callback == nil and type(options) == 'table') then
         assert(inventory.isCallable(callback), 'eventName and callback are required')
     end
     local owner = GetInvokingResource() or resourceName
@@ -4349,18 +4346,21 @@ local function registerHook(eventName, callback, options)
         { id = id, callback = callback, options = options or {}, owner = owner }
     return id
 end
----Remove hooks registered by the calling resource: one by id, or all of them
----when no id is given. Hooks owned by another resource are never touched.
----@param id string|nil
-local function removeHooks(id)
-    local caller = GetInvokingResource() or resourceName
+function ext.removeHooksOwnedBy(owner, id)
     for _, list in pairs(hooks) do
         for i = #list, 1, -1 do
-            if list[i].owner == caller and (id == nil or list[i].id == id) then
+            if list[i].owner == owner and (id == nil or list[i].id == id) then
                 table.remove(list, i)
             end
         end
     end
+end
+
+---Remove hooks registered by the calling resource: one by id, or all of them
+---when no id is given. Hooks owned by another resource are never touched.
+---@param id string|nil
+local function removeHooks(id)
+    ext.removeHooksOwnedBy(GetInvokingResource() or resourceName, id)
 end
 
 ---Grant player inspection only through explicit trusted server policy. The
@@ -4502,7 +4502,7 @@ local function rekeySecondary(reference, newKind, newId)
 
     -- Any session pointing at the old key would fail every subsequent
     -- revision check, so move viewers across rather than stranding them.
-    for src, session in pairs(sessions) do
+    for _, session in pairs(sessions) do
         if session.primary == oldKey then
             session.primary = newKey
         end
@@ -4651,8 +4651,6 @@ inventory.internal = {
     sameDropBucket = sameDropBucket,
     hasUseable = hasUseable,
     setBuiltInUseable = setBuiltInUseable,
-    registerInspectionAccess = registerInspectionAccess,
-    removeInspectionAccess = removeInspectionAccess,
     getRevision = revision,
     -- Read-only view of a player's live session. Compatibility bridges need the
     -- token and the two authorised inventory keys to translate a legacy request
@@ -4672,15 +4670,12 @@ inventory.internal = {
     -- The validated move/split/swap funnel: token, both revisions, access,
     -- routing bucket, distance and hooks are all rechecked inside its lock.
     -- Legacy transports translate onto this instead of mutating items directly.
-    transfer = function(src, request)
-        return transfer(src, request)
-    end,
+    transfer = transfer,
     copy = inventory.copy,
     itemWeight = inventory.itemWeight,
     totalWeight = inventory.totalWeight,
     sameInfo = inventory.sameInfo,
     config = config,
-    persistence = inventory.persistence,
 }
 
 -- Hook for server/decay.lua (lazy expiry + sweep); recordAudit, showItemBox
@@ -5319,13 +5314,7 @@ AddEventHandler('onResourceStop', function(name)
     if inventory.vehicles and inventory.vehicles.cleanupResource then
         inventory.vehicles.cleanupResource(name)
     end
-    for _, list in pairs(hooks) do
-        for i = #list, 1, -1 do
-            if list[i].owner == name then
-                table.remove(list, i)
-            end
-        end
-    end
+    ext.removeHooksOwnedBy(name)
     for id, hook in pairs(inspectionHooks) do
         if hook.owner == name then
             inspectionHooks[id] = nil
