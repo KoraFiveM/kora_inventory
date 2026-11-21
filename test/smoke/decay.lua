@@ -111,20 +111,20 @@ do
 
     -- Unstamped items are neither fresh nor expired: they are simply not evaluated.
     H.equal(D.status({}, rule, T0), nil, 'an unstamped item has no status (stamped on first sight, not spoiled)')
-    H.equal(D.decision({}, rule, T0 + 100 * DAY), nil, 'an unstamped item is never expired')
+    H.equal(D.status({}, rule, T0 + 100 * DAY), nil, 'an unstamped item is never expired')
     H.equal(D.status({ createdAt = 'x' }, rule, T0), nil, 'a malformed stamp counts as unstamped')
     H.equal(D.status(nil, rule, T0), nil, 'nil info has no status')
     H.equal(D.status(item.info, nil, T0), nil, 'no rule, no status')
 
     -- Conversion decision.
-    local action, into = D.decision(item.info, rule, T0 + 3 * DAY)
-    H.equal(action, 'convert', 'expired sandwich converts')
-    H.equal(into, 'garbage', 'into garbage')
-    H.equal(D.decision(item.info, rule, T0 + DAY), nil, 'no decision before expiry')
+    H.ok(D.status(item.info, rule, T0 + 3 * DAY).expired, 'expired sandwich is expired')
+    H.equal(rule.action, 'convert', 'expired sandwich converts')
+    H.equal(rule.into, 'garbage', 'into garbage')
+    H.ok(not D.status(item.info, rule, T0 + DAY).expired, 'no decision before expiry')
     local water = D.rule('water_bottle', nil, cfg())
-    action, into = D.decision({ createdAt = T0 }, water, T0 + 8 * DAY)
-    H.equal(action, 'remove', 'expired water bottle is removed')
-    H.equal(into, nil, 'remove has no target')
+    H.ok(D.status({ createdAt = T0 }, water, T0 + 8 * DAY).expired, 'expired water bottle is expired')
+    H.equal(water.action, 'remove', 'expired water bottle is removed')
+    H.equal(water.into, nil, 'remove has no target')
 
     -- The stamped lifetime is a snapshot: later config edits do not revive/spoil it.
     local longer = { lifetime = 10 * DAY, action = 'remove' }

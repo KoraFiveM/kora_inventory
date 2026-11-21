@@ -1,5 +1,5 @@
 -- Item decay / expiry: the pure maths. No state, no exports, no config reads
--- except the thin `*Config` wrappers at the bottom, so test/smoke/decay.lua can
+-- except `D.config` at the bottom, so test/smoke/decay.lua can
 -- drive every rule with explicit settings and a fixed clock.
 --
 -- Model (lazy, server-authoritative, no per-item timers):
@@ -159,15 +159,6 @@ function D.status(info, rule, now)
     }
 end
 
----What to do with an expired item: nil (nothing yet), or the rule's action.
----@return string|nil action 'convert' | 'remove'
----@return string|nil into
-function D.decision(info, rule, now)
-    local status = D.status(info, rule, now)
-    if not status or not status.expired then return nil end
-    return rule.action, rule.into
-end
-
 ---Stamp an item that has no stamp. `paused` = it sits in a paused inventory, so
 ---the clock starts stopped. Returns true when the item changed.
 function D.stampItem(item, rule, now, paused)
@@ -309,7 +300,7 @@ function D.viewField(info, rule, now)
     return { remaining = math.floor(status.remaining), fraction = status.fraction }
 end
 
--- Config wrappers: read Config.kora_inventory.decay at call time so /config
+-- Config accessor: reads Config.kora_inventory.decay at call time so /config
 -- edits apply on the next call.
 function D.config()
     local root = Config and Config.kora_inventory

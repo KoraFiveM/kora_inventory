@@ -305,5 +305,5 @@ function organize.plan(items, slots, mode, opts)
     end
 
     local changed = not sameValue(result, items, 0)
-    return { items = result, changed = changed, before = beforeCount, after = afterCount }
+    return { items = result, changed = changed }
 end

@@ -89,22 +89,6 @@ local function acceptsWeapons(config)
     return type(config.accepts) == 'table' and lower(config.accepts.type) == 'weapon'
 end
 
----Find a configured quick slot by id (case-sensitive).
----@param slotsConfig table
----@param id any
----@return table|nil config
-function quickSlots.find(slotsConfig, id)
-    if type(slotsConfig) ~= 'table' or type(id) ~= 'string' then
-        return nil
-    end
-    for _, config in ipairs(slotsConfig) do
-        if type(config) == 'table' and config.id == id then
-            return config
-        end
-    end
-    return nil
-end
-
 ---@param items table PlayerData.items (sparse: slot -> item)
 ---@param slotsConfig table Config.kora_inventory.quickSlots.slots
 ---@param opts table|nil
@@ -121,7 +105,7 @@ function quickSlots.resolve(items, slotsConfig, opts)
     slotsConfig = type(slotsConfig) == 'table' and slotsConfig or {}
     local pins = type(opts.pins) == 'table' and opts.pins or {}
     local keys = type(opts.keys) == 'table' and opts.keys or {}
-    local getDef = type(opts.getDef) == 'function' and opts.getDef or function() return nil end
+    local getDef = type(opts.getDef) == 'function' and opts.getDef or function(_) return nil end
     local equipped = math.floor(tonumber(opts.equippedSlot) or 0)
 
     local playerSlots = math.floor(tonumber(opts.playerSlots) or 0)
