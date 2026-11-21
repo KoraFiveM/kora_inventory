@@ -312,6 +312,12 @@ With `cash.asItem = true` kora_inventory registers with kora_core (`registerPhys
 
 Settings registered through `Kora.config` carry a scope (server or client) and a `live` flag: vehicle switches, door switches, UI toggles, `hotbarSeconds`, `slowRequestMs`, `sessionSliding`, `groundOffset` and `showTargetHints` apply on the next use or open. The vehicle class table, weapon components and carried-weapon components are edited through the config editor but apply after a restart. `Config` is replaced by the adopted copy at the end of `config.lua`, so scripts keep reading `Config.kora_inventory` as normal.
 
+## Layouts, quick slots, ammo info and trunk cargo in /config
+
+These keys are registered in `config/schema/core_features.lua` and appear in the in-game `/config` editor: `ui.layout`, `ui.layouts.*`, `ui.playerLayoutChoice`, `ui.rightClick`, `ui.quickTransfer`, `ui.modifierDrag`, `ui.quickAmounts`, `ui.filters`, `ui.tooltips`, `ui.weightWarnings.*`, `quickSlots.*`, `weapons.ammoInfo.*` and `vehicles.trunkCargo.*`. Layout and interface switches apply the next time a player opens their inventory; `quickSlots.hideWhenMissing`, `showKeyHints` and `inHotbarHud` apply on the next quick slot update; `ammoInfo.*` applies on the next inventory view; trunk cargo `enabled`, `drawDistance` and `maxProps` apply within a second or two.
+
+Restart required: `quickSlots.enabled` (its keybinds are registered once at start), `vehicles.trunkCargo.fallbackModel`, `models` and `bounds`. The `quickSlots.slots` list is not editable in `/config`; change it in `config.lua`.
+
 ## Tables that other files re-read
 
 A few keys are read by scripts that do not appear in config.lua: `giveDistance` (client give targeting), `weapons.serialPrefix` (deprecated) and `ui.moveTimeout` (legacy). They are accepted if you add them but are not part of the shipped file.
