@@ -30,6 +30,8 @@ shared_scripts {
     'config/shops/liquorstore.lua',
     'config/shops/convenience.lua',
     'shared.lua',
+    -- Pure quick slot resolver (pointers to real inventory slots). No state.
+    'shared/quickslots.lua',
 }
 
 server_scripts {
@@ -87,6 +89,9 @@ client_scripts {
     -- Slot 1-5 hotbar keybinds. Loads after client.lua for KoraInventory.useGate
     -- and the legacy QBCore:Server:UseItem transport it reuses.
     'client/hotbar.lua',
+    -- Quick slots: shortcuts to real inventory slots (side rail + hotkeys).
+    -- Presentation and local pins only; hotkeys reuse the hotbar use path.
+    'client/quickslots.lua',
     -- Ground-drop props. Presentation only; see the file header.
     'client/drops.lua',
     -- Inventory-key access to glovebox/trunk; intent only, the server resolves the vehicle.

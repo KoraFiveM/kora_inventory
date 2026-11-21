@@ -29,6 +29,12 @@ local function send(action, data)
     SendNUIMessage({ action = action, data = data })
 end
 
+-- The one place presentation messages leave for the browser. Other client
+-- modules that only render (client/quickslots.lua) send through this rather
+-- than calling SendNUIMessage themselves.
+KoraInventory = KoraInventory or {}
+KoraInventory.ui = { send = send }
+
 local function pushTheme()
     KoraTheme.refresh()
 end
@@ -50,6 +56,10 @@ local UI_LOCALE_KEYS = {
     'no_secondary_inventory', 'open_secondary_inventory', 'hidden_by_search',
     'select_item_help', 'close', 'use_selected', 'move_or_stack', 'drop',
     'split_dialog', 'split_title', 'move_how_many', 'cancel', 'split',
+    'quick_slots', 'quick_slot_item', 'quick_slot_empty', 'quick_slot_pinned', 'quick_slot_key',
+    'quick_slot_unpin', 'quick_slot_pin_failed', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
+    'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
+    'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type',
 }
 
 local function pushLocales()
@@ -93,14 +103,77 @@ local function moveTimeoutMs()
     return math.floor(math.max(500, math.min(60000, ms or (directTransport() and 6000 or 1500))))
 end
 
+-- Inventory layouts the NUI knows (web/src/layouts). Anything else is treated
+-- as 'classic' here and again in the page.
+local LAYOUT_IDS = { 'classic', 'loadout', 'compact', 'dock' }
+local LAYOUT_LABELS = { classic = 'Classic', loadout = 'Loadout', compact = 'Compact', dock = 'Dock' }
+local LAYOUT_KNOWN = {}
+for _, id in ipairs(LAYOUT_IDS) do LAYOUT_KNOWN[id] = true end
+
+local function knownLayout(value)
+    if type(value) == 'string' and LAYOUT_KNOWN[value] then return value end
+    return nil
+end
+
+local function serverLayout()
+    local ui = ((Config.kora_inventory or {}).ui) or {}
+    return knownLayout(ui.layout) or 'classic'
+end
+
+-- Which layouts players may pick: booleans only, missing = allowed, and an
+-- empty result still allows 'classic' so there is always something to render.
+local function allowedLayouts()
+    local ui = ((Config.kora_inventory or {}).ui) or {}
+    local configured = type(ui.layouts) == 'table' and ui.layouts or {}
+    local allowed = {}
+    for _, id in ipairs(LAYOUT_IDS) do
+        allowed[id] = configured[id] ~= false
+    end
+    local any = false
+    for _, id in ipairs(LAYOUT_IDS) do any = any or allowed[id] end
+    if not any then allowed.classic = true end
+    return allowed
+end
+
+-- 'split' (the dialog), 'menu' (a context menu) or 'none'. The legacy boolean
+-- rightClickSplit is only read when `rightClick` is absent or invalid.
+local RIGHT_CLICK_MODES = { split = true, menu = true, none = true }
+
+local function rightClickMode(ui)
+    if type(ui.rightClick) == 'string' and RIGHT_CLICK_MODES[ui.rightClick] then
+        return ui.rightClick
+    end
+    return ui.rightClickSplit == false and 'none' or 'split'
+end
+
 local function pushConfig()
     local ui = Config.kora_inventory.ui or {}
+    local ammoInfo = (Config.kora_inventory.weapons or {}).ammoInfo or {}
+    local where = ammoInfo.where
+    if where ~= 'inspector' and where ~= 'menu' then
+        where = 'both'
+    end
+
+    local function weightWarnings()
+        local w = type(ui.weightWarnings) == 'table' and ui.weightWarnings or {}
+        local warnAt = Kora.util.clamp(tonumber(w.warnAt) or 0.75, 0.01, 1.0)
+        local dangerAt = Kora.util.clamp(tonumber(w.dangerAt) or 0.95, 0.01, 1.0)
+        return { enabled = w.enabled ~= false, warnAt = warnAt, dangerAt = math.max(warnAt, dangerAt) }
+    end
 
     send('kora_inventory:nui:config', {
+        -- Presentation hint only; the server decides which fields exist on items.
+        ammoInfo = {
+            enabled = ammoInfo.enabled ~= false,
+            where = where,
+            showLoaded = ammoInfo.showLoaded ~= false,
+            showCompatible = ammoInfo.showCompatible ~= false,
+        },
         hotbarSlots = Config.kora_inventory.hotbarSlots,
         centreWhenSolo = ui.centreWhenSolo ~= false,
         showHotbar = ui.showHotbar ~= false,
         rightClickSplit = ui.rightClickSplit ~= false,
+        rightClick = rightClickMode(ui),
         optimisticMoves = ui.optimisticMoves ~= false,
         -- Drags made while a move is awaiting the server are queued rather than
         -- refused (only meaningful with optimisticMoves).
@@ -118,6 +191,18 @@ local function pushConfig()
         inspectorCopy = (Config.Inspector or {}).allowCopy ~= false,
         -- Slot border thickness in CSS px.
         slotBorderWidth = math.max(1, math.min(4, tonumber((Config.Slots or {}).borderWidth) or 2)),
+        -- Layout registry (web/src/layouts): server default, which ones may be
+        -- picked, and whether players may choose in kora_hud's /ui editor.
+        layout = serverLayout(),
+        layouts = allowedLayouts(),
+        playerLayoutChoice = ui.playerLayoutChoice ~= false,
+        -- Quality-of-life presentation flags (all default on).
+        quickTransfer = ui.quickTransfer ~= false,
+        modifierDrag = ui.modifierDrag ~= false,
+        quickAmounts = ui.quickAmounts ~= false,
+        filters = ui.filters ~= false,
+        tooltips = ui.tooltips ~= false,
+        weightWarnings = weightWarnings(),
     })
 end
 
@@ -136,6 +221,8 @@ local function defaultPlayerLayout()
         x = 0, y = 0, scale = 1, placed = false,
         playerSide = 'left',
         useForTransfer = uiConfig().playerLayoutTransfer == true,
+        -- nil: the server's Config.kora_inventory.ui.layout applies.
+        layout = nil,
     }
 end
 local playerLayout = defaultPlayerLayout()
@@ -160,6 +247,8 @@ local function setPlayerLayout(layout)
             placed = layout.placed == true,
             playerSide = settings.playerSide == 'right' and 'right' or 'left',
             useForTransfer = type(settings.useForTransfer) == 'boolean' and settings.useForTransfer or defaults.useForTransfer,
+            -- Whitelisted here; the page also checks it against the allowed set.
+            layout = knownLayout(settings.layout),
         }
     end
     send('kora_inventory:nui:layout', playerLayout)
@@ -227,6 +316,11 @@ AddEventHandler('kora_inventory:ui:sessionOpened', function(payload)
     pushConfig()
     send('kora_inventory:nui:layout', playerLayout)
     send('kora_inventory:nui:sessionOpened', wire)
+    -- Quick slots are pointers into the inventory just sent; resolve them now.
+    local quick = KoraInventory and KoraInventory.quickSlotsClient
+    if quick and quick.push then
+        quick.push(true)
+    end
     SetNuiFocus(true, true)
     TriggerEvent('kora_inventory:client:requestGiveAvailability')
 end)
@@ -255,6 +349,15 @@ AddEventHandler('kora_inventory:ui:hotbarShow', function(payload)
     pushTheme()
     pushConfig()
     payload.bottom = hotbarBottom()
+    -- Resolved quick slots (items only; shortcuts, not extra slots), unless
+    -- Config.kora_inventory.quickSlots.inHotbarHud is off.
+    local quick = KoraInventory and KoraInventory.quickSlotsClient
+    local quickSettings = Config.kora_inventory.quickSlots
+    if quick and quick.hud and type(quickSettings) == 'table' and quickSettings.enabled ~= false
+        and quickSettings.inHotbarHud ~= false
+    then
+        payload.quick = quick.hud()
+    end
     send('kora_inventory:nui:hotbar', payload)
 end)
 
@@ -545,9 +648,57 @@ RegisterNUICallback('kora_inventory:nui:close', function(data, cb)
     cb({ ok = true })
 end)
 
+-- Quick slot pins are a local display preference (client KVP, per character).
+-- The validation lives in client/quickslots.lua; nothing here reaches the
+-- server. Registered only while quick slots are enabled.
+do
+    local quickSettings = Config.kora_inventory.quickSlots
+    if type(quickSettings) == 'table' and quickSettings.enabled ~= false then
+        RegisterNUICallback('kora_inventory:pinQuickSlot', function(data, cb)
+            local quick = KoraInventory and KoraInventory.quickSlotsClient
+            if not quick or not quick.pin then
+                cb({ ok = false, error = 'quick slots unavailable' })
+                return
+            end
+            local called, ok, err = pcall(quick.pin, data)
+            if not called then
+                cb({ ok = false, error = 'quick slot request failed' })
+                return
+            end
+            cb({ ok = ok == true, error = ok and nil or err })
+        end)
+    end
+end
+
 local function editorWanted()
     return uiConfig().playerLayout ~= false
         and type(GetResourceState) == 'function' and GetResourceState('kora_hud') == 'started'
+end
+
+local function editorSettings()
+    local settings = {
+        { key = 'playerSide', label = 'Personal inventory side (stash/trunk view)', type = 'select',
+          default = 'left', options = { { value = 'left', label = 'Left' }, { value = 'right', label = 'Right' } } },
+        { key = 'useForTransfer', label = 'Use my position for stashes and trunks', type = 'toggle',
+          default = uiConfig().playerLayoutTransfer == true,
+          description = 'Off: stashes, trunks and gloveboxes open centred in the default two-panel layout.' },
+    }
+    if uiConfig().playerLayoutChoice ~= false then
+        local allowed, options = allowedLayouts(), {}
+        for _, id in ipairs(LAYOUT_IDS) do
+            if allowed[id] then options[#options + 1] = { value = id, label = LAYOUT_LABELS[id] } end
+        end
+        -- A choice of one is no choice: only offer the picker when there is one.
+        if #options > 1 then
+            local default = serverLayout()
+            if not allowed[default] then default = options[1].value end
+            settings[#settings + 1] = {
+                key = 'layout', label = 'Inventory layout', type = 'select',
+                default = default, options = options,
+            }
+        end
+    end
+    return settings
 end
 
 -- The editor box is the personal inventory window at its default size,
@@ -567,13 +718,7 @@ local function registerWithEditor()
             hideable = false,
             scaleMin = 0.75,
             scaleMax = 1.25,
-            settings = {
-                { key = 'playerSide', label = 'Personal inventory side (stash/trunk view)', type = 'select',
-                  default = 'left', options = { { value = 'left', label = 'Left' }, { value = 'right', label = 'Right' } } },
-                { key = 'useForTransfer', label = 'Use my position for stashes and trunks', type = 'toggle',
-                  default = uiConfig().playerLayoutTransfer == true,
-                  description = 'Off: stashes, trunks and gloveboxes open centred in the default two-panel layout.' },
-            },
+            settings = editorSettings(),
         })
     end)
 end
