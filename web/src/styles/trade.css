@@ -1,0 +1,57 @@
+/* Player trade window (TradePanel) and the Trade button. kora_theme tokens only. */
+
+.trade-request { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 10px; }
+
+.trade-panel { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto auto; gap: 10px; }
+.trade-header { grid-template-columns: 1fr auto; }
+.trade-header h2 { display: flex; align-items: center; gap: 6px; }
+.trade-timer { display: inline-flex; align-items: center; gap: 4px; color: hsl(var(--muted-foreground)); font-size: calc(10px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }
+
+.trade-sides { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; min-height: 0; }
+.trade-side { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 8px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--surface) / .6); transition: border-color 120ms ease, background-color 120ms ease; }
+.trade-side-own { background: hsl(var(--surface-raised) / .7); }
+.trade-side-target { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft)); }
+.trade-side-invalid { border-color: hsl(var(--destructive) / .6); background: hsl(var(--destructive-soft)); }
+.trade-divider { display: grid; place-items: center; color: hsl(var(--muted-foreground)); }
+
+.trade-side-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.trade-side-header h3 { margin: 0; color: hsl(var(--foreground)); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+
+.trade-flag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border: 1px solid hsl(var(--border)); border-radius: 999px; color: hsl(var(--muted-foreground)); background: hsl(var(--muted) / .5); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 750; white-space: nowrap; }
+.trade-flag-ready { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.trade-flag-confirmed { border-color: hsl(var(--primary)); color: hsl(var(--background)); background: hsl(var(--primary)); }
+
+.trade-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.trade-cell { cursor: default; grid-template-rows: minmax(0, 1fr) auto; }
+.trade-cell .item-art { grid-row: 1; }
+.trade-cell .item-footer { grid-row: 2; }
+.trade-cell-own { cursor: grab; }
+.trade-cell-empty { display: grid; place-items: center; border-style: dashed; background: hsl(var(--background) / .4); }
+.trade-cell-hint { color: hsl(var(--muted-foreground)); font-size: calc(16px * var(--ui-scale, 1)); }
+.trade-hint { margin: 0; color: hsl(var(--muted-foreground)); font-size: calc(10px * var(--ui-scale, 1)); text-align: center; }
+
+.trade-cash { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 4px 6px; }
+.trade-cash label { display: grid; gap: 3px; color: hsl(var(--muted-foreground)); font-size: calc(10px * var(--ui-scale, 1)); font-weight: 700; }
+.trade-cash input { min-width: 0; padding: 5px 7px; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--foreground)); background: hsl(var(--background)); font: inherit; font-variant-numeric: tabular-nums; }
+.trade-cash input:disabled { opacity: .6; }
+.trade-cash-invalid input { border-color: hsl(var(--destructive)); }
+.trade-cash small { grid-column: 1 / -1; color: hsl(var(--muted-foreground)); font-size: calc(9px * var(--ui-scale, 1)); }
+.trade-cash .quiet-action { min-height: 28px; padding: 4px 9px; }
+.trade-cash-readonly { display: flex; justify-content: space-between; margin: 0; color: hsl(var(--muted-foreground)); font-size: calc(10px * var(--ui-scale, 1)); font-weight: 700; }
+.trade-cash-readonly b { color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
+
+.trade-error { grid-template-columns: 14px 1fr; font-size: calc(11px * var(--ui-scale, 1)); }
+.trade-status { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0; color: hsl(var(--muted-foreground)); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 650; }
+.trade-status-countdown, .trade-status-confirm { color: hsl(var(--warning)); }
+.trade-status-partner_ready { color: hsl(var(--primary)); }
+
+.trade-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.trade-actions .quiet-action { display: inline-flex; align-items: center; gap: 5px; }
+.trade-ready, .trade-confirm { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.trade-confirm:not(:disabled) { color: hsl(var(--background)); background: hsl(var(--primary)); }
+.trade-cancel { margin-right: auto; }
+.trade-cancel:hover { border-color: hsl(var(--destructive) / .6); color: hsl(var(--destructive)); background: hsl(var(--destructive-soft)); }
+
+/* A stack offered in the open trade, in your own inventory. */
+.slot-offered { border-color: hsl(var(--brand-border)); }
+.slot-offered-badge { position: absolute; z-index: 1; bottom: 3px; right: 4px; padding: 0 4px; border-radius: 5px; color: hsl(var(--background)); background: hsl(var(--primary)); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 800; line-height: calc(14px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }

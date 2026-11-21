@@ -21,6 +21,7 @@ sidebar_position: 1
 | [Containers and evidence](./containers.md) | `KoraInventory.containers` | server |
 | [Evidence and confiscation](./evidence.md) | `KoraInventory.evidence` | server |
 | [Durable player exchanges](./exchange.md) | `exports.kora_inventory` | server |
+| [Player trades](./trade.md) | net events, `trade` intent | server, client |
 | [Persistence and migration](./persistence.md) | `exports.kora_inventory` | server |
 | [Physical cash bridge](./cash.md) | `exports.kora_inventory` | server |
 | [Events and callbacks](./events.md) | `events` | server, client |

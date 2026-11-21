@@ -380,7 +380,15 @@ local function submitIntent(intent)
         end
         return ok == true, result
     end
-    if action == 'use' or action == 'drop' or action == 'buy' or action == 'sync' or action == 'organize' or action == 'combine' then
+    -- The Trade button: the partner is resolved locally by client/trade.lua
+    -- (via give_target) and never reaches the browser.
+    if action == 'tradeRequest' then
+        TriggerEvent('kora_inventory:client:startTrade')
+        return true
+    end
+    -- 'trade' (offer/ready/confirm/cancel inside an open trade) rides the same
+    -- validated intent transport; server/trade.lua checks the lease and state.
+    if action == 'use' or action == 'drop' or action == 'buy' or action == 'sync' or action == 'organize' or action == 'combine' or action == 'trade' then
         local slot = action == 'use' and math.floor(tonumber(payload.slot) or 0)
         local item = slot and session.primary.items and session.primary.items[slot]
         local clearedBusy = item and item.preventClose ~= true

@@ -94,3 +94,4 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/decay.lua
 "${LUA:-lua}" test/smoke/audit_log.lua
 "${LUA:-lua}" test/smoke/omnipack.lua
+"${LUA:-lua}" test/smoke/trade.lua

@@ -21,6 +21,7 @@ import { canOpenBag, openBagPayload } from "@/lib/search"
 import { isAmmoCompatible, mergeAmmoInfo, resolveRightClick } from "@/lib/ammo"
 import { mergeDecayConfig } from "@/lib/decay"
 import { EMPTY_QUICK_SLOTS, normalizeQuickSlots, type QuickSlotsState } from "@/lib/quickSlots"
+import { mergeTradeConfig } from "@/lib/trade"
 import type { SlotUi } from "@/slotUi"
 
 // Drags that may wait behind an unanswered request before further ones are refused.
@@ -183,6 +184,7 @@ export function useInventorySession() {
             tips: mergeTips(current.tips, config.tips),
             combine: mergeCombine(current.combine, config.combine),
             decay: mergeDecayConfig(current.decay, config.decay),
+            trade: mergeTradeConfig(current.trade, config.trade),
         }))
     })
     useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number; quick?: HotbarQuickEntry[] }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom, quick }) => {

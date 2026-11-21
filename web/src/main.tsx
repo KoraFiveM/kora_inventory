@@ -13,6 +13,7 @@ import "./styles/combine.css"
 import "./styles/search.css"
 import "./styles/decay.css"
 import "./styles/admin.css"
+import "./styles/trade.css"
 import "./lib/fft"
 
 const scaleNui = () => {

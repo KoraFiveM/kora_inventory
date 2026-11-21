@@ -11,7 +11,7 @@ import { InventorySlot } from "./InventorySlot"
 
 const OMNIPACK_PAGE = 120
 
-export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, onOrganize, pending, query }: {
+export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, onOrganize, pending, query, offered }: {
     inventory: InventoryView
     selected?: Selection
     busy: boolean
@@ -30,6 +30,8 @@ export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlo
     query?: string
     /** True for the player's own inventory -- the only one with a hotbar. */
     isPlayer?: boolean
+    /** Slot -> amount currently offered in an open trade (marked, still usable). */
+    offered?: Map<number, number>
 }) {
     const { hotbarSlots, showHotbar, filters, weightWarnings, organize } = useContext(UiConfigContext)
     const t = useLocale()
@@ -79,7 +81,7 @@ export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlo
             {omniSlice ? omniSlice.shown.map((entry) => <InventorySlot key={entry.slot} index={entry.slot} inventory={inventory} item={entry} selected={selected?.inventory.id === inventory.id && selected.item.slot === entry.slot} busy={busy} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, entry.slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} onSplit={onSplit} onQuickTransfer={onQuickTransfer} />) : Array.from({ length: inventory.slots }, (_, offset) => {
                 const slot = offset + 1
                 const item = bySlot.get(slot)
-                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} hotbar={slot <= hotbarCount} lastHotbar={slot === hotbarCount} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} onSplit={onSplit} onQuickTransfer={onQuickTransfer} dimmed={(filters && isDimmed(item, category, query ?? "")) || (showSearch && Boolean(item) && !matchesQuery(item!, panelQuery))} />
+                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} hotbar={slot <= hotbarCount} lastHotbar={slot === hotbarCount} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} onSplit={onSplit} onQuickTransfer={onQuickTransfer} dimmed={(filters && isDimmed(item, category, query ?? "")) || (showSearch && Boolean(item) && !matchesQuery(item!, panelQuery))} offered={offered?.get(slot)} />
             })}
         </div>
         {omniSlice && omniSlice.total === 0 && <p className="omnipack-empty">{t("ui.omnipack_empty")}</p>}

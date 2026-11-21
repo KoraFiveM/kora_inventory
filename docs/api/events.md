@@ -1708,6 +1708,14 @@ Names the sections above do not list. All come from the current code of this res
 | `qb-inventory:server:GetCurrentDrops`, `createDrop`, `attemptPurchase`, `giveItem` | callbacks | qb-inventory compatibility, see [Compatibility](../compatibility.md). |
 | `qb-weapons:server:GetConfig`, `weapon:server:GetWeaponAmmo`, `qb-weapons:server:RepairWeapon`, `RemoveAttachment` | callbacks | Legacy qb-weapons callbacks. The repair and attachment ones refuse. |
 | `kora_inventory:weaponCarry` | player state bag | Written by the server: carried weapon list; clients only render it. |
+| `kora_inventory:server:tradeRequest` | net event (client to server) | `(targetServerId)`: ask a nearby player to trade. See [Player trades](./trade.md). |
+| `kora_inventory:server:tradeRespond` | net event (client to server) | `(tradeId, accepted)`: the invited player's answer; `accepted` must be a boolean. |
+| `kora_inventory:server:tradeCancel` | net event (client to server) | `(tradeId)`: end a trade the sender is in. |
+| `kora_inventory:client:tradeInvite` | net event (server to client) | `(tradeId, timeoutMs)`: shows the accept/decline dialog. |
+| `kora_inventory:client:tradeState` | net event (server to client) | `(view)`: the trade as this player sees it; relayed to the page as `kora_inventory:nui:trade`. |
+| `kora_inventory:client:tradeEnded` | net event (server to client) | `(tradeId, reason, completed)`; relayed to the page as `kora_inventory:nui:tradeEnded`. |
+| `kora_inventory:server:tradeCompleted` | server local event | `(tradeId, sourceA, sourceB, summary)` after a committed trade; `summary[source]` is `{ gave, cash }`. Each traded stack also fires `kora_inventory:server:itemsMoved` with `action = 'trade'`, and each player gets a `trade` audit entry. |
+| `kora_inventory:client:startTrade` | client local event | Starts a trade request with the nearest player (the page's Trade button goes through it). |
 | `fftSession` | state | Read only with [FFT hooks](../fft.md). |
 
 The server also listens for `kora_core:server:inventoryChanged`, `kora_core:server:playerLoaded`, `QBCore:Server:OnPlayerUnload` and `playerDropped`. Metadata read for blocks: `isdead`, `inlaststand`, `ishandcuffed`; state read: `koraCuffed`, `kora_vehiclekeys:locked`.

@@ -110,6 +110,26 @@ Toggles the vehicle's hood.
 
 The bonnet (or the boot for front-boot models) opens or closes.
 
+### `/trade`
+
+Asks the nearest player to trade. With several players close by, point at the one you mean with kora_target ("Trade with this player"). The other player gets an accept/decline dialog. See [Player trades](./api/trade.md). The name comes from `Config.kora_inventory.trade.command` and is read once at start; an empty value registers no command.
+
+| Field | Details |
+| --- | --- |
+| Context | In-game · client command |
+| Arguments | No arguments. |
+| Access | Anyone while `trade.enabled` is on. The server refuses it when you or the other player are downed, cuffed, already trading, too far away (`trade.distance`) or in another routing bucket, and limits it to one request every `trade.requestCooldown` seconds. |
+
+**Example**
+
+```text
+/trade
+```
+
+**Result**
+
+"Trade request sent." for you, and a "Trade request" dialog for the other player. When they accept, both inventories open with the trade window.
+
 ### `kora_inventory-migrate <dry-run|run|retry|verify>`
 
 Imports legacy inventory tables into the kora_inventory tables without ever modifying or deleting the legacy data.
@@ -306,6 +326,7 @@ Registered through `Kora.keybind`, so players can rebind them in **Settings → 
 | `kora_inventory:quick_<id>` | unbound | Use the item a quick slot points at, one binding per configured quick slot, under the same guards as the hotbar keys. |
 | `kora_inventory_clearjam` | `R` | Hold to clear a jam on the drawn weapon. |
 | `kora_inventory:hotbarshow` | `U` | Show the on-screen hotbar for `ui.hotbarSeconds` seconds (`0` disables the key). |
+| `kora_inventory:trade` | unbound | Same as `/trade`: ask the nearest player to trade. Listed as "Request a trade with the nearest player". |
 
 ## Migration actions and permissions (from the code)
 

@@ -51,21 +51,22 @@ function DockTab({ id, active, label, badge, badgeTitle, onSelect }: {
  * survives the switch to the other); the inspector slides up over the bottom.
  * The quick-slot drawer hangs on the inner edge, the one facing the screen centre.
  */
-export function DockLayout({ layoutId, session, playerLayout, shellRef, shellStyle, dragPreview, topbar, playerPanel, drawerInspector, secondaryPanel, transferView, shortcutBar, renderQuickSlots }: LayoutProps) {
+export function DockLayout({ layoutId, session, playerLayout, shellRef, shellStyle, dragPreview, topbar, playerPanel, drawerInspector, secondaryPanel, secondaryView, transferView, shortcutBar, renderQuickSlots }: LayoutProps) {
     const t = useLocale()
-    const secondary = transferView ? session.secondary : undefined
+    const derived = session.secondary ? { kind: "inventory" as const, label: session.secondary.label ?? session.secondary.id, count: asSlots(session.secondary.items).length } : undefined
+    const secondary = transferView ? (secondaryView ?? derived) : undefined
     // The choice belongs to one session: a new session starts on pockets.
     const [choice, setChoice] = useState<{ session: string; tab: DockTabId }>({ session: session.sessionId, tab: "pockets" })
     const tab: DockTabId = secondary && choice.session === session.sessionId ? choice.tab : "pockets"
     const select = (next: DockTabId) => setChoice((current) => current.session === session.sessionId && current.tab === next ? current : { session: session.sessionId, tab: next })
     const right = playerLayout.playerSide === "right"
-    const count = secondary ? asSlots(secondary.items).length : 0
+    const count = secondary?.count ?? 0
     return <main ref={shellRef} style={shellStyle} data-layout={layoutId} className={`inventory-shell ${right ? "dock-right" : "dock-left"}`}>
         {dragPreview}
         {topbar}
         <div className="dock-tabs" role="tablist" aria-label={t("ui.dock_tabs")}>
             <DockTab id="pockets" active={tab === "pockets"} label={t("ui.dock_tab_pockets")} onSelect={select} />
-            {secondary && <DockTab id="secondary" active={tab === "secondary"} label={secondary.label ?? secondary.id} badge={count} badgeTitle={t("ui.dock_tab_items", { count })} onSelect={select} />}
+            {secondary && <DockTab id="secondary" active={tab === "secondary"} label={secondary.label} badge={count} badgeTitle={t("ui.dock_tab_items", { count })} onSelect={select} />}
         </div>
         <div className="dock-body">
             <section id="dock-pane-pockets" role="tabpanel" aria-labelledby="dock-tab-pockets" className={`dock-pane${tab === "pockets" ? "" : " dock-pane-hidden"}`}>{playerPanel}</section>

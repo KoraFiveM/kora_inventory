@@ -27,6 +27,10 @@ local allowedIntents = {
     combine = true,
     -- Search: open a bag in the searched player's inventory (inventory + slot only).
     openTargetContainer = true,
+    -- Player trade: offer/unoffer/cash/ready/unready/confirm/cancel, and the
+    -- Trade button (resolved locally, see client/trade.lua).
+    trade = true,
+    tradeRequest = true,
 }
 
 local function send(action, data)
@@ -86,6 +90,12 @@ local UI_LOCALE_KEYS = {
     'decay_expires_in', 'decay_spoiled',
     -- Admin audit viewer and omnipack search (client/admin_ui.lua, InventoryPanel).
     'audit_title', 'audit_close', 'audit_filter_player', 'audit_filter_item', 'audit_filter_resource', 'audit_range', 'audit_range_1h', 'audit_range_24h', 'audit_range_7d', 'audit_search', 'audit_top_resources', 'audit_top_items', 'audit_col_time', 'audit_col_action', 'audit_col_player', 'audit_col_item', 'audit_col_amount', 'audit_col_inventory', 'audit_col_resource', 'audit_col_reason', 'audit_empty', 'audit_loading', 'audit_prev', 'audit_next', 'audit_page', 'audit_error', 'audit_memory_only', 'omnipack_search', 'omnipack_show_more', 'omnipack_empty',
+    'trade', 'trade_request', 'trade_you_offer', 'trade_they_offer', 'trade_cash', 'trade_cash_balance',
+    'trade_set_cash', 'trade_ready', 'trade_unready', 'trade_confirm', 'trade_cancel', 'trade_waiting',
+    'trade_partner_ready', 'trade_partner_not_ready', 'trade_partner_confirmed', 'trade_countdown',
+    'trade_locked', 'trade_drop_here', 'trade_remove_offer', 'trade_offer_amount', 'trade_offer',
+    'trade_empty_offer', 'trade_nothing_offered', 'trade_you_ready', 'trade_you_confirmed', 'trade_ends_in',
+    'trade_offered',
 }
 
 local function pushLocales()
@@ -271,6 +281,17 @@ local function pushConfig()
         -- server decides which recipe applies and what it costs.
         combine = KoraInventory.combinePresentation and KoraInventory.combinePresentation()
             or { enabled = false, recipes = {} },
+        -- Player trade presentation: whether the Trade button shows, how many
+        -- offer slots to draw and whether the cash field exists. The server
+        -- enforces all three on every trade action regardless.
+        trade = (function()
+            local trade = type(Config.kora_inventory.trade) == 'table' and Config.kora_inventory.trade or {}
+            return {
+                enabled = trade.enabled ~= false,
+                slots = math.floor(Kora.util.clamp(tonumber(trade.slots) or 8, 1, 32)),
+                allowCash = trade.allowCash ~= false,
+            }
+        end)(),
     })
 end
 

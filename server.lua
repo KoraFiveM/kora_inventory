@@ -3109,6 +3109,12 @@ local function handleIntent(src, request)
     if request.action == 'openTargetContainer' then
         return ext.intentOpenTargetContainer(src, request)
     end
+    -- Two-player trade (server/trade.lua). Same envelope and session lease as
+    -- the intents above; the trade module re-validates the token with
+    -- validSession and never accepts an item record.
+    if request.action == 'trade' and inventory.trade and inventory.trade.intent then
+        return inventory.trade.intent(src, request)
+    end
     return false, 'unsupported intent'
 end
 
@@ -4577,6 +4583,14 @@ inventory.internal = {
     end,
     close = close,
     canAccess = canAccess,
+    -- For server/trade.lua: the session lease check every intent uses, the
+    -- single kora_core item write (own-write tracked), audit, receipts and the
+    -- physical cash policy. Server-only; never reachable from a client.
+    validSession = validSession,
+    playerSetPath = playerSetPath,
+    recordAudit = recordAudit,
+    showItemBox = showItemBox,
+    cashPolicy = cashPolicy,
     isDowned = isDowned,
     isCuffed = isCuffed,
     isSlotBusy = isSlotBusy,
