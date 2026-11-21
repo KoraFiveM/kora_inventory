@@ -130,6 +130,8 @@ export interface QuickSlotsMessage {
     enabled?: boolean
     hideWhenMissing?: boolean
     showKeyHints?: boolean
+    /** Presentation of the side drawer; the player's own toggle (localStorage) wins after the first use. */
+    drawer?: { startCollapsed?: boolean }
     slots?: QuickSlotEntry[]
 }
 

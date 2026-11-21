@@ -5,10 +5,11 @@ export interface QuickSlotsState {
     enabled: boolean
     hideWhenMissing: boolean
     showKeyHints: boolean
+    drawer: { startCollapsed: boolean }
     slots: QuickSlotEntry[]
 }
 
-export const EMPTY_QUICK_SLOTS: QuickSlotsState = { enabled: false, hideWhenMissing: true, showKeyHints: true, slots: [] }
+export const EMPTY_QUICK_SLOTS: QuickSlotsState = { enabled: false, hideWhenMissing: true, showKeyHints: true, drawer: { startCollapsed: false }, slots: [] }
 
 /** Validates the `kora_inventory:nui:quickSlots` payload; anything malformed is dropped. */
 export function normalizeQuickSlots(data: QuickSlotsMessage | null | undefined): QuickSlotsState {
@@ -27,7 +28,7 @@ export function normalizeQuickSlots(data: QuickSlotsMessage | null | undefined):
             linked: entry.linked === true,
         })
     }
-    return { enabled: true, hideWhenMissing: data.hideWhenMissing !== false, showKeyHints: data.showKeyHints !== false, slots }
+    return { enabled: true, hideWhenMissing: data.hideWhenMissing !== false, showKeyHints: data.showKeyHints !== false, drawer: { startCollapsed: data.drawer?.startCollapsed === true }, slots }
 }
 
 export interface QuickTile {

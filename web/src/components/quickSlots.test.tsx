@@ -140,6 +140,141 @@ describe("QuickSlotBar rendering", () => {
     })
 })
 
+describe("QuickSlotBar drawer", () => {
+    const drawer = () => host.querySelector<HTMLElement>(".quickslot-drawer")
+    const handle = () => host.querySelector<HTMLButtonElement>(".quickslot-drawer-handle")!
+    beforeEach(() => { window.localStorage.clear() })
+    afterEach(() => { window.localStorage.clear() })
+
+    it("stacks the tiles in a drawer on the left, expanded, with a labelled handle", () => {
+        mount({ position: "drawer" })
+        expect(drawer()!.getAttribute("data-side")).toBe("left")
+        expect(drawer()!.classList.contains("quickslot-drawer-collapsed")).toBe(false)
+        expect(drawer()!.querySelectorAll("[data-quickslot]")).toHaveLength(3)
+        expect(handle().getAttribute("aria-expanded")).toBe("true")
+        expect(handle().getAttribute("aria-label")).toBe("Collapse quick slots")
+        expect(host.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("Quick slots")
+    })
+
+    it("attaches to the right edge when asked, and when the window has no room on its side", () => {
+        mount({ position: "drawer", side: "right" })
+        expect(drawer()!.getAttribute("data-side")).toBe("right")
+        expect(drawer()!.classList.contains("quickslot-drawer-right")).toBe(true)
+        mount({ position: "drawer", side: "left", flipped: true })
+        expect(drawer()!.getAttribute("data-side")).toBe("right")
+        expect(drawer()!.getAttribute("data-preferred-side")).toBe("left")
+    })
+
+    it("collapses and expands from the handle and remembers the choice", () => {
+        mount({ position: "drawer" })
+        act(() => handle().click())
+        expect(drawer()!.classList.contains("quickslot-drawer-collapsed")).toBe(true)
+        expect(handle().getAttribute("aria-expanded")).toBe("false")
+        expect(handle().getAttribute("aria-label")).toBe("Expand quick slots")
+        expect(window.localStorage.getItem("kora_inventory:quickDrawerCollapsed")).toBe("1")
+        act(() => handle().click())
+        expect(handle().getAttribute("aria-expanded")).toBe("true")
+        expect(window.localStorage.getItem("kora_inventory:quickDrawerCollapsed")).toBe("0")
+    })
+
+    it("starts collapsed with startCollapsed, until the player's stored choice says otherwise", () => {
+        const collapsed = normalizeQuickSlots({ enabled: true, drawer: { startCollapsed: true }, slots: entries })
+        mount({ position: "drawer", state: collapsed })
+        expect(drawer()!.classList.contains("quickslot-drawer-collapsed")).toBe(true)
+        act(() => root.unmount()); root = createRoot(host)
+        window.localStorage.setItem("kora_inventory:quickDrawerCollapsed", "0")
+        mount({ position: "drawer", state: collapsed })
+        expect(drawer()!.classList.contains("quickslot-drawer-collapsed")).toBe(false)
+        act(() => root.unmount()); root = createRoot(host)
+        window.localStorage.setItem("kora_inventory:quickDrawerCollapsed", "1")
+        mount({ position: "drawer" })
+        expect(drawer()!.classList.contains("quickslot-drawer-collapsed")).toBe(true)
+    })
+
+    it("still works when localStorage throws", () => {
+        vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("denied") })
+        vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("denied") })
+        mount({ position: "drawer" })
+        expect(drawer()!.classList.contains("quickslot-drawer-collapsed")).toBe(false)
+        act(() => handle().click())
+        expect(drawer()!.classList.contains("quickslot-drawer-collapsed")).toBe(true)
+    })
+
+    it("renders nothing at all, no handle and no frame, when there are no tiles", () => {
+        mount({ position: "drawer", state: normalizeQuickSlots({ enabled: true, slots: [{ id: "a", label: "A", slot: null }] }) })
+        expect(host.innerHTML).toBe("")
+        mount({ position: "drawer", state: normalizeQuickSlots({ enabled: false }) })
+        expect(host.innerHTML).toBe("")
+    })
+
+    it("keeps the tile interactions inside the drawer, even when it is collapsed", () => {
+        const { onSelect, onFlash } = mount({ position: "drawer" })
+        act(() => tile("med").click())
+        expect(onSelect).toHaveBeenCalledWith(player, player.items[3], 6)
+        expect(onFlash).toHaveBeenCalledWith(6)
+    })
+})
+
+describe("QuickSlotBar panel", () => {
+    const row = (id: string) => tile(id)
+    const figures = (id: string) => [...row(id).querySelectorAll(".quickslot-row-figure")].map((node) => node.textContent)
+
+    it("draws a Loadout panel with one full-width row per quick slot", () => {
+        mount({ position: "panel" })
+        expect(host.querySelector(".quickslot-panel")?.getAttribute("aria-label")).toBe("Loadout")
+        expect(host.querySelector(".quickslot-panel-header h2")?.textContent).toBe("Loadout")
+        expect([...host.querySelectorAll(".quickslot-row")].map((node) => node.getAttribute("data-quickslot"))).toEqual(["weapon", "ammo", "med"])
+        expect(row("weapon").querySelector(".quickslot-row-eyebrow")?.textContent).toBe("Weapon")
+        expect(row("weapon").querySelector(".quickslot-row-name")?.textContent).toBe("Pistol")
+        expect(row("weapon").querySelector(".quickslot-art")).not.toBeNull()
+    })
+
+    it("shows magazines for linked ammo, rounds loaded for a weapon, and the stack amount otherwise", () => {
+        mount({ position: "panel" })
+        expect(figures("ammo")).toEqual(["36 mags"])
+        expect(figures("weapon")).toEqual(["12 loaded"])
+        expect(figures("med")).toEqual(["×4"])
+    })
+
+    it("shows the key hint badge only when enabled and bound", () => {
+        mount({ position: "panel" })
+        expect(row("weapon").querySelector(".quickslot-key")?.textContent).toBe("F5")
+        expect(row("ammo").querySelector(".quickslot-key")).toBeNull()
+        mount({ position: "panel", state: normalizeQuickSlots({ enabled: true, showKeyHints: false, slots: entries }) })
+        expect(host.querySelector(".quickslot-key")).toBeNull()
+    })
+
+    it("shows dashed placeholder rows for unresolved slots when hideWhenMissing is off", () => {
+        const { onSelect } = mount({ position: "panel", state: normalizeQuickSlots({ enabled: true, hideWhenMissing: false, slots: entries }) })
+        const gone = row("gone")
+        expect(gone.classList.contains("quickslot-empty")).toBe(true)
+        expect(gone.querySelector(".quickslot-row-eyebrow")?.textContent).toBe("Missing")
+        expect(gone.querySelector(".quickslot-row-figure")).toBeNull()
+        act(() => gone.click())
+        expect(onSelect).not.toHaveBeenCalled()
+    })
+
+    it("renders nothing when there are no quick slots", () => {
+        mount({ position: "panel", state: normalizeQuickSlots({ enabled: false }) })
+        expect(host.innerHTML).toBe("")
+    })
+
+    it("has the tile interactions: click selects and flashes, double-click uses, right-click unpins, drop pins", () => {
+        const backend = fakeBackend()
+        const { onSelect, onFlash, onActivate, onPin } = mount({ position: "panel" }, backend)
+        act(() => row("med").click())
+        expect(onSelect).toHaveBeenCalledWith(player, player.items[3], 6)
+        expect(onFlash).toHaveBeenCalledWith(6)
+        act(() => { row("med").dispatchEvent(new MouseEvent("dblclick", { bubbles: true })) })
+        expect(onActivate).toHaveBeenCalledWith(player, player.items[3])
+        act(() => { row("weapon").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })) })
+        expect(onPin).toHaveBeenCalledWith("weapon", null)
+        onPin.mockClear()
+        expect(backend.drag(row("weapon"), row("med"))).toBe(true)
+        expect(onPin).toHaveBeenCalledWith("med", 2)
+    })
+})
+
 describe("QuickSlotBar interactions", () => {
     it("click selects the real item and flashes its slot; double-click activates it", () => {
         const { onSelect, onFlash, onActivate } = mount()
@@ -254,9 +389,10 @@ describe("in the app", () => {
         await post("kora_inventory:nui:sessionOpened", snapshot)
     })
 
-    it("draws the quick slot strip inside the player stage and pulses the real slot on click", async () => {
+    it("draws the quick slots as a drawer on the shell's left edge and pulses the real slot on click", async () => {
         await post("kora_inventory:nui:quickSlots", { enabled: true, hideWhenMissing: true, showKeyHints: true, slots: entries })
-        expect(host.querySelector(".inventory-stage-player .quickslot-bar-side")).not.toBeNull()
+        expect(host.querySelector("main.inventory-shell > .quickslot-drawer-left .quickslot-bar-drawer")).not.toBeNull()
+        expect(host.querySelector(".inventory-stage-player .quickslot")).toBeNull()
         act(() => tile("med").click())
         expect(slotBtn("Bandage").classList.contains("slot-flash")).toBe(true)
         expect(slotBtn("Bandage").getAttribute("aria-pressed")).toBe("true")

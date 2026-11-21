@@ -15,7 +15,7 @@ Kora Inventory is a set of server exports plus a client session layer. Your reso
 - **Item definitions live in kora_core's shared registry** (`items` and `weapons`). kora_inventory looks a definition up every time it needs one (`exports.kora_core:getShared('items', name)`), so items you register at runtime work immediately.
 - **The NUI is only a renderer.** The bundled page sends intents through `client/ui.lua`; `server.lua` validates the session token, both inventory revisions, access, routing bucket and distance before changing anything.
 - **Weights are in grams.** The default player limit `120000` is 120 kg. `slots` are counted per inventory. Slots `1..hotbarSlots` (5 by default) double as the hotbar.
-- **Quick slots are shortcuts, not slots.** The side rail of the inventory shows a Weapon, Ammo, Phone and Radio shortcut by default. Each points at an item that stays where it is in your inventory. Pin a different item to a shortcut from the page, or leave it to pick the drawn weapon and then the first matching item. Bind a key to a shortcut under Settings, Key Bindings, FiveM (`Quick slot: Weapon` and so on) to draw, holster, load or use it without opening the inventory. See [Configuration](./api/configuration.md) to change which shortcuts exist.
+- **Quick slots are shortcuts, not slots.** A drawer on the edge of the inventory window shows a Weapon, Ammo, Phone and Radio shortcut by default. Each points at an item that stays where it is in your inventory. Pin a different item to a shortcut from the page, or leave it to pick the drawn weapon and then the first matching item. Bind a key to a shortcut under Settings, Key Bindings, FiveM (`Quick slot: Weapon` and so on) to draw, holster, load or use it without opening the inventory. See [Configuration](./api/configuration.md) to change which shortcuts exist.
 
 ## Inventory types
 
@@ -34,7 +34,7 @@ Every inventory has a key of the form `kind:id`. The kinds that exist in code ar
 
 ## Pick an inventory layout
 
-The window has four layouts: `classic` (the original three-column window), `loadout` (pockets, a centre column with quick slots and the item inspector, then the other inventory), `compact` (a narrow single column with the inspector as a popover) and `dock` (a full-height panel on the screen edge with Pockets and other-inventory tabs). With kora_hud installed, players choose one in the `/ui` editor under "Inventory layout"; it is applied the next time the inventory opens. Server owners set the default with `Config.kora_inventory.ui.layout`, can switch layouts off with `ui.layouts`, and can stop players choosing with `ui.playerLayoutChoice = false` (see [Configuration](./api/configuration.md)). Every layout uses the same slots, drag and drop and server checks. See [NUI and UI](./api/nui.md) for how each one is arranged.
+The window has four layouts: `classic` (the original three-column window), `loadout` (pockets, a centre Loadout panel with the item inspector under it, then the other inventory), `compact` (a narrow single column with the inspector as a popover) and `dock` (a full-height panel on the screen edge with Pockets and other-inventory tabs). With kora_hud installed, players choose one in the `/ui` editor under "Inventory layout"; it is applied the next time the inventory opens. Server owners set the default with `Config.kora_inventory.ui.layout`, can switch layouts off with `ui.layouts`, and can stop players choosing with `ui.playerLayoutChoice = false` (see [Configuration](./api/configuration.md)). Every layout uses the same slots, drag and drop and server checks. See [NUI and UI](./api/nui.md) for how each one is arranged.
 
 ## Calling the exports
 
@@ -154,9 +154,11 @@ Players open it with `exports.kora_inventory:openInventory('stash', 'pd_armoury'
 
 ## Quick slots and the right-click menu
 
-Quick slots are shortcuts to items you already carry, shown as a strip beside your own inventory. They are not extra slots: clicking a tile selects the real item and flashes its slot, double-clicking uses it, and dragging a tile moves or drops the real item like any other.
+Quick slots are shortcuts to items you already carry, shown in a drawer pulled out of the side of the inventory window (in the loadout layout they are the Loadout panel in the middle instead). They are not extra slots: clicking a tile selects the real item and flashes its slot, double-clicking uses it, and dragging a tile moves or drops the real item like any other.
 
 To pin an item to a quick slot, drag it from your inventory onto the tile. Right-click a pinned tile to unpin it. The ammo shortcut follows your equipped weapon and cannot be pinned. A tile with no matching item is hidden, or shown greyed out when `quickSlots.hideWhenMissing` is off.
+
+The small tab on the outer edge of the drawer folds it into a slim strip and opens it again; the game remembers your choice. Server owners can start it folded with `quickSlots.drawer.startCollapsed`. If the window sits too close to the screen edge for the drawer, it appears on the other side.
 
 Set `Config.kora_inventory.ui.rightClick` to choose what right-click does on an item: `split` (the default) opens the split dialog, `menu` opens a context menu with Use, Split, Drop, Give, Ammo info and Copy as they apply, and `none` does nothing. While a weapon is selected the matching ammo is outlined, and while ammo is selected the weapons that take it are outlined. See [NUI contract](./api/nui.md) for details.
 

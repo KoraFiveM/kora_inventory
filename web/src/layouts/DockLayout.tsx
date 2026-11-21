@@ -3,7 +3,6 @@ import { useDrop } from "react-dnd"
 import { SLOT_DRAG_TYPE } from "@/components/dnd"
 import { asSlots } from "@/lib/inventory"
 import { useLocale } from "@/lib/locales"
-import { QuickSlots } from "./QuickSlots"
 import type { LayoutProps } from "./types"
 
 type DockTabId = "pockets" | "secondary"
@@ -50,6 +49,7 @@ function DockTab({ id, active, label, badge, badgeTitle, onSelect }: {
  * Full-height panel docked to a screen edge. Pockets and the secondary
  * inventory are tabs of one panel (both stay mounted so a drag started in one
  * survives the switch to the other); the inspector slides up over the bottom.
+ * The quick-slot drawer hangs on the inner edge, the one facing the screen centre.
  */
 export function DockLayout({ layoutId, session, playerLayout, shellRef, shellStyle, dragPreview, topbar, playerPanel, drawerInspector, secondaryPanel, transferView, shortcutBar, renderQuickSlots }: LayoutProps) {
     const t = useLocale()
@@ -67,12 +67,12 @@ export function DockLayout({ layoutId, session, playerLayout, shellRef, shellSty
             <DockTab id="pockets" active={tab === "pockets"} label={t("ui.dock_tab_pockets")} onSelect={select} />
             {secondary && <DockTab id="secondary" active={tab === "secondary"} label={secondary.label ?? secondary.id} badge={count} badgeTitle={t("ui.dock_tab_items", { count })} onSelect={select} />}
         </div>
-        <QuickSlots>{renderQuickSlots("top")}</QuickSlots>
         <div className="dock-body">
             <section id="dock-pane-pockets" role="tabpanel" aria-labelledby="dock-tab-pockets" className={`dock-pane${tab === "pockets" ? "" : " dock-pane-hidden"}`}>{playerPanel}</section>
             {secondary && <section id="dock-pane-secondary" role="tabpanel" aria-labelledby="dock-tab-secondary" className={`dock-pane${tab === "secondary" ? "" : " dock-pane-hidden"}`}>{secondaryPanel}</section>}
             {drawerInspector && <div className="dock-inspector">{drawerInspector}</div>}
         </div>
         {shortcutBar}
+        {renderQuickSlots("drawer", { side: right ? "left" : "right" })}
     </main>
 }

@@ -42,6 +42,57 @@
 .quickslot-key { position: absolute; top: 2px; left: 3px; padding: 0 3px; border: 1px solid hsl(var(--brand-border)); border-radius: 4px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); font: inherit; font-size: calc(8px * var(--ui-scale, 1)); font-weight: 800; line-height: calc(12px * var(--ui-scale, 1)); }
 .quickslot-pin { position: absolute; right: 3px; bottom: 3px; color: hsl(var(--primary)); }
 
+/* --- drawer: a vertical drawer pulled out of the window's outer edge --- */
+/* Attached to the OUTSIDE of .inventory-shell (right: 100% / left: 100%): same
+   panel gradient and border as the window, rounded on the outer corners only,
+   no border on the joined edge so it reads as one piece with the frame. */
+.quickslot-drawer {
+  --drawer-tile: calc(64px * var(--ui-scale, 1));
+  --drawer-pad: calc(8px * var(--ui-scale, 1));
+  --drawer-handle: calc(14px * var(--ui-scale, 1));
+  position: absolute; z-index: 2; top: calc(70px * var(--ui-scale, 1)); box-sizing: border-box; display: flex; align-items: stretch;
+  max-height: calc(100% - 84px * var(--ui-scale, 1)); min-height: calc(76px * var(--ui-scale, 1));
+  border: 1px solid hsl(var(--border-strong) / .82);
+  background: radial-gradient(circle at 0 0, hsl(var(--primary) / .11), transparent 60%),
+    linear-gradient(145deg, hsl(var(--surface-raised) / .98), hsl(var(--surface)) 32%, hsl(var(--background) / .98));
+  pointer-events: auto;
+}
+.quickslot-drawer-left { right: 100%; flex-direction: row; border-right: 0; border-radius: 14px 0 0 14px; box-shadow: var(--shadow-floating), inset -10px 0 12px -8px hsl(var(--background) / .85); }
+.quickslot-drawer-right { left: 100%; flex-direction: row-reverse; border-left: 0; border-radius: 0 14px 14px 0; box-shadow: var(--shadow-floating), inset 10px 0 12px -8px hsl(var(--background) / .85); }
+
+.quickslot-drawer-body { box-sizing: border-box; flex: none; width: calc(var(--drawer-tile) + var(--drawer-pad) * 2); min-height: 0; overflow: hidden; transition: width 180ms ease, visibility 0s linear 0s; }
+.quickslot-drawer-collapsed .quickslot-drawer-body { width: 0; visibility: hidden; transition: width 180ms ease, visibility 0s linear 180ms; }
+.quickslot-bar-drawer { box-sizing: border-box; flex-direction: column; gap: calc(6px * var(--ui-scale, 1)); width: calc(var(--drawer-tile) + var(--drawer-pad) * 2); max-height: 100%; padding: var(--drawer-pad); overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.quickslot-bar-drawer::-webkit-scrollbar { display: none; }
+.quickslot-drawer .quickslot { width: var(--drawer-tile); height: var(--drawer-tile); padding: 5px 4px 4px; }
+.quickslot-drawer .quickslot-art { width: calc(34px * var(--ui-scale, 1)); height: calc(34px * var(--ui-scale, 1)); }
+
+/* The handle: a slim tab on the outer edge that folds the drawer into a strip. */
+.quickslot-drawer-handle { box-sizing: border-box; flex: none; display: grid; place-items: center; width: var(--drawer-handle); padding: 0; border: 0; color: hsl(var(--muted-foreground)); background: hsl(var(--muted) / .45); cursor: pointer; transition: color 120ms ease, background-color 120ms ease; }
+.quickslot-drawer-left .quickslot-drawer-handle { border-right: 1px solid hsl(var(--border) / .85); border-radius: 13px 0 0 13px; }
+.quickslot-drawer-right .quickslot-drawer-handle { border-left: 1px solid hsl(var(--border) / .85); border-radius: 0 13px 13px 0; }
+.quickslot-drawer-collapsed .quickslot-drawer-handle { border: 0; }
+.quickslot-drawer-handle:hover, .quickslot-drawer-handle:focus-visible { outline: 0; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.quickslot-drawer-handle svg { display: block; flex: none; }
+@media (prefers-reduced-motion: reduce) {
+  .quickslot-drawer-body, .quickslot-drawer-collapsed .quickslot-drawer-body { transition: none; }
+}
+
+/* --- panel: the loadout column's full-width rows --- */
+.quickslot-panel { box-sizing: border-box; flex: none; display: grid; align-content: start; gap: 6px; padding: 13px; border: 1px solid hsl(var(--border-strong) / .8); border-radius: 14px; background: linear-gradient(155deg, hsl(var(--surface-panel)), hsl(var(--background) / .72)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .025); }
+.quickslot-panel-header { margin: 0 1px 7px; padding: 0 1px 8px; border-bottom: 1px solid hsl(var(--border) / .85); }
+.quickslot-rows { display: grid; gap: 6px; min-width: 0; }
+.quickslot.quickslot-row { width: 100%; height: auto; min-height: calc(54px * var(--ui-scale, 1)); display: grid; grid-template-rows: none; grid-template-columns: auto minmax(0, 1fr) auto; place-items: center stretch; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 10px; text-align: left; }
+.quickslot-row .quickslot-art { width: calc(40px * var(--ui-scale, 1)); height: calc(40px * var(--ui-scale, 1)); border-radius: 7px; font-size: calc(16px * var(--ui-scale, 1)); }
+.quickslot-row-text { min-width: 0; display: grid; gap: 1px; }
+.quickslot-row-eyebrow { display: flex; align-items: center; gap: 4px; overflow: hidden; color: hsl(var(--muted-foreground)); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 750; letter-spacing: .12em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.quickslot-pin-inline { flex: none; color: hsl(var(--primary)); }
+.quickslot-row-name { overflow: hidden; color: hsl(var(--foreground)); font-size: calc(13px * var(--ui-scale, 1)); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.quickslot-empty .quickslot-row-name { color: hsl(var(--muted-foreground)); font-weight: 500; }
+.quickslot-row-meta { display: grid; justify-items: end; align-content: center; gap: 3px; }
+.quickslot-row-figure { color: hsl(var(--foreground)); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quickslot-row-meta .quickslot-key-row { position: static; }
+
 /* --- the real slot pulses when its quick slot is clicked --- */
 @keyframes slot-flash-a { 0% { outline-color: hsl(var(--primary)); } 100% { outline-color: hsl(var(--primary) / 0); } }
 @keyframes slot-flash-b { 0% { outline-color: hsl(var(--primary)); } 100% { outline-color: hsl(var(--primary) / 0); } }

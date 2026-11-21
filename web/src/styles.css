@@ -41,6 +41,9 @@ html, body, #root, #root * { -webkit-user-select: none; user-select: none; }
   gap: 12px;
 }
 .inventory-heading { min-width: 0; display: grid; gap: 12px; }
+/* The quick-slot drawer hangs outside the window's edge, so these windows must
+   not clip their overflow. Panels and the inspector scroll inside themselves. */
+.inventory-shell:is([data-layout="classic"], [data-layout="compact"], [data-layout="dock"]) { overflow: visible; }
 
 /* Personal inventory is content-sized and remains centred until an item is
    selected. The selected item's existing inspector then slides out beside it
@@ -170,8 +173,8 @@ h2 { margin-bottom: 0; font-size: calc(15px * var(--ui-scale, 1)); font-weight: 
    from pushing artwork into the counters or label. */
 .item-art { grid-row: 2; min-width: 0; min-height: 0; width: 100%; height: 100%; box-sizing: border-box; padding: 2px 3px; border-radius: 5px; background: transparent; font-size: calc(20px * var(--ui-scale, 1)); }
 .item-footer { grid-row: 3; min-width: 0; min-height: calc(10px * var(--ui-scale, 1)); display: grid; align-content: end; gap: 1px; padding-bottom: 1px; }
-.item-label { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; color: hsl(var(--foreground)); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 650; line-height: calc(12px * var(--ui-scale, 1)); text-shadow: 0 1px 3px rgb(0 0 0 / .8); }
-.slot-priced .item-label { -webkit-line-clamp: 1; }
+/* One line with an ellipsis: a narrow cell never breaks a word in the middle. */
+.item-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: hsl(var(--foreground)); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 650; line-height: calc(12px * var(--ui-scale, 1)); text-shadow: 0 1px 3px rgb(0 0 0 / .8); }
 .item-amount { position: absolute; z-index: 1; top: 3px; right: 4px; border-radius: 5px; padding: 0 4px; background: hsl(var(--background) / .94); color: hsl(var(--foreground)); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 800; line-height: calc(16px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; border: 1px solid hsl(var(--border-strong)); letter-spacing: -.01em; }
 .item-price { justify-self: end; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 4px; padding: 0 3px; color: hsl(var(--primary)); background: hsl(var(--background) / .92); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 800; line-height: calc(13px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; border: 1px solid hsl(var(--primary) / .26); text-shadow: 0 1px 2px rgb(0 0 0 / .65); }
 .durability { position: absolute; z-index: 1; right: 5px; bottom: 0; left: 5px; }
@@ -185,7 +188,6 @@ h2 { margin-bottom: 0; font-size: calc(15px * var(--ui-scale, 1)); font-weight: 
    rather than the newer individual `translate` property because CEF builds
    can otherwise ignore the -50% offset. */
 .inventory-drag-preview { position: fixed; z-index: 1000; width: clamp(56px, 7vw, 86px); min-width: 0; min-height: 0; aspect-ratio: 1 / 1; transform: translate(-50%, -50%); border-color: hsl(var(--brand-border)); background: linear-gradient(145deg, hsl(var(--surface-raised)), hsl(var(--background))); box-shadow: 0 10px 28px rgb(0 0 0 / .48); pointer-events: none; }
-.inventory-drag-preview .item-label { -webkit-line-clamp: 1; }
 .item-box-stack { position: fixed; z-index: 1100; right: 20px; bottom: 20px; display: grid; width: min(260px, calc(100vw - 32px)); gap: 6px; pointer-events: none; }
 .item-box { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 46px; overflow: hidden; border-radius: 7px; padding: 5px 10px 5px 5px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); animation: item-box-in 150ms ease-out both; border: 1px solid hsl(var(--border)); border-left: 3px solid hsl(var(--primary)); }
 .item-box-art { display: grid; place-items: center; width: 36px; height: 36px; overflow: hidden; border-radius: 5px; padding: 3px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); font-weight: 800; }

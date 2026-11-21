@@ -123,6 +123,11 @@ Config.kora_inventory = {
         hideWhenMissing = true,
         -- Show the bound key on each quick slot in the UI.
         showKeyHints = true,
+        -- The quick slots are drawn in a drawer on the side of the inventory
+        -- window (classic, compact and dock layouts). startCollapsed = true
+        -- opens it as a slim strip; once the player toggles the handle, their
+        -- choice is remembered on their own machine and wins over this.
+        drawer = { startCollapsed = false },
         -- Include resolved quick slots in the U-key on-screen hotbar.
         inHotbarHud = true,
         -- Informational: ammunition is always loaded through the normal ammo

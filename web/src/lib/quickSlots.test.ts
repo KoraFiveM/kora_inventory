@@ -10,6 +10,15 @@ const player: InventoryView = {
     ],
 }
 
+describe("drawer config", () => {
+    it("defaults to expanded and reads startCollapsed only as a true boolean", () => {
+        expect(normalizeQuickSlots({ enabled: true }).drawer).toEqual({ startCollapsed: false })
+        expect(normalizeQuickSlots({ enabled: true, drawer: { startCollapsed: true } }).drawer).toEqual({ startCollapsed: true })
+        expect(normalizeQuickSlots({ enabled: true, drawer: { startCollapsed: "yes" as never } }).drawer).toEqual({ startCollapsed: false })
+        expect(EMPTY_QUICK_SLOTS.drawer).toEqual({ startCollapsed: false })
+    })
+})
+
 describe("normalizeQuickSlots", () => {
     it("treats a disabled or malformed message as nothing to show", () => {
         expect(normalizeQuickSlots({ enabled: false })).toBe(EMPTY_QUICK_SLOTS)

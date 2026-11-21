@@ -191,6 +191,7 @@ function api.push(force)
         enabled = true,
         hideWhenMissing = settings.hideWhenMissing ~= false,
         showKeyHints = settings.showKeyHints ~= false,
+        drawer = { startCollapsed = type(settings.drawer) == 'table' and settings.drawer.startCollapsed == true },
         slots = resolved,
     })
 end
