@@ -1,3 +1,4 @@
+import { asSlots } from "./inventory"
 import type { InventoryItem, InventoryView, SessionPatch, SessionSnapshot } from "./types"
 
 /**
@@ -15,7 +16,7 @@ import type { InventoryItem, InventoryView, SessionPatch, SessionSnapshot } from
  * slot renders dimmed; the server's patch replaces the items and so clears it.
  */
 
-export interface MoveRequest {
+interface MoveRequest {
     fromInventory: string
     fromSlot: number
     toInventory: string
@@ -27,13 +28,6 @@ export interface Prediction {
     session: SessionSnapshot
     /** The untouched views of every inventory the prediction changed. */
     before: Map<string, InventoryView>
-}
-
-export function slotItems(items: InventoryView["items"] | undefined): InventoryItem[] {
-    const values = Array.isArray(items) ? items : Object.values(items ?? {})
-    return values.filter((item): item is InventoryItem =>
-        item !== null && typeof item === "object" && Number.isInteger(item.slot) && item.slot > 0,
-    )
 }
 
 const sameMetadata = (a: InventoryItem, b: InventoryItem) => JSON.stringify(a.metadata ?? {}) === JSON.stringify(b.metadata ?? {})
@@ -62,8 +56,8 @@ export function predictMove(session: SessionSnapshot, request: MoveRequest): Pre
     if (from.id === to.id && fromSlot === toSlot) return undefined
 
     const same = from.id === to.id
-    const fromItems = slotItems(from.items).map((item) => ({ ...item }))
-    const toItems = same ? fromItems : slotItems(to.items).map((item) => ({ ...item }))
+    const fromItems = asSlots(from.items).map((item) => ({ ...item }))
+    const toItems = same ? fromItems : asSlots(to.items).map((item) => ({ ...item }))
     const source = fromItems.find((item) => item.slot === fromSlot)
     if (!source || !Number.isInteger(amount) || amount < 1 || amount > source.amount) return undefined
     const target = toItems.find((item) => item.slot === toSlot)
@@ -130,7 +124,7 @@ export function restoreInventories(session: SessionSnapshot, before: Map<string,
     return { ...session, player: pick(session.player), secondary: session.secondary && pick(session.secondary) }
 }
 
-export interface BuyRequest {
+interface BuyRequest {
     shopInventory: string
     slot: number
     amount: number
@@ -151,13 +145,13 @@ export function predictBuy(session: SessionSnapshot, request: BuyRequest): Predi
     // The omnipack has infinite stock and is never re-sent: nothing to predict.
     if (shop.omnipack) return undefined
 
-    const shopItems = slotItems(shop.items).map((item) => ({ ...item }))
+    const shopItems = asSlots(shop.items).map((item) => ({ ...item }))
     const stock = shopItems.find((item) => item.slot === request.slot)
     const { amount } = request
     if (!stock || !Number.isInteger(amount) || amount < 1 || amount > stock.amount) return undefined
     if (stock.weight === undefined || (stock.unique && amount > 1)) return undefined
 
-    const playerItems = slotItems(player.items).map((item) => ({ ...item }))
+    const playerItems = asSlots(player.items).map((item) => ({ ...item }))
     if (player.maxWeight !== undefined && totalWeight(playerItems) + (Number(stock.weight) || 0) * amount > player.maxWeight) return undefined
 
     const bought: InventoryItem = { ...stock, slot: 0, amount, pending: true }
