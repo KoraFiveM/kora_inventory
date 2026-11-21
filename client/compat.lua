@@ -5,12 +5,6 @@
 -- truth: kora_inventory asks its server to resolve every target and the active
 -- session remains the only source of inventory views and mutations.
 
--- Locale text with an English fallback (shared.lua's KoraInventory.text).
-local function localeText(key, fallback, vars)
-    local text = KoraInventory and KoraInventory.text
-    return text and text(key, fallback, vars) or fallback
-end
-
 local inventoryApi = assert(KoraInventory and KoraInventory.clientApi, 'kora_inventory client transport must load first')
 local selfOpening = false
 
@@ -292,7 +286,7 @@ end, false)
 
 Kora.keybind.add({
     name = 'openInv',
-    description = localeText('inventory.keybind_open', 'Open inventory'),
+    description = KoraInventory.text('inventory.keybind_open', 'Open inventory'),
     defaultMapper = 'keyboard',
     defaultKey = 'TAB',
     onPressed = openInventoryCommand,

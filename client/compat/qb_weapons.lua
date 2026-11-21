@@ -51,7 +51,7 @@ RegisterNetEvent('qb-weapons:client:CheckWeapon', function()
     TriggerServerEvent('kora_inventory:server:legacyWeaponHolster')
 end)
 
--- The two events below used to maintain qb-weapons' private client state.
+-- The events below used to maintain qb-weapons' private client state.
 -- kora_inventory owns that state in client/weaponcarry.lua; accepting them as
 -- no-ops avoids a stale resource error without creating competing controllers.
 RegisterNetEvent('qb-weapons:client:SetCurrentWeapon', function() end)
