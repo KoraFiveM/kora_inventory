@@ -324,6 +324,9 @@ RegisterNetEvent('kora_inventory:server:weaponToggled', function(slot)
     end
     if GetGameTimer() > request.expires then
         pending[src][slot] = nil
+        if next(pending[src]) == nil then
+            pending[src] = nil
+        end
         return
     end
 

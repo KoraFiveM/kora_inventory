@@ -29,6 +29,9 @@ local function sortedSlots(items)
         slots[#slots + 1] = slot
     end
     table.sort(slots, function(left, right)
+        if type(left) == 'number' and type(right) == 'number' then
+            return left < right
+        end
         return tostring(left) < tostring(right)
     end)
     return slots
