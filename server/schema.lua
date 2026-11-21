@@ -52,11 +52,24 @@ KoraInventorySchema = {
             { name = 'inventory_type', type = 'varchar(32)', null = true, default = NULL },
             { name = 'inventory_id', type = 'varchar(128)', null = true, default = NULL },
             { name = 'details', type = 'longtext' },
+            -- Item-creation audit (server/audit_log.lua). The columns above are
+            -- the original generic shape; these are filled by every batched
+            -- audit row. All nullable so rows written by older builds stay valid.
+            { name = 'citizenid', type = 'varchar(50)', null = true, default = NULL },
+            { name = 'source', type = 'int', null = true, default = NULL },
+            { name = 'item', type = 'varchar(96)', null = true, default = NULL },
+            { name = 'amount', type = 'int', null = true, default = NULL },
+            { name = 'resource', type = 'varchar(96)', null = true, default = NULL },
+            { name = 'reason', type = 'varchar(255)', null = true, default = NULL },
         },
         primary = { 'id' },
         indexes = {
             { name = 'idx_kora_inventory_audit_inventory', columns = { 'inventory_type', 'inventory_id', 'created_at' } },
             { name = 'idx_kora_inventory_audit_action', columns = { 'action', 'created_at' } },
+            { name = 'idx_kora_inventory_audit_created', columns = { 'created_at' } },
+            { name = 'idx_kora_inventory_audit_item', columns = { 'item', 'created_at' } },
+            { name = 'idx_kora_inventory_audit_resource', columns = { 'resource', 'created_at' } },
+            { name = 'idx_kora_inventory_audit_citizen', columns = { 'citizenid', 'created_at' } },
         },
     },
     {

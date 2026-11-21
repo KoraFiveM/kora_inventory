@@ -37,7 +37,21 @@ end
 -- modules that only render (client/quickslots.lua) send through this rather
 -- than calling SendNUIMessage themselves.
 KoraInventory = KoraInventory or {}
-KoraInventory.ui = { send = send }
+KoraInventory.ui = {
+    send = send,
+    -- Taking/releasing NUI focus for overlays that are not an inventory
+    -- session (client/admin_ui.lua). Refused while a session holds the focus.
+    focus = function(on)
+        if on and activeSession then
+            return false
+        end
+        SetNuiFocus(on == true, on == true)
+        return true
+    end,
+    sessionActive = function()
+        return activeSession ~= nil
+    end,
+}
 
 local function pushTheme()
     KoraTheme.refresh()
@@ -70,6 +84,8 @@ local UI_LOCALE_KEYS = {
     'combine', 'combine_title', 'combine_items',
     'closed_bag', 'closed', 'open_bag', 'water_damaged',
     'decay_expires_in', 'decay_spoiled',
+    -- Admin audit viewer and omnipack search (client/admin_ui.lua, InventoryPanel).
+    'audit_title', 'audit_close', 'audit_filter_player', 'audit_filter_item', 'audit_filter_resource', 'audit_range', 'audit_range_1h', 'audit_range_24h', 'audit_range_7d', 'audit_search', 'audit_top_resources', 'audit_top_items', 'audit_col_time', 'audit_col_action', 'audit_col_player', 'audit_col_item', 'audit_col_amount', 'audit_col_inventory', 'audit_col_resource', 'audit_col_reason', 'audit_empty', 'audit_loading', 'audit_prev', 'audit_next', 'audit_page', 'audit_error', 'audit_memory_only', 'omnipack_search', 'omnipack_show_more', 'omnipack_empty',
 }
 
 local function pushLocales()

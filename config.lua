@@ -478,6 +478,51 @@ Config.kora_inventory = {
         },
     },
     auditLimit = 1000,
+    -- Item-creation audit log: which script (resource) or player created which
+    -- items, to find duplication and badly written scripts. Every item ADD
+    -- (AddItem/addItem exports, qb/ox compat, shop purchases, crafting,
+    -- exchange, omnipack) is recorded with the invoking resource captured where
+    -- the export enters. Transfers between inventories are not creations and
+    -- are not logged here. Admins read it with /invaudit (ACE below).
+    audit = {
+        enabled = true,
+        -- Write rows to the kora_inventory_audit table. false keeps only the
+        -- in-memory ring (Config.kora_inventory.auditLimit entries).
+        persist = true,
+        -- Queued rows are written in one batch every flushSeconds, or as soon
+        -- as 200 are waiting, so an item add never waits on SQL.
+        flushSeconds = 10,
+        -- Rows older than this are pruned (once an hour and at start).
+        retentionDays = 14,
+        -- Also log removals (AddItem's counterpart). Off by default: removals
+        -- are far more frequent and rarely explain a duplication.
+        trackRemovals = false,
+        -- ACE permission needed for /invaudit and its data requests.
+        ace = 'kora_inventory.audit',
+        command = 'invaudit',
+        -- Rolling counters of item AMOUNTS added by one invoking resource
+        -- (other than kora_inventory itself) and by one player inside
+        -- windowSeconds. Crossing a threshold logs one warning and fires
+        -- kora_inventory:server:auditAnomaly, once per window per key.
+        anomaly = {
+            enabled = true,
+            windowSeconds = 300,
+            perResourceThreshold = 500,
+            perPlayerThreshold = 200,
+        },
+    },
+    -- Admin "omnipack": a read-only shop listing every registered item and
+    -- weapon at price 0 and infinite stock. Taking an item adds it to the
+    -- admin's inventory through the normal add path (weapons get a fresh
+    -- serial) and is recorded in the audit log as 'omnipack'. The server checks
+    -- the ACE on open and again on every take.
+    omnipack = {
+        enabled = true,
+        command = 'omnipack',
+        ace = 'kora_inventory.omnipack',
+        -- Largest single take (the amount picker is bounded by this).
+        maxAmount = 100,
+    },
     -- Trusted server domains only; client intent must be validated by the caller.
     exchangeCallers = { kora_drugs = true },
     requireSameBucket = true,

@@ -92,6 +92,8 @@ Details: [Shops](./api/shops.md), [Stashes and drops](./api/stashes.md).
 
 Not for general use: `physicalCashGet`, `physicalCashAdd`, `physicalCashRemove`, `physicalCashSet`, `physicalCashTransfer`, `physicalCashImport`, `physicalCashCanImport` (private bridge for kora_core's physical cash), `PhoneItemTransaction` / `phoneItemTransaction`, `getPersistenceStatus`, and `deleteLegacyPoliceTrash`.
 
+`openOmnipack(source)` (server) opens the admin omnipack for a player and returns `true`, or `false` and a reason. It checks the `omnipack.ace` permission of that player, so a resource cannot open it for someone without the permission. See [Commands](./commands.md).
+
 ## Client exports
 
 | Export | Notes |

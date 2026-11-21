@@ -57,6 +57,8 @@ When `Config.kora_inventory.decay.enabled` is on, items that decay also carry on
 | `kora_inventory:nui:sessionOpened` | table | `{ sessionId, token, revision, secondaryRevision, player, secondary?, expires }`. `player` and `secondary` are views `{ id (the inventory key), key, type, label, slots, maxWeight, weight, revision, items, stock? }`. |
 | `kora_inventory:nui:sessionPatched` | table | `{ sessionId, revision?, secondaryRevision?, player?, secondary?, snapshot? }`: the changed view replaces the page's copy. |
 | `kora_inventory:nui:sessionClosed` | table | `{ sessionId, reason }`. |
+| `kora_inventory:nui:auditOpen` | table | `{ filter }` with optional `player`, `item`, `resource`, `range`. Opens the read-only `/invaudit` overlay (not a session). |
+| `kora_inventory:nui:auditClose` | table | Closes the audit overlay. |
 | `kora_inventory:nui:intentResult` | table | `{ requestId, ok, error? }`: the deferred verdict of an intent. |
 | `kora_inventory:nui:itemBox` | table | Item receipt `{ name, label, image, imageUrl, amount, action, imageOverride, duration }` with `action` `add`, `purchase`, `remove` or `use`. |
 | `kora_inventory:nui:giveAvailability` | table | `{ available }`: whether a nearby give recipient exists. No names or ids are ever sent. |
@@ -196,6 +198,12 @@ Dropping one item onto a different item in the player's own inventory asks "Comb
 ```
 
 The page names no recipe, item, amount or result. The server validates the session lease, the revision, access, cuffed and downed state and the busy-slot lock exactly as for `use`, re-reads both slots, takes the recipe from its own registry and answers with the verdict. Like `use`, it may wait on a progress bar, so the bridge does not apply `moveTimeoutMs` to it. The page pushes the presentation list inside `kora_inventory:nui:config` as `combine = { enabled, recipes = { { a, b, label } } }`: item names and label only, no amounts. See [Crafting](./crafting.md#combining-items-by-dragging).
+
+### Admin audit overlay and omnipack
+
+The `/invaudit` overlay (`web/src/components/AuditViewer.tsx`, bridge in `client/admin_ui.lua`) is a separate component, not an inventory session: it has no token, lease or inventory and shares only NUI focus handling with `client/ui.lua` (`KoraInventory.ui.focus`). The server opens it with the net event `kora_inventory:client:auditOpen` after checking the audit ACE. The page posts filters to `kora_inventory:audit:query`; the client forwards them to the server callback `kora_inventory:server:auditQuery`, which re-checks the ACE on every request and returns a page of 100 rows plus a last-hour summary. `kora_inventory:audit:close` releases focus. It is read-only and refused while an inventory session holds the focus.
+
+The omnipack is an ordinary shop session; its view carries `omnipack = true`, is sent once on open (no `stock` copy), and the panel adds its own search box and draws 120 matches at a time with a "Show more" button, keeping each item's real slot number. Takes use the normal `buy` intent.
 
 ### Presentation config (`Config.kora_inventory.ui`)
 

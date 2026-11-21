@@ -533,6 +533,9 @@ function ox.AddItem(reference, item, count, metadata, slot, callback)
         end
         core.bump(currentKey)
         core.broadcast(currentKey)
+        if core.auditAdd then
+            core.auditAdd('add', current.type == 'player' and current.source or nil, currentKey, name, count)
+        end
         local targetSlot = tonumber(result) or tonumber(slot)
         local itemResult = targetSlot and current.items[targetSlot] or nil
         if not itemResult then

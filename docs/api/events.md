@@ -34,6 +34,34 @@ Local events fire after the action has committed, from inside the inventory's ow
 
 Each entry shows how to subscribe, the arguments, where the event is raised and what the handler may do.
 
+#### `AddEventHandler('kora_inventory:server:auditAnomaly', function(info) end)`
+
+Local server event raised when the item-creation audit sees unusual volume: the total item amount added by one invoking resource (other than kora_inventory itself) or received by one player inside `audit.anomaly.windowSeconds` reached `perResourceThreshold` or `perPlayerThreshold`. It fires once per window per resource or player and a `Kora.logging.warn` line (`audit.anomaly`) is written at the same time. Use it to post to Discord. Omnipack takes and removals are not counted. Raised from `server/audit_log.lua`.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `info.kind` | string | `resource` or `player`. |
+| `info.key` | string | `resource:<name>` or `player:<citizenid or srcN>`. |
+| `info.count` | integer | Total item amount inside the window. |
+| `info.threshold` | integer | The limit that was crossed. |
+| `info.windowSeconds` | integer | The window length. |
+| `info.resource`, `info.citizenid`, `info.source`, `info.item` | string \| integer \| nil | The add that crossed the limit. |
+| `info.at` | integer | Unix time of the alert. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+AddEventHandler('kora_inventory:server:auditAnomaly', function(info)
+    exports.my_logs:send('inventory', ('%s added %d items in %ds (limit %d)'):format(info.key, info.count, info.windowSeconds, info.threshold))
+end)
+```
+
 #### `AddEventHandler('kora_inventory:server:audit', function(action, src, details) end)`
 
 Local event raised for every audited action. The same entries are kept in the in-memory ring (`auditLimit`). Raised from `recordAudit` in server.lua.

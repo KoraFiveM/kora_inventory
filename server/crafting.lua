@@ -677,6 +677,11 @@ function crafting.craft(src, recipeId, context, amount)
         for _, output in ipairs(recipe.outputs) do
             scaledOutputs[#scaledOutputs + 1] = scaledEntry(output, parsedAmount)
         end
+        if internal.auditAdd then
+            for _, output in ipairs(scaledOutputs) do
+                internal.auditAdd('craft', src, inventoryKey, itemName(output.name or output.item), output.amount, recipe.id, owner())
+            end
+        end
         local result = #scaledOutputs == 1 and scaledOutputs[1] or scaledOutputs
         TriggerEvent('kora_inventory:server:crafted', src, recipe.id, result)
         return true, result

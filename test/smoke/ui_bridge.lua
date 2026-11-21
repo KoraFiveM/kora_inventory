@@ -443,15 +443,35 @@ answers('fft:observed', {action='buy', item='soda'}, 'disabled FFT observation')
 -- New NUI entry points must have acknowledgment coverage here.
 local scan = io.popen("grep -rl RegisterNUICallback client client.lua server.lua shared.lua fft_hooks.lua 2>/dev/null")
 for file in scan:lines() do
-    H.ok(file == 'client/ui.lua' or file == 'fft_hooks.lua', 'unexpected NUI callback owner: ' .. file)
+    H.ok(file == 'client/ui.lua' or file == 'client/admin_ui.lua' or file == 'fft_hooks.lua', 'unexpected NUI callback owner: ' .. file)
 end
 scan:close()
+-- The read-only /invaudit overlay owns two callbacks of its own.
+local auditEvents = {}
+local priorNetEvent = RegisterNetEvent
+RegisterNetEvent = function(name, handler) auditEvents[name] = handler end
+Kora.callback = Kora.callback or {}
+local auditAnswers = {}
+Kora.callback.trigger = function(name, filter) auditAnswers[#auditAnswers + 1] = { name = name, filter = filter }; return { rows = {}, hasMore = false } end
+dofile('client/admin_ui.lua')
+RegisterNetEvent = priorNetEvent
 local registered = 0
 for name in pairs(nui) do
     registered = registered + 1
-    H.ok(name == 'kora_inventory:nui:intent' or name == 'kora_inventory:nui:close' or name == 'kora_inventory:pinQuickSlot' or name == 'fft:result' or name == 'fft:observed', 'unexpected NUI callback ' .. name)
+    H.ok(name == 'kora_inventory:nui:intent' or name == 'kora_inventory:nui:close' or name == 'kora_inventory:pinQuickSlot'
+        or name == 'kora_inventory:audit:query' or name == 'kora_inventory:audit:close'
+        or name == 'fft:result' or name == 'fft:observed', 'unexpected NUI callback ' .. name)
 end
-H.equal(registered, 5, 'gameplay and optional development callbacks are covered')
+H.equal(registered, 7, 'gameplay, audit overlay and optional development callbacks are covered')
+
+-- The audit overlay only reads: a query while it is closed is refused locally,
+-- and it never produces an inventory intent.
+local auditReply
+nui['kora_inventory:audit:query']({ item = 'bread' }, function(result) auditReply = result end)
+H.equal(auditReply.error, 'closed', 'audit queries are refused while the overlay is closed')
+H.equal(#auditAnswers, 0, 'a closed overlay never reaches the server callback')
+nui['kora_inventory:audit:close']({}, function(result) auditReply = result end)
+H.equal(auditReply.ok, true, 'closing the audit overlay is always acknowledged')
 
 -- Quick slot pins are answered locally and never become a server intent.
 local pinReply

@@ -89,7 +89,22 @@ Core limits and session behaviour.
 | `sessionSliding` | boolean | Default `true`. Every request renews the lease, making it an idle timeout. `false` makes it a hard limit counted from opening. Live-editable. |
 | `slowRequestMs` | number | Default `250`. Log a "slow ... request" line when answering a move, buy, drop or use takes this many ms. `0` turns it off. Live-editable (0 to 10000). |
 | `dropDistance` | number | Default `2.0` metres. Reach used for drop inventories. |
-| `auditLimit` | integer | Default `1000`. Entries kept in the in-memory audit ring; older entries are discarded. Every entry also fires `kora_inventory:server:audit`. |
+| `auditLimit` | integer | Default `1000`. Entries kept in the in-memory audit ring (also the in-memory item-creation entries behind `/invaudit` when the database is off); older entries are discarded. Every entry also fires `kora_inventory:server:audit`. |
+| `audit.enabled` | boolean | Default `true`. Records every item creation (see [Item-creation audit log](./persistence.md#item-creation-audit-log)). Live-editable. |
+| `audit.persist` | boolean | Default `true`. Writes entries to `kora_inventory_audit`. `false` keeps only the in-memory ring. Live-editable. |
+| `audit.flushSeconds` | number | Default `10` (1 to 300). Seconds between batched database writes; 200 queued rows also trigger one. Live-editable. |
+| `audit.retentionDays` | number | Default `14` (1 to 365). Older rows are pruned at start and hourly. Live-editable. |
+| `audit.trackRemovals` | boolean | Default `false`. Also log `RemoveItem` removals. Live-editable. |
+| `audit.ace` | string | Default `kora_inventory.audit`. ACE needed for `/invaudit`; checked on every request. Live-editable. |
+| `audit.command` | string | Default `invaudit`. Command name, read at start. |
+| `audit.anomaly.enabled` | boolean | Default `true`. Counts item amounts added per invoking resource (other than kora_inventory itself) and per player inside the window; crossing a limit logs a warning and fires `kora_inventory:server:auditAnomaly` once per window per key. Omnipack takes and `remove` entries are not counted. Live-editable. |
+| `audit.anomaly.windowSeconds` | number | Default `300` (10 to 3600). Length of the rolling window and minimum gap between repeat alerts for one key. Live-editable. |
+| `audit.anomaly.perResourceThreshold` | number | Default `500`. Total item amount one resource may add in the window before an alert. Live-editable. |
+| `audit.anomaly.perPlayerThreshold` | number | Default `200`. Total item amount one player may receive in the window before an alert. Live-editable. |
+| `omnipack.enabled` | boolean | Default `true`. Enables `/omnipack` and the `openOmnipack` export. When `false`, opening and taking are refused immediately. Live-editable. |
+| `omnipack.command` | string | Default `omnipack`. Command name, read at start. |
+| `omnipack.ace` | string | Default `kora_inventory.omnipack`. ACE needed to open and to take; checked on every take. Live-editable. |
+| `omnipack.maxAmount` | number | Default `100` (1 to 10000). Largest single take of one item. Live-editable. |
 | `exchangeCallers` | table | Default `{ kora_drugs = true }`. Resource names allowed to call `ExecutePlayerExchange` and `GetPlayerExchange`. |
 | `requireSameBucket` | boolean | Default `true`. Players may only use drops, players and other inventories in their own routing bucket. |
 

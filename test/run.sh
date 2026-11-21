@@ -92,3 +92,5 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/search_containers.lua
 "${LUA:-lua}" test/smoke/water_damage.lua
 "${LUA:-lua}" test/smoke/decay.lua
+"${LUA:-lua}" test/smoke/audit_log.lua
+"${LUA:-lua}" test/smoke/omnipack.lua

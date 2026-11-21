@@ -200,6 +200,10 @@ ok = true: price * 2 is charged to the shop's currency account and two lockpicks
 - Dynamic pricing by rewriting rows with `SetShopItems`.
 - Vetoing or logging sales with a `buyItem` hook.
 
+## Admin omnipack
+
+`/omnipack` (ACE `kora_inventory.omnipack`) opens a generated shop `shop:omnipack` that lists every registered item and weapon at price 0 with infinite stock. It reuses the shop session, `buy` intent and UI, but is never persisted, cannot be reached with `BuyItem`, and its take path re-checks the ACE every time, bounds the amount by `omnipack.maxAmount`, and records an `omnipack` entry in the item-creation audit log. See [Commands](../commands.md) and [Security](../security.md).
+
 ## Limits and related APIs
 
 A shop is read-only to transfers. Stock added through `SetShopItems` has no price validation. The `access` callback is the only way to express rules beyond coords, groups and owner. Hook cancellations before payment charge nothing; a failed add after payment is refunded in full. Purchases on a shop with no `coords` and no `access` can be attempted from anywhere.

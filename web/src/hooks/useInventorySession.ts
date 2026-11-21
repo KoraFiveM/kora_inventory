@@ -295,7 +295,8 @@ export function useInventorySession() {
             if (from.type === "shop") {
                 if (current.player.id !== to.id) return t("ui.shop_player_only")
                 const prediction = configRef.current.optimisticMoves ? predictBuy(current, { shopInventory: from.id, slot: fromSlot, amount: 1 }) : undefined
-                return { intent: "buy", payload: { inventory: from.id, slot: fromSlot, amount: 1 }, awaiting: [from.id, to.id], prediction }
+                return { intent: "buy", payload: { inventory: from.id, slot: fromSlot, amount: 1 }, // The omnipack list is sent once and never re-patched, so only the player's patch is awaited.
+                awaiting: from.omnipack ? [to.id] : [from.id, to.id], prediction }
             }
             if (to.type === "shop") return t("ui.shop_read_only")
             const amount = requestedAmount ?? item.amount
@@ -478,7 +479,7 @@ export function useInventorySession() {
         const count = Math.min(Math.max(1, Math.floor(amount)), stock)
         enqueueRequest((current) => {
             const prediction = configRef.current.optimisticMoves ? predictBuy(current, { shopInventory: inventory.id, slot: item.slot, amount: count }) : undefined
-            return { intent: "buy", payload: { inventory: inventory.id, slot: item.slot, amount: count }, awaiting: [inventory.id, current.player.id], prediction }
+            return { intent: "buy", payload: { inventory: inventory.id, slot: item.slot, amount: count }, awaiting: inventory.omnipack ? [current.player.id] : [inventory.id, current.player.id], prediction }
         })
     }, [enqueueRequest, session])
     // Shared by the Enter-key shortcut on a selected item and the slot

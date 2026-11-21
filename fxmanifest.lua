@@ -49,7 +49,14 @@ server_scripts {
     -- import. It is deliberately loaded before the inventory authority.
     'server/schema.lua',
     'server/persistence.lua',
+    -- Item-creation audit log. Before server.lua: the export wrappers there
+    -- capture the invoking resource through it.
+    'server/audit_log.lua',
     'server.lua',
+    -- Admin tools: the omnipack catalogue/open path and the /invaudit and
+    -- /omnipack commands (ACE-gated; see docs/security.md).
+    'server/omnipack.lua',
+    'server/admin_tools.lua',
     'server/recovery.lua',
     -- Item decay runtime (lazy expiry through the mutation funnel + sweep).
     'server/decay.lua',
@@ -135,6 +142,8 @@ client_scripts {
     'client/compat.lua',
     'client/compat/ox.lua',
     'client/ui.lua',
+    -- /invaudit overlay (read-only admin viewer); reuses ui.lua's NUI focus.
+    'client/admin_ui.lua',
     'client/useables.lua',
     -- Progress bar for the `combine` intent and the recipe list the browser
     -- may show a confirm popover for (names and labels only).

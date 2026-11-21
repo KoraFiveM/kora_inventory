@@ -148,6 +148,8 @@ export function predictBuy(session: SessionSnapshot, request: BuyRequest): Predi
     const shop = session.secondary
     const player = session.player
     if (!shop || shop.type !== "shop" || shop.id !== request.shopInventory) return undefined
+    // The omnipack has infinite stock and is never re-sent: nothing to predict.
+    if (shop.omnipack) return undefined
 
     const shopItems = slotItems(shop.items).map((item) => ({ ...item }))
     const stock = shopItems.find((item) => item.slot === request.slot)
