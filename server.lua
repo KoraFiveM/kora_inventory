@@ -2991,6 +2991,7 @@ local function intentOrganize(src, request)
             order = type(settings.sortOrder) == 'table' and settings.sortOrder or nil,
             classify = organizeCategory,
             maxStack = organizeMaxStack,
+            merge = decayHelpers.merge,
         })
         if not plan then
             return false, planErr
