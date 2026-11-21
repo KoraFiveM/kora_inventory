@@ -29,6 +29,12 @@ local function send(action, data)
     SendNUIMessage({ action = action, data = data })
 end
 
+-- The one place presentation messages leave for the browser. Other client
+-- modules that only render (client/quickslots.lua) send through this rather
+-- than calling SendNUIMessage themselves.
+KoraInventory = KoraInventory or {}
+KoraInventory.ui = { send = send }
+
 local function pushTheme()
     KoraTheme.refresh()
 end
@@ -280,6 +286,11 @@ AddEventHandler('kora_inventory:ui:sessionOpened', function(payload)
     pushConfig()
     send('kora_inventory:nui:layout', playerLayout)
     send('kora_inventory:nui:sessionOpened', wire)
+    -- Quick slots are pointers into the inventory just sent; resolve them now.
+    local quick = KoraInventory and KoraInventory.quickSlotsClient
+    if quick and quick.push then
+        quick.push(true)
+    end
     SetNuiFocus(true, true)
     TriggerEvent('kora_inventory:client:requestGiveAvailability')
 end)
@@ -308,6 +319,15 @@ AddEventHandler('kora_inventory:ui:hotbarShow', function(payload)
     pushTheme()
     pushConfig()
     payload.bottom = hotbarBottom()
+    -- Resolved quick slots (items only; shortcuts, not extra slots), unless
+    -- Config.kora_inventory.quickSlots.inHotbarHud is off.
+    local quick = KoraInventory and KoraInventory.quickSlotsClient
+    local quickSettings = Config.kora_inventory.quickSlots
+    if quick and quick.hud and type(quickSettings) == 'table' and quickSettings.enabled ~= false
+        and quickSettings.inHotbarHud ~= false
+    then
+        payload.quick = quick.hud()
+    end
     send('kora_inventory:nui:hotbar', payload)
 end)
 
@@ -597,6 +617,28 @@ RegisterNUICallback('kora_inventory:nui:close', function(data, cb)
     end
     cb({ ok = true })
 end)
+
+-- Quick slot pins are a local display preference (client KVP, per character).
+-- The validation lives in client/quickslots.lua; nothing here reaches the
+-- server. Registered only while quick slots are enabled.
+do
+    local quickSettings = Config.kora_inventory.quickSlots
+    if type(quickSettings) == 'table' and quickSettings.enabled ~= false then
+        RegisterNUICallback('kora_inventory:pinQuickSlot', function(data, cb)
+            local quick = KoraInventory and KoraInventory.quickSlotsClient
+            if not quick or not quick.pin then
+                cb({ ok = false, error = 'quick slots unavailable' })
+                return
+            end
+            local called, ok, err = pcall(quick.pin, data)
+            if not called then
+                cb({ ok = false, error = 'quick slot request failed' })
+                return
+            end
+            cb({ ok = ok == true, error = ok and nil or err })
+        end)
+    end
+end
 
 local function editorWanted()
     return uiConfig().playerLayout ~= false

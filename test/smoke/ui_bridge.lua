@@ -422,7 +422,23 @@ scan:close()
 local registered = 0
 for name in pairs(nui) do
     registered = registered + 1
-    H.ok(name == 'kora_inventory:nui:intent' or name == 'kora_inventory:nui:close' or name == 'fft:result' or name == 'fft:observed', 'unexpected NUI callback ' .. name)
+    H.ok(name == 'kora_inventory:nui:intent' or name == 'kora_inventory:nui:close' or name == 'kora_inventory:pinQuickSlot' or name == 'fft:result' or name == 'fft:observed', 'unexpected NUI callback ' .. name)
 end
-H.equal(registered, 4, 'gameplay and optional development callbacks are covered')
+H.equal(registered, 5, 'gameplay and optional development callbacks are covered')
+
+-- Quick slot pins are answered locally and never become a server intent.
+local pinReply
+nui['kora_inventory:pinQuickSlot']({ id = 'weapon', slot = 3 }, function(result) pinReply = result end)
+H.equal(pinReply.ok, false, 'pinQuickSlot answers when the quick slot module is unavailable')
+local pinned
+KoraInventory.quickSlotsClient = { pin = function(data) pinned = data; return true end }
+nui['kora_inventory:pinQuickSlot']({ id = 'weapon', slot = 3 }, function(result) pinReply = result end)
+H.equal(pinReply.ok, true, 'pinQuickSlot reports the module verdict')
+H.equal(pinned.id, 'weapon', 'pinQuickSlot hands the body to the quick slot module')
+KoraInventory.quickSlotsClient = { pin = function() return false, 'item does not fit this quick slot' end }
+nui['kora_inventory:pinQuickSlot']({ id = 'weapon', slot = 2 }, function(result) pinReply = result end)
+H.equal(pinReply.error, 'item does not fit this quick slot', 'pinQuickSlot passes the refusal reason back')
+KoraInventory.quickSlotsClient = { pin = function() error('boom') end }
+nui['kora_inventory:pinQuickSlot']({}, function(result) pinReply = result end)
+H.equal(pinReply.ok, false, 'a failing pin handler still answers the browser')
 H.finish()

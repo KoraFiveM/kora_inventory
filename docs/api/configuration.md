@@ -78,6 +78,7 @@ Core limits and session behaviour.
 | `playerSlots` | integer | Default `41`. Slots in a player inventory. |
 | `playerMaxWeight` | integer | Default `120000` grams. Maximum carried weight. |
 | `hotbarSlots` | integer | Default `5`. Slots `1..hotbarSlots` double as the hotbar: number keys 1 to N are bound to them, and weapon carry in `hotbar` mode treats them as openly carried. `0` disables the key binds. Read once at start. |
+| `quickSlots` | table | Quick slots: shortcuts to items that stay in the normal inventory. See [Quick slots](#quick-slots-configkora_inventoryquickslots) below. |
 | `defaultSlots` | integer | Default `50`. Slot count for secondary inventories that do not specify `slots`. Also the slot count of ground drops. |
 | `defaultMaxWeight` | integer | Default `100000` grams. Capacity for secondary inventories that do not specify `maxWeight`. |
 | `interactionDistance` | number | Default `3.0` metres. Default reach for secondary inventories, player inspection and give targets. |
@@ -333,3 +334,49 @@ Keys that exist in `config.lua` but are not listed in the reference tables above
 `slowRequestMs` logs `slow <action> request from player <id>: <n> ms server-side` to the server console.
 
 See also [Installation](../installation.md) and [Commands and keybinds](../commands.md).
+
+## Quick slots (`Config.kora_inventory.quickSlots`)
+
+Quick slots are shortcuts, not physical slots. Items stay wherever they are in the player's normal inventory (slots `1..playerSlots`). A quick slot is a pointer that resolves to the real slot of a matching item. It is shown at the side of the inventory, can be included in the U-key on-screen hotbar, and can have a hotkey. Nothing new is stored on the server and the server gains no new authority: a hotkey uses the resolved item through the same path as the number-key hotbar. The settings are read when the client starts, so restart the resource after editing them.
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `quickSlots.enabled` | boolean | Default `true`. `false` registers no keybinds and no NUI callback, and the client sends the page a single `enabled = false` message. |
+| `quickSlots.hideWhenMissing` | boolean | Default `true`. `true` hides quick slots that resolve to no item; `false` makes the page show greyed placeholders. Sent to the page. |
+| `quickSlots.showKeyHints` | boolean | Default `true`. The page shows the bound key on each quick slot. Sent to the page. |
+| `quickSlots.inHotbarHud` | boolean | Default `true`. Adds the resolved quick slots to the U-key on-screen hotbar payload as `quick`. |
+| `quickSlots.reloadFromPockets` | boolean | Default `true`. Informational. Ammunition is always loaded through the normal ammo use path, which the server validates against the drawn weapon. |
+| `quickSlots.slots` | table | Ordered list of quick slots, see below. |
+
+Each entry of `slots`:
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `id` | string | Required. Letters, digits and underscores, unique. Names the hotkey command `kora_inventory:quick_<id>` (written with the id in place of the placeholder). Entries with another id are ignored. |
+| `label` | string | Shown in the page and in the key bindings list as `Quick slot: label`. |
+| `accepts` | table | Which items fit. `names` is a list of item names (any of), `type` is the item definition type (for example `'weapon'`) and `weapontype` is kora_core's weapon definition `weapontype` (for example `'Pistol'`). Every criterion given must match. Names are not case sensitive. An empty or missing filter matches nothing. |
+| `linkedTo` | string | Id of another quick slot. This slot then resolves to the ammunition item whose definition `ammoType` equals the `ammotype` of the weapon resolved for that slot, and reports the total amount of that ammunition across all slots. A weapon without an `ammotype`, or no matching ammunition, leaves it unresolved. A linked slot cannot be pinned. |
+| `key` | string | Default key, `''` for unbound. Nothing is bound by default because phone and radio resources, and GTA's own R reload, would clash. Players can still bind any quick slot under Settings, Key Bindings, FiveM. |
+
+How a quick slot picks its item, in order:
+
+1. The item the player pinned to it from the page (a local preference, see below). The item must still match the slot's filter, carry the pinned name and, if the pin has a serial, the same serial. A pinned weapon is followed when it moves to another slot.
+2. For slots that accept weapons: the weapon that is currently drawn, if it matches the filter.
+3. The lowest-numbered matching slot.
+
+A weapon taken by one weapon quick slot is not taken again by another one (for example `weapon` and `sidearm`) unless it was pinned there. Slots above `playerSlots` are ignored.
+
+Pins are stored in the player's own client key-value storage, per character (kora_core `citizenid`), under the key `kora_inventory:quickslots:` followed by the citizen id. They are never sent to the server and are re-checked against the live inventory on every resolve.
+
+```lua title="config.lua"
+quickSlots = {
+    enabled = true,
+    hideWhenMissing = false,
+    slots = {
+        { id = 'weapon',  label = 'Weapon',  accepts = { type = 'weapon' }, key = '' },
+        { id = 'sidearm', label = 'Sidearm', accepts = { type = 'weapon', weapontype = 'Pistol' }, key = '' },
+        { id = 'ammo',    label = 'Ammo',    linkedTo = 'weapon', key = '' },
+        { id = 'radio',   label = 'Radio',   accepts = { names = { 'radio' } }, key = 'F5' },
+    },
+},
+```
