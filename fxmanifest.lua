@@ -25,6 +25,10 @@ dependency 'kora_target'
 shared_scripts {
     '@kora_lib/init.lua',
     'config.lua',
+    -- Per-feature /config editor schema (Kora.config descriptors), one file per
+    -- feature so they never collide; then the single adopt call.
+    'config/schema/*.lua',
+    'config/adopt.lua',
     'config/shops/ammunation.lua',
     'config/shops/vendingmachine.lua',
     'config/shops/liquorstore.lua',

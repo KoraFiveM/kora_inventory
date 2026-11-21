@@ -1018,5 +1018,6 @@ if Kora and Kora.config and Kora.config.adopt then
         live = true,
     })
 
-    Config = Kora.config.adopt(Config)
+    -- Config = Kora.config.adopt(Config) now runs in config/adopt.lua, after the
+    -- per-feature schema files in config/schema/*.lua have registered theirs.
 end
