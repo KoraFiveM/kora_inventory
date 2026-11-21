@@ -30,6 +30,7 @@ shared_scripts {
     'config/shops/liquorstore.lua',
     'config/shops/convenience.lua',
     'shared.lua',
+    'shared/trunk_cargo.lua',
     -- Pure quick slot resolver (pointers to real inventory slots). No state.
     'shared/quickslots.lua',
 }
@@ -48,6 +49,7 @@ server_scripts {
     -- ammunition loader uses its server-only per-round ballistics API.
     'server/useables.lua',
     'server/vehicles.lua',
+    'server/trunk_cargo.lua',
     'server/containers.lua',
     -- Visible weapon carry + draw/holster pacing. Loads after useables.lua,
     -- whose weapon handler delegates to it at call time, and after
@@ -96,6 +98,7 @@ client_scripts {
     'client/drops.lua',
     -- Inventory-key access to glovebox/trunk; intent only, the server resolves the vehicle.
     'client/vehicles.lua',
+    'client/trunk_cargo.lua',
     -- ALT-menu trunk/hood toggles and the /trunk and /hood commands.
     'client/vehicle_doors.lua',
     'client/shops/ammunation.lua',

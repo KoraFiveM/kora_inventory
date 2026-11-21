@@ -201,6 +201,12 @@ Trunk and glovebox policy. Clients may suggest a network id only; plate, class, 
 | `vehicles.enabled` | boolean | Default `true`. Inventory key opens glovebox (seated) and trunk (at the boot). `false` leaves storage to other resources; `openInventory('trunk', netId)` still works. Live-editable. |
 | `vehicles.gloveboxEnabled` | boolean | Default `true`. Glovebox from the inventory key. |
 | `vehicles.trunkEnabled` | boolean | Default `true`. Trunk from the inventory key. |
+| `vehicles.trunkCargo.enabled` | boolean | Default `false`. Draw the items in a trunk as props inside the vehicle's boot for nearby players. Cosmetic only: it never opens or changes inventory. Restart after changing. |
+| `vehicles.trunkCargo.drawDistance` | number | Default `35.0` metres. Clients build props only for vehicles within this distance. |
+| `vehicles.trunkCargo.maxProps` | integer | Default `24` (1 to 24). Props per trunk, filled in slot order. |
+| `vehicles.trunkCargo.fallbackModel` | string | Default `prop_med_bag_01b`. Prop for items with no model override and no `dropProp` or `dropmodel` in their definition. |
+| `vehicles.trunkCargo.models` | table | Item name to prop model overrides, for example `water_bottle = 'prop_ld_flow_bottle'`. Weapons render as their own weapon model. |
+| `vehicles.trunkCargo.bounds` | table | Vehicle spawn name to a `min`/`max` model-space box that calibrates the cargo area of a custom model. A box outside the model's dimensions is ignored. |
 | `vehicles.bootReach` | number | Default `1.8` metres. How close to stand to the boot (0.5 to 5.0, live-editable). |
 | `vehicles.trunkDistance` | number | Default `7.0` metres. Server limit from player to the vehicle origin when opening a trunk (2.0 to 20.0). Larger than `distance` because the boot is at the far end. |
 | `vehicles.respectLocks` | boolean | Default `true`. Refuse trunk access while the vehicle is locked (`kora_vehiclekeys:locked` bag, else native door lock). The glovebox of the vehicle you sit in is never blocked. |
