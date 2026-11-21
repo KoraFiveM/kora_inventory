@@ -302,6 +302,18 @@ Server-owned recipes, weapon metadata rules, ballistics and the visible carried-
 | `weaponCarry.weapons` | table | Per-item overrides: `tier = false` stops carrying; `bone`, `pos`, `rot` override the position; `model` renders a prop instead. Default excludes `weapon_petrolcan` and `weapon_fireextinguisher`. |
 | `weaponCarry.components` | table | Default `{}`. Maps a component item name to the GTA component name rendered on the carried weapon. Only entries here reach clients. |
 
+### Drag to combine (combine)
+
+Lets a player drop one item onto another in their own inventory to combine them. The server holds the only recipe registry; the page is only told each pair's item names and label. All of these are in the `/config` editor, and the server reads them on every attempt, so changes apply without a restart (players see the popover change the next time they open their inventory). See [Crafting](./crafting.md#combining-items-by-dragging).
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `combine.enabled` | boolean | Default `true`. Off: no popover, the `combine` intent is refused, and dropping one item on another swaps or stacks them as usual. Live. |
+| `combine.progress` | boolean | Default `true`. Server only. Off: every recipe completes at once even if it has a `time`. Live. |
+| `combine.recipes` | list of tables | The pairs players can combine. Each row has `a`, `b` (item names, either drag order), `result`, `amount` (default `1`), `consumeA`, `consumeB` (default `1`; `0` keeps the item), `time` (progress bar milliseconds, default `0`) and `label`. Default: one row, `rolling_paper` + `weed` = `joint`, `time = 2500`, `label = 'Roll a joint'`. A row with a bad shape or an unsupported field is skipped and reported in the server log. Live; it is an advanced list in the `/config` editor. |
+
+Other resources add recipes at runtime with `registerCombination`; a pair already listed here cannot be registered again.
+
 ### Bundled shop files (config/shops/*.lua)
 
 Each file sets `Config.kora_inventory.shops.<id>`. The same table is read by the server registration, the client targets/blips/peds and the hint markers. The location list is duplicated on purpose: the client uses it for presentation, the server independently verifies the live position and bucket before every open.

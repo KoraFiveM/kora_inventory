@@ -54,6 +54,9 @@ server_scripts {
     -- Weapon/consumable use handlers.  This follows crafting.lua because the
     -- ammunition loader uses its server-only per-round ballistics API.
     'server/useables.lua',
+    -- Drag-to-combine recipes and the `combine` intent handler (resolves
+    -- crafting.lua's capacity check per call, so it only needs server.lua).
+    'server/combine.lua',
     'server/vehicles.lua',
     'server/trunk_cargo.lua',
     'server/containers.lua',
@@ -125,6 +128,9 @@ client_scripts {
     'client/compat/ox.lua',
     'client/ui.lua',
     'client/useables.lua',
+    -- Progress bar for the `combine` intent and the recipe list the browser
+    -- may show a confirm popover for (names and labels only).
+    'client/combine.lua',
     -- Renders every player's carried weapons from the server-set state bag,
     -- and plays out the draw/holster this client was asked for. It owns the
     -- weapon half of the old client/useables.lua toggle.

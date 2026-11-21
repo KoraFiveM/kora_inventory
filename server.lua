@@ -2763,6 +2763,15 @@ local function handleIntent(src, request)
     if request.action == 'organize' then
         return inventory._organize.intent(src, request)
     end
+    if request.action == 'combine' then
+        -- Implemented in server/combine.lua (loaded after this file); resolved
+        -- per call so the module stays optional.
+        local combine = inventory.combine
+        if not combine or not combine.intent then
+            return false, 'unsupported intent'
+        end
+        return combine.intent(src, request)
+    end
     return false, 'unsupported intent'
 end
 
@@ -4193,6 +4202,25 @@ inventory.internal = {
     isDowned = isDowned,
     isCuffed = isCuffed,
     isSlotBusy = isSlotBusy,
+    -- Mid-use lock for server/combine.lua, which waits on a client progress
+    -- bar the way a useable handler does: the slot stays locked against
+    -- drop/give/move until it clears (or config.busyTimeout passes).
+    setSlotBusy = function(src, slot, busy)
+        if config.blockWhileBusy == false or type(slot) ~= 'number' then
+            return
+        end
+        if busy then
+            busySlots[src] = busySlots[src] or {}
+            busySlots[src][slot] = GetGameTimer()
+        elseif busySlots[src] then
+            busySlots[src][slot] = nil
+        end
+    end,
+    notifyBusyBlocked = notifyBusyBlocked,
+    busyError = BUSY_ERROR,
+    validSession = validSession,
+    recordAudit = recordAudit,
+    showItemBox = showItemBox,
     sameDropBucket = sameDropBucket,
     hasUseable = hasUseable,
     setBuiltInUseable = setBuiltInUseable,

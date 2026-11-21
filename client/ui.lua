@@ -24,6 +24,7 @@ local allowedIntents = {
     organize = true,
     split = true,
     action = true,
+    combine = true,
 }
 
 local function send(action, data)
@@ -64,6 +65,7 @@ local UI_LOCALE_KEYS = {
     'sort_panel', 'stack_panel', 'panel_search', 'panel_search_placeholder',
     'tips_title', 'tip_next', 'tip_got_it', 'tip_drag_drop', 'tip_quick_transfer', 'tip_modifier_drag',
     'tip_right_click_split', 'tip_right_click_menu', 'tip_quick_slot', 'tip_organize', 'tip_layout',
+    'combine', 'combine_title', 'combine_items',
 }
 
 local function pushLocales()
@@ -233,6 +235,10 @@ local function pushConfig()
         organize = organizeConfig(),
         -- First-time tip card (shown at most maxShows openings per player).
         tips = tipsConfig(),
+        -- Drag-to-combine: recipe names + labels only (client/combine.lua). The
+        -- server decides which recipe applies and what it costs.
+        combine = KoraInventory.combinePresentation and KoraInventory.combinePresentation()
+            or { enabled = false, recipes = {} },
     })
 end
 
@@ -603,7 +609,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
             delivered = true
             send('kora_inventory:nui:intentResult', { requestId = requestId, ok = ok == true, error = ok and nil or err })
         end
-        if data.intent ~= 'use' then
+        if data.intent ~= 'use' and data.intent ~= 'combine' then
             SetTimeout(moveTimeoutMs(), function()
                 deliver(false, 'timeout')
             end)
@@ -632,7 +638,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
     -- so cb runs exactly once and never later than the move deadline: if the
     -- server round trip is still outstanding then, the browser is answered
     -- { ok = false, error = 'timeout' } and the late result is dropped (the UI
-    -- rolls back and asks for a resync). `use` is exempt: it may wait on a
+    -- rolls back and asks for a resync). `use` and `combine` are exempt: they may wait on a
     -- progress bar.
     local answered = false
     local function reply(result)
@@ -642,7 +648,7 @@ RegisterNUICallback('kora_inventory:nui:intent', function(data, cb)
         answered = true
         cb(result)
     end
-    if data.intent ~= 'use' then
+    if data.intent ~= 'use' and data.intent ~= 'combine' then
         SetTimeout(moveTimeoutMs(), function()
             reply({ ok = false, error = 'timeout' })
         end)

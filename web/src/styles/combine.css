@@ -1,0 +1,8 @@
+/* Confirm popover for dragging one item onto another (web/src/components/CombinePopover.tsx). */
+.combine-backdrop { position: fixed; pointer-events: auto; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgb(0 0 0 / .35); }
+.combine-popover { border: 1px solid hsl(var(--brand-border)); display: grid; gap: 8px; min-width: 220px; max-width: 320px; padding: 14px; border-radius: var(--radius); color: hsl(var(--foreground)); background: hsl(var(--surface-panel)); box-shadow: var(--shadow-modal); font-size: calc(13px * var(--ui-scale, 1)); }
+.combine-popover h3 { margin: 0; font-size: calc(15px * var(--ui-scale, 1)); font-weight: 600; }
+.combine-items { margin: 0; color: hsl(var(--muted-foreground)); }
+.combine-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.combine-actions button { padding: 6px 12px; color: inherit; }
+.combine-confirm { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft)); }

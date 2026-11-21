@@ -1,5 +1,6 @@
 import { createContext } from "react"
 import { DEFAULT_AMMO_INFO } from "@/lib/ammo"
+import { DEFAULT_COMBINE, type CombineConfig } from "@/lib/combine"
 import type { AmmoInfoConfig, OrganizeConfig, RightClickMode, TipsConfig, UiConfig } from "@/lib/types"
 
 /**
@@ -10,7 +11,7 @@ import type { AmmoInfoConfig, OrganizeConfig, RightClickMode, TipsConfig, UiConf
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig; organize: OrganizeConfig; tips: TipsConfig } = {
+export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig; organize: OrganizeConfig; tips: TipsConfig; combine: CombineConfig } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
@@ -42,6 +43,8 @@ export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreW
     // Config.kora_inventory.organize and ui.tips; the server enforces organize itself.
     organize: { enabled: true, sort: true, stack: true, panelSearch: true },
     tips: { enabled: true, maxShows: 5 },
+    // Drag one item onto another for a recipe (Config.kora_inventory.combine).
+    combine: DEFAULT_COMBINE,
     images: {
         localPath: "nui://kora_inventory/images",
         extensions: ["webp", "png", "gif", "jpg"],

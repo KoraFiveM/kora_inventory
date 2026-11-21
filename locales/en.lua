@@ -176,7 +176,10 @@ return {
         tip_right_click_split = 'Right-click a stack to split it.',
         tip_right_click_menu = 'Right-click an item for its actions menu.',
         tip_quick_slot = 'Right-click a quick slot to pin the item you want it to point at.',
-        tip_organize = 'Use Sort and Stack all in a panel's header to tidy it up.',
+        tip_organize = "Use Sort and Stack all in a panel's header to tidy it up.",
         tip_layout = 'Pick the inventory layout you like best in the /ui editor.',
+        combine = 'Combine',
+        combine_title = '%{label}?',
+        combine_items = '%{from} + %{to}',
     },
 }

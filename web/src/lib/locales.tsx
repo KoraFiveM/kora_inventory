@@ -123,6 +123,9 @@ export const DEFAULT_LOCALES: Record<string, string> = {
     "ui.tip_quick_slot": "Right-click a quick slot to pin the item you want it to point at.",
     "ui.tip_organize": "Use Sort and Stack all in a panel's header to tidy it up.",
     "ui.tip_layout": "Pick the inventory layout you like best in the /ui editor.",
+    "ui.combine": "Combine",
+    "ui.combine_title": "%{label}?",
+    "ui.combine_items": "%{from} + %{to}",
 }
 
 type LocaleContextValue = (key: string, values?: Record<string, string | number>) => string

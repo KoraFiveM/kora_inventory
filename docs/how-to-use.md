@@ -174,6 +174,21 @@ To pin an item to a quick slot, drag it from your inventory onto the tile. Right
 
 Set `Config.kora_inventory.ui.rightClick` to choose what right-click does on an item: `split` (the default) opens the split dialog, `menu` opens a context menu with Use, Split, Drop, Give, Ammo info and Copy as they apply, and `none` does nothing. While a weapon is selected the matching ammo is outlined, and while ammo is selected the weapons that take it are outlined. See [NUI contract](./api/nui.md) for details.
 
+## Combine two items by dragging
+
+Players can drag one item onto another in their own inventory to combine them. With the shipped config, dropping rolling paper on weed (or weed on rolling paper) asks "Roll a joint? Combine / Cancel"; Combine shows a progress bar and then swaps one of each for a joint. Pairs with no recipe swap or stack as usual, and nothing combines between your inventory and a stash, trunk or shop.
+
+Add or change recipes under `Config.kora_inventory.combine.recipes` (also editable in `/config`), or from another resource:
+
+```lua
+exports.kora_inventory:registerCombination({
+    a = 'repairkit', b = 'electronickit', result = 'advancedrepairkit',
+    consumeA = 1, consumeB = 1, time = 3000, label = 'Upgrade the repair kit',
+})
+```
+
+Both items and the result must be real kora_core items. A combine fails, and nothing is consumed, if the result does not fit your weight or slots, the progress bar is cancelled, or the items change while it runs. Set `combine.enabled = false` to turn the whole feature off. See [Crafting](./api/crafting.md#combining-items-by-dragging) for every field.
+
 ## Failure results and what they mean
 
 Most server functions return `ok, reason`. The reason is a short string; branch on `ok`, not on the text, except for the vocabularies called out in the compat modules.
