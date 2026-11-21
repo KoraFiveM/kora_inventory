@@ -23,6 +23,7 @@ local function read(path)
 end
 
 local manifest = read('fxmanifest.lua')
+local expandGlobs = dofile('test/manifest_glob.lua')
 local function pathsFrom(blockName)
     local block = assert(manifest:match(blockName .. '%s*{(.-)\n}'), 'fxmanifest.lua must declare ' .. blockName)
     local paths = {}
@@ -31,7 +32,8 @@ local function pathsFrom(blockName)
             for path in line:gmatch("'([^']+)'") do paths[#paths + 1] = path end
         end
     end
-    return paths
+    -- fxmanifest.lua entries may be globs (config/schema/*.lua); FXServer expands them.
+    return expandGlobs(paths)
 end
 
 -- realm -> identity -> { name -> fn }, from __cfx_export_<identity>_<name>.
@@ -66,6 +68,7 @@ for _, path in ipairs(pathsFrom('shared_scripts')) do
 end
 
 Kora = {
+    logging = dofile('test/logging_spy.lua').logging,
     util = { deepClone = function(value)
         local seen = {}
         local function clone(v)
@@ -156,7 +159,10 @@ exports = setmetatable({}, {
 })
 
 realm = 'server'
-for _, path in ipairs(pathsFrom('server_scripts')) do dofile(path) end
+for _, path in ipairs(pathsFrom('server_scripts')) do
+    -- '@kora_sql/init.lua' is another resource; its Kora surface is mocked above.
+    if path:sub(1, 1) ~= '@' then dofile(path) end
+end
 realm = 'client'
 for _, path in ipairs(pathsFrom('client_scripts')) do
     if path:sub(1, 1) ~= '@' then dofile(path) end
