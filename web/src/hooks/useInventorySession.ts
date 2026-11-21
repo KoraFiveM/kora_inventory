@@ -17,6 +17,7 @@ import { pickTransferSlot } from "@/lib/quickTransfer"
 import { copyText, itemCopyText } from "@/lib/clipboard"
 import { clampGiveAmount } from "@/lib/giveAmount"
 import { isAmmoCompatible, mergeAmmoInfo, resolveRightClick } from "@/lib/ammo"
+import { mergeDecayConfig } from "@/lib/decay"
 import { EMPTY_QUICK_SLOTS, normalizeQuickSlots, type QuickSlotsState } from "@/lib/quickSlots"
 import type { SlotUi } from "@/slotUi"
 
@@ -156,6 +157,7 @@ export function useInventorySession() {
             filters: config.filters ?? current.filters,
             tooltips: config.tooltips ?? current.tooltips,
             weightWarnings: mergeWeightWarnings(current.weightWarnings, config.weightWarnings),
+            decay: mergeDecayConfig(current.decay, config.decay),
         }))
     })
     useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number; quick?: HotbarQuickEntry[] }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom, quick }) => {

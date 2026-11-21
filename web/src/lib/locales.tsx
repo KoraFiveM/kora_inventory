@@ -107,6 +107,8 @@ export const DEFAULT_LOCALES: Record<string, string> = {
     "ui.ammo_rounds_per_item": "Rounds per item",
     "ui.ammo_fits": "Fits",
     "ui.ammo_type": "Type",
+    "ui.decay_expires_in": "Expires in %{time}",
+    "ui.decay_spoiled": "Spoiled",
 }
 
 type LocaleContextValue = (key: string, values?: Record<string, string | number>) => string

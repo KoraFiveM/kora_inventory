@@ -44,6 +44,17 @@ export interface InventoryItem {
     rounds?: number
     /** Ammo items only: labels of the weapons it fits (may end in a "+N more" entry). */
     fits?: string[]
+    /** Items that decay (decay.enabled): seconds of life left and 0..1 of it. Server-computed, view-only. */
+    decay?: { remaining: number; fraction: number }
+}
+
+/** Item decay presentation (Config.kora_inventory.decay). The server decides which items carry `decay`. */
+export interface DecayConfig {
+    enabled: boolean
+    /** Draw the freshness bar on the slot. */
+    showOnSlot: boolean
+    /** Bar turns --warning below this fraction of life left (and --destructive below 10%). */
+    warnBelow: number
 }
 
 export interface InventoryView {
@@ -198,6 +209,8 @@ export interface UiConfig {
     weightWarnings?: { enabled?: boolean; warnAt?: number; dangerAt?: number }
     /** Hover tooltip on filled slots (Config.kora_inventory.ui.tooltips). */
     tooltips?: boolean
+    /** Item decay presentation (Config.kora_inventory.decay). */
+    decay?: Partial<DecayConfig>
     images?: {
         /** e.g. `nui://kora_inventory/images` */
         localPath?: string

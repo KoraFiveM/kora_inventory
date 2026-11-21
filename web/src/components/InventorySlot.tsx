@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useDrag, useDragDropManager, useDrop } from "react-dnd"
 import { UiConfigContext } from "@/context"
+import { slotDecay } from "@/lib/decay"
 import { useLocale } from "@/lib/locales"
 import { SlotUiContext } from "@/slotUi"
 import type { DragSlot, SlotTarget } from "@/lib/inventory"
@@ -35,7 +36,7 @@ export interface SlotProps {
  * mouse. Unlike HTML5 DnD or source pointer-capture, it resolves the actual
  * destination slot after the cursor leaves the source element. */
 export function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, dimmed }: SlotProps) {
-    const { quickTransfer, modifierDrag, tooltips, inspectorDecimals } = useContext(UiConfigContext)
+    const { quickTransfer, modifierDrag, tooltips, inspectorDecimals, decay: decayConfig } = useContext(UiConfigContext)
     const dndManager = useDragDropManager()
     // Ctrl/Alt as they were when the gesture began; read when the drag item is built.
     const modifiers = useRef<DragSlot["modifiers"]>(undefined)
@@ -45,6 +46,8 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
     const hideTip = useCallback(() => { window.clearTimeout(tipTimer.current); setTip(undefined) }, [])
     useEffect(() => () => window.clearTimeout(tipTimer.current), [])
     const t = useLocale()
+    // Freshness bar for decaying items (server-computed `item.decay`; shops never carry it).
+    const decay = inventory.type === "shop" ? undefined : slotDecay(item, decayConfig, t)
     const slotUi = useContext(SlotUiContext)
     const flashing = slotUi.flash?.inventoryId === inventory.id && slotUi.flash.slot === index
     const target = useMemo<SlotTarget>(() => ({ inventoryId: inventory.id, slot: index }), [index, inventory.id])
@@ -159,6 +162,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
                 {inventory.type === "shop" && typeof item.price === "number" && <span className="item-price">${item.price.toLocaleString()}</span>}
             </span>
             <span className="item-amount">×{item.amount}</span>
+            {decay && <span className={`decay-bar decay-${decay.level}`} title={decay.label} role="progressbar" aria-label={decay.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(decay.fraction * 100)}><i style={{ width: `${Math.round(decay.fraction * 100)}%` }} /></span>}
             {typeof item.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, item.durability))}%` }} /></span>}
         </>}
         {tip && item && !isDragging && <SlotTooltip item={item} x={tip.x} y={tip.y} decimals={inspectorDecimals} />}
