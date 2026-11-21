@@ -58,6 +58,18 @@ local function resetShotCadence()
     lastShotAt, lastShotPed = nil, nil
 end
 
+local function clearDrawn()
+    drawn = nil
+    drawnSlot = nil
+    drawnName = nil
+    drawnThrowable = false
+end
+
+local function dropTrainingWeapon()
+    RemoveWeaponFromPed(Kora.cache.ped(), trainingWeapon)
+    trainingWeapon = nil
+end
+
 -- Damage tuning is applied as part of a confirmed inventory draw rather than
 -- in a polling loop. Reset it immediately when that weapon leaves the hand so
 -- another resource's weapon is never affected by this inventory setting.
@@ -93,10 +105,7 @@ local function reportUnequipped()
         return
     end
     clearDamageSettings()
-    drawn = nil
-    drawnSlot = nil
-    drawnName = nil
-    drawnThrowable = false
+    clearDrawn()
     resetShotCadence()
     notifyDrawnChanged()
     TriggerServerEvent('kora_inventory:server:weaponUnequipped')
@@ -115,8 +124,7 @@ local function stripDrawn(name)
     end
     clearDamageSettings()
     resetShotCadence()
-    drawn, drawnSlot, drawnName = nil, nil, nil
-    drawnThrowable = false
+    clearDrawn()
     notifyDrawnChanged()
 end
 
@@ -235,10 +243,7 @@ RegisterNetEvent('kora_inventory:client:toggleWeapon', function(request)
     if action == 'holster' then
         SetCurrentPedWeapon(ped, joaat('weapon_unarmed'), true)
         clearDamageSettings()
-        drawn = nil
-        drawnSlot = nil
-        drawnName = nil
-        drawnThrowable = false
+        clearDrawn()
         notifyDrawnChanged()
     else
         local ammo = math.max(0, math.floor(tonumber(request.ammo) or 0))
@@ -344,8 +349,7 @@ RegisterNetEvent('kora_inventory:client:stopTrainingWeapon', function()
         return
     end
     clearDamageSettings()
-    RemoveWeaponFromPed(Kora.cache.ped(), trainingWeapon)
-    trainingWeapon = nil
+    dropTrainingWeapon()
     resetShotCadence()
 end)
 
@@ -408,8 +412,7 @@ Kora.cache.onChange('isDead', function(isDead)
         resetShotCadence()
         if trainingWeapon then
             clearDamageSettings()
-            RemoveWeaponFromPed(Kora.cache.ped(), trainingWeapon)
-            trainingWeapon = nil
+            dropTrainingWeapon()
         end
     end
 end)
@@ -499,8 +502,7 @@ RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
         stripDrawn()
     end
     if trainingWeapon then
-        RemoveWeaponFromPed(Kora.cache.ped(), trainingWeapon)
-        trainingWeapon = nil
+        dropTrainingWeapon()
     end
 end)
 
@@ -515,8 +517,7 @@ AddEventHandler('onClientResourceStop', function(name)
     end
     clearDamageSettings()
     if trainingWeapon then
-        RemoveWeaponFromPed(Kora.cache.ped(), trainingWeapon)
-        trainingWeapon = nil
+        dropTrainingWeapon()
     end
 end)
 

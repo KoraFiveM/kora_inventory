@@ -127,7 +127,7 @@ AddEventHandler('onClientResourceStop', function(resource)
     end
 end)
 
-KoraInventory.shopLocationBlips(shop, Config.kora_inventory.shops.ammunation.blip.category,
+KoraInventory.shopLocationBlips(shop, 'Config.kora_inventory.shops.ammunation.blip.category',
     function() return shop.blip end,
     function()
         return {

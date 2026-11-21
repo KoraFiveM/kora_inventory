@@ -297,5 +297,3 @@ CreateThread(function()
         vehicleDoors.register()
     end
 end)
-
-return vehicleDoors
