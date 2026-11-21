@@ -48,6 +48,10 @@ server_scripts {
     'server.lua',
     'server/recovery.lua',
     'server/exchange.lua',
+    -- Two-player confirmed trade: the pure rules (no natives), then the
+    -- wiring onto the inventory authority, intents and net events.
+    'server/trade_state.lua',
+    'server/trade.lua',
     'server/crafting.lua',
     -- Weapon/consumable use handlers.  This follows crafting.lua because the
     -- ammunition loader uses its server-only per-round ballistics API.
@@ -119,6 +123,9 @@ client_scripts {
     'client/compat.lua',
     'client/compat/ox.lua',
     'client/ui.lua',
+    -- Trade request/answer prompt, /trade and its keybind; renders the
+    -- server's trade view through client/ui.lua. Intent only.
+    'client/trade.lua',
     'client/useables.lua',
     -- Renders every player's carried weapons from the server-set state bag,
     -- and plays out the draw/holster this client was asked for. It owns the

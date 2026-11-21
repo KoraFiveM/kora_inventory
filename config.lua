@@ -219,6 +219,28 @@ Config.kora_inventory = {
     -- purchase made from the inventory shop UI. The item box receipt is separate
     -- (itemBoxes.showPurchases) and does not say what was charged.
     purchaseNotify = true,
+    -- Two-sided confirmed trade window between two nearby players. A player
+    -- asks with the inventory's Trade button, /trade or the (unbound) trade
+    -- keybind; the other accepts or declines. Both then offer items and cash.
+    -- Offers are references to the items in each inventory -- nothing moves
+    -- until both players have pressed Ready, waited `confirmDelay` seconds and
+    -- pressed Confirm. Any change to either side, or to either inventory,
+    -- clears both players' Ready. The server re-checks everything (players,
+    -- distance, bucket, items, cash, room) and swaps it all at once, or
+    -- nothing at all. Read on every action, so /config changes apply at once
+    -- (an open trade is ended when `enabled` turns off). `command` is read
+    -- when the resource starts.
+    trade = {
+        enabled = true,
+        slots = 8, -- offer slots per side (1-32)
+        allowCash = true, -- each side may add cash (the cash account, or the cash item when cash.asItem is on)
+        distance = 3.0, -- metres the two players must stay within
+        requestTimeout = 20, -- seconds the other player has to answer a request
+        confirmDelay = 3, -- seconds offers are frozen after both press Ready before Confirm is accepted
+        maxDuration = 300, -- seconds a trade window may stay open before it is cancelled
+        requestCooldown = 10, -- seconds between trade requests from the same player
+        command = 'trade', -- chat command that requests a trade with the nearest player; '' for none
+    },
     -- Opening another player's inventory is denied by default. Supply a
     -- trusted server callback here (or register one at runtime) to opt into
     -- police/admin/consent rules; proximity alone is never authority.
