@@ -587,6 +587,8 @@ local presentationFields = {
     description = true,
     image = true,
     imageUrl = true,
+    -- Shown as the red "Jammed" badge (view field `jammed`), not a raw row.
+    jammed = true,
 }
 
 local function displayLabel(key)
@@ -785,6 +787,9 @@ local function viewItems(source)
 
         appendDisplayMetadata(item.displayMeta, metadata, true)
         applyAmmoInfo(item, def, metadata, ammoSettings)
+        -- View-only: a jammed weapon is flagged for the UI badge. Always
+        -- recomputed from the stored metadata, never taken from a record.
+        item.jammed = metadata.jammed == true or nil
         -- Player items can have been created by kora_core or loaded from an older
         -- persisted shape. Weapon type and the live handler table are
         -- authoritative so the UI does not hide their Use action.
@@ -3038,7 +3043,7 @@ local function setBuiltInUseable(name, handler, kind)
         builtInUseableKinds[name] = builtInUseableKinds[name] or {}
         builtInUseableKinds[name][kind] = handler
         local handlers = builtInUseableKinds[name]
-        builtInUseables[name] = handlers.weapon or handlers.ammo
+        builtInUseables[name] = handlers.weapon or handlers.ammo or handlers.upkeep
         if not builtInUseables[name] then
             builtInUseableKinds[name] = nil
         end

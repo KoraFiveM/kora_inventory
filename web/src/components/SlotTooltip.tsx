@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import { formatMetaValue } from "@/lib/format"
 import { useLocale } from "@/lib/locales"
 import type { InventoryItem } from "@/lib/types"
+import { JammedBadge } from "./JammedBadge"
 
 const MARGIN = 8
 const OFFSET = 16
@@ -28,6 +29,7 @@ export function SlotTooltip({ item, x, y, decimals }: { item: InventoryItem; x: 
                 <dt>{t("ui.amount")}</dt><dd>×{item.amount}</dd>
                 <dt>{t("ui.weight")}</dt><dd>{item.weight ?? 0} g</dd>
                 {typeof item.durability === "number" && <><dt>{t("ui.durability")}</dt><dd>{Math.round(item.durability)}%</dd></>}
+                {item.jammed === true && <><dt>{t("ui.jammed")}</dt><dd><JammedBadge item={item} /></dd></>}
                 {item.displayMeta?.map((meta, index) => <div key={index} className="slot-tooltip-row"><dt>{meta.label}</dt><dd>{formatMetaValue(meta.value, decimals)}</dd></div>)}
             </dl>
             {item.description && <p>{item.description}</p>}

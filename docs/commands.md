@@ -212,6 +212,26 @@ Press TAB
 
 Runs `/inventory`.
 
+### `Key: R (kora_inventory_clearjam)`
+
+Hold to clear a jam on the weapon in your hands. Registered through `Kora.keybind`, so it is rebindable under **Settings → Key Bindings → FiveM** ("Clear weapon jam (hold)").
+
+| Field | Details |
+| --- | --- |
+| Context | Key binding (rebindable) |
+| Arguments | No arguments. |
+| Access | Only acts while the server has told this client the drawn weapon is jammed (`weapons.jams.enabled`). Hold for about 0.6 seconds; the server then runs the `weapons.jams.clearTime` progress bar. Refused while downed or cuffed. |
+
+**Example**
+
+```text
+Hold R while a jammed weapon is drawn
+```
+
+**Result**
+
+A progress bar runs and the jam is cleared. The request carries no weapon or slot; the server clears the weapon it recorded as drawn.
+
 ## ConVars and ACEs
 
 kora_inventory reads no ConVars. The database connection comes from kora_sql (`mysql_connection_string`). The only ACE it checks itself is `command.kora_inventory` for `kora_inventory-migrate`. Evidence, player inspection, vehicle and stash access are decided by Lua callbacks, not ACEs, unless your callback checks one.
@@ -229,6 +249,7 @@ Registered through `Kora.keybind`, so players can rebind them in **Settings → 
 | `openInv` | `TAB` | Same as `/inventory`. |
 | `kora_inventory:hotbar1` ... `hotbarN` | `1` ... `5` | Use the item in that slot (`N` is `Config.kora_inventory.hotbarSlots`). Ignored while the NUI is focused or the pause menu is open. |
 | `kora_inventory:quick_<id>` | unbound | Use the item a quick slot points at, one binding per configured quick slot, under the same guards as the hotbar keys. |
+| `kora_inventory_clearjam` | `R` | Hold to clear a jam on the drawn weapon. |
 | `kora_inventory:hotbarshow` | `U` | Show the on-screen hotbar for `ui.hotbarSeconds` seconds (`0` disables the key). |
 
 ## Migration actions and permissions (from the code)

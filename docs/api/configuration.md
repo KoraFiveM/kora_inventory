@@ -270,6 +270,23 @@ Server-owned recipes, weapon metadata rules, ballistics and the visible carried-
 | `weapons.durability.multipliers` | table | Default `{}`. Per-weapon wear multipliers, for example `weapon_carbinerifle = 1.25`. |
 | `weapons.durability.excluded` | table | Default `{}`. Weapons that never wear, for example `weapon_stungun = true`. |
 | `weapons.components` | table | Default `{}`. Allow-list `weapon item name -> { component item names }` (a `default` row applies to weapons without their own). A weapon with no row accepts no components. |
+| `weapons.jams.enabled` | boolean | Default `false`. Accepted shots can jam the weapon. Live. |
+| `weapons.jams.baseChance` | number | Default `0.002`. Jam chance per accepted shot at 100 percent durability (0 to 1). Live. |
+| `weapons.jams.lowDurabilityChance` | number | Default `0.03`. Jam chance per accepted shot at or below `lowDurabilityBelow`. Live. |
+| `weapons.jams.lowDurabilityBelow` | number | Default `30`. Durability percent where the chance reaches `lowDurabilityChance`; blended linearly above it. Live. |
+| `weapons.jams.clearTime` | integer | Default `1500` ms. Server-run progress bar for clearing a jam. Live. |
+| `weapons.jams.excluded` | table | Default `{}`. Weapons that never jam, for example `weapon_revolver = true`. Melee, throwables and weapons with no `ammotype` never jam regardless. |
+| `weapons.repair.enabled` | boolean | Default `true`. Registers the kit and cleaning use handlers. Applies after a restart. |
+| `weapons.repair.maxDurability` | number | Default `100`. Ceiling for kits, cleaning and counters (never above 100). Live. |
+| `weapons.repair.kits` | table | Default `repairkit = { restore = 25, time = 4000 }`, `advancedrepairkit = { restore = 60, time = 6000 }`. Item name to durability points restored and progress bar milliseconds. Only listed names get a built-in handler. `restore` and `time` are live; adding or removing a name applies after a restart. |
+| `weapons.repair.cleaning.item` | string | Default `'cleaningkit'`. Item that cleans the drawn weapon. Applies after a restart. |
+| `weapons.repair.cleaning.clearsJam` | boolean | Default `true`. Cleaning also clears a jam. Live. |
+| `weapons.repair.cleaning.restore` | number | Default `5`. Durability points a cleaning restores. Live. |
+| `weapons.repair.cleaning.time` | integer | Default `3000` ms. Cleaning progress bar. Live. |
+| `weapons.repair.counters.enabled` | boolean | Default `false`. Repair counters. Zones are registered at start, so a change applies after a restart. |
+| `weapons.repair.counters.pricePerPoint` | number | Default `15`. Price per missing durability point, rounded up. Live. |
+| `weapons.repair.counters.account` | string | Default `'cash'`. `'cash'` or `'bank'` (anything else is treated as cash). Live. |
+| `weapons.repair.counters.locations` | table | Default `{}`. List of `{ coords = vec3(x, y, z), distance = 2.5, bucket = 0, label = 'Weapon repairs' }`. Edited in `config.lua` only. A commented example sits beside the Ammu-Nation coordinates. |
 | `weaponCarry.enabled` | boolean | Default `true`. Render owned, undrawn weapons on the body for every nearby client. Presentation and pacing only. |
 | `weaponCarry.visibility` | string | Default `'hotbar'`. `'all'` renders every carryable weapon; `'hotbar'` only slots 1..hotbarSlots. |
 | `weaponCarry.drawTime` | integer | Default `900` ms. Draw duration; `0` restores instant toggling and skips the animation. |

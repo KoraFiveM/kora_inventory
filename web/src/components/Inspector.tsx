@@ -7,6 +7,7 @@ import { useLocale } from "@/lib/locales"
 import type { Selection } from "@/lib/inventory"
 import type { InventoryItem, InventoryView } from "@/lib/types"
 import { ItemArtwork } from "./ItemArtwork"
+import { JammedBadge } from "./JammedBadge"
 
 export interface InspectorProps {
     /** The selection after the search filter; undefined renders the empty state. */
@@ -43,7 +44,7 @@ export function Inspector({ inspected, selected, solo, playerId, movePending, gi
                 {inspected ? <>
                 <ItemArtwork item={inspected.item} className="detail-art" />
                 <p className="eyebrow">{inspected.inventory.type === "shop" ? t("ui.shop_item") : t("ui.slot_number", { slot: inspected.item.slot })}</p>
-                <h1>{inspected.item.label ?? inspected.item.name}</h1>
+                <h1>{inspected.item.label ?? inspected.item.name}<JammedBadge item={inspected.item} className="jammed-badge-detail" /></h1>
                 <p>{inspected.item.description ?? t("ui.no_item_description")}</p>
                 <dl><dt>{t("ui.amount")}</dt><dd>×{inspected.item.amount}</dd><dt>{t("ui.weight")}</dt><dd>{inspected.item.weight ?? 0} g</dd>{inspected.item.displayMeta?.map((meta, index) => <Fragment key={index}><dt>{meta.label}</dt><dd>{formatMetaValue(meta.value, inspectorDecimals)}</dd></Fragment>)}{inspected.inventory.type === "shop" && <><dt>{t("ui.price")}</dt><dd>${(inspected.item.price ?? 0).toLocaleString()}</dd></>}</dl>
                 {inspected.inventory.type === "shop" ? <div className="amount-action">

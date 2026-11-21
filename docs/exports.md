@@ -74,7 +74,7 @@ Details: [Shops](./api/shops.md), [Stashes and drops](./api/stashes.md).
 
 ## Crafting and weapons (server)
 
-`RegisterCraftRecipe`, `RemoveCraftRecipe`, `GetCraftRecipe`, `CanCraftRecipe`, `CanCraftItems`, `CraftItem`, `RegisterCraftHook`, `RemoveCraftHook` (see [Crafting](./api/crafting.md)); `PrepareWeaponMetadata`, `GetWeaponState`, `SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, `SetWeaponComponents`, `LoadWeaponRounds`, `FireWeaponRound`, `GetCarriedWeapons`, `GetEquippedWeapon`, `StartTrainingWeapon`, `StopTrainingWeapon` (see [Weapons](./api/weapons.md)).
+`RegisterCraftRecipe`, `RemoveCraftRecipe`, `GetCraftRecipe`, `CanCraftRecipe`, `CanCraftItems`, `CraftItem`, `RegisterCraftHook`, `RemoveCraftHook` (see [Crafting](./api/crafting.md)); `PrepareWeaponMetadata`, `GetWeaponState`, `SetWeaponState`, `ConsumeWeaponDurability`, `SetWeaponAmmo`, `SetWeaponComponents`, `LoadWeaponRounds`, `FireWeaponRound`, `GetCarriedWeapons`, `GetEquippedWeapon`, `StartTrainingWeapon`, `StopTrainingWeapon`, `repairWeaponAt` (see [Weapons](./api/weapons.md)).
 
 ## Exchanges and items (server)
 

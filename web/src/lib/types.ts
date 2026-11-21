@@ -24,6 +24,8 @@ export interface InventoryItem {
     info?: Record<string, unknown>
     displayMeta?: Array<{ key: string; label: string; value: unknown }>
     durability?: number
+    /** Weapons only: the server marked this weapon jammed (weapons.jams). View-only, never sent by the browser. */
+    jammed?: boolean
     price?: number
     stack?: boolean
     /** Instance-unique items (weapons, serialled items) never stack. */

@@ -59,6 +59,9 @@ server_scripts {
     -- whose weapon handler delegates to it at call time, and after
     -- crafting.lua so weapon metadata rules are already in place.
     'server/weaponcarry.lua',
+    -- Weapon jams, repair kits, cleaning and repair counters. Acts on the
+    -- weapon weaponcarry.lua records as drawn, so it loads after it.
+    'server/weapon_upkeep.lua',
     -- Narrow adapter for the legacy qb-weapons event/callback names.  This
     -- comes after the authoritative weapon modules so it can resolve slots,
     -- ammunition and durability from kora_inventory state rather than trusting
@@ -124,6 +127,9 @@ client_scripts {
     -- and plays out the draw/holster this client was asked for. It owns the
     -- weapon half of the old client/useables.lua toggle.
     'client/weaponcarry.lua',
+    -- Jam blocking/clear key, upkeep progress bar and repair counter targets.
+    -- Presentation and intents only; see the file header.
+    'client/weapon_upkeep.lua',
     -- Legacy qb-weapons client events, translated into the server-owned
     -- kora_inventory weapon lifecycle above.
     'client/compat/qb_weapons.lua',
