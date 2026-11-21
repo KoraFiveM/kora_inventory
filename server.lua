@@ -4667,9 +4667,6 @@ inventory.internal = {
     end,
     notifyBusyBlocked = notifyBusyBlocked,
     busyError = BUSY_ERROR,
-    validSession = validSession,
-    recordAudit = recordAudit,
-    showItemBox = showItemBox,
     sameDropBucket = sameDropBucket,
     hasUseable = hasUseable,
     setBuiltInUseable = setBuiltInUseable,
@@ -4705,11 +4702,8 @@ inventory.internal = {
     persistence = inventory.persistence,
 }
 
--- Hooks for server/decay.lua (lazy expiry + sweep). Kept out of the table
--- literal above so they do not collide with other additions to it.
-inventory.internal.recordAudit = recordAudit
-inventory.internal.showItemBox = showItemBox
-inventory.internal.playerSetPath = playerSetPath
+-- Hook for server/decay.lua (lazy expiry + sweep); recordAudit, showItemBox
+-- and playerSetPath are already in the table literal above.
 inventory.internal.removeEmptyDrop = removeEmptyDrop
 
 -- The schema event precedes yielding restoreAll. Consumers that depend on
