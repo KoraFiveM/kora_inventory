@@ -45,7 +45,7 @@ When `Config.kora_inventory.weapons.ammoInfo.enabled` is on, views (including sh
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice, quickTransfer, modifierDrag, quickAmounts, filters, tooltips, weightWarnings }`, derived from `Config.kora_inventory.ui`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. Pushed on resource start and on every session open. |
+| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, rightClick, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice, quickTransfer, modifierDrag, quickAmounts, filters, tooltips, weightWarnings }`, derived from `Config.kora_inventory.ui`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. Pushed on resource start and on every session open. |
 | `kora_inventory:nui:layout` | table | The player's window placement from kora_hud's `/ui` editor: `{ x, y, scale, placed, playerSide, useForTransfer, layout? }`. Offsets and scale are clamped. `layout` is the player's chosen inventory layout, one of `classic`, `loadout`, `compact`, `dock`; any other value is dropped, and the page also checks it against the allowed set. Pushed when the editor applies or resets the layout and on every session open. |
 | `kora_inventory:nui:locales` | table | Flat key/value map for the React UI, resolved on the client with `Kora.lang()` from `locales/en.lua`. Pushed two seconds after the client resource starts so the page's message listener is ready. |
 | `kora_inventory:nui:sessionOpened` | table | `{ sessionId, token, revision, secondaryRevision, player, secondary?, expires }`. `player` and `secondary` are views `{ id (the inventory key), key, type, label, slots, maxWeight, weight, revision, items, stock? }`. |
@@ -195,7 +195,8 @@ The only config sent to the browser (`kora_inventory:nui:config`, at start and o
 | `layout` | `'classic'` | Server default layout: `classic`, `loadout`, `compact` or `dock`. Unknown values are sent as `classic`. |
 | `layouts` | all `true` | Which layouts may be used. Sent as booleans only; if none is enabled, `classic` stays enabled. |
 | `playerLayoutChoice` | `true` | Add an "Inventory layout" select to the `/ui` editor and honour the player's choice. Needs `playerLayout` and `kora_hud`. |
-| `rightClickSplit` | `true` | Right-click on a stack of two or more opens the split dialog. |
+| `rightClickSplit` | `true` | Legacy boolean for `rightClick`: `true` is `split`, `false` is `none`. Only used when `rightClick` is absent or invalid. |
+| `rightClick` | `'split'` | `split` (the split dialog on a stack of two or more), `menu` (the item context menu, see below) or `none`. Invalid values fall back to `rightClickSplit`. |
 | `quickTransfer` | `true` | Shift+click moves a whole stack to the other open inventory (a buy of one from a shop). |
 | `modifierDrag` | `true` | Ctrl+drag moves half a stack, Alt+drag moves one. |
 | `quickAmounts` | `true` | Preset amount buttons beside the inspector's amount slider. |
@@ -210,6 +211,45 @@ The only config sent to the browser (`kora_inventory:nui:config`, at start and o
 | `images` | see [Items](./items.md) | Artwork resolution. |
 
 `hotbarSlots` is sent alongside so the outline and the keys cannot disagree. Top-level `Config.Inspector`, `Config.Slots` and `Config.Hotbar` also style the UI. The inspector's text is selectable only when `Config.Inspector.allowCopy` is true; its Copy button copies the item as JSON.
+
+### Weapon and ammo highlight
+
+When `ammoInfo.enabled` is on and the selected item is a weapon with an `ammo.type`, every slot (in the player and the secondary inventory) holding ammo whose `ammoType` is the same gets the `slot-compatible` class, a subtle ring in the accent colour. Selecting an ammo item highlights the weapons whose `ammo.type` matches its `ammoType`. Two weapons, two ammo items and unrelated items are never highlighted. The match is pure view logic over the server-computed fields; it changes nothing.
+
+### Right-click item menu
+
+With `ui.rightClick = 'menu'`, right-clicking an item opens a small menu at the cursor instead of the split dialog. It is clamped to stay on screen and closes on Escape (which does not close the inventory), on a click outside it, and whenever the server patches the session. It lists only the entries that apply to the item:
+
+| Entry | Shown when |
+| --- | --- |
+| Use | The item is useable (or a container) and in the player's inventory. |
+| Split | The stack has 2 or more and is not in a shop. Opens the normal split dialog. |
+| Drop | The item is in the player's inventory. Drops the whole stack, like dragging it out of the window. |
+| Give | As Drop, and only while a player to give to is available. Gives the whole stack. |
+| Ammo info | The item has `ammo` or `ammoType`, `ammoInfo.enabled` is on and `ammoInfo.where` is `menu` or `both`. Shows what a weapon takes and has loaded, or an ammo item's type, rounds per item and the weapons it fits (each row follows `showLoaded` and `showCompatible`). |
+| Copy | `Config.Inspector.allowCopy` is on. |
+
+Every entry sends the same intent the inspector buttons send; the server validates it exactly as before.
+
+### Quick slots in the page
+
+Quick slots are shortcuts to real items in the player's inventory, never slots of their own. The Lua client sends `kora_inventory:nui:quickSlots` with `{ enabled, hideWhenMissing, showKeyHints, slots }`, where each slot is `{ id, label, slot, name, total, pinned, key, linked }`. `slot` is the real player slot the shortcut points at (null when unresolved), `total` is set for linked ammo, `key` is the bound key label or an empty string, and `linked` marks the ammo slot, which cannot be pinned. A message with `enabled = false` hides everything.
+
+The page draws a strip next to the player's grid (a vertical strip in the classic layout, including the compact personal view and the transfer view). Each tile shows the real item's artwork, the quick slot label, the stack amount (or the ammo total), a key badge when `showKeyHints` is on and a key is bound, and a pin icon when pinned. A tile whose slot is empty, or now holds a different item than `name`, counts as missing. With `hideWhenMissing` (default) missing tiles are not drawn and the whole strip disappears when none is left; otherwise they are greyed placeholders with the label.
+
+| Gesture | Result |
+| --- | --- |
+| Click a tile | Selects the real item, like clicking its slot, and pulses that slot in the grid (`slot-flash`). |
+| Double-click a tile | Uses the real item. |
+| Drag from a tile | Drags the real item: drop it on a grid slot to move it, or outside the window to drop it. |
+| Drag an item from the player's inventory onto a tile | Pins that item with the `kora_inventory:pinQuickSlot` callback. Linked (ammo) tiles refuse the drop. |
+| Right-click a pinned tile | Unpins it. |
+
+Tiles respect the same busy state as the grid. A failed pin shows the refusal in the notice bar.
+
+`kora_inventory:pinQuickSlot` receives `{ id, slot }` (`slot` null or 0 unpins) and answers `{ ok = true }` or `{ ok = false, error }`. Pins are a local display preference stored by the client; they are not sent to the server and never change inventory data.
+
+The on-screen hotbar payload (`kora_inventory:nui:hotbar`) may carry `quick`, a list of `{ id, slotLabel, slot, name, label, amount, total, key, pinned, image, imageUrl }`. The page draws these after the numbered slots, behind a divider, with their key hint; a payload without `quick` renders as before.
 
 ### Layouts
 

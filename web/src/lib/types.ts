@@ -36,6 +36,14 @@ export interface InventoryItem {
     useTime?: number
     /** When true, using this item leaves the inventory panel open. */
     preventClose?: boolean
+    /** Weapons only (weapons.ammoInfo): the ammunition it takes and what is loaded. View-only. */
+    ammo?: { type: string; item: string; label: string; loaded?: number }
+    /** Ammo items only: the ammo type; matches a weapon's `ammo.type`. */
+    ammoType?: string
+    /** Ammo items only: rounds one item holds. */
+    rounds?: number
+    /** Ammo items only: labels of the weapons it fits (may end in a "+N more" entry). */
+    fits?: string[]
 }
 
 export interface InventoryView {
@@ -94,6 +102,50 @@ export interface ItemBoxReceipt {
     duration?: number
 }
 
+export type RightClickMode = "split" | "menu" | "none"
+
+export interface AmmoInfoConfig {
+    enabled: boolean
+    where: "inspector" | "menu" | "both"
+    showLoaded: boolean
+    showCompatible: boolean
+}
+
+/** One resolved quick slot from `kora_inventory:nui:quickSlots`. */
+export interface QuickSlotEntry {
+    id: string
+    label: string
+    /** The real player inventory slot this shortcut points at; null = unresolved. */
+    slot: number | null
+    name?: string | null
+    /** Linked ammo: total rounds/magazines of that ammo across the inventory. */
+    total?: number | null
+    pinned?: boolean
+    key?: string
+    /** Linked slots follow another quick slot and cannot be pinned. */
+    linked?: boolean
+}
+
+export interface QuickSlotsMessage {
+    enabled?: boolean
+    hideWhenMissing?: boolean
+    showKeyHints?: boolean
+    slots?: QuickSlotEntry[]
+}
+
+/** The `quick` entries of `kora_inventory:nui:hotbar`. */
+export interface HotbarQuickEntry {
+    id?: string
+    label?: string
+    slotLabel?: string
+    slot?: number
+    name?: string
+    amount?: number
+    image?: string
+    imageUrl?: string
+    key?: string
+}
+
 /**
  * The presentation half of `Config.kora_inventory`, pushed on
  * `kora_inventory:nui:config`. Everything here is a rendering choice -- nothing in
@@ -108,8 +160,12 @@ export interface UiConfig {
     showHotbar?: boolean
     /** Size multiplier for text and slots (Config.kora_inventory.ui.scale), 1 = default. */
     scale?: number
-    /** Right-clicking a stack opens the split dialog (Config.kora_inventory.ui.rightClickSplit). */
+    /** Right-clicking a stack opens the split dialog (legacy form of `rightClick`; Config.kora_inventory.ui.rightClickSplit). */
     rightClickSplit?: boolean
+    /** What right-click does: split dialog, a context menu, or nothing (Config.kora_inventory.ui.rightClick). */
+    rightClick?: RightClickMode
+    /** Weapon/ammo compatibility presentation hints (Config.kora_inventory.weapons.ammoInfo). */
+    ammoInfo?: Partial<AmmoInfoConfig>
     /** Paint a move before the server answers and roll back if refused (Config.kora_inventory.ui.optimisticMoves). */
     optimisticMoves?: boolean
     /** Queue drags made while a move is pending instead of refusing them (Config.kora_inventory.ui.queueMoves). */

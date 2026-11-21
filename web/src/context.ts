@@ -1,5 +1,6 @@
 import { createContext } from "react"
-import type { UiConfig } from "@/lib/types"
+import { DEFAULT_AMMO_INFO } from "@/lib/ammo"
+import type { AmmoInfoConfig, RightClickMode, UiConfig } from "@/lib/types"
 
 /**
  * Presentation config from `Config.kora_inventory.ui`, pushed on
@@ -9,11 +10,14 @@ import type { UiConfig } from "@/lib/types"
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]> } = {
+export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
     rightClickSplit: true,
+    // Split dialog by default; `menu` and `none` come from ui.rightClick.
+    rightClick: "split",
+    ammoInfo: DEFAULT_AMMO_INFO,
     optimisticMoves: true,
     queueMoves: true,
     directTransport: true,

@@ -325,6 +325,16 @@ Config.kora_inventory = {
         -- Applied the next time the inventory opens.
         rightClickSplit = true,
 
+        -- What right-clicking an item does (this replaces rightClickSplit,
+        -- which is only read when `rightClick` is absent or invalid):
+        --   'split' - the split dialog described above (default)
+        --   'menu'  - a small context menu at the cursor with Use, Split,
+        --             Drop, Give, Ammo info (see weapons.ammoInfo) and Copy,
+        --             showing only what applies to that item
+        --   'none'  - right-click does nothing
+        -- Applied the next time the inventory opens.
+        rightClick = 'split',
+
         -- Quality-of-life presentation flags. Browser-only: the server still
         -- validates every resulting move. Applied the next time the inventory opens.
         -- Shift+click moves a whole stack to the other open inventory.

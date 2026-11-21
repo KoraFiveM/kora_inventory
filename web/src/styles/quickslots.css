@@ -1,0 +1,70 @@
+/*
+ * Quick slots, the right-click item menu, weapon/ammo highlight and the quick
+ * entries of the hotbar HUD. Colours come from the kora_theme tokens only.
+ * Kept out of styles.css so layout work can change that file independently.
+ */
+
+/* --- player stage: grid beside a quick-slot strip --- */
+.inventory-stage-player { grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; }
+.inventory-stage-player > .quickslot-bar-side { margin-left: 8px; }
+
+/* --- the bar --- */
+.quickslot-bar { display: flex; gap: 6px; min-width: 0; min-height: 0; }
+.quickslot-bar-side { flex-direction: column; align-self: start; max-height: 100%; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.quickslot-bar-side::-webkit-scrollbar { display: none; }
+.quickslot-bar-top, .quickslot-bar-bottom { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+.quickslot-bar-top { margin-bottom: 8px; }
+.quickslot-bar-bottom { margin-top: 8px; }
+
+/* --- a tile --- */
+.quickslot {
+  position: relative; box-sizing: border-box; flex: none; display: grid; grid-template-rows: minmax(0, 1fr) auto; place-items: center;
+  width: calc(58px * var(--ui-scale, 1)); height: calc(58px * var(--ui-scale, 1)); padding: 4px; overflow: hidden;
+  border: var(--slot-border-width, 1px) solid hsl(var(--border)); border-radius: 9px;
+  color: hsl(var(--muted-foreground)); background: linear-gradient(145deg, hsl(var(--background)), hsl(var(--card)));
+  cursor: pointer; font: inherit; touch-action: none; -webkit-user-select: none; user-select: none;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.quickslot:hover, .quickslot:focus-visible { outline: 0; border-color: hsl(var(--brand-border)); background: hsl(var(--surface-hover)); }
+.quickslot-filled { cursor: grab; color: hsl(var(--foreground)); }
+.quickslot-empty { cursor: default; opacity: .5; border-style: dashed; }
+.quickslot-empty:hover { border-color: hsl(var(--border)); background: linear-gradient(145deg, hsl(var(--background)), hsl(var(--card))); }
+.quickslot-selected, .quickslot-selected:hover { border-color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.quickslot-drag-source { opacity: .45; }
+.quickslot-drop-target { border-color: hsl(var(--primary)); background: hsl(var(--primary) / .1); }
+.quickslot-drop-invalid { border-color: hsl(var(--danger) / .75); background: hsl(var(--destructive-soft)); }
+
+.quickslot-art { display: grid; place-items: center; width: calc(28px * var(--ui-scale, 1)); height: calc(28px * var(--ui-scale, 1)); overflow: hidden; border-radius: 5px; color: hsl(var(--primary)); font-weight: 800; background: hsl(var(--brand-soft)); }
+.quickslot-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.quickslot-art-empty { background: hsl(var(--muted)); }
+.quickslot-label { max-width: 100%; overflow: hidden; font-size: calc(8px * var(--ui-scale, 1)); font-weight: 750; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.quickslot-count { position: absolute; top: 2px; right: 3px; padding: 0 3px; border: 1px solid hsl(var(--border-strong)); border-radius: 5px; color: hsl(var(--foreground)); background: hsl(var(--background) / .94); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 800; line-height: calc(13px * var(--ui-scale, 1)); font-variant-numeric: tabular-nums; }
+.quickslot-key { position: absolute; top: 2px; left: 3px; padding: 0 3px; border: 1px solid hsl(var(--brand-border)); border-radius: 4px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); font: inherit; font-size: calc(8px * var(--ui-scale, 1)); font-weight: 800; line-height: calc(12px * var(--ui-scale, 1)); }
+.quickslot-pin { position: absolute; right: 3px; bottom: 3px; color: hsl(var(--primary)); }
+
+/* --- the real slot pulses when its quick slot is clicked --- */
+@keyframes slot-flash-a { 0% { outline-color: hsl(var(--primary)); } 100% { outline-color: hsl(var(--primary) / 0); } }
+@keyframes slot-flash-b { 0% { outline-color: hsl(var(--primary)); } 100% { outline-color: hsl(var(--primary) / 0); } }
+.slot-flash { outline: 3px solid hsl(var(--primary)); outline-offset: -3px; }
+.slot-flash-0 { animation: slot-flash-a 900ms ease-out both; }
+.slot-flash-1 { animation: slot-flash-b 900ms ease-out both; }
+
+/* --- the other half of the selected weapon/ammo pair --- */
+.slot-compatible { outline: 2px solid hsl(var(--primary) / .6); outline-offset: -2px; }
+.slot-compatible:not(.slot-selected) { background: linear-gradient(145deg, hsl(var(--brand-soft)), hsl(var(--card))); }
+
+/* --- right-click item menu (portal on body, so no root scale transform) --- */
+.item-menu { position: fixed; z-index: 1300; box-sizing: border-box; min-width: 150px; max-width: 260px; display: grid; gap: 2px; padding: 4px; border: 1px solid hsl(var(--border-strong)); border-radius: 10px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); box-shadow: var(--shadow-floating); font-size: 13px; animation: item-menu-in 100ms ease-out both; }
+@keyframes item-menu-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+.item-menu-title { overflow: hidden; padding: 4px 8px 6px; border-bottom: 1px solid hsl(var(--border) / .85); color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.item-menu-entry { display: block; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.item-menu-entry:hover:not(:disabled), .item-menu-entry:focus-visible { outline: 0; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.item-menu-entry:disabled { color: hsl(var(--muted-foreground)); cursor: default; opacity: .6; }
+.item-menu-ammo { display: grid; gap: 4px; margin: 0; padding: 6px 8px 4px; }
+.item-menu-ammo div { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+.item-menu-ammo dt { color: hsl(var(--muted-foreground)); }
+.item-menu-ammo dd { margin: 0; overflow-wrap: anywhere; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* --- hotbar HUD: quick slots after the numbered slots --- */
+.hotbar-divider { align-self: stretch; width: 1px; margin: 4px 2px; border-radius: 1px; background: hsl(var(--border-strong)); }
+.hotbar-slot-quick kbd { padding: 0 3px; border: 1px solid hsl(var(--brand-border)); border-radius: 4px; background: hsl(var(--brand-soft)); }

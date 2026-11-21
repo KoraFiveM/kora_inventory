@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DEFAULT_UI_CONFIG, type ResolvedUiConfig } from "@/context"
 import type { ActiveItemBox } from "@/components/ItemBoxStack"
-import type { HotbarState } from "@/components/HotbarHud"
-import { closeSession, sendIntent } from "@/lib/nui"
+import { sanitizeHotbarQuick, type HotbarState } from "@/components/HotbarHud"
+import type { MenuTarget } from "@/components/ItemContextMenu"
+import { closeSession, pinQuickSlot, sendIntent } from "@/lib/nui"
 import { applyPatch, findInventory, findItem, type DragSlot, type Selection, type SlotTarget } from "@/lib/inventory"
 import { isLayoutId } from "@/lib/layoutIds"
-import type { InventoryItem, InventoryView, ItemBoxReceipt, SessionPatch, SessionSnapshot, UiConfig } from "@/lib/types"
+import type { HotbarQuickEntry, InventoryItem, InventoryView, ItemBoxReceipt, QuickSlotsMessage, SessionPatch, SessionSnapshot, UiConfig } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 import { predictBuy, predictMove, refreshedInventories, restoreInventories, type Prediction } from "@/lib/optimistic"
 import { createIntentResults } from "@/lib/intentResults"
@@ -14,6 +15,10 @@ import { useLocale } from "@/lib/locales"
 import { modifierDragAmount } from "@/lib/modifierDrag"
 import { pickTransferSlot } from "@/lib/quickTransfer"
 import { copyText, itemCopyText } from "@/lib/clipboard"
+import { clampGiveAmount } from "@/lib/giveAmount"
+import { isAmmoCompatible, mergeAmmoInfo, resolveRightClick } from "@/lib/ammo"
+import { EMPTY_QUICK_SLOTS, normalizeQuickSlots, type QuickSlotsState } from "@/lib/quickSlots"
+import type { SlotUi } from "@/slotUi"
 
 // Drags that may wait behind an unanswered request before further ones are refused.
 const MAX_QUEUED_MOVES = 8
@@ -52,6 +57,12 @@ export function useInventorySession() {
     const [splitTarget, setSplitTarget] = useState<Selection | undefined>()
     const [uiConfig, setUiConfig] = useState(DEFAULT_UI_CONFIG)
     const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
+    const [quickSlots, setQuickSlots] = useState<QuickSlotsState>(EMPTY_QUICK_SLOTS)
+    // A real player slot to pulse after a quick slot click; the nonce lets the same slot flash again.
+    const [flash, setFlash] = useState<SlotUi["flash"]>()
+    const flashNonce = useRef(0)
+    const flashTimeout = useRef<number>()
+    const [menu, setMenu] = useState<MenuTarget | undefined>()
     // With instant moves the inventory never locks behind the server: a drag made
     // while a move is in flight is queued and sent when that move settles.
     const unlocked = uiConfig.optimisticMoves && uiConfig.queueMoves
@@ -126,6 +137,8 @@ export function useInventorySession() {
             centreWhenSolo: config.centreWhenSolo ?? current.centreWhenSolo,
             showHotbar: config.showHotbar ?? current.showHotbar,
             rightClickSplit: config.rightClickSplit ?? current.rightClickSplit,
+            rightClick: resolveRightClick(config, current.rightClick),
+            ammoInfo: mergeAmmoInfo(current.ammoInfo, config.ammoInfo),
             optimisticMoves: config.optimisticMoves ?? current.optimisticMoves,
             queueMoves: config.queueMoves ?? current.queueMoves,
             directTransport: config.directTransport ?? current.directTransport,
@@ -145,12 +158,13 @@ export function useInventorySession() {
             weightWarnings: mergeWeightWarnings(current.weightWarnings, config.weightWarnings),
         }))
     })
-    useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom }) => {
+    useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number; quick?: HotbarQuickEntry[] }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom, quick }) => {
         if (!Array.isArray(slots) || !(Number(seconds) > 0)) return
         window.clearTimeout(hotbarTimeout.current)
-        setHotbar({ id: Date.now(), slots, bottom: Number.isFinite(bottom) ? Number(bottom) : undefined })
+        setHotbar({ id: Date.now(), slots, bottom: Number.isFinite(bottom) ? Number(bottom) : undefined, quick: sanitizeHotbarQuick(quick) })
         hotbarTimeout.current = window.setTimeout(() => setHotbar(null), Number(seconds) * 1000)
     })
+    useNuiEvent<QuickSlotsMessage>("kora_inventory:nui:quickSlots", (data) => setQuickSlots(normalizeQuickSlots(data)))
     useNuiEvent<{ bottom?: number }>("kora_inventory:nui:hotbarPosition", ({ bottom }) => {
         if (!Number.isFinite(bottom)) return
         setHotbar((current) => current ? { ...current, bottom: Number(bottom) } : current)
@@ -167,6 +181,7 @@ export function useInventorySession() {
             : [patch.player?.id ?? "", patch.secondary?.id ?? ""])
         updateSession((current) => current && current.sessionId === patch.sessionId ? applyPatch(current, patch) : current)
         setSelected(undefined)
+        setMenu(undefined)
     })
     useNuiEvent<{ sessionId: string; reason?: string }>("kora_inventory:nui:sessionClosed", ({ sessionId }) => {
         clearPendingMove()
@@ -352,10 +367,16 @@ export function useInventorySession() {
         if (!emptySlot) { setError(t("ui.no_empty_slot")); return }
         move(inventory.id, item.slot, inventory.id, emptySlot, amount)
     }, [move, selectedCount, session, t])
-    const promptSplit = useCallback((inventory: InventoryView, item: InventoryItem) => {
-        if (!uiConfig.rightClickSplit || inventory.type === "shop" || item.amount < 2) return
+    // The split dialog itself, whichever gesture asked for it (right-click or the menu's Split).
+    const openSplit = useCallback((inventory: InventoryView, item: InventoryItem) => {
+        if (inventory.type === "shop" || item.amount < 2) return
         setSplitTarget({ inventory, item })
-    }, [uiConfig.rightClickSplit])
+    }, [])
+    // Right-click in `split` mode. `menu` mode never reaches this (the slot opens the menu) and `none` does nothing.
+    const promptSplit = useCallback((inventory: InventoryView, item: InventoryItem) => {
+        if (uiConfig.rightClick !== "split") return
+        openSplit(inventory, item)
+    }, [openSplit, uiConfig.rightClick])
     const confirmSplit = useCallback((amount: number) => {
         const target = splitTarget
         setSplitTarget(undefined)
@@ -366,7 +387,7 @@ export function useInventorySession() {
     }, [split, splitTarget])
     // The dialog never outlives its session, and any server patch dismisses it
     // so it can never act on a stack that changed underneath it.
-    useEffect(() => { setSplitTarget(undefined) }, [session?.sessionId, session?.revision, session?.secondaryRevision])
+    useEffect(() => { setSplitTarget(undefined); setMenu(undefined) }, [session?.sessionId, session?.revision, session?.secondaryRevision])
 
     const use = useCallback((inventory: InventoryView, item: InventoryItem) => {
         if (inventory.id !== session?.player.id) { setError(t("ui.use_player_item_only")); return }
@@ -389,18 +410,47 @@ export function useInventorySession() {
         if (inventory.type === "shop") buy(inventory, item)
         else use(inventory, item)
     }, [buy, use])
+    const openMenu = useCallback((point: { x: number; y: number }, inventory: InventoryView, item: InventoryItem) => {
+        if (locked) return
+        setMenu({ ...point, inventory, item })
+    }, [locked])
+    const closeMenu = useCallback(() => setMenu(undefined), [])
+    // Menu actions send the whole stack, like dragging it out of the window or onto a player.
+    const dropItem = useCallback((inventory: InventoryView, item: InventoryItem) => {
+        if (inventory.id !== session?.player.id) return
+        submit("drop", { inventory: inventory.id, slot: item.slot, amount: item.amount })
+    }, [session?.player.id, submit])
+    const giveItem = useCallback((inventory: InventoryView, item: InventoryItem) => {
+        if (inventory.id !== session?.player.id) return
+        submit("give", { inventory: inventory.id, slot: item.slot, amount: clampGiveAmount(item.amount, item.amount) })
+    }, [session?.player.id, submit])
+    const copyItem = useCallback((inventory: InventoryView, item: InventoryItem) => { void copyText(itemCopyText(inventory, item)) }, [])
+    // Quick slots: pins are a local preference answered by the Lua client; the
+    // refreshed `quickSlots` message is what changes the bar.
+    const pinQuick = useCallback((id: string, slot: number | null) => {
+        void pinQuickSlot(id, slot).then((result) => { if (!result.ok) setError(result.error ?? t("ui.quick_slot_pin_failed")) })
+    }, [t])
+    const flashSlot = useCallback((slot: number) => {
+        const inventoryId = sessionRef.current?.player.id
+        if (!inventoryId) return
+        window.clearTimeout(flashTimeout.current)
+        setFlash({ inventoryId, slot, nonce: ++flashNonce.current })
+        flashTimeout.current = window.setTimeout(() => setFlash(undefined), 900)
+    }, [])
+    useEffect(() => () => window.clearTimeout(flashTimeout.current), [])
     const activateSelected = useCallback((selection: Selection) => activateItem(selection.inventory, selection.item), [activateItem])
     const close = useCallback(() => { if (session) void closeSession(session.sessionId, session.token) }, [session])
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.key === "Escape" && splitTarget) { setSplitTarget(undefined); return }
+            if (event.key === "Escape" && menu) return
             if (event.key === "Escape" || event.key === "Tab") close()
             if (event.key === "Enter" && selected && !locked && !movePending) activateSelected(selected)
         }
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
-    }, [activateSelected, close, locked, movePending, selected, splitTarget])
+    }, [activateSelected, close, locked, menu, movePending, selected, splitTarget])
 
     // A refusal notice is information, not a state: let it go once it has been read.
     useEffect(() => {
@@ -436,7 +486,18 @@ export function useInventorySession() {
         setCopyState(await copyText(itemCopyText(selection.inventory, selection.item)) ? "copied" : "failed")
     }, [])
 
+    // What every slot needs beyond its own props: the flash, the weapon/ammo ring for the selection, the menu.
+    const slotUi = useMemo<SlotUi>(() => {
+        const wanted = uiConfig.ammoInfo.enabled ? selected?.item : undefined
+        return {
+            flash,
+            isCompatible: (item) => Boolean(wanted && item && isAmmoCompatible(wanted, item)),
+            openMenu: uiConfig.rightClick === "menu" ? openMenu : undefined,
+        }
+    }, [flash, openMenu, selected, uiConfig.ammoInfo.enabled, uiConfig.rightClick])
+
     return {
+        slotUi, quickSlots, pinQuick, flashSlot, menu, closeMenu, dropItem, giveItem, copyItem, openSplit,
         session, uiConfig, selected, inspected, solo, locked, movePending, error, giveAvailable,
         query, setQuery, itemBoxes, hotbar,
         selectedMax, selectedCount, setSelectedAmount, copyState, copySelected,

@@ -144,7 +144,8 @@ The only settings that cross into the browser. Nothing here is authority. Most a
 | `ui.showHotbar` | boolean | Default `true`. Outline slots `1..hotbarSlots` in the accent colour inside the panel. |
 | `ui.hotbarSeconds` | number | Default `5`. Seconds the on-screen hotbar stays visible after the U key. `0` disables the key (live-editable, 0 to 30). |
 | `ui.scale` | number | Default `1.0`. Size multiplier for text, slots and counts, clamped 0.5 to 2.0. |
-| `ui.rightClickSplit` | boolean | Default `true`. Right-click on a stack of 2+ opens the split dialog; `false` makes right-click do nothing. |
+| `ui.rightClickSplit` | boolean | Legacy form of `ui.rightClick`, default `true`. Only read when `ui.rightClick` is absent or invalid: `true` means `split`, `false` means `none`. |
+| `ui.rightClick` | string | Default `split`. What right-clicking an item does: `split` opens the split dialog for a stack of 2+ (the original behaviour), `menu` opens a small context menu at the cursor, `none` does nothing. Any other value falls back to `rightClickSplit`. Applied the next time the inventory opens. |
 | `ui.quickTransfer` | boolean | Default `true`. Shift+click on a filled slot moves the whole stack to the other open inventory (stackable stack first, else first empty slot). From a shop it buys one. Never targets a shop. |
 | `ui.modifierDrag` | boolean | Default `true`. Ctrl+drag moves half the stack (rounded down, at least 1); Alt+drag moves one. |
 | `ui.quickAmounts` | boolean | Default `true`. Preset amount buttons (1, 5, 10, half, All, only those within the stack) beside the inspector's amount slider. |
