@@ -1,5 +1,7 @@
 /* First-time tip card at the bottom of the window. kora_theme tokens only. */
 .shortcut-stack { min-width: 0; display: grid; gap: 8px; }
+/* Nothing to show (no tip, no pending move): leave no footer, border or gap behind. */
+.shortcut-stack:empty { display: none; }
 .tip-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid hsl(var(--brand-border)); border-radius: 10px; background: hsl(var(--brand-soft)); color: hsl(var(--foreground)); font-size: calc(12px * var(--ui-scale, 1)); }
 .tip-card svg { color: hsl(var(--primary)); }
 .tip-card p { margin: 0; line-height: 1.35; }

@@ -9,11 +9,12 @@ const everything: TipsContext = {
     organize: { enabled: true, sort: true, stack: true },
     playerLayoutChoice: true,
     layouts: { classic: true, loadout: true, compact: true, dock: true },
+    controlsButton: true,
 }
 
 describe("availableTips", () => {
     it("offers only tips for features that are on, in a fixed order", () => {
-        expect(availableTips(everything)).toEqual(["drag_drop", "quick_transfer", "modifier_drag", "right_click_split", "quick_slot", "organize", "layout"])
+        expect(availableTips(everything)).toEqual(["drag_drop", "quick_transfer", "modifier_drag", "right_click_split", "quick_slot", "organize", "layout", "controls"])
     })
 
     it("follows the right-click mode", () => {
@@ -26,7 +27,11 @@ describe("availableTips", () => {
 
     it("drops tips for disabled features", () => {
         const tips = availableTips({ ...everything, quickTransfer: false, modifierDrag: false, quickSlotsEnabled: false, organize: { enabled: false, sort: true, stack: true } })
-        expect(tips).toEqual(["drag_drop", "right_click_split", "layout"])
+        expect(tips).toEqual(["drag_drop", "right_click_split", "layout", "controls"])
+    })
+
+    it("only suggests the controls button when the button exists", () => {
+        expect(availableTips({ ...everything, controlsButton: false })).not.toContain("controls")
     })
 
     it("needs sort or stack for the organize tip", () => {

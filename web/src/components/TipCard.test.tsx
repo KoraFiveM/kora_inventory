@@ -89,7 +89,7 @@ describe("TipCard", () => {
     })
 
     it("only offers tips for enabled features", async () => {
-        const config = { ...DEFAULT_UI_CONFIG, quickTransfer: false, modifierDrag: false, rightClick: "none" as const, organize: { enabled: false, sort: false, stack: false, panelSearch: false }, playerLayoutChoice: false }
+        const config = { ...DEFAULT_UI_CONFIG, quickTransfer: false, modifierDrag: false, rightClick: "none" as const, organize: { enabled: false, sort: false, stack: false, panelSearch: false }, playerLayoutChoice: false, controls: { button: false, defaultVisible: false } }
         await mount(config, undefined, false)
         expect(card()?.textContent).toContain("Drag an item out")
         // With one tip left there is nothing to go Next to.

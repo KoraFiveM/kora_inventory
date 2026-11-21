@@ -91,7 +91,7 @@ function InventoryApp() {
         secondaryPanel: session.secondary
             ? <InventoryPanel inventory={session.secondary} {...panelHandlers} />
             : solo ? null : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>{t("ui.no_secondary_inventory")}</h2><p>{t("ui.open_secondary_inventory")}</p></section>,
-        shortcutBar: <div className="shortcut-stack"><TipCard sessionId={session.sessionId} quickSlotsEnabled={s.quickSlots.enabled} /><ShortcutBar movePending={s.movePending} revision={session.revision} /></div>,
+        shortcutBar: <div className="shortcut-stack"><TipCard sessionId={session.sessionId} quickSlotsEnabled={s.quickSlots.enabled} /><ShortcutBar movePending={s.movePending} /></div>,
         renderQuickSlots: (position, options) => <QuickSlotBar position={position} side={options?.side} flipped={shell.drawerFlip} state={s.quickSlots} player={session.player} busy={locked} selected={selected} onSelect={s.selectSlot} onActivate={s.activateItem} onPin={s.pinQuick} onFlash={s.flashSlot} />,
     }
 

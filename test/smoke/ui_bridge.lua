@@ -85,7 +85,20 @@ Kora = {
         return value
     end },
 }
+-- The controls overlay module loads before the bridge (see fxmanifest.lua).
+local overlay = { shown = 0, hidden = 0, lastButtons = nil, alive = false }
+Kora.instructional = { show = function(buttons)
+    overlay.shown, overlay.lastButtons, overlay.alive = overlay.shown + 1, buttons, true
+    return {
+        setButtons = function(list) overlay.lastButtons = list; return true end,
+        hide = function() overlay.hidden, overlay.alive = overlay.hidden + 1, false; return true end,
+        isVisible = function() return overlay.alive end,
+    }
+end }
+dofile('client/controls.lua')
 dofile(arg[1] or 'client/ui.lua')
+-- client/admin_ui.lua later registers its own onResourceStop in this stub.
+local uiResourceStop = handlers['onResourceStop']
 
 -- Hotbar overlay position: Config.Hotbar offsets, switched by vehicle state.
 H.equal(Config.Hotbar.bottomOffset, 90, 'hotbar on-foot offset defaults to 90px')
@@ -185,7 +198,7 @@ local envelope = function(intent, payload)
     return { sessionId = 'D', token = 'D', intent = intent, payload = payload }
 end
 local submit
-KoraInventory = { clientApi = { submitIntent = function(...) return submit(...) end } }
+KoraInventory = { controls = KoraInventory.controls, clientApi = { submitIntent = function(...) return submit(...) end } }
 submit = function() return true end
 H.equal(answers('kora_inventory:nui:intent', envelope('move', {}), 'accepted').ok, true, 'an accepted intent reports ok')
 submit = function() return false, 'over weight' end
@@ -459,10 +472,72 @@ local registered = 0
 for name in pairs(nui) do
     registered = registered + 1
     H.ok(name == 'kora_inventory:nui:intent' or name == 'kora_inventory:nui:close' or name == 'kora_inventory:pinQuickSlot'
-        or name == 'kora_inventory:audit:query' or name == 'kora_inventory:audit:close'
+        or name == 'kora_inventory:controls' or name == 'kora_inventory:audit:query' or name == 'kora_inventory:audit:close'
         or name == 'fft:result' or name == 'fft:observed', 'unexpected NUI callback ' .. name)
 end
-H.equal(registered, 7, 'gameplay, audit overlay and optional development callbacks are covered')
+H.equal(registered, 8, 'gameplay, audit overlay and optional development callbacks are covered')
+
+-- Controls overlay callback: client-local presentation, never forwarded.
+H.ok(nui['kora_inventory:controls'], 'the controls callback is registered')
+local controlsConfigPush
+for _, message in ipairs(messages) do
+    if message.action == 'kora_inventory:nui:config' then controlsConfigPush = message.data.controls end
+end
+H.ok(controlsConfigPush == nil or controlsConfigPush.button == true, 'the config push carries the controls settings')
+local function controlsCall(data)
+    local reply
+    nui['kora_inventory:controls'](data, function(result) reply = result end)
+    return reply
+end
+local triggered = {}
+TriggerEvent = function(name) triggered[#triggered + 1] = name end
+handlers['kora_inventory:ui:sessionClosed']({ token = 'E' })
+H.equal(controlsCall({ show = true }).visible, false, 'no overlay without an open session')
+H.equal(overlay.shown, 0, 'nothing is shown while no inventory session is open')
+handlers['kora_inventory:ui:sessionOpened']({ token = 'C1', primary = view('player:1', 1) })
+local pushed
+for index = #messages, 1, -1 do
+    if messages[index].action == 'kora_inventory:nui:config' then pushed = messages[index].data break end
+end
+H.equal(pushed.controls.button, true, 'config push: the controls button defaults on')
+H.equal(pushed.controls.defaultVisible, false, 'config push: the overlay defaults to hidden')
+local shownReply = controlsCall({ show = true })
+H.equal(shownReply.ok, true, 'showing the overlay in a session succeeds')
+H.equal(shownReply.visible, true, 'and reports it visible')
+H.equal(overlay.shown, 1, 'one native overlay is created')
+H.ok(#overlay.lastButtons >= 5, 'it lists the control buttons')
+Config.kora_inventory.ui.quickTransfer = false
+controlsCall({ show = true })
+H.equal(overlay.shown, 1, 'showing again refreshes the existing overlay')
+local labels = {}
+for _, button in ipairs(overlay.lastButtons) do labels[button.control] = true end
+H.ok(not labels[21], 'the button list follows the current config (quick transfer off, no Shift)')
+Config.kora_inventory.ui.quickTransfer = true
+H.equal(controlsCall({ show = false }).visible, false, 'toggling off hides it')
+H.equal(overlay.hidden, 1, 'the overlay was hidden')
+controlsCall({ show = 'yes' })
+H.equal(overlay.alive, false, 'only a boolean true shows the overlay')
+controlsCall({ show = true })
+H.equal(overlay.alive, true, 'shown again')
+handlers['kora_inventory:ui:sessionClosed']({ token = 'C1' })
+H.equal(overlay.alive, false, 'closing the session always hides the overlay')
+Config.kora_inventory.ui.controls = { button = false }
+handlers['kora_inventory:ui:sessionOpened']({ token = 'C2', primary = view('player:1', 1) })
+H.equal(controlsCall({ show = true }).visible, false, 'button = false means the overlay is never shown')
+H.equal(overlay.alive, false, 'and nothing is on screen')
+Config.kora_inventory.ui.controls = { button = true }
+controlsCall({ show = true })
+H.equal(overlay.alive, true, 'shown with the button on again')
+handlers['kora_hud:ui:editing'](true)
+H.equal(overlay.alive, false, 'opening the /ui editor hides the overlay')
+controlsCall({ show = true })
+uiResourceStop('kora_inventory')
+H.equal(overlay.alive, false, 'stopping the resource hides the overlay')
+local submits = 0
+for _, name in ipairs(triggered) do if name == 'kora_inventory:client:submitIntent' then submits = submits + 1 end end
+H.equal(submits, 1, 'the controls callback forwards nothing to the server (only the editor close intent)')
+TriggerEvent = function() end
+Config.kora_inventory.ui.controls = { button = true, defaultVisible = false }
 
 -- The audit overlay only reads: a query while it is closed is refused locally,
 -- and it never produces an inventory intent.

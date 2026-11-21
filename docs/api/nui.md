@@ -51,7 +51,7 @@ When `Config.kora_inventory.decay.enabled` is on, items that decay also carry on
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, rightClick, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice, quickTransfer, modifierDrag, quickAmounts, filters, tooltips, weightWarnings, organize, tips, combine, decay }`, derived from `Config.kora_inventory.ui`, `Config.kora_inventory.organize`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. `decay` is `{ enabled, showOnSlot, warnBelow }` from `Config.kora_inventory.decay`, also presentation only. Pushed on resource start and on every session open. |
+| `kora_inventory:nui:config` | table | `{ ammoInfo, hotbarSlots, centreWhenSolo, showHotbar, rightClickSplit, rightClick, optimisticMoves, queueMoves, moveTimeoutMs, directTransport, scale, images, inspectorDecimals, inspectorCopy, slotBorderWidth, layout, layouts, playerLayoutChoice, quickTransfer, modifierDrag, quickAmounts, filters, tooltips, weightWarnings, organize, tips, controls, combine, decay }`, derived from `Config.kora_inventory.ui`, `Config.kora_inventory.organize`, `Config.Inspector`, `Config.Slots` and `Config.kora_inventory.weapons.ammoInfo`. `ammoInfo` is `{ enabled, where, showLoaded, showCompatible }` (booleans, and `where` as `inspector`, `menu` or `both`), a presentation hint only. `controls` is `{ button, defaultVisible }` from `Config.kora_inventory.ui.controls`. `decay` is `{ enabled, showOnSlot, warnBelow }` from `Config.kora_inventory.decay`, also presentation only. Pushed on resource start and on every session open. |
 | `kora_inventory:nui:layout` | table | The player's window placement from kora_hud's `/ui` editor: `{ x, y, scale, placed, playerSide, useForTransfer, layout? }`. Offsets and scale are clamped. `layout` is the player's chosen inventory layout, one of `classic`, `loadout`, `compact`, `dock`; any other value is dropped, and the page also checks it against the allowed set. Pushed when the editor applies or resets the layout and on every session open. |
 | `kora_inventory:nui:locales` | table | Flat key/value map for the React UI, resolved on the client with `Kora.lang()` from `locales/en.lua`. Pushed two seconds after the client resource starts so the page's message listener is ready. |
 | `kora_inventory:nui:sessionOpened` | table | `{ sessionId, token, revision, secondaryRevision, player, secondary?, expires }`. `player` and `secondary` are views `{ id (the inventory key), key, type, label, slots, maxWeight, weight, revision, items, stock? }`. |
@@ -69,7 +69,7 @@ When `Config.kora_inventory.decay.enabled` is on, items that decay also carry on
 
 ## Functions
 
-The two entries below are the NUI callbacks. The messages sent to the page are listed under Messages.
+The entries below are the NUI callbacks. The messages sent to the page are listed under Messages.
 
 ### `RegisterNUICallback('kora_inventory:nui:intent', function(data, cb) end)`
 
@@ -157,6 +157,40 @@ await fetch('https://kora_inventory/kora_inventory:pinQuickSlot', { method: 'POS
 { ok: true }
 ```
 
+### `RegisterNUICallback('kora_inventory:controls', function(data, cb) end)`
+
+The page asks to show or hide GTA's native instructional buttons (the controls overlay, drawn bottom-right of the screen without NUI focus, through kora_lib's `Kora.instructional`). This is client-local presentation: it is answered on the client and never forwarded to the server. Registered always; it shows nothing unless an inventory session is open and `ui.controls.button` is not `false`.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `data` | table | `{ show }`. Only the boolean `true` shows the overlay; anything else hides it. |
+
+The button list is built from the current config at call time, so only enabled features appear: Esc (close), Enter (use selected), left mouse (drag to move or stack, drag outside to drop, double-click to use), right mouse (split stack or item menu, per `ui.rightClick`; omitted for `none`), Shift (quick transfer, with `ui.quickTransfer`), and Ctrl and Alt (move half and move one, with `ui.modifierDrag`). Labels come from `inventory.controls_*` in `locales/en.lua`.
+
+The overlay is always hidden when the inventory session closes, when the `/ui` editor opens and when the resource stops. The page keeps the player's choice in its own `localStorage` key `kora_inventory:controlsVisible` and asks again after each session opens.
+
+**Returns**
+
+- **cb(&#123; ok = true, visible = true &#125;)** when the overlay is shown or refreshed.
+- **cb(&#123; ok = true, visible = false &#125;)** when it is hidden, or when it was refused (no session, or the button is disabled).
+- **cb(&#123; ok = false &#125;)** if kora_lib could not show it.
+
+**Example**
+
+```lua
+await fetch('https://kora_inventory/kora_inventory:controls', { method: 'POST', body: JSON.stringify({ show: true }) })
+```
+
+**Representative console output**
+
+```text
+{ ok: true, visible: true }
+```
+
+The window no longer has a footer of keyboard hint chips or a "Revision" label. The layouts keep a footer slot that stays empty unless the first-time tip card or a short "Updating inventory…" status (while a move waits for the server) has something to show; the keyboard button in the top bar replaces the hints.
+
 ## Common use cases
 
 - Replacing the bundled UI with a custom page.
@@ -230,6 +264,7 @@ The only config sent to the browser (`kora_inventory:nui:config`, at start and o
 | `tooltips` | `true` | Hover tooltip on filled slots. |
 | `organize` | `{ enabled = true, sort = true, stack = true, panelSearch = true }` | Which of the per-panel Sort and Stack all buttons and the panel search box to draw. `sort` and `stack` are already combined with `enabled`. Presentation only: the server enforces `organize.*` itself. |
 | `tips` | `{ enabled = true, maxShows = 5 }` | The first-time tip card: shown on at most `maxShows` openings (1 to 50). |
+| `controls` | `{ button = true, defaultVisible = false }` | Keyboard button in the top bar that toggles the native controls overlay (see the `kora_inventory:controls` callback). `button = false` hides it and the overlay is never shown. Applied the next time the inventory opens. |
 | `optimisticMoves` | `true` | Paint a move or purchase immediately and undo it if the server refuses or does not answer within `moveTimeoutMs`. The server validates every move either way. |
 | `queueMoves` | `true` | With `optimisticMoves`, queue up to eight further drags while one is pending. |
 | `directTransport` | `true` | Send requests as `kora_inventory:server:call` and receive `kora_inventory:client:callResult` instead of kora_lib callbacks. The `kora_inventory:server:transfer` and `intent` callbacks stay registered for third-party renderers. |

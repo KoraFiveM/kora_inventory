@@ -474,6 +474,18 @@ Config.kora_inventory = {
         -- player's own machine. Applied the next time the inventory opens.
         tips = { enabled = true, maxShows = 5 },
 
+        -- Controls overlay. A keyboard button in the inventory's top bar shows
+        -- GTA's native instructional buttons (bottom-right of the screen) listing
+        -- what Esc, Enter, the mouse and the Shift / Ctrl / Alt modifiers do, for
+        -- the features that are switched on. It is client-side presentation only.
+        --   button         - show the toggle button. false hides it and the overlay
+        --                    is never shown.
+        --   defaultVisible - show the overlay on the first opening, before the
+        --                    player has pressed the button (their own choice is
+        --                    remembered on their machine afterwards).
+        -- Applied the next time the inventory opens.
+        controls = { button = true, defaultVisible = false },
+
         -- Local item artwork. Definition image filenames and per-item
         -- `info.image` filenames resolve under localPath. A full https:// or
         -- nui:// value in info.image is used directly.

@@ -83,3 +83,23 @@ export async function closeAudit() {
         body: "{}",
     })
 }
+
+/**
+ * Shows or hides GTA's native instructional buttons (the controls overlay).
+ * Client-local presentation answered by the Lua client; nothing reaches the
+ * server. Never throws: a failed request is reported as `{ ok: false }`.
+ */
+export async function setControls(show: boolean): Promise<{ ok: boolean }> {
+    if (browser) return { ok: true }
+    try {
+        const response = await fetch(`https://${resourceName()}/kora_inventory:controls`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=UTF-8" },
+            body: JSON.stringify({ show }),
+        })
+        const result = await response.json() as { ok?: boolean } | null
+        return { ok: result?.ok === true }
+    } catch {
+        return { ok: false }
+    }
+}

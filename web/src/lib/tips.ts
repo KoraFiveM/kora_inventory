@@ -4,10 +4,10 @@ import type { RightClickMode, UiConfig } from "./types"
 /** localStorage key holding the player's tip progress. */
 export const TIPS_STORAGE_KEY = "kora_inventory:tips"
 
-export type TipId = "drag_drop" | "quick_transfer" | "modifier_drag" | "right_click_split" | "right_click_menu" | "quick_slot" | "organize" | "layout"
+export type TipId = "drag_drop" | "quick_transfer" | "modifier_drag" | "right_click_split" | "right_click_menu" | "quick_slot" | "organize" | "layout" | "controls"
 
 /** The order tips are offered in. */
-export const TIP_ORDER: readonly TipId[] = ["drag_drop", "quick_transfer", "modifier_drag", "right_click_split", "right_click_menu", "quick_slot", "organize", "layout"]
+export const TIP_ORDER: readonly TipId[] = ["drag_drop", "quick_transfer", "modifier_drag", "right_click_split", "right_click_menu", "quick_slot", "organize", "layout", "controls"]
 
 export interface TipsState {
     /** Tips already shown. */
@@ -29,6 +29,8 @@ export interface TipsContext {
     organize: { enabled: boolean; sort: boolean; stack: boolean }
     playerLayoutChoice: boolean
     layouts: Partial<Record<LayoutId, boolean>>
+    /** The keyboard button that toggles the controls overlay is shown. */
+    controlsButton: boolean
 }
 
 /** Layouts a player may pick: missing counts as allowed, `classic` always is. */
@@ -49,6 +51,7 @@ export function availableTips(context: TipsContext): TipId[] {
         quick_slot: context.quickSlotsEnabled,
         organize: context.organize.enabled && (context.organize.sort || context.organize.stack),
         layout: context.playerLayoutChoice && allowedLayoutCount(context.layouts) > 1,
+        controls: context.controlsButton,
     }
     return TIP_ORDER.filter((id) => wanted[id])
 }
@@ -126,7 +129,7 @@ export function saveTipsState(state: TipsState, storage: TipsStorage | undefined
 }
 
 /** Builds the context from the merged UI config. */
-export function tipsContext(config: Pick<Required<UiConfig>, "quickTransfer" | "modifierDrag" | "rightClick" | "organize" | "playerLayoutChoice" | "layouts">, quickSlotsEnabled: boolean): TipsContext {
+export function tipsContext(config: Pick<Required<UiConfig>, "quickTransfer" | "modifierDrag" | "rightClick" | "organize" | "playerLayoutChoice" | "layouts" | "controls">, quickSlotsEnabled: boolean): TipsContext {
     return {
         quickTransfer: config.quickTransfer,
         modifierDrag: config.modifierDrag,
@@ -135,5 +138,6 @@ export function tipsContext(config: Pick<Required<UiConfig>, "quickTransfer" | "
         organize: config.organize as TipsContext["organize"],
         playerLayoutChoice: config.playerLayoutChoice,
         layouts: config.layouts,
+        controlsButton: config.controls.button !== false,
     }
 }

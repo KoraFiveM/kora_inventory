@@ -1,7 +1,7 @@
 import { createContext } from "react"
 import { DEFAULT_AMMO_INFO } from "@/lib/ammo"
 import { DEFAULT_COMBINE, type CombineConfig } from "@/lib/combine"
-import type { AmmoInfoConfig, OrganizeConfig, RightClickMode, TipsConfig, DecayConfig, UiConfig } from "@/lib/types"
+import type { AmmoInfoConfig, ControlsConfig, OrganizeConfig, RightClickMode, TipsConfig, DecayConfig, UiConfig } from "@/lib/types"
 import { DEFAULT_DECAY } from "@/lib/decay"
 
 /**
@@ -12,7 +12,7 @@ import { DEFAULT_DECAY } from "@/lib/decay"
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig; organize: OrganizeConfig; tips: TipsConfig; combine: CombineConfig; decay: DecayConfig } = {
+export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig; organize: OrganizeConfig; tips: TipsConfig; controls: ControlsConfig; combine: CombineConfig; decay: DecayConfig } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
@@ -46,6 +46,8 @@ export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreW
     // Config.kora_inventory.organize and ui.tips; the server enforces organize itself.
     organize: { enabled: true, sort: true, stack: true, panelSearch: true },
     tips: { enabled: true, maxShows: 5 },
+    // Keyboard button for GTA's native controls overlay (Config.kora_inventory.ui.controls).
+    controls: { button: true, defaultVisible: false },
     // Drag one item onto another for a recipe (Config.kora_inventory.combine).
     combine: DEFAULT_COMBINE,
     images: {

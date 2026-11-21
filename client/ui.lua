@@ -7,6 +7,19 @@ local function localeText(key, fallback, vars)
     return text and text(key, fallback, vars) or fallback
 end
 
+-- Controls overlay (client/controls.lua): optional, so the bridge also loads
+-- without it. Presentation only.
+local function controlsApi()
+    return KoraInventory and KoraInventory.controls
+end
+
+local function hideControls()
+    local controls = controlsApi()
+    if controls and controls.hide then
+        controls.hide()
+    end
+end
+
 local activeSession
 local activeToken
 local activePlayerId
@@ -79,6 +92,7 @@ local UI_LOCALE_KEYS = {
     'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
     'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type', 'jammed',
     'sort_panel', 'stack_panel', 'panel_search', 'panel_search_placeholder',
+    'controls_show', 'controls_hide', 'tip_controls',
     'tips_title', 'tip_next', 'tip_got_it', 'tip_drag_drop', 'tip_quick_transfer', 'tip_modifier_drag',
     'tip_right_click_split', 'tip_right_click_menu', 'tip_quick_slot', 'tip_organize', 'tip_layout',
     'combine', 'combine_title', 'combine_items',
@@ -193,6 +207,14 @@ local function tipsConfig()
     }
 end
 
+local function controlsConfig()
+    local controls = controlsApi()
+    if controls and controls.settings then
+        return controls.settings(Config.kora_inventory.ui)
+    end
+    return { button = true, defaultVisible = false }
+end
+
 -- Read on every push so a live config edit applies on the next open.
 local function decayPresentation()
     local decay = Config.kora_inventory.decay or {}
@@ -267,6 +289,8 @@ local function pushConfig()
         organize = organizeConfig(),
         -- First-time tip card (shown at most maxShows openings per player).
         tips = tipsConfig(),
+        -- Toggle button for the native controls overlay (client/controls.lua).
+        controls = controlsConfig(),
         -- Drag-to-combine: recipe names + labels only (client/combine.lua). The
         -- server decides which recipe applies and what it costs.
         combine = KoraInventory.combinePresentation and KoraInventory.combinePresentation()
@@ -326,6 +350,9 @@ local function closeSession(reason)
     if not activeSession then
         return
     end
+
+    -- The native overlay must never outlive the window it describes.
+    hideControls()
 
     send('kora_inventory:nui:sessionClosed', {
         sessionId = activeSession,
@@ -716,6 +743,26 @@ RegisterNUICallback('kora_inventory:nui:close', function(data, cb)
     cb({ ok = true })
 end)
 
+-- Show/hide the native controls overlay. Client-local presentation: nothing is
+-- forwarded to the server. Only an open inventory session may show it, only
+-- while ui.controls.button is on, and the button list is built from the config
+-- as it is now, so only enabled features are listed.
+RegisterNUICallback('kora_inventory:controls', function(data, cb)
+    local controls = controlsApi()
+    local wanted = type(data) == 'table' and data.show == true
+    if not controls then
+        cb({ ok = false, error = 'controls unavailable' })
+        return
+    end
+    local ui = (Config.kora_inventory or {}).ui or {}
+    if wanted and activeSession and controls.settings(ui).button then
+        cb({ ok = controls.show(ui), visible = controls.isVisible() })
+        return
+    end
+    controls.hide()
+    cb({ ok = true, visible = false })
+end)
+
 -- Quick slot pins are a local display preference (client KVP, per character).
 -- The validation lives in client/quickslots.lua; nothing here reaches the
 -- server. Registered only while quick slots are enabled.
@@ -801,6 +848,7 @@ AddEventHandler('kora_hud:ui:ready', registerWithEditor)
 -- The /ui editor takes NUI focus; an open inventory closes through the normal
 -- close intent (the server ends the session) rather than sitting under it.
 AddEventHandler('kora_hud:ui:editing', function(active)
+    if active == true then hideControls() end
     if active ~= true or not activeSession or type(activeToken) ~= 'string' then return end
     TriggerEvent('kora_inventory:client:submitIntent', {
         sessionId = activeSession,
@@ -829,6 +877,8 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then
+        -- kora_lib also hides a stopped resource's displays; be explicit.
+        hideControls()
         closeSession('resource_stop')
     end
 end)

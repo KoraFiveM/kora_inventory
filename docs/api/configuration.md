@@ -169,6 +169,7 @@ The only settings that cross into the browser. Nothing here is authority. Most a
 | `ui.weightWarnings` | table | Default `{ enabled = true, warnAt = 0.75, dangerAt = 0.95 }`. The weight bar turns warning-coloured at `warnAt` and destructive at `dangerAt` (fractions of max weight, 0.01 to 1). |
 | `ui.tooltips` | boolean | Default `true`. Hover tooltip (after about 350 ms) with label, amount, weight, durability, display rows and description. |
 | `ui.tips` | table | Default `{ enabled = true, maxShows = 5 }`. A small dismissible tip card at the bottom of the window for players new to the inventory. It appears on at most `maxShows` openings (1 to 50), cycling through short tips about features that are switched on in this table (drag out to drop, Shift+click, Ctrl/Alt drag, right-click as configured by `ui.rightClick`, quick slots, Sort and Stack all, and the layout choice in the `/ui` editor). Next shows another tip; Got it hides the card for good. Progress is kept in the player's own browser storage under `kora_inventory:tips`. It is never shown while an item is being dragged. Applied the next time the inventory opens. |
+| `ui.controls` | table | Default `{ button = true, defaultVisible = false }`. `button` shows a keyboard button in the inventory's top bar that toggles GTA's native instructional buttons (bottom-right of the screen) listing Esc, Enter, the mouse and the Shift, Ctrl and Alt modifiers for the features that are switched on; `false` removes the button and the overlay is never shown. `defaultVisible` shows it on a player's first opening, until they use the button (their own choice is then kept in their browser storage under `kora_inventory:controlsVisible`). It is hidden whenever the inventory closes. Client-side presentation only. Applied the next time the inventory opens. |
 | `ui.optimisticMoves` | boolean | Default `true`. Paint a move or purchase at once, dimmed until the server confirms, and undo it with a notice if refused or unanswered. |
 | `ui.queueMoves` | boolean | Default `true`. Queue drags made while a move is pending. Needs `optimisticMoves`. |
 | `ui.directTransport` | boolean | Default `true`. Send move/buy/drop/use requests as one direct net event (`kora_inventory:server:call`) instead of kora_lib callbacks. Same handlers and checks either way. |
@@ -458,7 +459,7 @@ Every inventory panel except shops (player, stash, trunk, glovebox, container an
 | `organize.sortOrder` | string[] | Default `{ 'weapon', 'ammo', 'useable', 'other' }`. Category order for Sort. A weapon is an item whose definition is a weapon, ammo has an `ammoType` (or type `ammo`), useable has a use action; a category left out of the list sorts last. |
 | `organize.panelSearch` | boolean | Default `true`. Show the per-panel search box. The top bar search keeps dimming the player panel as before. |
 
-The `/config` editor entries live in `config/schema/organize.lua` (and `config/schema/tips.lua` for `ui.tips`).
+The `/config` editor entries live in `config/schema/organize.lua` (`config/schema/tips.lua` for `ui.tips`, and `config/schema/controls.lua` for `ui.controls`; both controls keys are live).
 
 ## Quick slots (`Config.kora_inventory.quickSlots`)
 
