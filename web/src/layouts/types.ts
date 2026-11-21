@@ -17,7 +17,7 @@ import type { QuickSlotPosition, QuickSlotSide } from "@/components/QuickSlotBar
 export type { QuickSlotPosition, QuickSlotSide }
 
 /** The secondary view type: another inventory, or the player trade window. */
-export interface SecondaryView {
+interface SecondaryView {
     kind: "inventory" | "trade"
     label: string
     /** Items shown in it (tab badge). */
@@ -94,7 +94,7 @@ export interface LayoutProps {
      * the inspector in only on demand instead of reserving a column for it.
      */
     drawerInspector: ReactNode
-    /** Esc / Enter / Drag hints and the revision. */
+    /** The first-time tip card and, while a request is in flight, the "Updating inventory" status; either renders nothing when it has nothing to show. */
     shortcutBar: ReactNode
     /**
      * Builds the quick-slot bar for a position; layouts choose where it goes.

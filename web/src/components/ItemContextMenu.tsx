@@ -8,7 +8,7 @@ import type { InventoryItem, InventoryView } from "@/lib/types"
 
 export interface MenuTarget { x: number; y: number; inventory: InventoryView; item: InventoryItem }
 
-export interface ItemContextMenuProps {
+interface ItemContextMenuProps {
     target: MenuTarget
     playerId: string
     giveAvailable: boolean

@@ -1,6 +1,6 @@
 import type { InventoryItem } from "./types"
 
-export type ItemCategory = "weapons" | "ammo" | "consumables" | "other"
+type ItemCategory = "weapons" | "ammo" | "consumables" | "other"
 export type CategoryFilter = "all" | ItemCategory
 export const CATEGORY_FILTERS: readonly CategoryFilter[] = ["all", "weapons", "ammo", "consumables", "other"]
 
@@ -13,7 +13,7 @@ export function classifyItem(item: Pick<InventoryItem, "name" | "useable"> & { a
     return "other"
 }
 
-export function matchesCategory(item: Parameters<typeof classifyItem>[0], filter: CategoryFilter): boolean {
+function matchesCategory(item: Parameters<typeof classifyItem>[0], filter: CategoryFilter): boolean {
     return filter === "all" || classifyItem(item) === filter
 }
 

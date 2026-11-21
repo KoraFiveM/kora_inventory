@@ -40,13 +40,11 @@ export function TipCard({ sessionId, quickSlotsEnabled }: { sessionId: string; q
         }
         saveTipsState(state)
         // `available` and the tips config are read as they are when the window opens.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId])
 
     // A tip for a feature that has since been switched off is not kept on screen.
     useEffect(() => {
         if (tip && !available.includes(tip)) setTip(chooseTip(available, loadTipsState().seen))
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableKey])
 
     const visibleTip = tip && available.includes(tip) ? tip : undefined

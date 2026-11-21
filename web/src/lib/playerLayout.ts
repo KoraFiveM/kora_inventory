@@ -23,6 +23,11 @@ function clamp(value: unknown, min: number, max: number, fallback: number): numb
     return typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback
 }
 
+/** The factor main.tsx scales the NUI root by. */
+export function rootScale() {
+    return Math.min(2, Math.max(0.5, Math.min(window.innerWidth / 1920, window.innerHeight / 1080)))
+}
+
 /** Re-validated in the page as well: nothing invalid may reach CSS. */
 export function normalizePlayerLayout(raw: unknown): PlayerLayout {
     if (!raw || typeof raw !== "object") return DEFAULT_PLAYER_LAYOUT

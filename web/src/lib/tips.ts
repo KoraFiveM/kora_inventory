@@ -1,4 +1,4 @@
-import type { LayoutId } from "./layoutIds"
+import { LAYOUT_IDS, type LayoutId } from "./layoutIds"
 import type { RightClickMode, UiConfig } from "./types"
 
 /** localStorage key holding the player's tip progress. */
@@ -7,9 +7,9 @@ export const TIPS_STORAGE_KEY = "kora_inventory:tips"
 export type TipId = "drag_drop" | "quick_transfer" | "modifier_drag" | "right_click_split" | "right_click_menu" | "quick_slot" | "organize" | "layout" | "controls"
 
 /** The order tips are offered in. */
-export const TIP_ORDER: readonly TipId[] = ["drag_drop", "quick_transfer", "modifier_drag", "right_click_split", "right_click_menu", "quick_slot", "organize", "layout", "controls"]
+const TIP_ORDER: readonly TipId[] = ["drag_drop", "quick_transfer", "modifier_drag", "right_click_split", "right_click_menu", "quick_slot", "organize", "layout", "controls"]
 
-export interface TipsState {
+interface TipsState {
     /** Tips already shown. */
     seen: string[]
     /** "Got it": never show again. */
@@ -34,9 +34,8 @@ export interface TipsContext {
 }
 
 /** Layouts a player may pick: missing counts as allowed, `classic` always is. */
-export function allowedLayoutCount(layouts: TipsContext["layouts"]): number {
-    const ids: LayoutId[] = ["classic", "loadout", "compact", "dock"]
-    const count = ids.filter((id) => layouts[id] !== false).length
+function allowedLayoutCount(layouts: TipsContext["layouts"]): number {
+    const count = LAYOUT_IDS.filter((id) => layouts[id] !== false).length
     return count === 0 ? 1 : count
 }
 

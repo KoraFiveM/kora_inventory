@@ -1,8 +1,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react"
 
-export const DEFAULT_LOCALES: Record<string, string> = {
+const DEFAULT_LOCALES: Record<string, string> = {
     "ui.inventory_label": "Inventory",
-    "ui.revision": "Revision %{revision}",
     "ui.slot_item": "%{item}, slot %{slot}",
     "ui.slot_number": "Slot %{slot}",
     "ui.split_amount": "Split %{amount} / %{remaining}",
@@ -67,10 +66,6 @@ export const DEFAULT_LOCALES: Record<string, string> = {
     "ui.open_bag": "Open bag",
     "ui.water_damaged": "Water damaged",
     "ui.select_item_help": "Select an item to see its details. Drag it between slots to move or stack it, or drag it outside the window to drop it.",
-    "ui.close": "Close",
-    "ui.quick_transfer": "Quick transfer",
-    "ui.move_half": "Move half",
-    "ui.move_one": "Move one",
     "ui.filter_items": "Filter items",
     "ui.filter_all": "All",
     "ui.filter_weapons": "Weapons",
@@ -83,9 +78,6 @@ export const DEFAULT_LOCALES: Record<string, string> = {
     "ui.jammed": "Jammed",
     "ui.no_other_inventory": "No other inventory is open",
     "ui.no_room_other": "No room in the other inventory",
-    "ui.use_selected": "Use selected",
-    "ui.move_or_stack": "Move or stack",
-    "ui.drop": "Drop",
     "ui.split_dialog": "Split %{item}",
     "ui.split_title": "Split %{item}",
     "ui.move_how_many": "Move how many? (1–%{amount})",
@@ -95,7 +87,6 @@ export const DEFAULT_LOCALES: Record<string, string> = {
     "ui.quick_slot_item": "%{slot}: %{item}, inventory slot %{inventory}",
     "ui.quick_slot_empty": "%{slot}: nothing assigned",
     "ui.quick_slot_pinned": "pinned",
-    "ui.quick_slot_key": "key %{key}",
     "ui.quick_slot_unpin": "Right-click to unpin",
     "ui.quick_slot_pin_failed": "That item cannot be pinned there",
     "ui.quick_drawer_collapse": "Collapse quick slots",

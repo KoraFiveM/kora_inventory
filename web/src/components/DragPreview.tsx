@@ -2,6 +2,7 @@ import { createPortal } from "react-dom"
 import { useDragLayer } from "react-dnd"
 import { findInventory, findItem, type DragSlot } from "@/lib/inventory"
 import type { SessionSnapshot } from "@/lib/types"
+import { DurabilityBar } from "./DurabilityBar"
 import { ItemArtwork } from "./ItemArtwork"
 
 export function DragPreview({ session }: { session: SessionSnapshot | null }) {
@@ -27,6 +28,6 @@ export function DragPreview({ session }: { session: SessionSnapshot | null }) {
             {source.type === "shop" && typeof draggedItem.price === "number" && <span className="item-price">${draggedItem.price.toLocaleString()}</span>}
         </span>
         <span className="item-amount">×{draggedItem.amount}</span>
-        {typeof draggedItem.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, draggedItem.durability))}%` }} /></span>}
+        {typeof draggedItem.durability === "number" && <DurabilityBar value={draggedItem.durability} />}
     </div>, document.body)
 }

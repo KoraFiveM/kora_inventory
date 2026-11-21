@@ -1,5 +1,7 @@
 import type { AuditFilter, AuditResult, IntentPayload, IntentResponse } from "./types"
 
+const AUDIT_PAGE_SIZE = 100
+
 declare global {
     interface Window {
         GetParentResourceName?: () => string
@@ -60,7 +62,7 @@ export async function pinQuickSlot(id: string, slot: number | null): Promise<{ o
  * Never throws: a failure is reported as `{ error }`.
  */
 export async function queryAudit(filter: AuditFilter): Promise<AuditResult> {
-    if (browser) return { rows: [], hasMore: false, page: filter.page, pageSize: 100 }
+    if (browser) return { rows: [], hasMore: false, page: filter.page, pageSize: AUDIT_PAGE_SIZE }
     try {
         const response = await fetch(`https://${resourceName()}/kora_inventory:audit:query`, {
             method: "POST",
@@ -68,10 +70,10 @@ export async function queryAudit(filter: AuditFilter): Promise<AuditResult> {
             body: JSON.stringify(filter),
         })
         const result = await response.json() as Partial<AuditResult> | null
-        if (!result || typeof result !== "object") return { rows: [], hasMore: false, page: filter.page, pageSize: 100, error: "request failed" }
-        return { rows: [], hasMore: false, page: filter.page, pageSize: 100, ...result }
+        if (!result || typeof result !== "object") return { rows: [], hasMore: false, page: filter.page, pageSize: AUDIT_PAGE_SIZE, error: "request failed" }
+        return { rows: [], hasMore: false, page: filter.page, pageSize: AUDIT_PAGE_SIZE, ...result }
     } catch {
-        return { rows: [], hasMore: false, page: filter.page, pageSize: 100, error: "request failed" }
+        return { rows: [], hasMore: false, page: filter.page, pageSize: AUDIT_PAGE_SIZE, error: "request failed" }
     }
 }
 

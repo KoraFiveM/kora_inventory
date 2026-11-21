@@ -8,12 +8,13 @@ import { isClosedBag, isWaterDamaged } from "@/lib/search"
 import { SlotUiContext } from "@/slotUi"
 import type { DragSlot, SlotTarget } from "@/lib/inventory"
 import type { InventoryItem, InventoryView } from "@/lib/types"
+import { DurabilityBar } from "./DurabilityBar"
 import { ItemArtwork } from "./ItemArtwork"
 import { JammedBadge } from "./JammedBadge"
 import { SLOT_DRAG_TYPE } from "./dnd"
 import { SlotTooltip } from "./SlotTooltip"
 
-export interface SlotProps {
+interface SlotProps {
     item?: InventoryItem
     index: number
     inventory: InventoryView
@@ -126,7 +127,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
             window.clearTimeout(tipTimer.current)
             tipTimer.current = window.setTimeout(() => {
                 // Never over a drag or an open context menu.
-                if (dndManager.getMonitor().isDragging() || document.querySelector("[data-context-menu], .context-menu, .item-menu")) return
+                if (dndManager.getMonitor().isDragging() || document.querySelector(".item-menu")) return
                 setTip({ ...cursor.current })
             }, 350)
         }}
@@ -176,7 +177,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
             {isWaterDamaged(item) && <span className="water-badge" role="img" aria-label={t("ui.water_damaged")} title={t("ui.water_damaged")}><Droplets size={11} aria-hidden /></span>}
             {decay && <span className={`decay-bar decay-${decay.level}`} title={decay.label} role="progressbar" aria-label={decay.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(decay.fraction * 100)}><i style={{ width: `${Math.round(decay.fraction * 100)}%` }} /></span>}
             {offered ? <span className="slot-offered-badge" title={t("ui.trade_offered", { amount: offered })}>{offered}</span> : null}
-            {typeof item.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, item.durability))}%` }} /></span>}
+            {typeof item.durability === "number" && <DurabilityBar value={item.durability} />}
         </>}
         {tip && item && !isDragging && <SlotTooltip item={item} x={tip.x} y={tip.y} decimals={inspectorDecimals} />}
     </button>
