@@ -460,6 +460,17 @@ With `weapons.ballistics.enabled` (default), `info.loadedBullets` holds one gene
 
 Using an ammo item loads the weapon currently drawn. The server resolves the weapon from its own record of the confirmed draw, and the round count from the shared item definition's `rounds`. The magazine's `ammoType` must match the weapon's `ammotype`, otherwise nothing is consumed. `server/useables.lua` registers a useable for every registry item with both `ammoType` and a positive `rounds`, including items registered at runtime. A holstered weapon is refused.
 
+### Which ammo does this gun take?
+
+With `weapons.ammoInfo.enabled` (default), every inventory and shop view tells the player what ammunition a weapon takes and which weapons an ammo item fits. The fields are computed on the server from kora_core's weapon and item definitions and from the weapon's own metadata; nothing is read from the client, and they are view-only (never saved to item metadata, and any value already on a record is overwritten).
+
+- A weapon definition with an `ammotype` gets `ammo` with `type`, `item` (the definition's `ammoItem`), `label` (that ammo item's label, falling back to the item name) and, with `showLoaded`, `loaded` (the length of `info.loadedBullets`, otherwise `info.ammo`).
+- An ammo item definition with an `ammoType` and positive `rounds` gets `ammoType` and `rounds`, and with `showCompatible` a `fits` list of weapon labels. The list is sorted, capped at 12, and ends with a "+N more" entry when longer.
+- Weapons without an `ammotype` get nothing.
+- With `where` set to `inspector` or `both`, rows are also added to `displayMeta`: Takes and Loaded for weapons, Rounds and Fits for ammo. Their labels come from the `inventory.ammo_*` locale keys, with English as the fallback for other languages.
+
+Item definitions are resolved through kora_core each time. The only retained data is an index from ammo type to weapon labels, rebuilt after any kora_core weapons or items change.
+
 ### Visible carry and draw pacing
 
 `Config.kora_inventory.weaponCarry` renders owned weapons on the body and makes equipping a timed, animated draw. `enabled = false` turns it all off.

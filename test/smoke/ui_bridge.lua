@@ -37,6 +37,16 @@ H.ok(source:find('scale = Kora.util.clamp(tonumber(ui.scale) or 1.0, 0.5, 2.0)',
 
 H.equal(Config.kora_inventory.ui.rightClickSplit, true, 'right-click split defaults on')
 H.ok(source:find('rightClickSplit = ui.rightClickSplit ~= false', 1, true), 'rightClickSplit is pushed to the NUI on every config push')
+H.equal(Config.kora_inventory.ui.rightClick, 'split', 'right-click defaults to the split dialog')
+H.ok(source:find('rightClick = rightClickMode(ui),', 1, true), 'rightClick is pushed to the NUI on every config push')
+
+for _, key in ipairs({ 'quickTransfer', 'modifierDrag', 'quickAmounts', 'filters', 'tooltips' }) do
+    H.equal(Config.kora_inventory.ui[key], true, key .. ' defaults on')
+    H.ok(source:find(key .. ' = ui.' .. key .. ' ~= false', 1, true), key .. ' is pushed to the NUI on every config push')
+end
+H.equal(Config.kora_inventory.ui.weightWarnings.warnAt, 0.75, 'weight warning threshold defaults to 0.75')
+H.equal(Config.kora_inventory.ui.weightWarnings.dangerAt, 0.95, 'weight danger threshold defaults to 0.95')
+H.ok(source:find('weightWarnings = weightWarnings()', 1, true), 'weightWarnings is pushed to the NUI')
 
 H.equal(Config.kora_inventory.ui.optimisticMoves, true, 'optimistic moves default on')
 H.ok(source:find('optimisticMoves = ui.optimisticMoves ~= false', 1, true), 'optimisticMoves is pushed to the NUI on every config push')
@@ -314,6 +324,89 @@ H.equal(messages[#messages].data.scale, 1, 'a reset restores the default layout'
 H.equal(Config.kora_inventory.ui.playerLayout, true, 'the /ui registration defaults on')
 H.equal(Config.kora_inventory.ui.playerLayoutTransfer, false, 'stashes use the default layout by default')
 
+-- Layout registry: server default, allowed set and the player's choice.
+H.equal(Config.kora_inventory.ui.layout, 'classic', 'the server layout defaults to classic')
+H.equal(Config.kora_inventory.ui.playerLayoutChoice, true, 'players may choose a layout by default')
+for _, id in ipairs({ 'classic', 'loadout', 'compact', 'dock' }) do
+    H.equal(Config.kora_inventory.ui.layouts[id], true, id .. ' layout is allowed by default')
+end
+H.ok(source:find('playerLayoutChoice = ui.playerLayoutChoice ~= false', 1, true), 'playerLayoutChoice is pushed to the NUI on every config push')
+handlers['kora_inventory:ui:sessionOpened']({ token = 'L', primary = view('player:1', 1) })
+local function lastConfig()
+    for i = #messages, 1, -1 do
+        if messages[i].action == 'kora_inventory:nui:config' then return messages[i].data end
+    end
+end
+local pushed = lastConfig()
+H.ok(pushed ~= nil, 'opening a session pushes the config')
+H.equal(pushed.layout, 'classic', 'the server layout reaches the NUI')
+H.equal(pushed.layouts.dock, true, 'the allowed layouts reach the NUI')
+H.equal(pushed.playerLayoutChoice, true, 'the player choice flag reaches the NUI')
+local uiCfg = Config.kora_inventory.ui
+local savedUi = { layout = uiCfg.layout, layouts = uiCfg.layouts, choice = uiCfg.playerLayoutChoice }
+uiCfg.layout, uiCfg.layouts, uiCfg.playerLayoutChoice = 'bogus', { dock = false, compact = 'yes' }, false
+handlers['kora_inventory:ui:sessionOpened']({ token = 'L2', primary = view('player:1', 1) })
+pushed = lastConfig()
+H.equal(pushed.layout, 'classic', 'an unknown layout falls back to classic')
+H.equal(pushed.layouts.dock, false, 'a layout set to false is not allowed')
+H.equal(pushed.layouts.compact, true, 'only an explicit false disables a layout (booleans only)')
+H.equal(pushed.playerLayoutChoice, false, 'playerLayoutChoice = false is pushed')
+uiCfg.layouts = { classic = false, loadout = false, compact = false, dock = false }
+handlers['kora_inventory:ui:sessionOpened']({ token = 'L3', primary = view('player:1', 1) })
+H.equal(lastConfig().layouts.classic, true, 'classic stays allowed when everything is disabled')
+uiCfg.layout, uiCfg.layouts, uiCfg.playerLayoutChoice = savedUi.layout, savedUi.layouts, savedUi.choice
+
+-- Right-click mode: valid values pass through, anything else falls back to the legacy boolean.
+H.equal(lastConfig().rightClick, 'split', 'the right-click mode reaches the NUI')
+local savedClick = { mode = uiCfg.rightClick, split = uiCfg.rightClickSplit }
+uiCfg.rightClick = 'menu'
+handlers['kora_inventory:ui:sessionOpened']({ token = 'R1', primary = view('player:1', 1) })
+H.equal(lastConfig().rightClick, 'menu', 'rightClick = menu is pushed')
+uiCfg.rightClick = 'none'
+handlers['kora_inventory:ui:sessionOpened']({ token = 'R2', primary = view('player:1', 1) })
+H.equal(lastConfig().rightClick, 'none', 'rightClick = none is pushed')
+uiCfg.rightClick, uiCfg.rightClickSplit = 'bogus', false
+handlers['kora_inventory:ui:sessionOpened']({ token = 'R3', primary = view('player:1', 1) })
+H.equal(lastConfig().rightClick, 'none', 'an invalid rightClick falls back to the legacy false = none')
+uiCfg.rightClick, uiCfg.rightClickSplit = nil, true
+handlers['kora_inventory:ui:sessionOpened']({ token = 'R4', primary = view('player:1', 1) })
+H.equal(lastConfig().rightClick, 'split', 'an absent rightClick falls back to the legacy true = split')
+uiCfg.rightClick, uiCfg.rightClickSplit = savedClick.mode, savedClick.split
+
+-- The editor registration carries the picker (allowed layouts only).
+local savedExports, savedState = exports, GetResourceState
+local registeredElement
+exports = setmetatable({}, { __index = function() return { registerUiElement = function(_, element) registeredElement = element end } end })
+GetResourceState = function() return 'started' end
+local function layoutSetting()
+    registeredElement = nil
+    handlers['kora_hud:ui:ready']()
+    for _, setting in ipairs(registeredElement and registeredElement.settings or {}) do
+        if setting.key == 'layout' then return setting end
+    end
+end
+local picker = layoutSetting()
+H.ok(picker ~= nil, 'the /ui editor offers an inventory layout picker')
+H.equal(picker.type, 'select', 'the picker is a select')
+H.equal(picker.default, 'classic', 'the picker defaults to the server layout')
+H.equal(#picker.options, 4, 'every allowed layout is an option')
+H.equal(picker.options[2].label, 'Loadout', 'options carry display labels')
+uiCfg.layouts = { classic = true, loadout = false, compact = true, dock = false }
+picker = layoutSetting()
+H.equal(#picker.options, 2, 'disallowed layouts are not offered')
+H.equal(picker.options[2].value, 'compact', 'the remaining options keep their order')
+uiCfg.playerLayoutChoice = false
+H.equal(layoutSetting(), nil, 'playerLayoutChoice = false hides the picker')
+uiCfg.layouts, uiCfg.playerLayoutChoice = savedUi.layouts, savedUi.choice
+exports, GetResourceState = savedExports, savedState
+
+handlers['kora_hud:ui:apply']('kora_inventory', 'inventory', { settings = { layout = 'dock' } })
+H.equal(messages[#messages].data.layout, 'dock', 'a known layout choice reaches the NUI')
+handlers['kora_hud:ui:apply']('kora_inventory', 'inventory', { settings = { layout = '../evil' } })
+H.equal(messages[#messages].data.layout, nil, 'an unknown layout choice is dropped')
+handlers['kora_hud:ui:apply']('kora_inventory', 'inventory', nil)
+H.equal(messages[#messages].data.layout, nil, 'a reset carries no layout choice')
+
 local closeIntents = {}
 TriggerEvent = function(name, payload) if name == 'kora_inventory:client:submitIntent' then closeIntents[#closeIntents + 1] = payload end end
 handlers['kora_inventory:ui:sessionOpened']({ token = 'E', primary = view('player:1', 1) })
@@ -356,7 +449,23 @@ scan:close()
 local registered = 0
 for name in pairs(nui) do
     registered = registered + 1
-    H.ok(name == 'kora_inventory:nui:intent' or name == 'kora_inventory:nui:close' or name == 'fft:result' or name == 'fft:observed', 'unexpected NUI callback ' .. name)
+    H.ok(name == 'kora_inventory:nui:intent' or name == 'kora_inventory:nui:close' or name == 'kora_inventory:pinQuickSlot' or name == 'fft:result' or name == 'fft:observed', 'unexpected NUI callback ' .. name)
 end
-H.equal(registered, 4, 'gameplay and optional development callbacks are covered')
+H.equal(registered, 5, 'gameplay and optional development callbacks are covered')
+
+-- Quick slot pins are answered locally and never become a server intent.
+local pinReply
+nui['kora_inventory:pinQuickSlot']({ id = 'weapon', slot = 3 }, function(result) pinReply = result end)
+H.equal(pinReply.ok, false, 'pinQuickSlot answers when the quick slot module is unavailable')
+local pinned
+KoraInventory.quickSlotsClient = { pin = function(data) pinned = data; return true end }
+nui['kora_inventory:pinQuickSlot']({ id = 'weapon', slot = 3 }, function(result) pinReply = result end)
+H.equal(pinReply.ok, true, 'pinQuickSlot reports the module verdict')
+H.equal(pinned.id, 'weapon', 'pinQuickSlot hands the body to the quick slot module')
+KoraInventory.quickSlotsClient = { pin = function() return false, 'item does not fit this quick slot' end }
+nui['kora_inventory:pinQuickSlot']({ id = 'weapon', slot = 2 }, function(result) pinReply = result end)
+H.equal(pinReply.error, 'item does not fit this quick slot', 'pinQuickSlot passes the refusal reason back')
+KoraInventory.quickSlotsClient = { pin = function() error('boom') end }
+nui['kora_inventory:pinQuickSlot']({}, function(result) pinReply = result end)
+H.equal(pinReply.ok, false, 'a failing pin handler still answers the browser')
 H.finish()

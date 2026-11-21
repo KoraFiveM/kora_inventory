@@ -1,3 +1,5 @@
+import { isLayoutId, type LayoutId } from "@/lib/layoutIds"
+
 /**
  * Per-player window layout from kora_hud's /ui editor, relayed by
  * client/ui.lua as `kora_inventory:nui:layout`. Offsets are viewport fractions
@@ -11,6 +13,8 @@ export interface PlayerLayout {
     playerSide: "left" | "right"
     /** Apply the offset to the transfer view too, not only the personal one. */
     useForTransfer: boolean
+    /** The player's chosen inventory layout; undefined = use the server default. */
+    layout?: LayoutId
 }
 
 export const DEFAULT_PLAYER_LAYOUT: PlayerLayout = { x: 0, y: 0, scale: 1, playerSide: "left", useForTransfer: false }
@@ -29,6 +33,7 @@ export function normalizePlayerLayout(raw: unknown): PlayerLayout {
         scale: clamp(value.scale, 0.75, 1.25, 1),
         playerSide: value.playerSide === "right" ? "right" : "left",
         useForTransfer: value.useForTransfer === true,
+        layout: isLayoutId(value.layout) ? value.layout : undefined,
     }
 }
 

@@ -21,7 +21,10 @@ end
 
 local HOTBAR_SLOTS = math.max(0, math.floor(tonumber(Config.kora_inventory.hotbarSlots) or 5))
 
-local function useHotbarSlot(slot)
+-- Shared use path. The quick slot hotkeys (client/quickslots.lua) resolve a
+-- shortcut to a real inventory slot and then call this, so they get exactly the
+-- same guards, progress-bar gate and server transport as the number keys.
+function KoraInventory.useSlot(slot)
     -- Keys 1-5 also type into chat/search boxes and the pause menu. Only fire
     -- while nothing already owns keyboard focus -- same guard client/compat.lua
     -- uses for the `inventory` command. This also means the panel is always
@@ -72,6 +75,8 @@ local function useHotbarSlot(slot)
     -- compared before it calls the same useItem() the NUI 'use' intent does).
     TriggerServerEvent('QBCore:Server:UseItem', { slot = slot, name = item.name })
 end
+
+local useHotbarSlot = KoraInventory.useSlot
 
 for slot = 1, HOTBAR_SLOTS do
     local command = ('kora_inventory:hotbar%d'):format(slot)

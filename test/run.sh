@@ -42,6 +42,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/no_builtin_consumables.lua
 "${LUA:-lua}" test/smoke/audit_guards.lua
 "${LUA:-lua}" test/smoke/hotbar.lua
+"${LUA:-lua}" test/smoke/quickslots.lua
 "${LUA:-lua}" test/smoke/weapon_carry.lua
 "${LUA:-lua}" test/smoke/weapon_shooting_performance.lua
 "${LUA:-lua}" test/smoke/weapon_damage_client.lua
@@ -71,6 +72,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/shop_hints.lua
 "${LUA:-lua}" test/smoke/shop_blip_fallback.lua
 "${LUA:-lua}" test/smoke/ammo.lua
+"${LUA:-lua}" test/smoke/ammo_info.lua
 "${LUA:-lua}" test/smoke/parachute.lua
 "${LUA:-lua}" test/smoke/vendingmachine.lua
 "${LUA:-lua}" test/smoke/vendingmachine_client.lua

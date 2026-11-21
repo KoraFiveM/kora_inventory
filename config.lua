@@ -103,6 +103,52 @@ Config.kora_inventory = {
     -- inventory is closed; the only visual is the accent outline on those
     -- slots inside the open panel (ui.showHotbar). 0 disables the key binds.
     hotbarSlots = 5,
+    -- Quick slots are SHORTCUTS, not physical slots. Items stay wherever they
+    -- are in the normal inventory; a quick slot is a pointer that resolves to
+    -- the real slot of a matching item. It is shown at the side of the
+    -- inventory (and optionally in the U-key hotbar) and can have a hotkey
+    -- (rebindable keybinds `kora_inventory:quick_<id>`, Settings > Key
+    -- Bindings > FiveM). Nothing is stored on the server; pins (see below) are
+    -- a per-character preference kept on the player's own machine.
+    --
+    -- Each slot picks its item in this order: the item the player pinned to it
+    -- from the UI, then (weapon slots) the weapon currently drawn, then the
+    -- lowest-numbered matching slot. A weapon taken by one weapon quick slot is
+    -- not offered again to another one unless it was pinned there.
+    quickSlots = {
+        -- false registers no keys or callbacks and the UI shows no quick slots.
+        enabled = true,
+        -- true hides quick slots that resolve to nothing; false shows a greyed
+        -- placeholder for them.
+        hideWhenMissing = true,
+        -- Show the bound key on each quick slot in the UI.
+        showKeyHints = true,
+        -- Include resolved quick slots in the U-key on-screen hotbar.
+        inHotbarHud = true,
+        -- Informational: ammunition is always loaded through the normal ammo
+        -- use path, so it is validated by the server against the drawn weapon.
+        reloadFromPockets = true,
+        -- id:       letters, digits and underscores; the command is
+        --           `kora_inventory:quick_<id>`.
+        -- label:    shown in the UI and in the key bindings list.
+        -- accepts:  which items fit. `names` (any of), `type` (item definition
+        --           type, e.g. 'weapon') and `weapontype` (kora_core weapon
+        --           definition weapontype, e.g. 'Pistol'); all given criteria
+        --           must match. Names are not case sensitive.
+        -- linkedTo: the id of another slot. This slot then shows the ammunition
+        --           item whose `ammoType` matches the `ammotype` of the weapon
+        --           resolved for that slot, with the total across all slots.
+        --           Linked slots cannot be pinned.
+        -- key:      default key, '' = unbound. Phone/radio resources and GTA's
+        --           own R reload would clash, so nothing is bound by default.
+        slots = {
+            { id = 'weapon', label = 'Weapon', accepts = { type = 'weapon' }, key = '' },
+            { id = 'ammo',   label = 'Ammo',   linkedTo = 'weapon', key = '' },
+            { id = 'phone',  label = 'Phone',  accepts = { names = { 'phone', 'iphone', 'samsungphone' } }, key = '' },
+            { id = 'radio',  label = 'Radio',  accepts = { names = { 'radio' } }, key = '' },
+            -- { id = 'sidearm', label = 'Sidearm', accepts = { type = 'weapon', weapontype = 'Pistol' }, key = '' },
+        },
+    },
     -- Built-in use handlers owned by kora_inventory for items that otherwise
     -- have no handler anywhere. Set an entry to false to leave that item to
     -- another resource (it then falls back to the legacy UseItem event).
@@ -259,11 +305,50 @@ Config.kora_inventory = {
         -- personal inventory. Size and side apply either way.
         playerLayoutTransfer = false,
 
+        -- Inventory layout the NUI renders: 'classic' (the original window),
+        -- 'loadout', 'compact' or 'dock'. This is the server default; players
+        -- can override it when playerLayoutChoice is on. Unknown values fall
+        -- back to 'classic'. Applied the next time the inventory opens.
+        layout = 'classic',
+        -- Which layouts players may pick (and the server layout may use). A
+        -- layout set to false is hidden from the picker; if every entry is
+        -- false, 'classic' stays available.
+        layouts = { classic = true, loadout = true, compact = true, dock = true },
+        -- Players choose their layout in kora_hud's /ui editor ("Inventory
+        -- layout"). false = everyone gets `layout` above. Needs playerLayout =
+        -- true and kora_hud.
+        playerLayoutChoice = true,
+
         -- Right-clicking a stack of 2 or more in your own or a stash inventory
         -- opens an in-page "split" dialog (amount, Split, Cancel; Escape or a
         -- click outside cancels). Set to false to make right-click do nothing.
         -- Applied the next time the inventory opens.
         rightClickSplit = true,
+
+        -- What right-clicking an item does (this replaces rightClickSplit,
+        -- which is only read when `rightClick` is absent or invalid):
+        --   'split' - the split dialog described above (default)
+        --   'menu'  - a small context menu at the cursor with Use, Split,
+        --             Drop, Give, Ammo info (see weapons.ammoInfo) and Copy,
+        --             showing only what applies to that item
+        --   'none'  - right-click does nothing
+        -- Applied the next time the inventory opens.
+        rightClick = 'split',
+
+        -- Quality-of-life presentation flags. Browser-only: the server still
+        -- validates every resulting move. Applied the next time the inventory opens.
+        -- Shift+click moves a whole stack to the other open inventory.
+        quickTransfer = true,
+        -- Ctrl+drag moves half a stack, Alt+drag moves one.
+        modifierDrag = true,
+        -- 1 / 5 / 10 / half / All buttons beside the amount slider.
+        quickAmounts = true,
+        -- Category chips (All, Weapons, Ammo, Consumables, Other) that dim non-matching slots.
+        filters = true,
+        -- Hover tooltip on filled slots.
+        tooltips = true,
+        -- Weight bar turns amber at warnAt and red at dangerAt (fractions of max weight).
+        weightWarnings = { enabled = true, warnAt = 0.75, dangerAt = 0.95 },
 
         -- Paint a drag-and-drop move or a shop purchase in the browser straight
         -- away instead of waiting for the server's reply, then reconcile with
@@ -563,6 +648,15 @@ Config.kora_inventory = {
             maxLoadedRounds = 240, -- hard metadata cap; keep this close to the weapons used on your server
             shotCooldown = 65, -- client/server floor between native shot reports
             casingOffset = 0.75, -- metres behind/alongside the shooter for the recovered casing marker
+        },
+        -- "Which ammo does this gun take?" Presentation only: the server adds
+        -- `ammo` to weapon views and `ammoType`/`rounds`/`fits` to ammo views,
+        -- computed from kora_core's definitions and the weapon's own metadata.
+        ammoInfo = {
+            enabled = true,
+            where = 'both',        -- 'inspector' | 'menu' | 'both' (hint for the UI)
+            showLoaded = true,     -- include the rounds currently loaded in the weapon
+            showCompatible = true, -- ammo items list the weapons they fit
         },
         -- Wear is applied by the SERVER for every accepted round fired.
         -- `perShot` is durability percentage points (0.10 means 1 point per
