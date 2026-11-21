@@ -18,7 +18,7 @@ export function TopBar({ transfer, query, onQueryChange, error, onClose, trading
     onTrade?: () => void
 }) {
     const t = useLocale()
-    const { controls } = useContext(UiConfigContext)
+    const { controls, organize } = useContext(UiConfigContext)
     const [choice, setChoice] = useState<boolean | undefined>(() => loadControlsChoice())
     const visible = controlsVisible(controls, choice)
     const sent = useRef<boolean | undefined>(undefined)
@@ -43,7 +43,8 @@ export function TopBar({ transfer, query, onQueryChange, error, onClose, trading
     return <div className="inventory-heading">
         <header className="inventory-topbar">
             <div className="brand"><span className="brand-mark"><PackageOpen size={18} /></span><span>{t("ui.inventory_label")}</span></div>
-            <label className="search"><Search size={16} /><input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={t("ui.filter_selected_item")} /></label>
+            {/* Each panel has its own search box when organize.panelSearch is on, so the global one would be a duplicate. */}
+            {!organize.panelSearch && <label className="search"><Search size={16} /><input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={t("ui.filter_selected_item")} /></label>}
             <div className="topbar-actions">
                 {onTrade && <button type="button" className="quiet-action trade-request" onClick={onTrade} title={t("ui.trade_request")} data-testid="trade-request"><Handshake size={15} />{t("ui.trade")}</button>}
                 <span className="session-state">{trading ? t("ui.trade") : transfer ? t("ui.transfer_open") : t("ui.personal_inventory")}</span>

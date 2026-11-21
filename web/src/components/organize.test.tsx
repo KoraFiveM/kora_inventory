@@ -96,7 +96,13 @@ describe("organize controls and panel search", () => {
         expect(dimmed(first)).toBe(0)
     })
 
-    it("keeps the top bar search dimming the player panel", async () => {
+    it("hides the duplicate top bar search while every panel has its own", async () => {
+        await post("kora_inventory:nui:sessionOpened", snapshot(stash))
+        expect(host.querySelector(".inventory-topbar .search input")).toBeNull()
+    })
+
+    it("keeps the top bar search dimming the player panel when panel search is off", async () => {
+        await post("kora_inventory:nui:config", { organize: { enabled: true, sort: true, stack: true, panelSearch: false } })
         await post("kora_inventory:nui:sessionOpened", snapshot(stash))
         const input = host.querySelector<HTMLInputElement>(".inventory-topbar .search input")!
         await act(async () => {

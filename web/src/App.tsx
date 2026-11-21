@@ -98,7 +98,9 @@ function InventoryApp() {
         // Solo layout starts as the player's inventory alone. Its inspector is a
         // drawer, mounted only after selection, so an idle personal inventory does
         // not reserve a permanently empty actions column.
-        inspector: (!solo || selected) ? buildInspector(solo) : null,
+        // Loadout keeps its inspector column filled in the solo view too (the
+        // "Inspect an item" placeholder), so the window has no dead space.
+        inspector: layoutId === "loadout" ? buildInspector(false) : (!solo || selected) ? buildInspector(solo) : null,
         // The drawer-styled inspector (with its close button) whatever the view,
         // mounted only once something is selected: for layouts that float it.
         drawerInspector: selected ? buildInspector(true) : null,
