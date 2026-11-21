@@ -32,6 +32,22 @@ local THROW_RELEASE_MS = 1000
 -- Longest a cooked grenade is waited on while attack is held.
 local THROW_HOLD_MAX_MS = 10000
 local toggling = false
+
+-- Read-only window onto the drawn slot for presentation (client/quickslots.lua
+-- shows the drawn weapon in its quick slot). There is deliberately no setter:
+-- this value is only ever changed by the draw/holster paths below, and the
+-- local event is a notification, never an input.
+KoraInventory = KoraInventory or {}
+function KoraInventory.getDrawnWeaponSlot()
+    return drawnSlot
+end
+
+local function notifyDrawnChanged()
+    if type(TriggerEvent) == 'function' then
+        TriggerEvent('kora_inventory:client:weaponDrawnChanged', drawnSlot)
+    end
+end
+
 local trainingWeapon
 local modifiedWeapon
 local criticalHitsDisabled = false
@@ -82,6 +98,7 @@ local function reportUnequipped()
     drawnName = nil
     drawnThrowable = false
     resetShotCadence()
+    notifyDrawnChanged()
     TriggerServerEvent('kora_inventory:server:weaponUnequipped')
 end
 
@@ -100,6 +117,7 @@ local function stripDrawn(name)
     resetShotCadence()
     drawn, drawnSlot, drawnName = nil, nil, nil
     drawnThrowable = false
+    notifyDrawnChanged()
 end
 
 -- The server saw the equipped item leave the inventory (dropped, given, moved
@@ -221,6 +239,7 @@ RegisterNetEvent('kora_inventory:client:toggleWeapon', function(request)
         drawnSlot = nil
         drawnName = nil
         drawnThrowable = false
+        notifyDrawnChanged()
     else
         local ammo = math.max(0, math.floor(tonumber(request.ammo) or 0))
         if not HasPedGotWeapon(ped, hash, false) then
@@ -243,6 +262,7 @@ RegisterNetEvent('kora_inventory:client:toggleWeapon', function(request)
         drawnSlot = tonumber(request.slot)
         drawnName = request.name
         drawnThrowable = request.throwable == true
+        notifyDrawnChanged()
     end
 
     if request.slot then

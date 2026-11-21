@@ -103,6 +103,52 @@ Config.kora_inventory = {
     -- inventory is closed; the only visual is the accent outline on those
     -- slots inside the open panel (ui.showHotbar). 0 disables the key binds.
     hotbarSlots = 5,
+    -- Quick slots are SHORTCUTS, not physical slots. Items stay wherever they
+    -- are in the normal inventory; a quick slot is a pointer that resolves to
+    -- the real slot of a matching item. It is shown at the side of the
+    -- inventory (and optionally in the U-key hotbar) and can have a hotkey
+    -- (rebindable keybinds `kora_inventory:quick_<id>`, Settings > Key
+    -- Bindings > FiveM). Nothing is stored on the server; pins (see below) are
+    -- a per-character preference kept on the player's own machine.
+    --
+    -- Each slot picks its item in this order: the item the player pinned to it
+    -- from the UI, then (weapon slots) the weapon currently drawn, then the
+    -- lowest-numbered matching slot. A weapon taken by one weapon quick slot is
+    -- not offered again to another one unless it was pinned there.
+    quickSlots = {
+        -- false registers no keys or callbacks and the UI shows no quick slots.
+        enabled = true,
+        -- true hides quick slots that resolve to nothing; false shows a greyed
+        -- placeholder for them.
+        hideWhenMissing = true,
+        -- Show the bound key on each quick slot in the UI.
+        showKeyHints = true,
+        -- Include resolved quick slots in the U-key on-screen hotbar.
+        inHotbarHud = true,
+        -- Informational: ammunition is always loaded through the normal ammo
+        -- use path, so it is validated by the server against the drawn weapon.
+        reloadFromPockets = true,
+        -- id:       letters, digits and underscores; the command is
+        --           `kora_inventory:quick_<id>`.
+        -- label:    shown in the UI and in the key bindings list.
+        -- accepts:  which items fit. `names` (any of), `type` (item definition
+        --           type, e.g. 'weapon') and `weapontype` (kora_core weapon
+        --           definition weapontype, e.g. 'Pistol'); all given criteria
+        --           must match. Names are not case sensitive.
+        -- linkedTo: the id of another slot. This slot then shows the ammunition
+        --           item whose `ammoType` matches the `ammotype` of the weapon
+        --           resolved for that slot, with the total across all slots.
+        --           Linked slots cannot be pinned.
+        -- key:      default key, '' = unbound. Phone/radio resources and GTA's
+        --           own R reload would clash, so nothing is bound by default.
+        slots = {
+            { id = 'weapon', label = 'Weapon', accepts = { type = 'weapon' }, key = '' },
+            { id = 'ammo',   label = 'Ammo',   linkedTo = 'weapon', key = '' },
+            { id = 'phone',  label = 'Phone',  accepts = { names = { 'phone', 'iphone', 'samsungphone' } }, key = '' },
+            { id = 'radio',  label = 'Radio',  accepts = { names = { 'radio' } }, key = '' },
+            -- { id = 'sidearm', label = 'Sidearm', accepts = { type = 'weapon', weapontype = 'Pistol' }, key = '' },
+        },
+    },
     -- Built-in use handlers owned by kora_inventory for items that otherwise
     -- have no handler anywhere. Set an entry to false to leave that item to
     -- another resource (it then falls back to the legacy UseItem event).
