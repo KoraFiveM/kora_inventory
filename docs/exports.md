@@ -98,6 +98,7 @@ Not for general use: `physicalCashGet`, `physicalCashAdd`, `physicalCashRemove`,
 | `getCurrentSession()` | |
 | `HasItem(names, amount?)` | Reads the local session snapshot. |
 | `giveTargetAvailable`, `requestGiveTarget`, `cancelGiveTarget` | Give-target selection used by the UI bridge. |
+| `requestTrade()` | Asks the nearest player to trade, like `/trade`. See [Player trades](./api/trade.md). |
 | `getConfigWeaponAttachments()` | Legacy `qb-weapons` attachment config, derived from the configured component allow-lists. |
 | `fftVersion()`, `fftAction(action, item, amount)` | Only when FFT hooks are enabled, see [FFT hooks](./fft.md). |
 

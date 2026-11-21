@@ -176,6 +176,22 @@ Optional physical cash and the item notification boxes.
 | `itemBoxes.showRemovals` | boolean | Default `true`. Receipts for `RemoveItem`. |
 | `itemBoxes.showUses` | boolean | Default `false`. Receipts for item use. Off by default because a consuming use already draws a removal receipt. |
 
+### Player trades (trade)
+
+The two-sided confirmed trade window. See [Player trades](./trade.md). All keys are editable in `/config`; every key except `command` is read when it is used, so a change applies at once (`slots` and `allowCash` reach the window the next time the inventory opens). `distance`, `requestTimeout`, `confirmDelay`, `maxDuration` and `requestCooldown` are server-only.
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `trade.enabled` | boolean | Default `true`. Turns trading on. Off hides the Trade button, refuses new requests and ends any open trade. |
+| `trade.slots` | integer | Default `8`. Offer slots per side (1 to 32). |
+| `trade.allowCash` | boolean | Default `true`. Each side may add cash: the cash account, or the cash item when `cash.asItem` is on. |
+| `trade.distance` | number | Default `3.0` metres. How close the players must be to request, keep open and complete a trade. |
+| `trade.requestTimeout` | integer | Default `20` seconds. Time the asked player has to answer. |
+| `trade.confirmDelay` | integer | Default `3` seconds. After both press Ready the offers freeze this long before Confirm is accepted. |
+| `trade.maxDuration` | integer | Default `300` seconds. An open trade is cancelled with no changes after this long. |
+| `trade.requestCooldown` | integer | Default `10` seconds. Minimum gap between trade requests from one player. |
+| `trade.command` | string | Default `'trade'`. Chat command that requests a trade with the nearest player; empty for none. Read when the resource starts. |
+
 ### Persistence (persistence)
 
 Durable storage for secondary inventories only. Player items are never stored here.

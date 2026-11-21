@@ -193,6 +193,15 @@ These are presentation features of the window; each can be switched off under `C
 - The weight bar turns amber at 75 percent of capacity and red at 95 percent (`ui.weightWarnings`).
 - Hovering a filled slot for a moment shows a tooltip with the item details.
 
+## Trade with another player
+
+1. Stand next to the other player (within `trade.distance`, 3 m by default) and press **Trade** in the top bar of your inventory, type `/trade`, or use the trade key if you bound one. With several players nearby, point at the right one.
+2. The other player accepts the "Trade request" dialog within 20 seconds.
+3. Both inventories open with the trade window beside them. Drag items onto **You offer** (or Shift+click them); for a stack you choose how many. Type an amount in **Cash** and press **Set** if you want to add money. Right-click an offer, or drag it away, to take it back.
+4. Check **They offer**, then press **Ready**. When both are ready the offers lock for a 3 second countdown; then both press **Confirm trade**.
+
+Nothing leaves your inventory until both have confirmed. If either side changes anything, or either inventory changes, both have to press Ready again. Closing your inventory, walking away or pressing **Cancel trade** ends the trade with no changes. Server owners tune it under `Config.kora_inventory.trade`; developers see [Player trades](./api/trade.md).
+
 ## Limitations worth knowing
 
 - The container, evidence and vehicle-storage modules are Lua tables inside the resource (`KoraInventory.containers`, `KoraInventory.evidence`, `KoraInventory.vehicles`). They are not exported; other resources reach them through configuration callbacks and the exports listed under their modules.

@@ -22,6 +22,7 @@ Player items are never stored by this resource: `kora_core` owns the slot-keyed 
 - **Crafting API** - a headless recipe and craft API for other resources. See [Crafting](./api/crafting.md).
 - **Weapons** - serials, durability, ammunition, ballistics, visible carry on the body and timed draw/holster. See [Weapons](./api/weapons.md).
 - **Durable exchanges** - idempotent item/cash swaps for trusted resources. See [Player exchanges](./api/exchange.md).
+- **Player trades** - a two-sided trade window: both players offer items and cash, press Ready, wait out a short countdown and Confirm; the server swaps everything at once or nothing. See [Player trades](./api/trade.md).
 - **Hooks** - ox-style `registerHook` and qb-style `AddHook`/`AddListener`. See [Hooks](./api/hooks.md).
 - **Compatibility** - `qb-inventory`, `ox_inventory` and `qb-weapons` identities. See [Compatibility](./compatibility.md).
 - **Downed, cuffed and busy blocks** - inventory use is refused while downed or cuffed, while an item is in use, or while another resource blocks the UI. See [Security model](./security.md).
@@ -32,7 +33,7 @@ Getting started
 
 - [Installation](./installation.md) - requirements, start order, manifest, dependencies, legacy import, startup troubleshooting.
 - [How to use](./how-to-use.md) - day-to-day player and developer workflows.
-- [Commands and keybinds](./commands.md) - `/inventory`, `/trunk`, `/hood`, `kora_inventory-migrate`, key bindings, ACE.
+- [Commands and keybinds](./commands.md) - `/inventory`, `/trunk`, `/hood`, `/trade`, `kora_inventory-migrate`, key bindings, ACE.
 
 API reference
 
@@ -51,6 +52,7 @@ API reference
 - [Containers and evidence](./api/containers.md) - portable and generic containers.
 - [Evidence and confiscation](./api/evidence.md) - evidence cases and seizing.
 - [Durable player exchanges](./api/exchange.md) - `ExecutePlayerExchange`.
+- [Player trades](./api/trade.md) - two-sided confirmed trade window between nearby players.
 - [Persistence and migration](./api/persistence.md) - tables, restore and legacy import.
 - [Physical cash bridge](./api/cash.md) - cash as an item.
 - [Events and callbacks](./api/events.md) - net events, local events, callbacks, state bags.

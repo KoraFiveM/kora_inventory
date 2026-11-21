@@ -34,8 +34,8 @@ The built-in UI sends an envelope `{ sessionId, token, intent, payload }`. Third
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `intent / action` | string | `close`, `move` (also `split`, `transfer`, `swapItems`), `use`, `drop`, `give`, `buy` or `sync`. Anything else is refused with `unsupported intent`. Default `transfer`. |
-| `payload` | table | Intent fields. move: `fromInventory`, `fromSlot`, `toInventory`, `toSlot`, `amount` (or `fromSecondary` / `toSecondary` booleans). use: `slot`. drop: `slot`, `amount`. give: `slot`, `amount`. buy: `slot`, `amount`, optional `inventory`. |
+| `intent / action` | string | `close`, `move` (also `split`, `transfer`, `swapItems`), `use`, `drop`, `give`, `buy`, `sync`, `trade` or `tradeRequest`. Anything else is refused with `unsupported intent`. Default `transfer`. |
+| `payload` | table | Intent fields. move: `fromInventory`, `fromSlot`, `toInventory`, `toSlot`, `amount` (or `fromSecondary` / `toSecondary` booleans). use: `slot`. drop: `slot`, `amount`. give: `slot`, `amount`. buy: `slot`, `amount`, optional `inventory`. trade: `op`, `id` and the op's fields (see [Player trades](./trade.md)). tradeRequest: none; the nearest player is picked locally. |
 | `token / sessionId` | string | Optional session token; a mismatch with the current session returns `stale session`. |
 | `announce` | boolean | Default true. When false the caller handles refusals itself. |
 
@@ -204,7 +204,7 @@ local canGive = exports.kora_inventory:giveTargetAvailable()
 true when someone is within 3 m
 ```
 
-### `exports.kora_inventory:requestGiveTarget(requestId)`
+### `exports.kora_inventory:requestGiveTarget(requestId, label?)`
 
 Starts recipient selection: with one nearby player it resolves immediately, with several it starts a kora_target selection on exactly those peds (15 second timeout). The answer arrives as the local event `kora_inventory:client:giveTargetResolved`.
 
@@ -213,6 +213,7 @@ Starts recipient selection: with one nearby player it resolves immediately, with
 | Name | Type | Description |
 | --- | --- | --- |
 | `requestId` | string \| integer | Correlation id echoed in the result. |
+| `label?` | string | kora_target option label when several players are close. Default "Give selected item". |
 
 **Returns**
 
@@ -232,6 +233,31 @@ exports.kora_inventory:requestGiveTarget(1)
 
 ```text
 true; the event reports the recipient server id.
+```
+
+### `exports.kora_inventory:requestTrade()`
+
+Asks the nearest player to trade, exactly like `/trade`: one nearby player is picked at once, several start a kora_target selection. Only the chosen player's server id is sent; the server checks range, bucket, cooldown and state. See [Player trades](./trade.md).
+
+**Parameters**
+
+None.
+
+**Returns**
+
+- **started** — true when the request started; false when trading is disabled, you are already trading, downed or cuffed, or targeting is unavailable.
+- **reason** — string on false.
+
+**Example**
+
+```lua
+exports.kora_inventory:requestTrade()
+```
+
+**Representative console output**
+
+```text
+true; the other player sees the trade request dialog.
 ```
 
 ### `exports.kora_inventory:cancelGiveTarget(reason?)`
