@@ -198,6 +198,7 @@ function api.push(force)
         enabled = true,
         hideWhenMissing = liveSettings().hideWhenMissing ~= false,
         showKeyHints = liveSettings().showKeyHints ~= false,
+        drawer = { startCollapsed = type(liveSettings().drawer) == 'table' and liveSettings().drawer.startCollapsed == true },
         slots = resolved,
     })
 end

@@ -7,8 +7,14 @@ import type { InventoryItem, InventoryView, SessionSnapshot } from "@/lib/types"
 
 export type { LayoutId }
 
-/** Where a layout wants the quick-slot (hotbar) bar relative to the player panel. */
-export type QuickSlotPosition = "side" | "top" | "bottom"
+import type { QuickSlotPosition, QuickSlotSide } from "@/components/QuickSlotBar"
+
+/**
+ * How a layout wants its quick slots drawn: `drawer` hangs a vertical drawer
+ * on the window's edge, `panel` is the loadout column's rows, and
+ * `side` / `top` / `bottom` are the older strips kept for compatibility.
+ */
+export type { QuickSlotPosition, QuickSlotSide }
 
 /**
  * Everything a layout receives from InventoryApp.
@@ -74,8 +80,14 @@ export interface LayoutProps {
     drawerInspector: ReactNode
     /** Esc / Enter / Drag hints and the revision. */
     shortcutBar: ReactNode
-    /** Builds the quick-slot bar for a position; layouts choose where it goes. */
-    renderQuickSlots: (position: QuickSlotPosition) => ReactNode
+    /**
+     * Builds the quick-slot bar for a position; layouts choose where it goes.
+     * `options.side` is the window edge a drawer prefers (it may still end up on
+     * the other one when the preferred edge is off screen). A drawer is
+     * absolutely positioned against the shell: render it as a direct child of
+     * the shell, not inside a grid or flex wrapper.
+     */
+    renderQuickSlots: (position: QuickSlotPosition, options?: { side?: QuickSlotSide }) => ReactNode
     /** The floating drag preview; mount it inside the shell. */
     dragPreview: ReactNode
 }

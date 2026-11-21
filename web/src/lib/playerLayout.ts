@@ -65,3 +65,28 @@ export function onScreenNudge(
     }
     return { x: fix(left, rect.width, viewport.width) / scale, y: fix(top, rect.height, viewport.height) / scale }
 }
+
+/**
+ * Which window edge the quick-slot drawer hangs on, and the area the window
+ * plus its drawer cover. The preferred edge wins unless it has no room on
+ * screen and the other one does. `rect` is the window's current box in viewport
+ * pixels and `current` the nudge already applied to it, so the decision is made
+ * on the un-nudged position and does not chase its own correction.
+ */
+export function drawerPlacement(
+    rect: { left: number; top: number; width: number; height: number },
+    current: { x: number; y: number },
+    drawerWidth: number,
+    preferred: "left" | "right",
+    viewport: { width: number; height: number },
+    scale: number,
+) {
+    const left = rect.left - current.x * scale
+    const fits = { left: left >= drawerWidth - 0.5, right: left + rect.width + drawerWidth <= viewport.width + 0.5 }
+    const other = preferred === "left" ? "right" : "left"
+    const side = fits[preferred] || !fits[other] ? preferred : other
+    const union = side === "left"
+        ? { ...rect, left: rect.left - drawerWidth, width: rect.width + drawerWidth }
+        : { ...rect, width: rect.width + drawerWidth }
+    return { side, flipped: side !== preferred, rect: union }
+}

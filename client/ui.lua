@@ -75,7 +75,7 @@ local UI_LOCALE_KEYS = {
     'select_item_help', 'close', 'use_selected', 'move_or_stack', 'drop',
     'split_dialog', 'split_title', 'move_how_many', 'cancel', 'split',
     'quick_slots', 'quick_slot_item', 'quick_slot_empty', 'quick_slot_pinned', 'quick_slot_key',
-    'quick_slot_unpin', 'quick_slot_pin_failed', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
+    'quick_slot_unpin', 'quick_slot_pin_failed', 'quick_drawer_collapse', 'quick_drawer_expand', 'loadout', 'quick_slot_loaded', 'quick_slot_mags', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
     'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
     'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type', 'jammed',
     'sort_panel', 'stack_panel', 'panel_search', 'panel_search_placeholder',

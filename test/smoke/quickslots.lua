@@ -342,6 +342,7 @@ H.equal(message.action, 'kora_inventory:nui:quickSlots', 'push sends the NUI qui
 H.equal(message.data.enabled, true, 'enabled flag')
 H.equal(message.data.hideWhenMissing, true, 'hideWhenMissing flag')
 H.equal(message.data.showKeyHints, true, 'showKeyHints flag')
+H.equal(message.data.drawer.startCollapsed, false, 'drawer starts expanded by default')
 H.equal(#message.data.slots, 4, 'one entry per quick slot')
 H.equal(message.data.slots[1].slot, 2, 'weapon resolved to the lowest weapon slot')
 H.equal(message.data.slots[2].slot, 6, 'ammo resolved')
@@ -486,5 +487,13 @@ H.ok(ui:find('KoraInventory.ui', 1, true), 'ui.lua exposes the bridge helper')
 H.ok(ui:find('quick = ', 1, true) and ui:find('inHotbarHud', 1, true), 'the hotbar HUD payload carries resolved quick slots')
 H.ok(weaponcarry:find('function KoraInventory.getDrawnWeaponSlot()', 1, true), 'weaponcarry exposes a read-only drawn slot getter')
 H.ok(not weaponcarry:find('setDrawnWeapon', 1, true), 'no setter for the drawn weapon was added')
+
+do
+    local collapsedConfig = fresh()
+    collapsedConfig.drawer = { startCollapsed = true }
+    local collapsedEnv = runClient(collapsedConfig, player, nil)
+    KoraInventory.quickSlotsClient.push(true)
+    H.equal(sentOf(collapsedEnv).data.drawer.startCollapsed, true, 'drawer.startCollapsed is forwarded to the NUI')
+end
 
 H.finish()

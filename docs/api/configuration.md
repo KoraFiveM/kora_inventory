@@ -435,7 +435,7 @@ Keys that exist in `config.lua` but are not listed in the reference tables above
 | `stackableWeapons` | table | `weapon_grenade`, `weapon_molotov` | Weapons that stack in one slot instead of one slot each (no serial). Only affects items added afterwards. |
 | `ui.playerLayout` | boolean | `true` | Register the window with kora_hud's `/ui` editor so players can move, resize (75-125 %) and pick a side. Needs `kora_hud`. |
 | `ui.playerLayoutTransfer` | boolean | `false` | Default for "Use my position for stashes and trunks". |
-| `ui.layout` | string | `'classic'` | Server default inventory layout: `classic` (original three columns), `loadout` (pockets, quick slots over the inspector, other inventory), `compact` (narrow single column, inspector as a popover) or `dock` (full-height edge panel with tabs; see [NUI and UI](./nui.md)). An unknown value falls back to `classic`. Applied the next time the inventory opens. |
+| `ui.layout` | string | `'classic'` | Server default inventory layout: `classic` (original three columns), `loadout` (pockets, the Loadout panel over the inspector, other inventory), `compact` (narrow single column, inspector as a popover) or `dock` (full-height edge panel with tabs; see [NUI and UI](./nui.md)). An unknown value falls back to `classic`. Applied the next time the inventory opens. |
 | `ui.layouts` | table | all four `true` | Which layouts may be used and picked, for example `classic = true, dock = false`. Only an explicit `false` disables one; if all are `false`, `classic` stays available. |
 | `ui.playerLayoutChoice` | boolean | `true` | Players choose their layout in kora_hud's `/ui` editor ("Inventory layout", listing only the allowed layouts). `false` gives everyone `ui.layout`. Needs `ui.playerLayout` and `kora_hud`. |
 | `vehicles.gloveboxRequireSeated` | boolean | `true` | The server requires the player to be seated in the vehicle for the glovebox. |
@@ -462,13 +462,14 @@ The `/config` editor entries live in `config/schema/organize.lua` (and `config/s
 
 ## Quick slots (`Config.kora_inventory.quickSlots`)
 
-Quick slots are shortcuts, not physical slots. Items stay wherever they are in the player's normal inventory (slots `1..playerSlots`). A quick slot is a pointer that resolves to the real slot of a matching item. It is shown at the side of the inventory, can be included in the U-key on-screen hotbar, and can have a hotkey. Nothing new is stored on the server and the server gains no new authority: a hotkey uses the resolved item through the same path as the number-key hotbar. The settings are read when the client starts, so restart the resource after editing them.
+Quick slots are shortcuts, not physical slots. Items stay wherever they are in the player's normal inventory (slots `1..playerSlots`). A quick slot is a pointer that resolves to the real slot of a matching item. It is shown in a drawer on the side of the inventory window (a Loadout panel in the loadout layout), can be included in the U-key on-screen hotbar, and can have a hotkey. Nothing new is stored on the server and the server gains no new authority: a hotkey uses the resolved item through the same path as the number-key hotbar. The settings are read when the client starts, so restart the resource after editing them.
 
 | Option | Type | Description |
 | --- | --- | --- |
 | `quickSlots.enabled` | boolean | Default `true`. `false` registers no keybinds and no NUI callback, and the client sends the page a single `enabled = false` message. |
 | `quickSlots.hideWhenMissing` | boolean | Default `true`. `true` hides quick slots that resolve to no item; `false` makes the page show greyed placeholders. Sent to the page. |
 | `quickSlots.showKeyHints` | boolean | Default `true`. The page shows the bound key on each quick slot. Sent to the page. |
+| `quickSlots.drawer` | table | `{ startCollapsed = false }`. The quick slots hang in a drawer on the window's edge (classic, compact and dock layouts). `startCollapsed = true` opens the drawer as a slim strip. Once a player uses the drawer handle their choice is remembered on their own machine and wins over this value. Sent to the page. |
 | `quickSlots.inHotbarHud` | boolean | Default `true`. Adds the resolved quick slots to the U-key on-screen hotbar payload as `quick`. |
 | `quickSlots.reloadFromPockets` | boolean | Default `true`. Informational. Ammunition is always loaded through the normal ammo use path, which the server validates against the drawn weapon. |
 | `quickSlots.slots` | table | Ordered list of quick slots, see below. |
@@ -497,6 +498,7 @@ Pins are stored in the player's own client key-value storage, per character (kor
 quickSlots = {
     enabled = true,
     hideWhenMissing = false,
+    drawer = { startCollapsed = true },
     slots = {
         { id = 'weapon',  label = 'Weapon',  accepts = { type = 'weapon' }, key = '' },
         { id = 'sidearm', label = 'Sidearm', accepts = { type = 'weapon', weapontype = 'Pistol' }, key = '' },

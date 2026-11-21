@@ -32,7 +32,7 @@ function InventoryApp() {
     const t = useLocale()
     const s = useInventorySession()
     const { session, uiConfig } = s
-    const shell = useShellLayout({ hasSession: Boolean(session), transferView: Boolean(session?.secondary) })
+    const shell = useShellLayout({ transferView: Boolean(session?.secondary) })
 
     if (!session) return <UiConfigContext.Provider value={uiConfig}><DragGuard open={false} /><AuditViewer />{s.hotbar && <HotbarHud hotbar={s.hotbar} />}<ItemBoxStack boxes={s.itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
 
@@ -92,7 +92,7 @@ function InventoryApp() {
             ? <InventoryPanel inventory={session.secondary} {...panelHandlers} />
             : solo ? null : <section className="inventory-panel secondary-empty"><PackageOpen size={28} /><h2>{t("ui.no_secondary_inventory")}</h2><p>{t("ui.open_secondary_inventory")}</p></section>,
         shortcutBar: <div className="shortcut-stack"><TipCard sessionId={session.sessionId} quickSlotsEnabled={s.quickSlots.enabled} /><ShortcutBar movePending={s.movePending} revision={session.revision} /></div>,
-        renderQuickSlots: (position) => <QuickSlotBar position={position} state={s.quickSlots} player={session.player} busy={locked} selected={selected} onSelect={s.selectSlot} onActivate={s.activateItem} onPin={s.pinQuick} onFlash={s.flashSlot} />,
+        renderQuickSlots: (position, options) => <QuickSlotBar position={position} side={options?.side} flipped={shell.drawerFlip} state={s.quickSlots} player={session.player} busy={locked} selected={selected} onSelect={s.selectSlot} onActivate={s.activateItem} onPin={s.pinQuick} onFlash={s.flashSlot} />,
     }
 
     return <UiConfigContext.Provider value={uiConfig}><SlotUiContext.Provider value={s.slotUi}><ItemBoxStack boxes={s.itemBoxes} /><DragGuard open /><WorldDropZone session={session} busy={locked} onDropOut={s.dropOut} />{s.splitTarget && <SplitDialog label={s.splitTarget.item.label ?? s.splitTarget.item.name} stack={s.splitTarget.item.amount} onConfirm={s.confirmSplit} onCancel={s.cancelSplit} />}{s.combineTarget && <CombinePopover label={s.combineTarget.recipe.label} fromLabel={s.combineTarget.fromItem.label ?? s.combineTarget.fromItem.name} toLabel={s.combineTarget.toItem.label ?? s.combineTarget.toItem.name} onConfirm={s.confirmCombine} onCancel={s.cancelCombine} />}{s.menu && <ItemContextMenu target={s.menu} playerId={session.player.id} giveAvailable={s.giveAvailable} busy={locked} onClose={s.closeMenu} onUse={s.use} onOpenBag={s.openBag} onSplit={s.openSplit} onDrop={s.dropItem} onGive={s.giveItem} onCopy={s.copyItem} />}<Layout {...layoutProps} /></SlotUiContext.Provider></UiConfigContext.Provider>

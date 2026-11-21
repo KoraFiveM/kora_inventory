@@ -72,6 +72,14 @@ quickSlots.showKeyHints = K.boolean(quickSlots.showKeyHints, {
     live = true,
 })
 
+if type(quickSlots.drawer) == 'table' then
+    quickSlots.drawer.startCollapsed = K.boolean(quickSlots.drawer.startCollapsed, {
+        label = 'Quick slot drawer starts collapsed',
+        description = 'When on, the quick slot drawer on the side of the inventory starts folded into a thin handle until the player opens it. After a player opens or closes it once, their own choice is remembered.' .. APPLY_OPEN,
+        live = true,
+    })
+end
+
 quickSlots.inHotbarHud = K.boolean(quickSlots.inHotbarHud, {
     label = 'Quick slots in the hotbar display',
     description = 'Includes filled quick slots in the on-screen hotbar shown when a player presses the show-hotbar key. Applies the next time the hotbar is shown.',
