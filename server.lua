@@ -2950,10 +2950,16 @@ local function intentOrganize(src, request)
     if target.type == 'shop' then
         return false, 'shop inventories cannot be organized'
     end
+    -- A searched / robbed player's pockets are a secondary panel too. The
+    -- commit below writes the plan into a player inventory, so organizing one
+    -- is only ever allowed for the caller's own.
+    if target.type == 'player' and target.source ~= src then
+        return false, 'cannot organize another player\'s inventory'
+    end
     if target.blocked or target.durablePending then
         return false, 'inventory is locked'
     end
-    if isAnyUseBusy(src) then
+    if isAnyUseBusy(target.type == 'player' and target.source or src) then
         notifyBusyBlocked(src)
         return false, BUSY_ERROR
     end
@@ -2972,6 +2978,9 @@ local function intentOrganize(src, request)
         end
         if current.type == 'shop' or current.blocked or current.durablePending then
             return false, 'inventory is locked'
+        end
+        if current.type == 'player' and current.source ~= src then
+            return false, 'cannot organize another player\'s inventory'
         end
         local keep = 0
         if current.type == 'player' and settings.keepHotbar ~= false then
@@ -2997,7 +3006,7 @@ local function intentOrganize(src, request)
             return false, 'plan mismatch'
         end
         if current.type == 'player' then
-            local ok, err = playerSetPath(src, { 'items' }, plan.items)
+            local ok, err = playerSetPath(current.source, { 'items' }, plan.items)
             if not ok then
                 return false, err or 'inventory write failed'
             end
