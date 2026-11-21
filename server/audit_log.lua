@@ -34,7 +34,10 @@ auditLog.RANGES = RANGES
 auditLog.clock = os.time
 auditLog.sink = nil -- function(rows) -> ok|nil, err ; defaults to persistence
 
-local ring, queue = {}, {}
+-- In-memory ring: a circular buffer (`ring` is the physical array, `ringHead`
+-- the physical index of the OLDEST entry, `ringSize` the count, `ringCap` the
+-- capacity the layout was built for), so recording never shifts the array.
+local ring, ringHead, ringSize, ringCap, queue = {}, 1, 0, 0, {}
 local lastFlush, lastPrune, flushing, flushScheduled = nil, nil, false, false
 local contexts = {}
 local anomalyState, anomalyFired = {}, {}
@@ -212,6 +215,46 @@ local function ringLimit()
     return math.floor(number((Config.kora_inventory or {}).auditLimit, 1000, 100, 20000))
 end
 
+---Entry `position` of the ring, 1 = oldest ... ringSize = newest.
+local function ringAt(position)
+    return ring[(ringHead + position - 2) % ringCap + 1]
+end
+
+---The ring as a fresh oldest-first array.
+local function ringList()
+    local list = {}
+    for position = 1, ringSize do
+        list[position] = ringAt(position)
+    end
+    return list
+end
+
+---Replaces the ring contents with `list` (oldest first), keeping the newest
+---`limit` entries, laid out linearly.
+local function ringLoad(list, limit)
+    local drop = math.max(0, #list - limit)
+    local fresh = {}
+    for position = drop + 1, #list do
+        fresh[#fresh + 1] = list[position]
+    end
+    ring, ringHead, ringSize, ringCap = fresh, 1, #fresh, limit
+end
+
+---O(1) append. The oldest entry is overwritten once the ring is full.
+local function ringPush(entry, limit)
+    if limit ~= ringCap then
+        -- The configured limit changed: re-lay the ring out once.
+        ringLoad(ringList(), limit)
+    end
+    if ringSize < ringCap then
+        ring[(ringHead + ringSize - 1) % ringCap + 1] = entry
+        ringSize = ringSize + 1
+    else
+        ring[ringHead] = entry
+        ringHead = ringHead % ringCap + 1
+    end
+end
+
 ---Records one item creation (or, with trackRemovals, removal). Never yields.
 ---@param entry table { action, source, citizenid, item, amount, inventory, resource, reason }
 ---@return table|nil recorded the stored entry, nil when disabled or invalid
@@ -239,14 +282,7 @@ function auditLog.record(entry)
         resource = clean(entry.resource or auditLog.invoker(), 96),
         reason = clean(entry.reason, 255),
     }
-    ring[#ring + 1] = stored
-    local overflow = #ring - ringLimit()
-    if overflow > 0 then
-        table.move(ring, overflow + 1, #ring, 1)
-        for index = #ring, #ring - overflow + 1, -1 do
-            ring[index] = nil
-        end
-    end
+    ringPush(stored, ringLimit())
     if persisting() then
         queue[#queue + 1] = stored
         if #queue > QUEUE_CAP then
@@ -336,12 +372,13 @@ function auditLog.prune()
     local cutoff = auditLog.retentionCutoff()
     lastPrune = now()
     local kept = {}
-    for _, entry in ipairs(ring) do
+    for position = 1, ringSize do
+        local entry = ringAt(position)
         if entry.at >= cutoff then
             kept[#kept + 1] = entry
         end
     end
-    ring = kept
+    ringLoad(kept, ringCap > 0 and ringCap or ringLimit())
     if persisting() then
         local persistence = inventory.persistence
         if persistence and persistence.auditPrune then
@@ -486,8 +523,8 @@ function auditLog.query(raw)
     end
     result.source = 'memory'
     local skipped = filter.page * PAGE_SIZE
-    for index = #ring, 1, -1 do
-        local entry = ring[index]
+    for position = ringSize, 1, -1 do
+        local entry = ringAt(position)
         if matches(entry, filter) then
             if skipped > 0 then
                 skipped = skipped - 1
@@ -499,7 +536,7 @@ function auditLog.query(raw)
             end
         end
     end
-    result.summary = auditLog.summarise(ring, now() - 3600, 5)
+    result.summary = auditLog.summarise(ringList(), now() - 3600, 5)
     return result
 end
 
@@ -536,7 +573,7 @@ end
 
 ---Test hook: forget all in-memory state.
 function auditLog.reset()
-    ring, queue = {}, {}
+    ring, ringHead, ringSize, ringCap, queue = {}, 1, 0, 0, {}
     lastFlush, lastPrune, flushing, flushScheduled = nil, nil, false, false
     contexts, anomalyState, anomalyFired = {}, {}, {}
     lastSinkWarn = 0

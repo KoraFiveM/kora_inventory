@@ -305,7 +305,7 @@ What a searcher sees and may open when they open another player's inventory. See
 | --- | --- | --- |
 | `search.hideContainerContents` | boolean | Default `true`. Live. Portable containers in a searched player's inventory are shown closed: no container id and nothing about their contents is sent to the searcher. Off shows them like ordinary items. |
 | `search.openContainers` | boolean | Default `true`. Live. Lets a searcher open a searched player's bag with the `openTargetContainer` intent. The server re-checks the session, slot, range, bucket and search policy. Off refuses every such request and the view stops offering Open. |
-| `search.openTime` | integer | Default `2000`. Live. Milliseconds of progress bar on the searcher's client before the open request is sent (0 to 30000). A client-side delay only; the server checks everything when the request arrives. |
+| `search.openTime` | integer | Default `2000`. Live. Milliseconds of progress bar the searcher must complete before the bag opens (0 to 20000). The server runs the bar on the searcher's client and enforces the minimum elapsed time, then re-validates the session and slot before opening. |
 
 ### Water damage (waterDamage)
 
@@ -317,7 +317,7 @@ Electronics damaged by swimming. See [Items and metadata](./items.md).
 | `waterDamage.swimSeconds` | integer | Default `3`. Live. Seconds of swimming before the client reports (1 to 120). The server still accepts one report per player every 10 seconds. |
 | `waterDamage.items` | table | Default `phone`, `iphone`, `samsungphone` at `chance = 1.0` and `radio` at `chance = 0.5`. Live. Item name to `{ chance = 0..1 }`, rolled once per carried stack per report. |
 | `waterDamage.mode` | string | Default `flag`. Live. `flag`, `convert` or `remove`; anything else behaves like `flag`. |
-| `waterDamage.into` | string \| nil | Default `nil`. Live. Item used by `convert`; an unknown or missing item falls back to `flag`. |
+| `waterDamage.into` | string \| nil | Default `nil`. Live. Item used by `convert`; an unknown or missing item falls back to `flag`. Swimming is self-reported, so never use an item worth more than the original (use junk such as garbage). |
 | `waterDamage.repairItem` | string | Default `electronickit`. Live. Using it repairs the first water damaged pocket item and consumes one. |
 | `waterDamage.protectedBy` | table | Default `{ 'paperbag' }`. Reserved, no effect yet: items inside any portable container are already never damaged. |
 

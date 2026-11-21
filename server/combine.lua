@@ -110,6 +110,10 @@ local function normalise(raw, id)
     if not whole(consumeA, 0, MAX_AMOUNT) or not whole(consumeB, 0, MAX_AMOUNT) then
         return nil, 'invalid consumed amount'
     end
+    -- A recipe that consumes nothing would be a free item printer.
+    if consumeA + consumeB < 1 then
+        return nil, 'combination must consume at least one item'
+    end
     if not whole(time, 0, MAX_TIME) then
         return nil, 'invalid combination time'
     end
@@ -320,6 +324,27 @@ local function snapshot(item)
     return { name = item.name, amount = item.amount, info = internal.copy(item.info or {}) }
 end
 
+---True (after telling the player) when either ingredient may not be combined:
+---a spoiled stack (decay) or a water damaged item. Same guards use / move use.
+---Reads the slots fresh from the inventory.
+local function ingredientBlocked(src, key, fromSlot, toSlot)
+    local current = internal.getInventory(key)
+    local decayRuntime = inventory.decayRuntime
+    if decayRuntime and (decayRuntime.guard(key, fromSlot, src) or decayRuntime.guard(key, toSlot, src)) then
+        return true, 'this item has spoiled'
+    end
+    local water = inventory.waterDamage
+    if water and current then
+        for _, slot in ipairs({ fromSlot, toSlot }) do
+            local item = current.items[slot]
+            if item and water.blocksUse(src, item) then
+                return true, 'this item is water damaged'
+            end
+        end
+    end
+    return false
+end
+
 -- The slot still holds the very item the player chose and enough of it.
 local function unchanged(item, snap, need)
     return item ~= nil
@@ -467,6 +492,11 @@ function combine.intent(src, request)
         end
     end
 
+    local blocked, blockedReason = ingredientBlocked(src, key, fromSlot, toSlot)
+    if blocked then
+        return false, blockedReason
+    end
+
     local fromSnap, toSnap = snapshot(first), snapshot(second)
     local waited = false
     active[src] = true
@@ -499,6 +529,11 @@ function combine.intent(src, request)
         if not currentSession then
             return false, 'stale inventory'
         end
+        -- Ingredients can spoil or get wet while the bar runs.
+        local nowBlocked, nowReason = ingredientBlocked(src, key, fromSlot, toSlot)
+        if nowBlocked then
+            return false, nowReason
+        end
         return commit(src, key, fromSlot, toSlot, recipe, fromSnap, toSnap)
     end)
     release(src, fromSlot, toSlot)
@@ -510,6 +545,10 @@ function combine.intent(src, request)
         return false, result
     end
 
+    -- Item-creation audit (server/audit_log.lua): the result item was minted.
+    if internal.auditAdd then
+        internal.auditAdd('combine', src, key, recipe.result, recipe.amount, recipe.id)
+    end
     internal.recordAudit('combine', src, {
         recipe = recipe.id,
         from = first.name,

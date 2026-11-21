@@ -142,7 +142,7 @@ end
 
 ---Merges stackable groups into their lowest slots. `list` is modified in place
 ---and returned without the entries that were emptied.
-local function stackList(list, maxStack, keep)
+local function stackList(list, maxStack, keep, merge)
     local groups = {}
     for _, entry in ipairs(list) do
         local item = entry.item
@@ -174,11 +174,27 @@ local function stackList(list, maxStack, keep)
             -- rather than lose the surplus.
             if math.ceil(group.total / limit) <= #group.entries then
                 local left = group.total
+                -- Folding stacks together must not launder their metadata:
+                -- the server's merge hook (decay: the stack keeps its OLDEST
+                -- stamp) sees every folded entry, exactly like a normal merge.
+                if type(merge) == 'function' then
+                    for index = 2, #group.entries do
+                        merge(group.first, group.entries[index].item)
+                    end
+                end
+                local firstKept
                 for _, entry in ipairs(group.entries) do
                     local take = math.min(left, limit)
                     if take > 0 then
                         entry.item.amount = take
                         left = left - take
+                        if type(merge) == 'function' then
+                            if firstKept then
+                                -- Every stack of the group carries the same (oldest) stamp.
+                                merge(entry.item, firstKept)
+                            end
+                            firstKept = firstKept or entry.item
+                        end
                     else
                         emptied[entry] = true
                     end
@@ -213,6 +229,9 @@ end
 ---   order string[]     category order for 'sort' (default organize.DEFAULT_ORDER)
 ---   classify fun(item): string  category of an item (default organize.category)
 ---   maxStack fun(item): number|nil  largest stack for an item (default unbounded)
+---   merge fun(into, from)  called with the two (copied) items for every stack folded
+---                     into another, so per-stack metadata (decay stamps) is combined
+---                     by the same rule a normal merge uses (default none)
 ---@return table|nil result { items = slot -> item, changed = boolean }
 ---@return string|nil err
 function organize.plan(items, slots, mode, opts)
@@ -232,7 +251,7 @@ function organize.plan(items, slots, mode, opts)
     end
     local beforeCount, beforeAmount = totals(list)
 
-    list = stackList(list, opts.maxStack, keep)
+    list = stackList(list, opts.maxStack, keep, opts.merge)
 
     if mode == 'sort' then
         local order = {}

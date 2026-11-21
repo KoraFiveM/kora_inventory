@@ -288,8 +288,9 @@ Config.kora_inventory = {
         -- intent). Needs the normal search permission; the server re-checks
         -- the session, the slot, the target's range/bucket and policy.
         openContainers = true,
-        -- Milliseconds of progress bar the searcher's client runs before the
-        -- open request is sent. 0 = instant. Cosmetic delay (client side).
+        -- Milliseconds of progress bar the searcher must complete before the bag
+        -- opens (0..20000, 0 = instant). The SERVER runs the bar on the
+        -- searcher's client and refuses an answer that comes back too early.
         openTime = 2000,
     },
     -- Water damage for electronics. Off by default. The client reports (payload
@@ -309,7 +310,11 @@ Config.kora_inventory = {
         -- 'flag' marks info.waterDamaged (item cannot be used until repaired),
         -- 'convert' turns the item into `into`, 'remove' deletes it.
         mode = 'flag',
-        into = nil, -- item name used by mode = 'convert' (e.g. 'garbage')
+        -- Item name used by mode = 'convert' (e.g. 'garbage'). WARNING: the
+        -- swim report is self-reported (it can only harm the sender, who can
+        -- trigger it at will), so `into` must NEVER be worth more than the
+        -- original item. Use junk such as garbage.
+        into = nil,
         -- Using this item clears the flag from a damaged item (one is consumed).
         repairItem = 'electronickit',
         -- Item names that protect what is stored in them. Portable containers

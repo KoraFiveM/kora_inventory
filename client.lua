@@ -346,21 +346,8 @@ local function submitIntent(intent)
             reject('invalid item slot')
             return false, 'invalid item slot'
         end
-        local openTime = math.max(0, math.floor(tonumber(search.openTime) or 0))
-        if openTime > 0 then
-            KoraInventory.useInFlight = true
-            local completed = KoraInventory.useGate({
-                useTime = openTime,
-                label = KoraInventory.text('inventory.opening_bag', 'Opening bag...'),
-            })
-            KoraInventory.useInFlight = false
-            if not completed then
-                return false, 'cancelled'
-            end
-            if not session or session.token ~= requestToken then
-                return false, 'stale session'
-            end
-        end
+        -- The opening delay (search.openTime) is a progress bar the SERVER runs
+        -- on this client (kora_inventory:client:combineProgress) and enforces.
         local called, ok, result = pcall(callServer, 'intent', 'kora_inventory:server:intent', {
             token = session.token,
             action = 'openTargetContainer',

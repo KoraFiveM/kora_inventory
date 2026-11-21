@@ -178,6 +178,9 @@ local function rollItems(src)
                 local removed, _, removedItem = inventoryApi.removeFrom(playerKey, slot, amount)
                 if removed then
                     ok = inventoryApi.addTo(playerKey, into, amount, slot, {}, 'water-damage')
+                    if ok and inventoryApi.auditAdd then
+                        inventoryApi.auditAdd('water', src, playerKey, into, amount, 'water-damage:' .. tostring(removedItem and removedItem.name or item.name))
+                    end
                     if not ok then
                         -- Could not place the replacement: put the original back.
                         inventoryApi.addTo(playerKey, removedItem.name, amount, slot, removedItem.info or removedItem.metadata,

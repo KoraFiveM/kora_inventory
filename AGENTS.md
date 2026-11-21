@@ -49,7 +49,13 @@ server-generated `info.containerId` to a real kora_core-owned player item throug
 the mutation funnel. Configured portable item types (`containers.items`) are
 opened only through the existing validated `use` intent: resolve the real slot,
 item definition, and present-possession policy on the server; never accept a
-container ID from the browser. Keep portable containers out of other containers
+container ID from the browser. The one other sanctioned path is the
+`openTargetContainer` intent, used by a player who is searching another player:
+its payload is the session's granted secondary inventory ID and a slot only; the
+target, the real item and the bound container are re-derived on the server, the
+`search.openTime` bar is run and timed by the server, and the search policy
+(range, bucket, inspection access, still carried) is re-checked on every access
+to the opened bag. Do not add a third way in. Keep portable containers out of other containers
 unless an explicit nesting policy is added. Evidence/confiscation is default-deny and must retain its
 server-side access, target entity, range, routing-bucket, slot/amount, capacity
 and deterministic-lock checks. Metadata always comes from the source item.

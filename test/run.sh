@@ -40,6 +40,8 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/use_item.lua
 "${LUA:-lua}" test/smoke/busy_use.lua
 "${LUA:-lua}" test/smoke/combine.lua
+"${LUA:-lua}" test/smoke/combine_guards.lua
+"${LUA:-lua}" test/smoke/audit_creation_paths.lua
 "${LUA:-lua}" test/smoke/no_builtin_consumables.lua
 "${LUA:-lua}" test/smoke/audit_guards.lua
 "${LUA:-lua}" test/smoke/hotbar.lua
@@ -89,10 +91,14 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/config_schema.lua
 "${LUA:-lua}" test/smoke/organize.lua
 "${LUA:-lua}" test/smoke/organize_intent.lua
+"${LUA:-lua}" test/smoke/organize_search.lua
+"${LUA:-lua}" test/smoke/organize_decay.lua
+"${LUA:-lua}" test/smoke/internal_keys.lua
 "${LUA:-lua}" test/smoke/search_containers.lua
 "${LUA:-lua}" test/smoke/water_damage.lua
 "${LUA:-lua}" test/smoke/decay.lua
 "${LUA:-lua}" test/smoke/audit_log.lua
+"${LUA:-lua}" test/smoke/audit_ring.lua
 "${LUA:-lua}" test/smoke/omnipack.lua
 "${LUA:-lua}" test/smoke/trade.lua
 "${LUA:-lua}" test/smoke/controls.lua

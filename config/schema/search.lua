@@ -16,9 +16,9 @@ cfg.openContainers = Kora.config.boolean(cfg.openContainers, {
 })
 cfg.openTime = Kora.config.integer(cfg.openTime, {
     label = 'Time to open a searched bag (milliseconds)',
-    description = 'How long the searcher’s progress bar runs before the request to open the bag is sent. 0 opens it instantly. This delay is drawn on the searcher’s own screen; the server still checks everything when the request arrives. Applies on the next open request.',
+    description = 'How long the searcher’s progress bar runs before the bag opens. 0 opens it instantly. The server runs the bar on the searcher’s screen and refuses an answer that comes back too early, then checks everything again before opening. Applies on the next open request.',
     min = 0,
-    max = 30000,
+    max = 20000,
     step = 100,
     live = true,
 })

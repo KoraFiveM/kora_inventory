@@ -2950,10 +2950,16 @@ local function intentOrganize(src, request)
     if target.type == 'shop' then
         return false, 'shop inventories cannot be organized'
     end
+    -- A searched / robbed player's pockets are a secondary panel too. The
+    -- commit below writes the plan into a player inventory, so organizing one
+    -- is only ever allowed for the caller's own.
+    if target.type == 'player' and target.source ~= src then
+        return false, 'cannot organize another player\'s inventory'
+    end
     if target.blocked or target.durablePending then
         return false, 'inventory is locked'
     end
-    if isAnyUseBusy(src) then
+    if isAnyUseBusy(target.type == 'player' and target.source or src) then
         notifyBusyBlocked(src)
         return false, BUSY_ERROR
     end
@@ -2973,6 +2979,9 @@ local function intentOrganize(src, request)
         if current.type == 'shop' or current.blocked or current.durablePending then
             return false, 'inventory is locked'
         end
+        if current.type == 'player' and current.source ~= src then
+            return false, 'cannot organize another player\'s inventory'
+        end
         local keep = 0
         if current.type == 'player' and settings.keepHotbar ~= false then
             keep = math.max(0, math.min(current.slots, math.floor(tonumber(config.hotbarSlots) or 5)))
@@ -2982,6 +2991,7 @@ local function intentOrganize(src, request)
             order = type(settings.sortOrder) == 'table' and settings.sortOrder or nil,
             classify = organizeCategory,
             maxStack = organizeMaxStack,
+            merge = decayHelpers.merge,
         })
         if not plan then
             return false, planErr
@@ -2997,7 +3007,7 @@ local function intentOrganize(src, request)
             return false, 'plan mismatch'
         end
         if current.type == 'player' then
-            local ok, err = playerSetPath(src, { 'items' }, plan.items)
+            local ok, err = playerSetPath(current.source, { 'items' }, plan.items)
             if not ok then
                 return false, err or 'inventory write failed'
             end
@@ -3066,6 +3076,53 @@ function ext.intentOpenTargetContainer(src, request)
         return false, 'invalid item slot'
     end
     local itemName, targetSrc = target.items[slot].name, target.source
+    -- The opening delay is enforced HERE, not by the browser or client: the bar
+    -- runs on the searcher's client through a server callback, and an answer
+    -- that comes back sooner than the bar can run is a refusal (same rule as
+    -- combine and the weapon upkeep bars). The wait yields, so everything is
+    -- re-validated and the slot re-resolved before anything opens.
+    local openTime = math.min(20000, math.max(0, math.floor(tonumber(config.search.openTime) or 0)))
+    if openTime > 0 then
+        ext.openingBag = ext.openingBag or {}
+        if ext.openingBag[src] then
+            return false, 'already opening a container'
+        end
+        ext.openingBag[src] = true
+        local token, secondaryKey = session.token, session.secondary
+        local ran, passed, reason = pcall(function()
+            local startedAt = GetGameTimer()
+            local called, finished = pcall(Kora.callback.trigger, src, 'kora_inventory:client:combineProgress', {
+                time = openTime,
+                label = Kora.lang('inventory.opening_bag'),
+            })
+            if not called or finished ~= true then
+                return false, 'cancelled'
+            end
+            if GetGameTimer() - startedAt < openTime - 500 then
+                return false, 'cancelled'
+            end
+            local after = sessions[src]
+            if not after or after.token ~= token or after.secondary ~= secondaryKey then
+                return false, 'stale session'
+            end
+            local _, fresh, freshErr = validSession(src, token, secondaryKey, after.primary, nil, nil)
+            if not fresh then
+                return false, freshErr or 'stale session'
+            end
+            if fresh.type ~= 'player' or fresh.source ~= targetSrc or not fresh.items[slot]
+                or fresh.items[slot].name ~= itemName then
+                return false, 'invalid item slot'
+            end
+            return true
+        end)
+        ext.openingBag[src] = nil
+        if not ran then
+            return false, 'open failed'
+        end
+        if not passed then
+            return false, reason
+        end
+    end
     local ok, result = containerApi.openForSearcher(src, targetSrc, slot)
     if not ok then
         return false, result
@@ -4610,9 +4667,6 @@ inventory.internal = {
     end,
     notifyBusyBlocked = notifyBusyBlocked,
     busyError = BUSY_ERROR,
-    validSession = validSession,
-    recordAudit = recordAudit,
-    showItemBox = showItemBox,
     sameDropBucket = sameDropBucket,
     hasUseable = hasUseable,
     setBuiltInUseable = setBuiltInUseable,
@@ -4648,11 +4702,8 @@ inventory.internal = {
     persistence = inventory.persistence,
 }
 
--- Hooks for server/decay.lua (lazy expiry + sweep). Kept out of the table
--- literal above so they do not collide with other additions to it.
-inventory.internal.recordAudit = recordAudit
-inventory.internal.showItemBox = showItemBox
-inventory.internal.playerSetPath = playerSetPath
+-- Hook for server/decay.lua (lazy expiry + sweep); recordAudit, showItemBox
+-- and playerSetPath are already in the table literal above.
 inventory.internal.removeEmptyDrop = removeEmptyDrop
 
 -- The schema event precedes yielding restoreAll. Consumers that depend on
@@ -5131,7 +5182,8 @@ local function timedRequest(action, src, handler, request)
     local called, ok, result, extra = pcall(handler, src, request)
     local elapsed = GetGameTimer() - started
     local threshold = tonumber(config.slowRequestMs) or 0
-    if threshold > 0 and elapsed >= threshold then
+    -- Opening a searched bag runs its progress bar inside the request.
+    if threshold > 0 and elapsed >= threshold and not (type(request) == 'table' and request.action == 'openTargetContainer') then
         Kora.logging.warn('request.slow', 'Slow inventory request', { action = action, playerId = src, elapsedMs = elapsed })
     end
     return called, ok, result, extra
