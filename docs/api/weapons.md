@@ -405,6 +405,33 @@ exports.kora_inventory:StopTrainingWeapon(src)
 true; the weapon is removed from the ped.
 ```
 
+### `exports.kora_inventory:repairWeaponAt(src, counterIndex)`
+
+Repairs the weapon the player has drawn at one of the configured repair counters (`weapons.repair.counters.locations`), charging the configured account. The server checks that counters are enabled, that the player is within the counter's `distance` and routing bucket, and that a weapon is drawn; it resolves the weapon from its own record of the draw, so no weapon name or slot is taken. On success the weapon is restored to `repair.maxDurability` and any jam is cleared.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `src` | integer | Player server id. |
+| `counterIndex` | integer | 1-based index into `weapons.repair.counters.locations`. |
+
+**Returns**
+
+- **ok** — true, plus `{ price, durability, account }`; or false with a reason such as `repair counters are disabled`, `unknown repair counter`, `too far from the repair counter`, `draw a weapon first`, `weapon does not need repairs` or `insufficient funds`.
+
+**Example**
+
+```lua
+local ok, result = exports.kora_inventory:repairWeaponAt(src, 1)
+```
+
+**Representative console output**
+
+```text
+true, { price = 300, durability = 100, account = 'cash' }
+```
+
 ## Common use cases
 
 - Gunsmith and repair resources adjusting durability, components and tint.
@@ -490,6 +517,22 @@ Item definitions are resolved through kora_core each time. The only retained dat
 | `components` | `{}` | Component item name to GTA component model name rendered on a holstered weapon. Empty by default. |
 
 The carried list is built on the server and published on the player state bag `kora_inventory:weaponCarry`; clients only render it. There is deliberately no setter. A drawn weapon is holstered and removed from the ped when its item leaves the inventory by any route (`kora_inventory:client:weaponRemoved`).
+
+### Weapon jams, repair kits, cleaning and repair counters
+
+`server/weapon_upkeep.lua` (with `client/weapon_upkeep.lua`) adds weapon upkeep. Everything acts on the weapon the server recorded as drawn (the same record the ammunition loader uses), never on a weapon name or slot sent by a client. All settings live under `weapons.jams` and `weapons.repair` (see [Configuration](./configuration.md)) and are read when used, so `/config` changes apply without a restart, except the kit item names, which are registered when item definitions load.
+
+**Jams** (`weapons.jams.enabled`, off by default). When the server accepts a shot it rolls a jam chance. The chance is `baseChance` at 100 percent durability, rises linearly to `lowDurabilityChance` at or below `lowDurabilityBelow` percent, and is rolled per accepted round. Melee, throwables, weapons whose definition has no `ammotype`, and weapons listed in `jams.excluded` never jam. A jam is stored as `info.jammed = true` on the weapon slot (through the weapon state helpers, so `GetWeaponState` and `SetWeaponState` accept a boolean `jammed`) and the client is told with `kora_inventory:client:weaponJamState`. Shots reported while the weapon is jammed are rejected inside the same transaction that would consume a round, so a jammed weapon loses no ammunition and takes no wear. The client blocks firing and shows the hint "Weapon jammed — hold R to clear". Inventory views carry a view-only `jammed` field that the UI shows as a red Jammed badge on the slot, in the tooltip and in the inspector.
+
+**Clearing a jam.** Holding the clear-jam key (see [Commands](../commands.md)) sends the payload-free `kora_inventory:server:clearJam`. The server resolves the drawn weapon, runs a `jams.clearTime` progress bar through a kora_lib callback to that client (an answer that comes back sooner than the bar could finish counts as a cancel), re-checks that the same weapon is still drawn and jammed, then clears the flag.
+
+**Repair kits** (`weapons.repair.kits`). Using a listed kit item while a weapon is drawn runs a progress bar of `time` milliseconds, restores `restore` durability points on the drawn weapon, never above `repair.maxDurability`, and consumes one kit. The slot is locked against drop, give and move for the whole bar. Nothing is consumed if nothing is drawn, the weapon is already at the maximum, the bar is cancelled, or the weapon or kit changed during the bar. The defaults are `repairkit` (25 points, 4000 ms) and `advancedrepairkit` (60 points, 6000 ms).
+
+**Cleaning** (`weapons.repair.cleaning`). The configured cleaning item (default `cleaningkit`) clears a jam when `clearsJam` is on and restores `restore` points (default 5), after a `time` progress bar. It is refused when there is nothing to clean.
+
+Kit and cleaning items get a built-in use handler only for the names listed in config, so other resources' usables are never taken over. An item another resource registers with `createUseable` always wins over the built-in handler. Set `repair.enabled = false`, or remove a kit from `repair.kits`, to hand an item back (after a restart).
+
+**Repair counters** (`weapons.repair.counters`, off by default, no locations). Each configured location gets a kora_target interaction. Selecting it asks the server for a quote (`kora_inventory:server:repairQuote`), which prices the drawn weapon as the missing durability points times `pricePerPoint`, rounded up, and tells the player the price. Selecting the counter again within a few seconds sends `kora_inventory:server:repairConfirm` with the counter index only. The server accepts the confirm only against the live quote it issued, re-checks the player's position and routing bucket against the counter, recomputes the price (a price that moved since the quote is refused), charges `account` through kora_core, and restores the weapon. A failed repair after payment is refunded. Resources can call `repairWeaponAt` directly from their own server code.
 
 ### Parachute
 

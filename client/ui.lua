@@ -59,7 +59,7 @@ local UI_LOCALE_KEYS = {
     'quick_slots', 'quick_slot_item', 'quick_slot_empty', 'quick_slot_pinned', 'quick_slot_key',
     'quick_slot_unpin', 'quick_slot_pin_failed', 'item_menu', 'menu_use', 'menu_split', 'menu_drop',
     'menu_give', 'menu_copy', 'menu_ammo_info', 'ammo_info', 'ammo_takes', 'ammo_loaded',
-    'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type',
+    'ammo_rounds_value', 'ammo_rounds_per_item', 'ammo_fits', 'ammo_type', 'jammed',
 }
 
 local function pushLocales()

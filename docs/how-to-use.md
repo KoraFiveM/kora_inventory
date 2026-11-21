@@ -117,6 +117,20 @@ exports.kora_inventory:createUseable('lockpick_adv', function(src, item)
 end)
 ```
 
+## Add weapon jams, repair kits and repair counters
+
+Weapon upkeep is configured under `weapons.jams` and `weapons.repair` in `config.lua` (or live in `/config`). Jams ship off; repair kits and cleaning are on and use the existing `repairkit`, `advancedrepairkit` and `cleaningkit` items.
+
+```lua title="config.lua"
+Config.kora_inventory.weapons.jams.enabled = true
+Config.kora_inventory.weapons.repair.counters.enabled = true
+Config.kora_inventory.weapons.repair.counters.locations = {
+    { coords = vec3(809.49, -2157.27, 29.62), distance = 2.5, bucket = 0, label = 'Weapon repairs' },
+}
+```
+
+Players draw a weapon first: kits, cleaning and counters all act on the drawn weapon. When a weapon jams, firing is blocked and the hint appears; hold R to clear it. At a counter, select the interaction once to see the price and again to confirm. To repair from your own script, call `exports.kora_inventory:repairWeaponAt(src, counterIndex)` or `SetWeaponState` after your own checks. See [Weapons](./api/weapons.md).
+
 ## Create a shop
 
 A shop is registered once on the server. Give it `coords` (one point or a list) or an `access` callback, otherwise a client can request it from anywhere. Stock rows need a real item name, an amount and a price.

@@ -689,6 +689,63 @@ Config.kora_inventory = {
         -- Explicit allow-lists. An absent weapon (and absent `default`) has
         -- no allowed components, preventing arbitrary client metadata.
         components = {},
+        -- Weapon jams (server-authoritative; see server/weapon_upkeep.lua).
+        -- When the SERVER accepts a shot it rolls a jam chance that rises from
+        -- `baseChance` (weapon at 100% durability) to `lowDurabilityChance`
+        -- (at or below `lowDurabilityBelow` percent). A jam is stored on the
+        -- weapon (`info.jammed`), shots are refused while it is set, and the
+        -- player clears it by holding the clear-jam key (default R): the
+        -- server runs a `clearTime` progress bar on the weapon it knows is
+        -- drawn. Melee, throwables, weapons that take no ammo and anything in
+        -- `excluded` ([weapon_name] = true) never jam. Off by default.
+        jams = {
+            enabled = false,
+            baseChance = 0.002,         -- per accepted shot at full durability (0.002 = 0.2%)
+            lowDurabilityChance = 0.03, -- per accepted shot at/below `lowDurabilityBelow`
+            lowDurabilityBelow = 30,    -- durability percent where the chance tops out
+            clearTime = 1500,           -- ms of progress bar to clear a jam
+            excluded = {
+                -- weapon_revolver = true,
+            },
+        },
+        -- Repair kits, cleaning and repair counters. All of them act on the
+        -- weapon the SERVER knows the player has drawn; nothing about the
+        -- weapon is ever taken from the client.
+        repair = {
+            -- false leaves every kit and the cleaning item to other resources.
+            enabled = true,
+            -- Durability never goes above this (hard ceiling 100).
+            maxDurability = 100,
+            -- Kit items. Only names listed here get a built-in use handler, so
+            -- other resources' usables are never hijacked. `restore` is
+            -- durability points, `time` is the progress bar in ms. Set a kit
+            -- to false (or remove it) to hand the item to another resource
+            -- (takes effect after a restart; an item another resource
+            -- registers with its own handler always wins).
+            kits = {
+                repairkit = { restore = 25, time = 4000 },
+                advancedrepairkit = { restore = 60, time = 6000 },
+            },
+            -- Cleaning item: clears a jam (when `clearsJam`) and restores a
+            -- little durability. One item is consumed per use.
+            cleaning = { item = 'cleaningkit', clearsJam = true, restore = 5, time = 3000 },
+            -- Repair counters: pay `pricePerPoint` per missing durability point
+            -- (rounded up) to restore the drawn weapon to maxDurability. The
+            -- server checks the player is at the counter (distance and
+            -- routing bucket) and charges `account` ('cash' or 'bank').
+            -- Counter points live here only; the client uses the same list
+            -- purely to draw the interaction.
+            counters = {
+                enabled = false,
+                pricePerPoint = 15,
+                account = 'cash',
+                -- Example beside the Cypress Flats Ammu-Nation counter (the x/y/z
+                -- in config/shops/ammunation.lua; shift it a step so it does not
+                -- sit on top of the shop target):
+                -- { coords = vec3(809.49, -2157.27, 29.62), distance = 2.5, bucket = 0, label = 'Weapon repairs' },
+                locations = {},
+            },
+        },
     },
     -- Visible weapon carry. A weapon a player owns but is not currently
     -- holding is rendered on their body for every nearby client, and drawing

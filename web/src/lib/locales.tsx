@@ -76,6 +76,7 @@ export const DEFAULT_LOCALES: Record<string, string> = {
     "ui.quick_amounts": "Quick amounts",
     "ui.all": "All",
     "ui.durability": "Durability",
+    "ui.jammed": "Jammed",
     "ui.no_other_inventory": "No other inventory is open",
     "ui.no_room_other": "No room in the other inventory",
     "ui.use_selected": "Use selected",

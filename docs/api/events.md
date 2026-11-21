@@ -761,6 +761,99 @@ TriggerServerEvent('kora_inventory:server:weaponFired')
 One round is removed server-side and `weaponRoundFired` fires.
 ```
 
+#### `RegisterNetEvent('kora_inventory:server:clearJam', function() end)  -- client: TriggerServerEvent`
+
+Net event, payload-free: the client asks to clear the jam on the weapon it holds. The server resolves the weapon from its own equipped record (any argument is ignored), runs a `weapons.jams.clearTime` progress bar through a kora_lib callback with minimum-elapsed enforcement, then clears `info.jammed`. Ignored while downed or cuffed, or when nothing is drawn or jammed.
+
+**Parameters**
+
+
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+-- client
+TriggerServerEvent('kora_inventory:server:clearJam')
+```
+
+**Representative console output**
+
+```text
+A progress bar runs; the jam is cleared and the client is told with kora_inventory:client:weaponJamState.
+```
+
+#### `RegisterNetEvent('kora_inventory:server:repairConfirm', function(counterIndex) end)  -- client: TriggerServerEvent`
+
+Net event: confirms a weapon repair quoted by the `kora_inventory:server:repairQuote` callback. Only the counter index is sent; it is honoured only against the live quote the server issued for that counter, and the position, routing bucket and price are re-checked before payment.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `counterIndex` | integer | 1-based index into `weapons.repair.counters.locations`. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+-- client, after the quote notification
+TriggerServerEvent('kora_inventory:server:repairConfirm', 1)
+```
+
+**Representative console output**
+
+```text
+The account is charged once and the drawn weapon is restored to the maximum durability.
+```
+
+#### `RegisterNetEvent('kora_inventory:client:weaponJamState', function(state) end)`
+
+Server to client: `{ slot, jammed }` for the weapon slot whose jam state changed (and, after a draw is confirmed, for the drawn weapon). The client blocks firing and shows the hint while the drawn slot is jammed. Presentation only; the server rejects shots from a jammed weapon regardless.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `state` | table | `{ slot = integer, jammed = boolean }`. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+-- sent by the server when a weapon jams or is cleared
+```
+
+#### `AddEventHandler('kora_inventory:server:weaponJammed', function(src, weaponName) end)`
+
+Local server event raised when an accepted shot jams the player's drawn weapon.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `src` | integer | Player. |
+| `weaponName` | string | The drawn weapon item name. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+AddEventHandler('kora_inventory:server:weaponJammed', function(src, weaponName) end)
+```
+
 #### `RegisterNetEvent('kora_inventory:server:weaponAmmoConsumed', function(slot, amount) end)  -- client: TriggerServerEvent`
 
 Legacy path used when ballistics are disabled: the client reports the ped's remaining ammo. It can only lower the stored ammo of the equipped weapon in that slot.

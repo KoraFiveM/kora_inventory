@@ -6,6 +6,7 @@ import { SlotUiContext } from "@/slotUi"
 import type { DragSlot, SlotTarget } from "@/lib/inventory"
 import type { InventoryItem, InventoryView } from "@/lib/types"
 import { ItemArtwork } from "./ItemArtwork"
+import { JammedBadge } from "./JammedBadge"
 import { SLOT_DRAG_TYPE } from "./dnd"
 import { SlotTooltip } from "./SlotTooltip"
 
@@ -159,6 +160,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
                 {inventory.type === "shop" && typeof item.price === "number" && <span className="item-price">${item.price.toLocaleString()}</span>}
             </span>
             <span className="item-amount">×{item.amount}</span>
+            <JammedBadge item={item} className="jammed-badge-slot" />
             {typeof item.durability === "number" && <span className="durability"><i style={{ width: `${Math.max(0, Math.min(100, item.durability))}%` }} /></span>}
         </>}
         {tip && item && !isDragging && <SlotTooltip item={item} x={tip.x} y={tip.y} decimals={inspectorDecimals} />}
