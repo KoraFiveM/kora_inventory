@@ -2,7 +2,7 @@
 .audit-overlay, .audit-overlay * { pointer-events: auto; }
 .audit-table-wrap, .audit-table-wrap * { -webkit-user-select: text; user-select: text; }
 .audit-overlay { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; background: hsl(var(--background) / .72); }
-.audit-panel { display: flex; flex-direction: column; gap: 10px; width: min(1240px, 92%); max-height: 88%; padding: 16px 18px; border: 1px solid hsl(var(--border-strong)); border-radius: 12px; background: hsl(var(--surface-panel)); color: hsl(var(--foreground)); box-shadow: 0 18px 50px rgb(0 0 0 / .5); }
+.audit-panel { display: flex; flex-direction: column; gap: 10px; width: min(1240px, 92%); max-height: 88%; padding: 16px 18px; border: 1px solid hsl(var(--border-strong)); border-radius: 12px; background: hsl(var(--surface-panel)); color: hsl(var(--foreground)); box-shadow: 0 18px 50px hsl(var(--background) / .7); }
 .audit-header { display: flex; align-items: center; justify-content: space-between; }
 .audit-header h2 { margin: 0; font-size: calc(16px * var(--ui-scale, 1)); }
 .audit-close { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--surface-raised)); color: hsl(var(--muted-foreground)); cursor: pointer; }

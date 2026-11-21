@@ -180,6 +180,5 @@ return {
         omnipack_search = 'Search all items',
         omnipack_show_more = 'Show more (%{count} left)',
         omnipack_empty = 'No items match your search.',
-        omnipack_free = 'Free',
     },
 }

@@ -84,3 +84,5 @@ cd "$(dirname "$0")/.."
 
 "${LUA:-lua}" test/smoke/player_exchange.lua
 "${LUA:-lua}" test/smoke/trunk_cargo.lua
+"${LUA:-lua}" test/smoke/audit_log.lua
+"${LUA:-lua}" test/smoke/omnipack.lua

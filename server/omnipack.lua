@@ -21,7 +21,6 @@ local omnipack = {}
 inventory.omnipack = omnipack
 
 local INVENTORY_ID = 'omnipack'
-local INFINITE = 9999 -- displayed stack size; stock is never decremented
 omnipack.inventoryKey = 'shop:' .. INVENTORY_ID
 
 local lastSignature
@@ -116,13 +115,16 @@ local function sync()
     if not inv then
         return nil, 'omnipack unavailable'
     end
-    local signature = table.concat(names, '\n')
+    -- Displayed stock is the largest take, so the amount picker is bounded by
+    -- omnipack.maxAmount; stock itself is infinite and never decremented.
+    local displayed = omnipack.maxAmount()
+    local signature = displayed .. '\n' .. table.concat(names, '\n')
     if inv.omnipack ~= true or signature ~= lastSignature then
         local items = {}
         for _, name in ipairs(names) do
             local entry = internal.buildItem(name, 1, #items + 1, {})
             if entry then
-                entry.amount = INFINITE
+                entry.amount = displayed
                 entry.price = 0
                 items[entry.slot] = entry
             end

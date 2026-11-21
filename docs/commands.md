@@ -132,6 +132,47 @@ kora_inventory-migrate verify
 
 Logs `imported: N, skipped: N, quarantined: N`. Reads the tables listed in `Config.kora_inventory.persistence.legacyTables` (`inventories`, `stashitems`, `trunkitems`, `gloveboxitems`). Malformed rows are copied to `kora_inventory_quarantine`.
 
+### `/invaudit`
+
+Opens the admin item-creation audit viewer: a read-only overlay showing which script created which items, so duplication and bad scripts can be found. It is not an inventory session and cannot change anything.
+
+| Field | Details |
+| --- | --- |
+| Context | In game (opens the overlay) or server console (prints a summary) |
+| Arguments | Optional `player=<citizenid or server id>`, `item=<name>`, `resource=<name>`, `range=<1h or 24h or 7d>`, `page=<n>`. In game they pre-fill the filters; in the console they select what is summarised. |
+| Access | The ACE `kora_inventory.audit` (name configurable with `audit.ace`), checked when you run the command and again on every data request the overlay makes. The server console always has access. |
+
+**Example**
+
+```text
+/invaudit
+/invaudit resource=kora_drugs range=1h
+```
+
+**Result**
+
+In game: an overlay with filters (player, item, resource, last hour, 24 hours or 7 days), a table of results (newest first, 100 per page) and a "top scripts / top items in the last hour" summary. Press Esc to close. In the console: `Kora.logging.info` lines with the top resources and items of the last hour and the newest entries. Name configurable with `audit.command`.
+
+### `/omnipack`
+
+Opens the admin omnipack: a free, read-only shop listing every registered item and weapon, with a search box. Dragging or buying from it adds the item to your own inventory through the normal add path (weapons get a fresh serial) and records an `omnipack` audit entry.
+
+| Field | Details |
+| --- | --- |
+| Context | In game |
+| Arguments | None. Also available to server code as `exports.kora_inventory:openOmnipack(source)`. |
+| Access | The ACE `kora_inventory.omnipack` (name configurable with `omnipack.ace`), checked on open, on every request the open window makes, and again on every take. Revoking the ACE closes the window at the next action. |
+
+**Example**
+
+```text
+/omnipack
+```
+
+**Result**
+
+A shop window titled Omnipack. Price is 0 and stock is infinite. The largest single take is `omnipack.maxAmount` (default 100). The list is sent once when the window opens; takes only update your own inventory. Name configurable with `omnipack.command`.
+
 ### `Key: 1 - 5 (kora_inventory:hotbar1 ... kora_inventory:hotbarN)`
 
 Uses the item in hotbar slot N. The number of bindings is `Config.kora_inventory.hotbarSlots`; 0 disables them.
@@ -214,7 +255,21 @@ Runs `/inventory`.
 
 ## ConVars and ACEs
 
-kora_inventory reads no ConVars. The database connection comes from kora_sql (`mysql_connection_string`). The only ACE it checks itself is `command.kora_inventory` for `kora_inventory-migrate`. Evidence, player inspection, vehicle and stash access are decided by Lua callbacks, not ACEs, unless your callback checks one.
+kora_inventory reads no ConVars. The database connection comes from kora_sql (`mysql_connection_string`). It checks `command.kora_inventory` for `kora_inventory-migrate`, and two ACEs of its own for the admin tools:
+
+| ACE | Allows | Config key |
+| --- | --- | --- |
+| `kora_inventory.audit` | `/invaudit` and the audit viewer's data requests. | `audit.ace` |
+| `kora_inventory.omnipack` | `/omnipack`, the `openOmnipack` export, and taking items from the omnipack. | `omnipack.ace` |
+
+Grant them in `server.cfg`, for example:
+
+```cfg
+add_ace group.admin kora_inventory.audit allow
+add_ace group.admin kora_inventory.omnipack allow
+```
+
+Both are denied to everyone else by default. Give them only to staff you trust to create any item. Evidence, player inspection, vehicle and stash access are decided by Lua callbacks, not ACEs, unless your callback checks one.
 
 ## State bags this resource reads or writes
 

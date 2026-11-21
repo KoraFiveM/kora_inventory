@@ -137,7 +137,6 @@ export const DEFAULT_LOCALES: Record<string, string> = {
     "ui.omnipack_search": "Search all items",
     "ui.omnipack_show_more": "Show more (%{count} left)",
     "ui.omnipack_empty": "No items match your search.",
-    "ui.omnipack_free": "Free",
 }
 
 type LocaleContextValue = (key: string, values?: Record<string, string | number>) => string

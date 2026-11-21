@@ -2525,8 +2525,14 @@ function ext.omnipackTake(src, request, session, shopKey)
         return false, denied or 'not authorised'
     end
     local slot = math.floor(tonumber(request.payload.slot) or 0)
-    local count = inventory.amount(request.payload.amount, 1)
-    if not count or count > omnipack.maxAmount() then
+    -- Strict: a whole number from 1 to omnipack.maxAmount. Unlike a shop buy,
+    -- a missing or non-numeric amount is not silently read as 1.
+    local requested = request.payload.amount
+    if type(requested) ~= 'number' or requested ~= requested or requested % 1 ~= 0 then
+        return false, 'invalid amount'
+    end
+    local count = requested >= 1 and requested <= omnipack.maxAmount() and math.floor(requested) or nil
+    if not count then
         return false, 'invalid amount'
     end
     return lock({ session.primary }, function()

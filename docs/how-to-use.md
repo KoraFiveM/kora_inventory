@@ -182,6 +182,19 @@ Most server functions return `ok, reason`. The reason is a short string; branch 
 - Player inspection, evidence, vehicle storage and stash policies are default-deny callbacks supplied by trusted resources.
 - A busy slot (use handler running or progress bar active) cannot be dropped, given or moved, so an item cannot be used and kept.
 
+## Admin tools: audit log and omnipack
+
+Two ACE-gated tools help staff. Grant the permissions in `server.cfg` (see [Commands](./commands.md#convars-and-aces)):
+
+```cfg
+add_ace group.admin kora_inventory.audit allow
+add_ace group.admin kora_inventory.omnipack allow
+```
+
+**Finding duplicated items or a broken script.** Every item that is created in an inventory (script `AddItem`, shop purchase, craft, exchange, omnipack) is logged with the resource that did it, kept for 14 days (`audit.retentionDays`). Run `/invaudit`, filter by player (citizen id or server id), item, script or time (last hour, 24 hours, 7 days) and read the newest-first table. The "top scripts / top items in the last hour" summary shows at a glance which script is creating the most. If a script or player adds an unusual amount in five minutes, the server logs a warning and fires `kora_inventory:server:auditAnomaly` (see [Events](./api/events.md)); thresholds are under `audit.anomaly`. On the server console `invaudit resource=kora_drugs` prints the same summary as log lines.
+
+**Spawning items for testing or support.** `/omnipack` opens a free shop of every registered item and weapon. Use the search box, then drag an item to your inventory or select it, pick an amount and press the take button. Weapons get a fresh serial, and every take is written to the audit log as `omnipack`, so staff-spawned items are never mistaken for duplication.
+
 ## Inventory shortcuts for players
 
 These are presentation features of the window; each can be switched off under `Config.kora_inventory.ui` (see the configuration page). The server validates every resulting move.
@@ -196,7 +209,7 @@ These are presentation features of the window; each can be switched off under `C
 ## Limitations worth knowing
 
 - The container, evidence and vehicle-storage modules are Lua tables inside the resource (`KoraInventory.containers`, `KoraInventory.evidence`, `KoraInventory.vehicles`). They are not exported; other resources reach them through configuration callbacks and the exports listed under their modules.
-- The audit trail is an in-memory ring (`Config.kora_inventory.auditLimit`) plus the `kora_inventory:server:audit` event. The `kora_inventory_audit` table is created but nothing in the resource writes to it.
+- The generic audit trail is an in-memory ring (`Config.kora_inventory.auditLimit`) plus the `kora_inventory:server:audit` event. Item creations are also persisted to `kora_inventory_audit` for 14 days (see [Admin tools](#admin-tools-audit-log-and-omnipack)); moves, gives and drops are not.
 - Player inventory size and weight come from config only; the ox compat `SetSlotCount` / `SetMaxWeight` refuse player inventories.
 - Shop stock changed with `SetShopItems` is not price-validated; rows without a `price` sell for the shop's `prices[name]` or for free.
 - Access callbacks can only deny with a generic `access denied` for stashes and shops; the reason string they return is not shown to the player.

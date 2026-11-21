@@ -51,6 +51,8 @@ When `Config.kora_inventory.weapons.ammoInfo.enabled` is on, views (including sh
 | `kora_inventory:nui:sessionOpened` | table | `{ sessionId, token, revision, secondaryRevision, player, secondary?, expires }`. `player` and `secondary` are views `{ id (the inventory key), key, type, label, slots, maxWeight, weight, revision, items, stock? }`. |
 | `kora_inventory:nui:sessionPatched` | table | `{ sessionId, revision?, secondaryRevision?, player?, secondary?, snapshot? }`: the changed view replaces the page's copy. |
 | `kora_inventory:nui:sessionClosed` | table | `{ sessionId, reason }`. |
+| `kora_inventory:nui:auditOpen` | table | `{ filter }` with optional `player`, `item`, `resource`, `range`. Opens the read-only `/invaudit` overlay (not a session). |
+| `kora_inventory:nui:auditClose` | table | Closes the audit overlay. |
 | `kora_inventory:nui:intentResult` | table | `{ requestId, ok, error? }`: the deferred verdict of an intent. |
 | `kora_inventory:nui:itemBox` | table | Item receipt `{ name, label, image, imageUrl, amount, action, imageOverride, duration }` with `action` `add`, `purchase`, `remove` or `use`. |
 | `kora_inventory:nui:giveAvailability` | table | `{ available }`: whether a nearby give recipient exists. No names or ids are ever sent. |
@@ -179,6 +181,12 @@ The client receives a short-lived token only after the server has resolved and a
 ### Using items from the UI and hotbar
 
 Double-clicking a slot, the Use or Buy button and Enter on a selected item all run one `activateItem`. Number keys use slots `1..hotbarSlots` with the panel closed. Both go through `KoraInventory.useGate`, which runs the `useTime` progress bar before any request is sent.
+
+### Admin audit overlay and omnipack
+
+The `/invaudit` overlay (`web/src/components/AuditViewer.tsx`, bridge in `client/admin_ui.lua`) is a separate component, not an inventory session: it has no token, lease or inventory and shares only NUI focus handling with `client/ui.lua` (`KoraInventory.ui.focus`). The server opens it with the net event `kora_inventory:client:auditOpen` after checking the audit ACE. The page posts filters to `kora_inventory:audit:query`; the client forwards them to the server callback `kora_inventory:server:auditQuery`, which re-checks the ACE on every request and returns a page of 100 rows plus a last-hour summary. `kora_inventory:audit:close` releases focus. It is read-only and refused while an inventory session holds the focus.
+
+The omnipack is an ordinary shop session; its view carries `omnipack = true`, is sent once on open (no `stock` copy), and the panel adds its own search box and draws 120 matches at a time with a "Show more" button, keeping each item's real slot number. Takes use the normal `buy` intent.
 
 ### Presentation config (`Config.kora_inventory.ui`)
 

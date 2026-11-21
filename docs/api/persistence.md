@@ -43,6 +43,18 @@ Created by `Kora.sql.ensureTables`. Existing installs only gain missing columns 
 | `kora_inventory_recovery_operations` | table | `ClaimStash` receipts: `provider`, `operation_key`, `stash_id`, `citizenid`, `status` (`pending`/`complete`), `destination_items`, `source_revision`, `receipt`. |
 | `kora_inventory_player_exchanges` | table | `ExecutePlayerExchange` receipts: `provider`, `operation_key`, `citizenid`, `request`, `player_values`, `receipt`. |
 
+## Item-creation audit log
+
+`kora_inventory_audit` records every item that is *created* in an inventory (not moved between inventories), so admins can find duplication and badly written scripts. The recording code is `server/audit_log.lua`; the SQL (`auditInsertBatch`, `auditQuery`, `auditSummary`, `auditPrune`) is in `server/persistence.lua`.
+
+- **Batched writes.** An item add only appends to an in-memory queue. The queue is written with one multi-row `INSERT` every `audit.flushSeconds` (default 10) or as soon as 200 rows are waiting, from a background thread, so an add never waits on SQL. If the database is unavailable the rows stay queued (up to 5000) and are retried.
+- **Retention.** Rows older than `audit.retentionDays` (default 14) are deleted at start and then once an hour with `DELETE ... WHERE created_at < FROM_UNIXTIME(cutoff)`.
+- **What is recorded.** Time, action (`add`, `purchase`, `craft`, `exchange`, `omnipack`, `set`, and `remove` only when `audit.trackRemovals` is on), the player's citizen id and server id, item name, amount, inventory key, the invoking resource and the reason string if one was given. The invoking resource is captured where the export enters kora_inventory, because deeper in the call `GetInvokingResource()` no longer names the caller.
+- **Not recorded.** Moves, swaps, gives, drops and pickups (the items already existed), and physical cash credits made by kora_core.
+- **Persistence off.** With `audit.persist = false` only the in-memory ring (`auditLimit` entries) is kept and no rows are written.
+
+Read it in game with `/invaudit` (see [Commands](../commands.md)); there is no other reader.
+
 ## What is and is not saved
 
 Saved: stash, trunk, glovebox, container, evidence and shop inventories. Saved only with the config flags: drops (`persistDrops`) and temporary inventories (`persistTemporary`). Never saved: player inventories, access callbacks, per-registration policy such as `weightLimit`.
@@ -61,7 +73,7 @@ The importer reads `inventories` (identifier or id, plus `kind` or `type`), `sta
 
 ## Internal persistence API
 
-The Lua table `KoraInventory.persistence` (not exported) provides `save`, `load`, `markDirty`, `flush`, `delete`, `restoreAll`, `normaliseItems`, `shouldPersist`, `getStatus`, `migrateLegacy`, `verifyMigration`, `withLock`, `committed`, `deleteLegacyPoliceTrash` and `audit`.
+The Lua table `KoraInventory.persistence` (not exported) provides `save`, `load`, `markDirty`, `flush`, `delete`, `restoreAll`, `normaliseItems`, `shouldPersist`, `getStatus`, `migrateLegacy`, `verifyMigration`, `withLock`, `committed`, `deleteLegacyPoliceTrash`, `audit` (generic row writer), and the item-creation audit helpers `auditInsertBatch`, `auditQuery`, `auditSummary` and `auditPrune`. The generated admin omnipack shop is never persisted.
 
 ## Functions
 
@@ -129,7 +141,7 @@ Created and extended at start by `Kora.sql.ensureTables` from `server/schema.lua
 | --- | --- | --- |
 | `kora_inventory_inventories` | `inventory_type`, `inventory_id` | Secondary inventories (stashes, trunks, gloveboxes, containers, evidence, shops, optionally drops and temporary stashes): `label`, `slots`, `max_weight`, `revision`, `items` (JSON), `properties` (JSON), `created_at`, `updated_at`. |
 | `kora_inventory_shop_stock` | `shop_id`, `slot` | Persisted shop stock rows (`item` JSON, `revision`). |
-| `kora_inventory_audit` | `id` | Audit rows: `actor`, `action`, `inventory_type`, `inventory_id`, `details`. Indexed by inventory and by action. The helper that inserts rows (`persistence.audit` in `server/persistence.lua`) has no caller in this repository, so the table stays empty; audit entries only exist in memory and as the `kora_inventory:server:audit` event. |
+| `kora_inventory_audit` | `id` | The item-creation audit log (see [Item-creation audit log](#item-creation-audit-log)). Columns: `created_at`, `actor`, `action`, `inventory_type`, `inventory_id`, `details`, plus `citizenid`, `source`, `item`, `amount`, `resource`, `reason`. The item-creation columns are nullable and are added to existing installs by `Kora.sql.ensureTables`. Indexed by inventory, action, `created_at`, `(item, created_at)`, `(resource, created_at)` and `(citizenid, created_at)`. Rows are written in batches and pruned after `audit.retentionDays`. |
 | `kora_inventory_migration_state` | `source_name` | Legacy import status and counters per source. |
 | `kora_inventory_migration_rows` | `source_name`, `source_key` | One row per imported legacy record with `source_checksum`, `status`, `error`. |
 | `kora_inventory_quarantine` | `id` | Malformed legacy rows kept for review (`reason`, `raw_payload`). |
