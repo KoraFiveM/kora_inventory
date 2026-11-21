@@ -464,9 +464,18 @@ Config.kora_inventory = {
         -- seated in that vehicle. false restores the old distance-only rule.
         gloveboxRequireSeated = true,
         trunkEnabled = true,
-        -- How close (metres) a player must stand to the boot position to open
-        -- the trunk. The boot position is derived from the model dimensions.
-        -- vehicle spawn name. Restart after changing models or bounds.
+        -- Cosmetic trunk cargo: items in a trunk are drawn as props inside the
+        -- vehicle's boot for nearby players. The server only publishes which
+        -- item names sit in which slots on a vehicle state bag; nothing here
+        -- opens, moves or changes inventory. Off by default.
+        --   drawDistance  metres within which clients build the props
+        --   maxProps      props per trunk (1-24)
+        --   fallbackModel prop for items with no model of their own
+        --   models        item name -> prop model override
+        --   bounds        vehicle spawn name -> { min = vec, max = vec } cargo
+        --                 box (model space) to calibrate a custom model's boot,
+        --                 keyed by vehicle spawn name. Restart after changing
+        --                 models or bounds.
         trunkCargo = {
             enabled = false,
             drawDistance = 35.0,
@@ -482,6 +491,8 @@ Config.kora_inventory = {
             bounds = {},
         },
 
+        -- How close (metres) a player must stand to the boot position to open
+        -- the trunk. The boot position is derived from the model dimensions.
         bootReach = 1.8,
         -- Server-side limit (metres) from the player to the vehicle origin when
         -- opening a trunk. Larger than `distance` because the boot sits at the

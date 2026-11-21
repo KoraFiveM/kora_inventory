@@ -206,7 +206,7 @@ local function buildPending()
             end
             if not ok and states[pending.vehicle] == pending then
                 clear(pending.vehicle)
-                print(('[kora_inventory] Could not render trunk cargo: %s'):format(tostring(built)))
+                Kora.logging.warn('vehicles.trunk_cargo_render_failed', 'Could not render trunk cargo', { error = tostring(built) })
             end
             pending.status = ok and built and 'ready' or 'waiting'
         end
