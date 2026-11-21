@@ -9,11 +9,6 @@
 -- intents sent by the page through client/ui.lua -> client.lua's submitIntent.
 -- The browser never learns who the partner is; it sees offers, not identities.
 
-local function localeText(key, fallback, vars)
-    local text = KoraInventory and KoraInventory.text
-    return text and text(key, fallback, vars) or fallback
-end
-
 local function settings()
     local raw = (Config.kora_inventory or {}).trade
     return type(raw) == 'table' and raw or {}
@@ -24,7 +19,7 @@ local function enabled()
 end
 
 local function notify(message, kind)
-    Kora.notify.send({ title = localeText('inventory.trade_title', 'Trade'), message = message, type = kind or 'info' })
+    Kora.notify.send({ title = KoraInventory.text('inventory.trade_title', 'Trade'), message = message, type = kind or 'info' })
 end
 
 local function send(action, data)
@@ -35,8 +30,6 @@ local function send(action, data)
 end
 
 local tradeClient = {}
-KoraInventory = KoraInventory or {}
-KoraInventory.tradeClient = tradeClient
 
 local nextRequest = 0
 local pendingTarget
@@ -48,11 +41,11 @@ local prompt
 ---cannot start.
 function tradeClient.request()
     if not enabled() then
-        notify(localeText('inventory.trade_disabled', 'Trading is disabled.'), 'error')
+        notify(KoraInventory.text('inventory.trade_disabled', 'Trading is disabled.'), 'error')
         return false, 'trading is disabled'
     end
     if activeId then
-        notify(localeText('inventory.trade_already', 'You are already trading.'), 'error')
+        notify(KoraInventory.text('inventory.trade_already', 'You are already trading.'), 'error')
         return false, 'already trading'
     end
     if KoraInventory.isDowned and KoraInventory.isDowned() then
@@ -69,7 +62,7 @@ function tradeClient.request()
     end
     nextRequest = nextRequest + 1
     pendingTarget = ('trade:%d'):format(nextRequest)
-    resolver.request(pendingTarget, localeText('inventory.trade_with_player', 'Trade with this player'))
+    resolver.request(pendingTarget, KoraInventory.text('inventory.trade_with_player', 'Trade with this player'))
     return true
 end
 
@@ -83,7 +76,7 @@ AddEventHandler('kora_inventory:client:giveTargetResolved', function(result)
     pendingTarget = nil
     if result.cancelled or type(result.target) ~= 'number' then
         if result.reason == 'no nearby player' then
-            notify(localeText('inventory.trade_no_player', 'Nobody is close enough to trade with.'), 'error')
+            notify(KoraInventory.text('inventory.trade_no_player', 'Nobody is close enough to trade with.'), 'error')
         elseif result.reason and result.reason ~= 'cancelled' and result.reason ~= 'replaced' then
             notify(tostring(result.reason), 'error')
         end
@@ -106,10 +99,10 @@ RegisterNetEvent('kora_inventory:client:tradeInvite', function(id, timeoutMs)
     CreateThread(function()
         local current = prompt
         local ok, result = pcall(Kora.nui.openAlert, {
-            title = localeText('inventory.trade_invite_title', 'Trade request'),
-            message = localeText('inventory.trade_invite_message', 'A nearby player wants to trade with you. You have %{seconds} seconds to answer.', { seconds = seconds }),
-            confirmLabel = localeText('inventory.trade_accept', 'Trade'),
-            cancelLabel = localeText('inventory.trade_decline', 'Decline'),
+            title = KoraInventory.text('inventory.trade_invite_title', 'Trade request'),
+            message = KoraInventory.text('inventory.trade_invite_message', 'A nearby player wants to trade with you. You have %{seconds} seconds to answer.', { seconds = seconds }),
+            confirmLabel = KoraInventory.text('inventory.trade_accept', 'Trade'),
+            cancelLabel = KoraInventory.text('inventory.trade_decline', 'Decline'),
         })
         if prompt ~= current then
             return
@@ -153,14 +146,6 @@ RegisterNetEvent('kora_inventory:client:tradeEnded', function(id, reason, comple
     send('kora_inventory:nui:tradeEnded', { id = id, reason = tostring(reason or 'cancelled'), completed = completed == true })
 end)
 
--- Cancel without an open window (e.g. a pending request the requester no
--- longer wants). Carries the trade id only.
-function tradeClient.cancel()
-    if activeId then
-        TriggerServerEvent('kora_inventory:server:tradeCancel', activeId)
-    end
-end
-
 -- The page's Trade button (client.lua forwards the 'tradeRequest' intent here).
 AddEventHandler('kora_inventory:client:startTrade', function()
     tradeClient.request()
@@ -175,7 +160,7 @@ do
     end
     Kora.keybind.add({
         name = 'kora_inventory:trade',
-        description = localeText('inventory.keybind_trade', 'Request a trade with the nearest player'),
+        description = KoraInventory.text('inventory.keybind_trade', 'Request a trade with the nearest player'),
         defaultKey = '',
         onPressed = function()
             tradeClient.request()

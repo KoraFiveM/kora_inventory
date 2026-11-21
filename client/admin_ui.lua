@@ -40,8 +40,8 @@ RegisterNetEvent('kora_inventory:client:auditOpen', function(initial)
     if not bridge.focus(true) then
         -- An inventory session holds the focus; ask the admin to close it first.
         Kora.notify.send({
-            title = KoraInventory.text and KoraInventory.text('inventory.title', 'Inventory') or 'Inventory',
-            message = KoraInventory.text and KoraInventory.text('inventory.audit_close_first', 'Close your inventory first.') or 'Close your inventory first.',
+            title = KoraInventory.text('inventory.title', 'Inventory'),
+            message = KoraInventory.text('inventory.audit_close_first', 'Close your inventory first.'),
             type = 'error',
         })
         return
