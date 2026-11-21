@@ -2,6 +2,8 @@
 if not (Kora and Kora.config and Kora.config.adopt) then return end
 local cfg = Config.kora_inventory
 local trade = cfg.trade
+-- An older config.lua without the block: the code falls back to its defaults.
+if type(trade) ~= 'table' then return end
 
 trade.enabled = Kora.config.boolean(trade.enabled, {
     label = 'Enable player trading',
