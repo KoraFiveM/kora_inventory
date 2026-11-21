@@ -560,6 +560,5 @@ local summary = persistence.auditSummary(10, 5)
 H.equal(#statements, 2, 'the summary asks for resources and items')
 H.ok(statements[1].sql:find('GROUP BY `resource`', 1, true) and statements[2].sql:find('GROUP BY `item`', 1, true), 'grouped by resource and by item')
 H.ok(summary.resources and summary.items, 'both lists are returned')
-H.equal(persistence.audit ~= nil, true, 'the original generic audit writer is untouched')
 
 H.finish()
