@@ -16,7 +16,7 @@ export function mergeAmmoInfo(current: AmmoInfoConfig, pushed: Partial<AmmoInfoC
 const typeOf = (value: unknown) => typeof value === "string" && value !== "" ? value : undefined
 
 /** The ammo type a weapon takes, or the type an ammo item is; undefined for anything else. */
-export function ammoTypeOf(item: Pick<InventoryItem, "ammo" | "ammoType"> | undefined): { kind: "weapon" | "ammo"; type: string } | undefined {
+function ammoTypeOf(item: Pick<InventoryItem, "ammo" | "ammoType"> | undefined): { kind: "weapon" | "ammo"; type: string } | undefined {
     if (!item) return undefined
     const weapon = typeOf(item.ammo?.type)
     if (weapon) return { kind: "weapon", type: weapon }
@@ -35,7 +35,7 @@ export function isAmmoCompatible(selected: Pick<InventoryItem, "ammo" | "ammoTyp
     return Boolean(a && b && a.kind !== b.kind && a.type === b.type)
 }
 
-export interface AmmoRow { key: "takes" | "loaded" | "rounds" | "fits"; label: string; value: string }
+interface AmmoRow { key: "takes" | "loaded" | "rounds" | "fits"; label: string; value: string }
 
 /** Rows for the "Ammo info" popover; empty when the item has nothing to show. */
 export function ammoInfoRows(item: InventoryItem, config: AmmoInfoConfig, t: (key: string, values?: Record<string, string | number>) => string): AmmoRow[] {

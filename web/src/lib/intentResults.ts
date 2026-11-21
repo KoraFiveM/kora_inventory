@@ -9,7 +9,7 @@ import type { MoveAnswer } from "./moveQueue"
  * can win the race against the fetch's own response, so one that arrives with
  * nobody waiting yet is kept (a small bounded set) and handed over on `wait`.
  */
-export interface IntentResults {
+interface IntentResults {
     /** A verdict arrived from the bridge. */
     deliver: (requestId: number, answer: MoveAnswer) => void
     /** Resolves with the verdict for `requestId`, now if it already came. */

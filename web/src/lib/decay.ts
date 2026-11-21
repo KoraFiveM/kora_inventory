@@ -35,7 +35,7 @@ export function formatDuration(seconds: number): string {
     return parts.join(" ")
 }
 
-export type DecayLevel = "ok" | "warn" | "danger"
+type DecayLevel = "ok" | "warn" | "danger"
 
 /** Bar colour class: --destructive under 10%, --warning under `warnBelow`, otherwise the normal accent. */
 export function decayLevel(fraction: number, warnBelow: number): DecayLevel {
@@ -53,7 +53,7 @@ export function decayLabel(remaining: number, t: Translate): string {
     return t("ui.decay_expires_in", { time: formatDuration(remaining) })
 }
 
-export interface SlotDecay { fraction: number; level: DecayLevel; label: string }
+interface SlotDecay { fraction: number; level: DecayLevel; label: string }
 
 /** What a slot needs to draw its freshness bar, or undefined when it should draw none. */
 export function slotDecay(item: Pick<InventoryItem, "decay"> | undefined, config: DecayConfig, t: Translate): SlotDecay | undefined {

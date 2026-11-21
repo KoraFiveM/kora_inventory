@@ -10,7 +10,7 @@
  */
 
 export interface MoveAnswer { ok: boolean; error?: string }
-export type FailureReason = "rejected" | "timeout" | "error"
+type FailureReason = "rejected" | "timeout" | "error"
 
 export interface MoveJob {
     /** Sends the request and resolves with the answer of the server. A rejection is a transport error. */
@@ -35,9 +35,9 @@ export function isNoopMove(from: { id: string; slot: number }, to: { id: string;
 }
 
 /** Builds the job when its turn comes, against whatever the UI looks like by then; undefined skips it. */
-export type JobFactory = () => MoveJob | undefined
+type JobFactory = () => MoveJob | undefined
 
-export interface MoveQueueOptions {
+interface MoveQueueOptions {
     /** Jobs allowed to wait behind the one in flight. */
     maxQueued: number
     /** Called whenever a job starts or settles (true while one is in flight). */

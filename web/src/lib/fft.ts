@@ -6,13 +6,13 @@ function post(name: string, data: unknown) {
     const resource = window.GetParentResourceName?.() ?? 'kora_inventory'
     return fetch(`https://${resource}/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).catch(() => undefined)
 }
-export function visibleControl(element: HTMLElement) {
+function visibleControl(element: HTMLElement) {
     const style = getComputedStyle(element)
     const rect = element.getBoundingClientRect()
     return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0 && rect.top < innerHeight && rect.left < innerWidth &&
         style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && !element.closest('[hidden],[inert]')
 }
-export function uniqueControl(selector: string, item?: string): HTMLElement {
+function uniqueControl(selector: string, item?: string): HTMLElement {
     const matches = Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(el =>
         (item === undefined || el.dataset.fftItem === item) && visibleControl(el))
     if (matches.length !== 1) throw new Error(`Expected one visible control; found ${matches.length}`)
@@ -20,7 +20,7 @@ export function uniqueControl(selector: string, item?: string): HTMLElement {
     if ((el as HTMLButtonElement).disabled || el.getAttribute('aria-disabled') === 'true' || el.dataset.pending === 'true') throw new Error('Control is disabled or pending')
     return el
 }
-export function executeAction(data: Action) {
+function executeAction(data: Action) {
     if (!session || data.session !== session || !token || data.token !== token) throw new Error('Stale or unauthorised UI session')
     if (data.action === 'dragBuy') {
         if (data.amount !== 1) throw new Error('A shop drag buys one item')

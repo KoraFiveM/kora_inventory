@@ -1,5 +1,5 @@
-export type QuickAmountKey = "1" | "5" | "10" | "half" | "all"
-export interface QuickAmount { key: QuickAmountKey; value: number }
+type QuickAmountKey = "1" | "5" | "10" | "half" | "all"
+interface QuickAmount { key: QuickAmountKey; value: number }
 
 /** Preset amounts no larger than the stack, deduplicated by value and ascending. */
 export function quickAmounts(max: number): QuickAmount[] {
