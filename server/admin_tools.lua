@@ -37,7 +37,6 @@ local function auditAllowed(src)
     end
     return src == 0 or IsPlayerAceAllowed(tostring(src), auditAce()) == true
 end
-inventory.auditAllowed = auditAllowed
 
 local function notifyDenied(src, key, fallback)
     local text = inventory.text and inventory.text(key, fallback) or fallback
@@ -65,47 +64,45 @@ end
 local lastQuery = {}
 local QUERY_GAP_MS = 250
 
-if auditLog then
-    RegisterCommand(commandName(auditSettings().command, 'invaudit'), function(src, args)
-        if src == 0 then
-            -- Console fallback: prints a summary (and the newest rows) through
-            -- Kora.logging.info. Accepts player=/item=/resource=/range=/page=.
-            CreateThread(function()
-                auditLog.printSummary(parseArgs(args))
-            end)
-            return
-        end
-        if not auditAllowed(src) then
-            return notifyDenied(src, 'inventory.audit_denied', 'You do not have permission to view the item audit log.')
-        end
-        -- The client opens an empty overlay; every data request below is
-        -- authorised again.
-        TriggerClientEvent('kora_inventory:client:auditOpen', src, parseArgs(args))
-    end, false)
+RegisterCommand(commandName(auditSettings().command, 'invaudit'), function(src, args)
+    if src == 0 then
+        -- Console fallback: prints a summary (and the newest rows) through
+        -- Kora.logging.info. Accepts player=/item=/resource=/range=/page=.
+        CreateThread(function()
+            auditLog.printSummary(parseArgs(args))
+        end)
+        return
+    end
+    if not auditAllowed(src) then
+        return notifyDenied(src, 'inventory.audit_denied', 'You do not have permission to view the item audit log.')
+    end
+    -- The client opens an empty overlay; every data request below is
+    -- authorised again.
+    TriggerClientEvent('kora_inventory:client:auditOpen', src, parseArgs(args))
+end, false)
 
-    ---Data for the viewer. The ACE is checked on every request, so revoking it
-    ---stops the next page. Returns { error } for a refusal, else the query result.
-    Kora.callback.register('kora_inventory:server:auditQuery', function(src, filter)
-        if not auditAllowed(src) then
-            return { error = 'not authorised' }
-        end
-        local stamp = GetGameTimer()
-        if lastQuery[src] and stamp - lastQuery[src] < QUERY_GAP_MS then
-            return { error = 'too many requests' }
-        end
-        lastQuery[src] = stamp
-        local ok, result = pcall(auditLog.query, filter)
-        if not ok then
-            Kora.logging.warn('audit.query_error', 'Audit query failed', { error = tostring(result) })
-            return { error = 'query failed' }
-        end
-        return result
-    end)
+---Data for the viewer. The ACE is checked on every request, so revoking it
+---stops the next page. Returns { error } for a refusal, else the query result.
+Kora.callback.register('kora_inventory:server:auditQuery', function(src, filter)
+    if not auditAllowed(src) then
+        return { error = 'not authorised' }
+    end
+    local stamp = GetGameTimer()
+    if lastQuery[src] and stamp - lastQuery[src] < QUERY_GAP_MS then
+        return { error = 'too many requests' }
+    end
+    lastQuery[src] = stamp
+    local ok, result = pcall(auditLog.query, filter)
+    if not ok then
+        Kora.logging.warn('audit.query_error', 'Audit query failed', { error = tostring(result) })
+        return { error = 'query failed' }
+    end
+    return result
+end)
 
-    AddEventHandler('playerDropped', function()
-        lastQuery[source] = nil
-    end)
-end
+AddEventHandler('playerDropped', function()
+    lastQuery[source] = nil
+end)
 
 -- ---------------------------------------------------------------------------
 -- /omnipack
@@ -123,19 +120,17 @@ local function openOmnipack(src)
     return ok, result
 end
 
-if omnipack then
-    local settings = type((Config.kora_inventory or {}).omnipack) == 'table' and Config.kora_inventory.omnipack or {}
-    RegisterCommand(commandName(settings.command, 'omnipack'), function(src)
-        if src == 0 then
-            Kora.logging.info('omnipack.console', 'The omnipack can only be opened in game')
-            return
-        end
-        CreateThread(function()
-            openOmnipack(src)
-        end)
-    end, false)
+local settings = type((Config.kora_inventory or {}).omnipack) == 'table' and Config.kora_inventory.omnipack or {}
+RegisterCommand(commandName(settings.command, 'omnipack'), function(src)
+    if src == 0 then
+        Kora.logging.info('omnipack.console', 'The omnipack can only be opened in game')
+        return
+    end
+    CreateThread(function()
+        openOmnipack(src)
+    end)
+end, false)
 
-    -- Server-side only. The ACE is checked for the TARGET player, so another
-    -- resource cannot open the omnipack for someone without the permission.
-    exports('openOmnipack', openOmnipack)
-end
+-- Server-side only. The ACE is checked for the TARGET player, so another
+-- resource cannot open the omnipack for someone without the permission.
+exports('openOmnipack', openOmnipack)

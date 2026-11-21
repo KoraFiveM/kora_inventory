@@ -36,7 +36,7 @@ Created by `Kora.sql.ensureTables`. Existing installs only gain missing columns 
 | --- | --- | --- |
 | `kora_inventory_inventories` | table | One row per secondary inventory. Primary key `(inventory_type, inventory_id)`. Columns: `label`, `slots` (default 50), `max_weight` (default 100000), `revision`, `items` (JSON, slot-keyed), `properties` (JSON: coords, bucket, distance, groups, owner, temporary, stock, prices, currency, accessRequired, policyOwner, blocked), `created_at`, `updated_at`. |
 | `kora_inventory_shop_stock` | table | Per-slot shop stock. Primary key `(shop_id, slot)`; columns `item` (JSON), `revision`, `updated_at`. |
-| `kora_inventory_audit` | table | Declared audit table (`actor`, `action`, `inventory_type`, `inventory_id`, `details`). Nothing in kora_inventory currently writes to it; the audit ring is in memory. |
+| `kora_inventory_audit` | table | Item-creation audit log, written in batches by `server/audit_log.lua` (see [Item-creation audit log](#item-creation-audit-log)). |
 | `kora_inventory_migration_state` | table | Per legacy source: status, start/finish times, imported, skipped and quarantined counts, last error. |
 | `kora_inventory_migration_rows` | table | Per legacy row `(source_name, source_key)`: checksum, target type and id, status (`imported`, `changed`, `quarantined`, `deleted`), error. |
 | `kora_inventory_quarantine` | table | Raw payloads of rows that failed validation, with the reason. |
@@ -73,7 +73,7 @@ The importer reads `inventories` (identifier or id, plus `kind` or `type`), `sta
 
 ## Internal persistence API
 
-The Lua table `KoraInventory.persistence` (not exported) provides `save`, `load`, `markDirty`, `flush`, `delete`, `restoreAll`, `normaliseItems`, `shouldPersist`, `getStatus`, `migrateLegacy`, `verifyMigration`, `withLock`, `committed`, `deleteLegacyPoliceTrash`, `audit` (generic row writer), and the item-creation audit helpers `auditInsertBatch`, `auditQuery`, `auditSummary` and `auditPrune`. The generated admin omnipack shop is never persisted.
+The Lua table `KoraInventory.persistence` (not exported) provides `save`, `load`, `markDirty`, `flush`, `delete`, `restoreAll`, `normaliseItems`, `shouldPersist`, `getStatus`, `migrateLegacy`, `verifyMigration`, `withLock`, `committed`, `deleteLegacyPoliceTrash`, and the item-creation audit helpers `auditInsertBatch`, `auditQuery`, `auditSummary` and `auditPrune`. The generated admin omnipack shop is never persisted.
 
 ## Functions
 

@@ -21,7 +21,6 @@ local omnipack = {}
 inventory.omnipack = omnipack
 
 local INVENTORY_ID = 'omnipack'
-omnipack.inventoryKey = 'shop:' .. INVENTORY_ID
 
 local lastSignature
 
@@ -157,9 +156,4 @@ function omnipack.open(src)
         return false, err
     end
     return inventory.internal.openInventory(src, 'shop', { key = inv.key })
-end
-
----Test hook: forget the cached catalogue signature.
-function omnipack.reset()
-    lastSignature = nil
 end
