@@ -50,6 +50,10 @@ Alias used by the default TAB key mapping. Runs `/inventory`.
 
 Same as `/inventory`.
 
+### Controls overlay
+
+Not a command: the keyboard button in the inventory's top bar toggles GTA's native instructional buttons, listing the keys the inventory uses (Esc, Enter, mouse, Shift, Ctrl, Alt). It replaces the old row of hint chips at the bottom of the window and draws without NUI focus, bottom-right of the screen. It is hidden whenever the inventory closes or the `/ui` editor opens. Switch it off with `Config.kora_inventory.ui.controls.button = false`, or start it visible with `defaultVisible = true`. See [NUI](./api/nui.md).
+
 ### `/closeInv`
 
 Closes the open inventory session.

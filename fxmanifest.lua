@@ -145,6 +145,9 @@ client_scripts {
     -- only routes requested targets through client.lua's validated transport.
     'client/compat.lua',
     'client/compat/ox.lua',
+    -- Native instructional-buttons overlay (controls toggle); loads before ui.lua,
+    -- which hides it whenever the session closes.
+    'client/controls.lua',
     'client/ui.lua',
     -- /invaudit overlay (read-only admin viewer); reuses ui.lua's NUI focus.
     'client/admin_ui.lua',

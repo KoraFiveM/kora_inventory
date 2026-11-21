@@ -110,7 +110,7 @@ function InventoryApp() {
         secondaryView: trading && trade.view
             ? { kind: "trade", label: t("ui.trade"), count: trade.view.you.offers.length + trade.view.them.offers.length }
             : undefined,
-        shortcutBar: <div className="shortcut-stack"><TipCard sessionId={session.sessionId} quickSlotsEnabled={s.quickSlots.enabled} /><ShortcutBar movePending={s.movePending} revision={session.revision} /></div>,
+        shortcutBar: <div className="shortcut-stack"><TipCard sessionId={session.sessionId} quickSlotsEnabled={s.quickSlots.enabled} /><ShortcutBar movePending={s.movePending} /></div>,
         renderQuickSlots: (position, options) => <QuickSlotBar position={position} side={options?.side} flipped={shell.drawerFlip} state={s.quickSlots} player={session.player} busy={locked} selected={selected} onSelect={s.selectSlot} onActivate={s.activateItem} onPin={s.pinQuick} onFlash={s.flashSlot} />,
     }
 

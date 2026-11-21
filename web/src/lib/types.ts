@@ -143,6 +143,14 @@ export interface TipsConfig {
     maxShows: number
 }
 
+/** Native controls overlay toggle (Config.kora_inventory.ui.controls). */
+export interface ControlsConfig {
+    /** Show the keyboard button in the top bar. */
+    button: boolean
+    /** Show the overlay on the first opening, before the player has chosen. */
+    defaultVisible: boolean
+}
+
 export type RightClickMode = "split" | "menu" | "none"
 
 export interface AmmoInfoConfig {
@@ -245,6 +253,8 @@ export interface UiConfig {
     organize?: Partial<OrganizeConfig>
     /** First-time tip card (Config.kora_inventory.ui.tips). */
     tips?: Partial<TipsConfig>
+    /** Controls overlay toggle (Config.kora_inventory.ui.controls). */
+    controls?: Partial<ControlsConfig>
     /** Drag-to-combine presentation list: item names + label only (Config.kora_inventory.combine). */
     combine?: { enabled?: boolean; recipes?: CombineRecipe[] }
     /** Item decay presentation (Config.kora_inventory.decay). */

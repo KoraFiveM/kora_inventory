@@ -61,6 +61,14 @@ function mergeTips(current: ResolvedUiConfig["tips"], pushed: UiConfig["tips"]):
     }
 }
 
+function mergeControls(current: ResolvedUiConfig["controls"], pushed: UiConfig["controls"]): ResolvedUiConfig["controls"] {
+    if (!pushed || typeof pushed !== "object") return current
+    return {
+        button: typeof pushed.button === "boolean" ? pushed.button : current.button,
+        defaultVisible: typeof pushed.defaultVisible === "boolean" ? pushed.defaultVisible : current.defaultVisible,
+    }
+}
+
 /**
  * Session state, selection, the optimistic move queue and every intent the
  * window can send. Presentation (which layout renders it) lives elsewhere; this
@@ -182,6 +190,7 @@ export function useInventorySession() {
             weightWarnings: mergeWeightWarnings(current.weightWarnings, config.weightWarnings),
             organize: mergeOrganize(current.organize, config.organize),
             tips: mergeTips(current.tips, config.tips),
+            controls: mergeControls(current.controls, config.controls),
             combine: mergeCombine(current.combine, config.combine),
             decay: mergeDecayConfig(current.decay, config.decay),
             trade: mergeTradeConfig(current.trade, config.trade),
