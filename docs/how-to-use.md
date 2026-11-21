@@ -195,6 +195,14 @@ When you search another player (police or admin tools that grant `playerInspecti
 
 With `waterDamage.enabled` on, swimming can ruin the phone, iPhone, Samsung phone and radio in your pockets (not the ones in a bag). A damaged item shows a droplet badge and a "Condition: Water damaged" row, and cannot be used. Use an electronic kit to repair one; it takes one kit per item.
 
+## Let items spoil
+
+Food and other perishables can expire in real time. In the `/config` editor open kora_inventory, then Item decay, and switch on **Enable item decay**. It is off by default so existing servers do not lose items unexpectedly.
+
+Choose which items spoil under **Decaying items**: the lifetime in seconds (86400 is one day) and, optionally, the item it turns into (a sandwich becomes garbage; with nothing set the item is removed). Items players already carry start their clock the first time the server sees them, so nothing spoils retroactively.
+
+Players see a thin bar on the slot that turns amber and then red as the item runs out, and an "Expires in 1h 20m" row in the inspector. Spoilage is checked when an inventory is opened, an item is used or moved, and every few minutes for players who are online. You can freeze time inside stashes, trunks, gloveboxes, containers or ground drops (a fridge) with the pause switches. See [Items](./api/items.md#item-decay) for the rules and [Configuration](./api/configuration.md#item-decay-decay) for every key.
+
 ## Failure results and what they mean
 
 Most server functions return `ok, reason`. The reason is a short string; branch on `ok`, not on the text, except for the vocabularies called out in the compat modules.

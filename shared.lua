@@ -156,6 +156,14 @@ local function sameValue(left, right, depth)
 end
 
 function inventory.sameInfo(left, right)
+    -- Item decay stamps (createdAt, ...) are bookkeeping: under the default
+    -- mergePolicy 'oldest' they must not keep otherwise equal stacks apart.
+    -- shared/decay.lua loads after this file, so it is looked up at call time.
+    local decay = inventory.decay
+    if decay then
+        local policy = decay.mergePolicy(decay.config())
+        left, right = decay.comparable(left, policy), decay.comparable(right, policy)
+    end
     return sameValue(left or {}, right or {}, 0)
 end
 

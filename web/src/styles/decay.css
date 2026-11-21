@@ -1,0 +1,6 @@
+/* Item decay freshness bar. kora_theme tokens only. Sits on the top edge of the
+   slot (the durability bar owns the bottom edge); thin so it never hides art. */
+.decay-bar { position: absolute; z-index: 1; top: 0; right: 5px; left: 5px; height: 3px; overflow: hidden; border-radius: 0 0 999px 999px; background: hsl(var(--muted)); }
+.decay-bar i { display: block; height: 100%; border-radius: inherit; background: hsl(var(--primary)); transition: width 200ms ease; }
+.decay-warn i { background: hsl(var(--warning)); }
+.decay-danger i { background: hsl(var(--destructive)); }

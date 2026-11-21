@@ -44,6 +44,8 @@ return {
         water_repaired = 'You repaired your %{item}.',
         water_damaged_label = 'Condition',
         water_damaged_value = 'Water damaged',
+        decay_expires = 'Expires in',
+        decay_spoiled = 'Spoiled',
     },
     vehicle_doors = {
         title = 'Vehicle',
@@ -192,5 +194,7 @@ return {
         closed = 'Closed',
         open_bag = 'Open bag',
         water_damaged = 'Water damaged',
+        decay_expires_in = 'Expires in %{time}',
+        decay_spoiled = 'Spoiled',
     },
 }

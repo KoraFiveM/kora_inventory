@@ -130,6 +130,8 @@ export const DEFAULT_LOCALES: Record<string, string> = {
     "ui.combine": "Combine",
     "ui.combine_title": "%{label}?",
     "ui.combine_items": "%{from} + %{to}",
+    "ui.decay_expires_in": "Expires in %{time}",
+    "ui.decay_spoiled": "Spoiled",
 }
 
 type LocaleContextValue = (key: string, values?: Record<string, string | number>) => string

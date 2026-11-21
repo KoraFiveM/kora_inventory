@@ -69,6 +69,7 @@ local UI_LOCALE_KEYS = {
     'tip_right_click_split', 'tip_right_click_menu', 'tip_quick_slot', 'tip_organize', 'tip_layout',
     'combine', 'combine_title', 'combine_items',
     'closed_bag', 'closed', 'open_bag', 'water_damaged',
+    'decay_expires_in', 'decay_spoiled',
 }
 
 local function pushLocales()
@@ -176,6 +177,16 @@ local function tipsConfig()
     }
 end
 
+-- Read on every push so a live config edit applies on the next open.
+local function decayPresentation()
+    local decay = Config.kora_inventory.decay or {}
+    return {
+        enabled = decay.enabled == true,
+        showOnSlot = decay.showOnSlot ~= false,
+        warnBelow = Kora.util.clamp(tonumber(decay.warnBelow) or 0.25, 0.0, 1.0),
+    }
+end
+
 local function pushConfig()
     local ui = Config.kora_inventory.ui or {}
     local ammoInfo = (Config.kora_inventory.weapons or {}).ammoInfo or {}
@@ -216,6 +227,8 @@ local function pushConfig()
         -- Read on every push so a live config change applies on the next open.
         scale = Kora.util.clamp(tonumber(ui.scale) or 1.0, 0.5, 2.0),
         images = ui.images,
+        -- Item decay presentation (the server decides which items carry `decay`).
+        decay = decayPresentation(),
         inspectorDecimals = Kora.util.clamp(math.floor(tonumber((Config.Inspector or {}).decimals) or 1), 0, 3),
         -- Selectable inspector text + Copy button (item as JSON, incl. metadata).
         inspectorCopy = (Config.Inspector or {}).allowCopy ~= false,

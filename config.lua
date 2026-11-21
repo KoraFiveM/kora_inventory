@@ -510,6 +510,53 @@ Config.kora_inventory = {
         -- one action. Enable this for useables that are not consumed.
         showUses = false,
     },
+    -- Item decay / expiry. Items spoil in real time (os.time seconds) and, once
+    -- fully decayed, are removed or converted into another item (sandwich ->
+    -- garbage). The server checks lazily: when an inventory is viewed, an item is
+    -- used or moved, and in a low-frequency sweep of ONLINE players' inventories;
+    -- there are no per-item timers. Shipped OFF so a live server's food does not
+    -- suddenly vanish; turn it on in /config.
+    decay = {
+        enabled = false,
+        -- 'convert' turns a spoiled item into its `into` item (same slot and
+        -- amount) and removes it when no `into` is set. 'remove' always removes.
+        defaultAction = 'convert',
+        -- Per item name: lifetime = seconds of real time; into = item to convert
+        -- to (keeps the amount), nil or '' = remove. An entry here wins over a
+        -- `decay = { lifetime = ..., into = ... }` field on the kora_core item
+        -- definition. Set an entry to false to exempt an item.
+        items = {
+            sandwich = { lifetime = 172800, into = 'garbage' },
+            burger = { lifetime = 172800, into = 'garbage' },
+            water_bottle = { lifetime = 604800 },
+        },
+        -- Show an "Expires in 1h 20m" row in the item inspector.
+        showInInspector = true,
+        -- Show a thin freshness bar on the inventory slot.
+        showOnSlot = true,
+        -- The bar turns --warning below this fraction of life left (0..1) and
+        -- --destructive below 10%.
+        warnBelow = 0.25,
+        -- Seconds between sweeps of online players' inventories so items spoil
+        -- even if never opened. 0 = off (items then spoil only when viewed,
+        -- used or moved). Minimum 30 when on.
+        sweepSeconds = 300,
+        -- Stacks of the same item with different ages: 'oldest' merges them and
+        -- the whole stack spoils with its oldest member (the stamps are ignored
+        -- by the stack check); 'separate' keeps differently aged items in
+        -- separate stacks.
+        mergePolicy = 'oldest',
+        -- Inventory types where time does NOT count (true = frozen while the
+        -- item sits there; the time spent is not counted when it comes out).
+        -- Player inventories always count.
+        pauseIn = {
+            stash = false,
+            trunk = false,
+            glovebox = false,
+            container = false,
+            drop = false,
+        },
+    },
     persistence = {
         -- Secondary inventories only. Player items are kora_core-owned and are never
         -- read from or written to this storage layer.

@@ -184,6 +184,37 @@ end)
 The till gains the amount paid.
 ```
 
+#### `AddEventHandler('kora_inventory:server:itemDecayed', function(src, decayed) end)`
+
+Local event raised after a decaying item has been converted or removed because it spoiled (see [Item decay](./items.md#item-decay)). Raised from the decay runtime once the change is committed, broadcast and audited. Only fires while `Config.kora_inventory.decay.enabled` is on.
+
+**Parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `src` | integer or nil | The owner for a player inventory, otherwise the player who triggered the check (may be nil). |
+| `decayed` | table | `{ inventory, item, amount, slot, action, into }`: the inventory key, the spoiled item name and stack size, its slot, `action` (`convert` or `remove`) and, for a conversion, the item it became. |
+
+**Returns**
+
+- **No return value.**
+
+**Example**
+
+```lua
+AddEventHandler('kora_inventory:server:itemDecayed', function(src, decayed)
+    if decayed.action == 'convert' and decayed.into == 'garbage' then
+        -- e.g. make the player's character smell
+    end
+end)
+```
+
+**Representative console output**
+
+```text
+Two sandwiches in slot 3 became garbage.
+```
+
 #### `AddEventHandler('kora_inventory:server:usedItem', function(src, itemName, item) end)`
 
 Local event raised after a registered handler returned success. Also raised for built-in handlers such as weapon draws. Not raised for portable containers (see `openedContainer`) or for refused or failed uses. Raised from `useItem`.

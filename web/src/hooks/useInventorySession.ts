@@ -19,6 +19,7 @@ import { clampGiveAmount } from "@/lib/giveAmount"
 import { findCombination, mergeCombine, type CombineRecipe } from "@/lib/combine"
 import { canOpenBag, openBagPayload } from "@/lib/search"
 import { isAmmoCompatible, mergeAmmoInfo, resolveRightClick } from "@/lib/ammo"
+import { mergeDecayConfig } from "@/lib/decay"
 import { EMPTY_QUICK_SLOTS, normalizeQuickSlots, type QuickSlotsState } from "@/lib/quickSlots"
 import type { SlotUi } from "@/slotUi"
 
@@ -181,6 +182,7 @@ export function useInventorySession() {
             organize: mergeOrganize(current.organize, config.organize),
             tips: mergeTips(current.tips, config.tips),
             combine: mergeCombine(current.combine, config.combine),
+            decay: mergeDecayConfig(current.decay, config.decay),
         }))
     })
     useNuiEvent<{ slots?: HotbarState["slots"]; seconds?: number; bottom?: number; quick?: HotbarQuickEntry[] }>("kora_inventory:nui:hotbar", ({ slots, seconds, bottom, quick }) => {

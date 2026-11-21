@@ -1,7 +1,8 @@
 import { createContext } from "react"
 import { DEFAULT_AMMO_INFO } from "@/lib/ammo"
 import { DEFAULT_COMBINE, type CombineConfig } from "@/lib/combine"
-import type { AmmoInfoConfig, OrganizeConfig, RightClickMode, TipsConfig, UiConfig } from "@/lib/types"
+import type { AmmoInfoConfig, OrganizeConfig, RightClickMode, TipsConfig, DecayConfig, UiConfig } from "@/lib/types"
+import { DEFAULT_DECAY } from "@/lib/decay"
 
 /**
  * Presentation config from `Config.kora_inventory.ui`, pushed on
@@ -11,7 +12,7 @@ import type { AmmoInfoConfig, OrganizeConfig, RightClickMode, TipsConfig, UiConf
  * that message arriving (and in the dev harness, which sends no config at all),
  * so they mirror the shipped config rather than being "off".
  */
-export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig; organize: OrganizeConfig; tips: TipsConfig; combine: CombineConfig } = {
+export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreWhenSolo" | "showHotbar" | "scale" | "rightClickSplit" | "optimisticMoves" | "queueMoves" | "directTransport" | "moveTimeoutMs" | "inspectorDecimals" | "inspectorCopy" | "layout" | "playerLayoutChoice" | "quickTransfer" | "modifierDrag" | "quickAmounts" | "filters" | "tooltips">> & { weightWarnings: { enabled: boolean; warnAt: number; dangerAt: number } } & { images: NonNullable<UiConfig["images"]>; layouts: NonNullable<UiConfig["layouts"]>; rightClick: RightClickMode; ammoInfo: AmmoInfoConfig; organize: OrganizeConfig; tips: TipsConfig; combine: CombineConfig; decay: DecayConfig } = {
     hotbarSlots: 5,
     centreWhenSolo: true,
     showHotbar: true,
@@ -19,6 +20,8 @@ export const DEFAULT_UI_CONFIG: Required<Pick<UiConfig, "hotbarSlots" | "centreW
     // Split dialog by default; `menu` and `none` come from ui.rightClick.
     rightClick: "split",
     ammoInfo: DEFAULT_AMMO_INFO,
+    // Item decay is off until the server says otherwise (config.lua: decay.enabled).
+    decay: DEFAULT_DECAY,
     optimisticMoves: true,
     queueMoves: true,
     directTransport: true,
