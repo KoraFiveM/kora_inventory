@@ -141,6 +141,10 @@ function persistence.shouldPersist(inv)
     if not persistenceConfig.enabled or type(inv) ~= 'table' or inv.type == 'player' then
         return false
     end
+    -- The admin omnipack is a generated, read-only catalogue (server/omnipack.lua).
+    if inv.omnipack == true or inv.id == 'omnipack' and inv.type == 'shop' then
+        return false
+    end
     if inv.type == 'drop' and not persistenceConfig.persistDrops then
         return false
     end
@@ -473,6 +477,114 @@ function persistence.audit(action, actor, inv, details)
             encoded,
         }
     )
+end
+
+-- Item-creation audit storage (driven by server/audit_log.lua, which batches).
+-- `rows` are audit entries: { at, action, citizenid, source, item, amount,
+-- inventory, resource, reason }. One multi-row INSERT per batch.
+local AUDIT_COLUMNS = '(`created_at`,`actor`,`action`,`inventory_type`,`inventory_id`,`details`,'
+    .. '`citizenid`,`source`,`item`,`amount`,`resource`,`reason`)'
+function persistence.auditInsertBatch(rows)
+    if not state.ready then
+        return nil, state.lastError or 'persistence is not ready'
+    end
+    if type(rows) ~= 'table' or #rows == 0 then
+        return 0
+    end
+    local NULL = Kora.sql.NULL
+    local marks, params = {}, {}
+    for _, row in ipairs(rows) do
+        local kind, id = tostring(row.inventory or ''):match('^([^:]+):(.+)$')
+        marks[#marks + 1] = '(FROM_UNIXTIME(?),?,?,?,?,?,?,?,?,?,?,?)'
+        local details = encode({ inventory = row.inventory }) or '{}'
+        for _, value in ipairs({
+            tonumber(row.at) or os.time(),
+            row.citizenid or NULL,
+            tostring(row.action),
+            kind or NULL,
+            id or NULL,
+            details,
+            row.citizenid or NULL,
+            tonumber(row.source) or NULL,
+            row.item or NULL,
+            tonumber(row.amount) or NULL,
+            row.resource or NULL,
+            row.reason and tostring(row.reason):sub(1, 255) or NULL,
+        }) do
+            params[#params + 1] = value
+        end
+    end
+    return db('INSERT INTO `kora_inventory_audit` ' .. AUDIT_COLUMNS .. ' VALUES ' .. table.concat(marks, ','), params)
+end
+
+function persistence.auditPrune(cutoff)
+    return db('DELETE FROM `kora_inventory_audit` WHERE `created_at` < FROM_UNIXTIME(?)', { tonumber(cutoff) or 0 })
+end
+
+local function likeEscape(text)
+    return '%' .. tostring(text):gsub('[\\%%_]', '\\%0') .. '%'
+end
+
+local function auditWhere(filter)
+    local where, params = { '`created_at` >= FROM_UNIXTIME(?)' }, { tonumber(filter.since) or 0 }
+    if filter.citizenid then
+        where[#where + 1], params[#params + 1] = '`citizenid` = ?', filter.citizenid
+    end
+    if filter.source then
+        where[#where + 1], params[#params + 1] = '`source` = ?', filter.source
+    end
+    if filter.item then
+        where[#where + 1], params[#params + 1] = '`item` LIKE ?', likeEscape(filter.item)
+    end
+    if filter.resource then
+        where[#where + 1], params[#params + 1] = '`resource` LIKE ?', likeEscape(filter.resource)
+    end
+    return ' WHERE ' .. table.concat(where, ' AND '), params
+end
+
+---Newest-first page. Returns (rows, hasMore). `filter` is the normalised table
+---from audit_log.normaliseFilter, never raw client input.
+function persistence.auditQuery(filter, limit, offset)
+    limit, offset = math.floor(tonumber(limit) or 100), math.floor(tonumber(offset) or 0)
+    local where, params = auditWhere(filter)
+    params[#params + 1], params[#params + 2] = limit + 1, offset
+    local rows, err = dbQuery(
+        'SELECT UNIX_TIMESTAMP(`created_at`) AS `at`,`action`,`citizenid`,`source`,`item`,`amount`,'
+            .. '`inventory_type`,`inventory_id`,`resource`,`reason` FROM `kora_inventory_audit`'
+            .. where .. ' ORDER BY `created_at` DESC,`id` DESC LIMIT ? OFFSET ?',
+        params
+    )
+    if not rows then
+        return nil, err
+    end
+    local more = #rows > limit
+    if more then
+        rows[#rows] = nil
+    end
+    for _, row in ipairs(rows) do
+        row.inventory = row.inventory_type and (row.inventory_type .. ':' .. tostring(row.inventory_id or '')) or nil
+        row.inventory_type, row.inventory_id = nil, nil
+    end
+    return rows, more
+end
+
+---Top resources and items by added amount since `since` (unix seconds).
+function persistence.auditSummary(since, limit)
+    limit = math.floor(tonumber(limit) or 5)
+    local summary = { resources = {}, items = {} }
+    for _, spec in ipairs({ { 'resources', 'resource' }, { 'items', 'item' } }) do
+        local rows, err = dbQuery(
+            ('SELECT `%s` AS `name`,SUM(`amount`) AS `amount`,COUNT(*) AS `count` FROM `kora_inventory_audit` '
+                .. "WHERE `created_at` >= FROM_UNIXTIME(?) AND `action` <> 'remove' AND `%s` IS NOT NULL "
+                .. 'GROUP BY `%s` ORDER BY `amount` DESC LIMIT ?'):format(spec[2], spec[2], spec[2]),
+            { tonumber(since) or 0, limit }
+        )
+        if not rows then
+            return nil, err
+        end
+        summary[spec[1]] = rows
+    end
+    return summary
 end
 
 local LEGACY = {

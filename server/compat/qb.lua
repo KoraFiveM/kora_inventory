@@ -273,7 +273,7 @@ end
 ---funnels; the caller only picks which of the allowed storage types it may
 ---reach. Shops are read only there, and evidence, confiscation and portable
 ---container inventories keep their own bounded domain APIs.
-local function addToSecondary(identifier, itemName, amount, slot, info, reason, allowed)
+local function addToSecondary(identifier, itemName, amount, slot, info, reason, allowed, internalMove)
     local wanted = lower(itemName)
     amount = wholeNumber(amount)
     if not wanted or not amount then
@@ -308,6 +308,10 @@ local function addToSecondary(identifier, itemName, amount, slot, info, reason, 
         local ok, err = internal.addTo(key, wanted, amount, slot, hookInfo or {}, reason, slot ~= nil)
         if not ok then
             return false, err
+        end
+        -- Creation audit (not for the qb "internal move" flag, which is a transfer).
+        if not internalMove and internal.auditAdd then
+            internal.auditAdd('add', nil, key, wanted, amount, reason)
         end
         internal.bump(key)
         internal.broadcast(key)
@@ -443,7 +447,7 @@ local function addItem(identifier, itemName, amount, slot, info, reason, isInter
     if src then
         ok, err = native.AddItem(src, wanted, amount, slot, info, reason)
     else
-        ok, err = addToSecondary(inventoryKey, wanted, amount, slot, info, reason, storageTypes)
+        ok, err = addToSecondary(inventoryKey, wanted, amount, slot, info, reason, storageTypes, isInternalMove)
     end
     if ok and data and hooks then
         hooks.notify('ItemAdded', data.item.type, data)

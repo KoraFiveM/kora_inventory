@@ -192,6 +192,13 @@ local function execute(provider, source, key, terms, fingerprint)
         if found or foundCode ~= 'not_found' then return found, foundCode, foundError end
         return nil, result.code or 'rejected', result.message or 'Exchange was rolled back.'
     end
+    -- Item-creation audit: committed exactly once here (a retried key returns
+    -- through reconcile above and never reaches this line).
+    if internal.auditAdd then
+        for _, entry in ipairs(terms.give or {}) do
+            internal.auditAdd('exchange', source, nil, entry.name, entry.amount, ('%s:%s'):format(provider, key), provider)
+        end
+    end
     return reconcile(provider, key, fingerprint)
 end
 

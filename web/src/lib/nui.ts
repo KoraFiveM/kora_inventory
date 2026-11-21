@@ -1,4 +1,4 @@
-import type { IntentPayload, IntentResponse } from "./types"
+import type { AuditFilter, AuditResult, IntentPayload, IntentResponse } from "./types"
 
 declare global {
     interface Window {
@@ -52,4 +52,34 @@ export async function pinQuickSlot(id: string, slot: number | null): Promise<{ o
     } catch {
         return { ok: false }
     }
+}
+
+/**
+ * Asks the server for a page of the item-creation audit log through the Lua
+ * bridge. Read-only; the server re-checks the admin permission on every call.
+ * Never throws: a failure is reported as `{ error }`.
+ */
+export async function queryAudit(filter: AuditFilter): Promise<AuditResult> {
+    if (browser) return { rows: [], hasMore: false, page: filter.page, pageSize: 100 }
+    try {
+        const response = await fetch(`https://${resourceName()}/kora_inventory:audit:query`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=UTF-8" },
+            body: JSON.stringify(filter),
+        })
+        const result = await response.json() as Partial<AuditResult> | null
+        if (!result || typeof result !== "object") return { rows: [], hasMore: false, page: filter.page, pageSize: 100, error: "request failed" }
+        return { rows: [], hasMore: false, page: filter.page, pageSize: 100, ...result }
+    } catch {
+        return { rows: [], hasMore: false, page: filter.page, pageSize: 100, error: "request failed" }
+    }
+}
+
+export async function closeAudit() {
+    if (browser) return
+    await fetch(`https://${resourceName()}/kora_inventory:audit:close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=UTF-8" },
+        body: "{}",
+    })
 }

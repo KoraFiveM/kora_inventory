@@ -54,6 +54,8 @@ export interface InventoryView {
     maxWeight?: number
     weight?: number
     items: Record<string, InventoryItem> | InventoryItem[]
+    /** Admin omnipack: a free, infinite, read-only catalogue (search + paging in the panel). */
+    omnipack?: boolean
 }
 
 export interface SessionSnapshot {
@@ -204,4 +206,44 @@ export interface UiConfig {
         /** Tried in order for `<localPath>/<name>.<ext>`. */
         extensions?: string[]
     }
+}
+
+/** One row of the item-creation audit log (server/audit_log.lua). Read-only. */
+export interface AuditRow {
+    at: number
+    action: string
+    citizenid?: string
+    source?: number
+    item?: string
+    amount?: number
+    inventory?: string
+    resource?: string
+    reason?: string
+}
+
+export interface AuditSummaryRow {
+    name: string
+    amount: number
+    count: number
+}
+
+export type AuditRange = "1h" | "24h" | "7d"
+
+/** The filter the viewer sends; the server normalises and re-checks everything. */
+export interface AuditFilter {
+    player: string
+    item: string
+    resource: string
+    range: AuditRange
+    page: number
+}
+
+export interface AuditResult {
+    error?: string
+    rows: AuditRow[]
+    hasMore: boolean
+    page: number
+    pageSize: number
+    source?: "database" | "memory"
+    summary?: { resources: AuditSummaryRow[]; items: AuditSummaryRow[] }
 }

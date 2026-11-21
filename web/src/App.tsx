@@ -6,6 +6,7 @@ import { SlotUiContext } from "@/slotUi"
 import { openDevHarness } from "@/lib/dev"
 import { useLocale } from "@/lib/locales"
 import { DragGuard } from "@/components/DragGuard"
+import { AuditViewer } from "@/components/AuditViewer"
 import { DragPreview } from "@/components/DragPreview"
 import { HotbarHud } from "@/components/HotbarHud"
 import { Inspector } from "@/components/Inspector"
@@ -31,7 +32,7 @@ function InventoryApp() {
     const { session, uiConfig } = s
     const shell = useShellLayout({ hasSession: Boolean(session), transferView: Boolean(session?.secondary) })
 
-    if (!session) return <UiConfigContext.Provider value={uiConfig}><DragGuard open={false} />{s.hotbar && <HotbarHud hotbar={s.hotbar} />}<ItemBoxStack boxes={s.itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
+    if (!session) return <UiConfigContext.Provider value={uiConfig}><DragGuard open={false} /><AuditViewer />{s.hotbar && <HotbarHud hotbar={s.hotbar} />}<ItemBoxStack boxes={s.itemBoxes} />{import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open inventory UI harness</button> : null}</UiConfigContext.Provider>
 
     const { solo, selected, inspected, locked } = s
     const layoutId = resolveLayout(uiConfig, shell.playerLayout)

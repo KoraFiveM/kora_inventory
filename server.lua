@@ -185,12 +185,81 @@ local function playerSetPath(src, path, value)
     return table.unpack(results, 1, results.n)
 end
 
+-- Feature functions that need this file's locals (item audit, omnipack take)
+-- live on one table: the main chunk is at Lua's 200-local limit.
+local ext = {}
+
 local function recordAudit(action, src, details)
     audit[#audit + 1] = { at = os.time(), action = action, source = src, details = inventory.copy(details or {}) }
     if #audit > config.auditLimit then
         table.remove(audit, 1)
     end
     TriggerEvent('kora_inventory:server:audit', action, src, details)
+end
+
+---Item-creation audit (server/audit_log.lua). The ONE helper every creation
+---path calls: `action` is 'add', 'purchase', 'craft', 'exchange', 'omnipack',
+---'set' ... `src` is the player the items went to / were bought by (nil for a
+---script filling a stash). The invoking resource is whatever the export
+---boundary captured for this coroutine, else `resource`, else kora_inventory.
+---Never raises and never waits on SQL: a failure here must not undo an add.
+---@param action string
+---@param src integer|nil
+---@param inventoryKey string|nil
+---@param name string
+---@param amount integer
+---@param reason string|nil
+---@param resource string|nil
+function ext.auditAdd(action, src, inventoryKey, name, amount, reason, resource)
+    local log = inventory.auditLog
+    if not log or not log.enabled() then
+        return
+    end
+    local called, err = pcall(function()
+        if not src and type(inventoryKey) == 'string' then
+            src = tonumber(inventoryKey:match('^player:(%d+)$'))
+        end
+        local data = src and playerData(src) or nil
+        log.record({
+            action = action,
+            source = src,
+            citizenid = data and data.citizenid or nil,
+            item = name,
+            amount = amount,
+            inventory = inventoryKey or (src and playerKey(src)) or nil,
+            reason = reason,
+            resource = log.invoker(resource),
+        })
+    end)
+    if not called then
+        Kora.logging.warn('audit.record_failed', 'Item audit entry failed', { error = tostring(err) })
+    end
+end
+
+---Audit the items a wholesale replacement ADDED (per name: new total minus old
+---total, when positive). Used only by the public SetInventory/SetStashItems
+---paths, where a script can mint items without calling AddItem.
+function ext.auditSetDiff(src, inventoryKey, before, after, reason)
+    local log = inventory.auditLog
+    if not log or not log.enabled() or type(after) ~= 'table' then
+        return
+    end
+    local function totals(items)
+        local sums = {}
+        for _, item in pairs(items or {}) do
+            if type(item) == 'table' and type(item.name) == 'string' then
+                sums[item.name] = (sums[item.name] or 0) + (tonumber(item.amount or item.count) or 0)
+            end
+        end
+        return sums
+    end
+    local old, new = totals(before), totals(after)
+    for name, total in pairs(new) do
+        local gained = total - (old[name] or 0)
+        if gained > 0 then
+            ext.auditAdd('set', src, inventoryKey, name, gained, reason)
+        end
+    end
 end
 
 local canonicalItemFields = {
@@ -799,6 +868,11 @@ local function view(inventoryKey)
         return nil
     end
     local items = viewItems(inv.items)
+    -- The omnipack's stock IS its items table: never send ~1000 rows twice.
+    local stock
+    if not inv.omnipack then
+        stock = inv.stock and viewItems(inv.stock) or nil
+    end
     return {
         id = inv.id,
         key = inv.key,
@@ -809,7 +883,8 @@ local function view(inventoryKey)
         weight = inventory.totalWeight(inv.items),
         revision = revision(inventoryKey),
         items = items,
-        stock = inv.stock and viewItems(inv.stock) or nil,
+        stock = stock,
+        omnipack = inv.omnipack == true or nil,
     }
 end
 
@@ -2431,6 +2506,67 @@ local function intentGive(src, request)
     end)
 end
 
+---Admin omnipack take (a `buy` intent against the generated omnipack shop).
+---Same validation as a purchase -- lease, both revisions, access (whose policy
+---is the ACE), routing bucket, distance -- and the ACE is checked AGAIN here
+---on every take, so a revoked permission stops the very next intent. The item
+---name comes from the server's own catalogue slot, never from the browser; the
+---browser only picks a slot and an amount (bounded by omnipack.maxAmount).
+---Stock is infinite and free, so nothing is decremented or re-broadcast for the
+---shop; only the admin's own inventory changes.
+function ext.omnipackTake(src, request, session, shopKey)
+    local omnipack = inventory.omnipack
+    local allowed, denied = false, 'not authorised'
+    if omnipack then
+        allowed, denied = omnipack.allowed(src)
+    end
+    if not allowed then
+        close(src, 'access denied')
+        return false, denied or 'not authorised'
+    end
+    local slot = math.floor(tonumber(request.payload.slot) or 0)
+    local count = inventory.amount(request.payload.amount, 1)
+    if not count or count > omnipack.maxAmount() then
+        return false, 'invalid amount'
+    end
+    return lock({ session.primary }, function()
+        local _, shop, player = validSession(
+            src, request.token, shopKey, session.primary, request.secondaryRevision, request.primaryRevision
+        )
+        if not shop then
+            return false, player
+        end
+        if shop.omnipack ~= true then
+            return false, 'secondary inventory is not the omnipack'
+        end
+        local entry = (shop.stock or shop.items)[slot]
+        if not entry or type(entry.name) ~= 'string' then
+            return false, 'unknown item'
+        end
+        -- The registry is the authority at use time: an item removed since the
+        -- catalogue was built, or one that is not registered at all, is refused.
+        if not itemDef(entry.name) then
+            return false, 'unknown item'
+        end
+        if cashItemsActive and isCashItemName(entry.name) then
+            return false, 'cash cannot be taken from the omnipack'
+        end
+        local _, hookInfo = createItemHook(src, playerKey(src), entry.name, count, {})
+        -- addPlayer gives every weapon a fresh serial (prepareMetadata) and a
+        -- multi-take of a unique item one serial each.
+        local added, addErr, addedItem = addPlayer(src, entry.name, count, nil, hookInfo, 'omnipack')
+        if not added then
+            return false, addErr
+        end
+        bump(session.primary)
+        broadcast(session.primary)
+        recordAudit('omnipack', src, { item = entry.name, amount = count })
+        ext.auditAdd('omnipack', src, playerKey(src), entry.name, count, 'omnipack')
+        showItemBox(src, entry.name, count, 'add', addedItem)
+        return true
+    end)
+end
+
 local function intentBuy(src, request)
     local session = sessions[src]
     if not session or type(request.payload) ~= 'table' then
@@ -2439,6 +2575,10 @@ local function intentBuy(src, request)
     local shopKey = request.payload.inventory or request.payload.shopInventory or session.secondary
     if shopKey ~= session.secondary then
         return false, 'shop is not in this session'
+    end
+    local sessionShop = inventories[shopKey]
+    if sessionShop and sessionShop.omnipack == true then
+        return ext.omnipackTake(src, request, session, shopKey)
     end
     local _, shop, player =
         validSession(src, request.token, shopKey, session.primary, request.secondaryRevision, request.primaryRevision)
@@ -2526,6 +2666,7 @@ local function intentBuy(src, request)
             price = price * count,
             serverData = inventory.copy(currentItem.serverData),
         })
+        ext.auditAdd('purchase', src, playerKey(src), currentItem.name, count, 'shop:' .. tostring(currentShop.id))
         showItemBox(src, currentItem.name, count, 'purchase', addedItem)
         notifyPurchase(src, currentShop, currentItem.name, count, total)
         TriggerEvent('kora_inventory:server:itemPurchased', src, {
@@ -2664,6 +2805,7 @@ local function addItem(src, name, amount, slot, info, reason)
             bump(playerKey(src))
             broadcast(playerKey(src))
             recordAudit('add', src, { item = name, amount = amount, reason = reason })
+            ext.auditAdd('add', src, playerKey(src), name, amount, reason)
             showItemBox(src, name, amount, 'add', added)
         end
         return done, why
@@ -2695,6 +2837,7 @@ local function removeItem(src, name, amount, slot, reason)
                 bump(playerKey(src))
                 broadcast(playerKey(src))
                 recordAudit('remove', src, { item = name, amount = amount, slot = slot, reason = reason })
+                ext.auditAdd('remove', src, playerKey(src), name, amount, reason)
                 showItemBox(src, name, amount, 'remove', removed)
             end
             return ok, err
@@ -2720,6 +2863,7 @@ local function removeItem(src, name, amount, slot, reason)
         bump(playerKey(src))
         broadcast(playerKey(src))
         recordAudit('remove', src, { item = name, amount = amount, reason = reason })
+        ext.auditAdd('remove', src, playerKey(src), name, amount, reason)
         for _, part in ipairs(planned) do
             showItemBox(src, name, part.amount, 'remove', part.item)
         end
@@ -2988,7 +3132,12 @@ local function setItems(src, newItems)
     if cashItemsActive then
         return false, 'SetInventory is unavailable while cash is an item'
     end
-    return replacePlayerItems(src, newItems)
+    local before = inventory.auditLog and inventory.auditLog.enabled() and inventory.copy(playerItems(src)) or nil
+    local ok, err = replacePlayerItems(src, newItems)
+    if ok and before then
+        ext.auditSetDiff(src, playerKey(src), before, newItems, 'SetInventory')
+    end
+    return ok, err
 end
 
 local useables, builtInUseables = {}, {}
@@ -3173,7 +3322,12 @@ end
 local function stashSet(identifier, items)
     local inv = secondary('stash', identifier)
     return lock({ inv.key }, function()
-        return setInventoryItems(inv.key, inventory.copy(items or {}))
+        local before = inventory.auditLog and inventory.auditLog.enabled() and inventory.copy(inv.items) or nil
+        local ok, err = setInventoryItems(inv.key, inventory.copy(items or {}))
+        if ok and before then
+            ext.auditSetDiff(nil, inv.key, before, items, 'SetStashItems')
+        end
+        return ok, err
     end)
 end
 -- Shop stock accessors. A shop is registered with its opening stock, but until
@@ -3603,6 +3757,10 @@ local function buyItem(src, shopId, slot, count)
     if not shop then
         return false, 'shop not found'
     end
+    -- The omnipack has its own validated take path (intentOmnipackTake).
+    if shop.omnipack == true then
+        return false, 'shop not found'
+    end
     local ok, opened = open(src, shop.key)
     if not ok then
         return false, opened
@@ -3671,6 +3829,7 @@ local function buyItem(src, shopId, slot, count)
             price = price * count,
             serverData = inventory.copy(item.serverData),
         })
+        ext.auditAdd('purchase', src, playerKey(src), item.name, count, 'shop:' .. tostring(shopId))
         TriggerEvent('kora_inventory:server:itemPurchased', src, {
             shopId = shopId,
             itemName = item.name,
@@ -3988,6 +4147,7 @@ inventory.internal = {
     canAdd = canAddToInventory,
     addTo = addTo,
     addSecondary = addSecondary,
+    auditAdd = ext.auditAdd,
     removeFrom = removeFrom,
     buildItem = buildItem,
     itemDef = itemDef,
@@ -4434,8 +4594,19 @@ local physicalCashApi = {
     physicalCashImport = physicalCashImport,
     physicalCashCanImport = physicalCashCanImport,
 }
+-- Capture the calling resource where each export ENTERS: deeper in the call
+-- (and after any yield) GetInvokingResource() no longer names the caller, so
+-- the audit log reads it from this per-coroutine context instead.
+-- Only the exports that can create (or, optionally, remove) items are wrapped,
+-- so read-only exports pay nothing.
+local captureInvoker = inventory.auditLog and inventory.auditLog.wrapExport or function(fn) return fn end
+local auditedExports = {
+    addItem = true, AddItem = true, removeItem = true, RemoveItem = true,
+    setItems = true, SetInventory = true, stashSet = true, SetStashItems = true,
+    buyItem = true, BuyItem = true,
+}
 for name, fn in pairs(api) do
-    exports(name, fn)
+    exports(name, auditedExports[name] and captureInvoker(fn) or fn)
 end
 for name, fn in pairs(physicalCashApi) do
     exports(name, fn)

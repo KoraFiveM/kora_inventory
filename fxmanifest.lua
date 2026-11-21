@@ -45,7 +45,14 @@ server_scripts {
     -- import. It is deliberately loaded before the inventory authority.
     'server/schema.lua',
     'server/persistence.lua',
+    -- Item-creation audit log. Before server.lua: the export wrappers there
+    -- capture the invoking resource through it.
+    'server/audit_log.lua',
     'server.lua',
+    -- Admin tools: the omnipack catalogue/open path and the /invaudit and
+    -- /omnipack commands (ACE-gated; see docs/security.md).
+    'server/omnipack.lua',
+    'server/admin_tools.lua',
     'server/recovery.lua',
     'server/exchange.lua',
     'server/crafting.lua',
@@ -119,6 +126,8 @@ client_scripts {
     'client/compat.lua',
     'client/compat/ox.lua',
     'client/ui.lua',
+    -- /invaudit overlay (read-only admin viewer); reuses ui.lua's NUI focus.
+    'client/admin_ui.lua',
     'client/useables.lua',
     -- Renders every player's carried weapons from the server-set state bag,
     -- and plays out the draw/holster this client was asked for. It owns the
