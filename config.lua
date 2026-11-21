@@ -288,8 +288,9 @@ Config.kora_inventory = {
         -- intent). Needs the normal search permission; the server re-checks
         -- the session, the slot, the target's range/bucket and policy.
         openContainers = true,
-        -- Milliseconds of progress bar the searcher's client runs before the
-        -- open request is sent. 0 = instant. Cosmetic delay (client side).
+        -- Milliseconds of progress bar the searcher must complete before the bag
+        -- opens (0..20000, 0 = instant). The SERVER runs the bar on the
+        -- searcher's client and refuses an answer that comes back too early.
         openTime = 2000,
     },
     -- Water damage for electronics. Off by default. The client reports (payload

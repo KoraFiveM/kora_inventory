@@ -305,7 +305,7 @@ What a searcher sees and may open when they open another player's inventory. See
 | --- | --- | --- |
 | `search.hideContainerContents` | boolean | Default `true`. Live. Portable containers in a searched player's inventory are shown closed: no container id and nothing about their contents is sent to the searcher. Off shows them like ordinary items. |
 | `search.openContainers` | boolean | Default `true`. Live. Lets a searcher open a searched player's bag with the `openTargetContainer` intent. The server re-checks the session, slot, range, bucket and search policy. Off refuses every such request and the view stops offering Open. |
-| `search.openTime` | integer | Default `2000`. Live. Milliseconds of progress bar on the searcher's client before the open request is sent (0 to 30000). A client-side delay only; the server checks everything when the request arrives. |
+| `search.openTime` | integer | Default `2000`. Live. Milliseconds of progress bar the searcher must complete before the bag opens (0 to 20000). The server runs the bar on the searcher's client and enforces the minimum elapsed time, then re-validates the session and slot before opening. |
 
 ### Water damage (waterDamage)
 

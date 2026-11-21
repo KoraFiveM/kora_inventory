@@ -312,7 +312,7 @@ If `search.openContainers` is on, the searcher can open a bag with the `openTarg
 4. The bag opens as the searcher's secondary inventory. Its access policy accepts the searcher only while the target still carries that exact bag, is in range, and search policy still allows it; it is re-checked on every request, so walking away or the target dropping the bag closes it.
 5. Closing the bag on purpose returns the searcher to the target's inventory if that is still allowed. Any other close reason (expiry, range, cuffing) just closes.
 
-The bundled client shows a progress bar for `search.openTime` before it sends the request. That delay is drawn on the searcher's own screen and is not enforced by the server, like the use progress bar.
+The server runs a progress bar of `search.openTime` milliseconds on the searcher's client (the same progress callback combine uses) and refuses the open if the client answers sooner than the bar can run or cancels it. After the wait the session, access and the slot are validated again before the bag opens. A value of 0 opens instantly; values above 20000 are clamped.
 
 ### Evidence and confiscation
 

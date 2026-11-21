@@ -21,10 +21,21 @@ local function clone(value)
 end
 
 local callbacks, handlers, netEvents, sent = {}, {}, {}, {}
+local clock = 5000
+local bar = { calls = {}, answer = true, delay = function(time) return time end }
 Kora = {
     util = { deepClone = clone },
     resources = { serverRegistry = function() return { track = function() end, untrack = function() end } end },
-    callback = { register = function(name, fn) callbacks[name] = fn end },
+    callback = {
+        register = function(name, fn) callbacks[name] = fn end,
+        -- The searcher's client progress bar (the server runs and times it).
+        trigger = function(src, name, data)
+            bar.calls[#bar.calls + 1] = { src = src, name = name, data = data }
+            if bar.hook then bar.hook() end
+            clock = clock + bar.delay(data.time)
+            return bar.answer
+        end,
+    },
     distance = { player = function(source, point, distance)
         return math.abs(point.x - GetEntityCoords(GetPlayerPed(source)).x) <= distance
     end },
@@ -41,7 +52,7 @@ AddEventHandler = function(name, fn) handlers[name] = handlers[name] or {}; tabl
 RegisterNetEvent = function(name, fn) netEvents[name] = fn end
 TriggerClientEvent = function(name, src, ...) sent[#sent + 1] = { name = name, src = src, args = { ... } } end
 TriggerEvent = function(name, ...) for _, fn in ipairs(handlers[name] or {}) do fn(...) end end
-GetGameTimer = function() return 5000 end
+GetGameTimer = function() return clock end
 GetPlayerPed = function(source) return source end
 GetEntityCoords = function(ped) return { x = positions[ped], y = 0, z = 0 } end
 GetPlayerRoutingBucket = function() return 0 end
@@ -288,6 +299,63 @@ for _, event in ipairs(sent) do
     if event.name == 'kora_inventory:client:sessionOpened' and event.src == 7 then seen = event.args[1] end
 end
 H.equal(seen.secondary.items[1].name, 'weed', 'the opened bag shows its contents')
+
+-- The opening delay is enforced by the SERVER (search.openTime) ---------------
+
+H.equal(#bar.calls >= 1, true, 'the server ran the progress bar on the searcher client')
+H.equal(bar.calls[#bar.calls].src, 7, 'the bar ran on the searcher client')
+H.equal(bar.calls[#bar.calls].name, 'kora_inventory:client:combineProgress', 'through the shared progress callback')
+H.equal(bar.calls[#bar.calls].data.time, 2000, 'for search.openTime milliseconds')
+
+-- A client that answers instantly (modified client) is refused and opens nothing.
+view = search()
+bar.delay = function() return 0 end
+ok, err = intent(7, request({ inventory = 'player:9', slot = 3 }))
+H.equal(ok, false, 'an instant bar answer is refused')
+H.equal(err, 'cancelled', 'as a cancelled open')
+H.equal(I.sessionOf(7).secondary, 'player:9', 'and nothing opened')
+-- Just inside the tolerance is accepted, anything shorter is not.
+bar.delay = function(time) return time - 600 end
+ok = intent(7, request({ inventory = 'player:9', slot = 3 }))
+H.equal(ok, false, 'an answer well before the bar can finish is refused')
+bar.delay = function(time) return time - 400 end
+ok = intent(7, request({ inventory = 'player:9', slot = 3 }))
+H.ok(ok, 'an answer within the tolerance opens')
+I.close(7, 'test')
+bar.delay = function(time) return time end
+
+-- A cancelled or failed bar opens nothing.
+view = search()
+bar.answer = false
+ok, err = intent(7, request({ inventory = 'player:9', slot = 3 }))
+H.equal(ok, false, 'a cancelled bar is refused')
+bar.answer = true
+
+-- The session changing during the wait is caught by the re-validation.
+bar.hook = function() positions[9] = 50 end
+ok = intent(7, request({ inventory = 'player:9', slot = 3 }))
+H.equal(ok, false, 'walking out of range during the bar refuses the open')
+bar.hook = nil
+positions[9] = 1
+view = search()
+local carriedBag = playersItems[9][3]
+bar.hook = function() playersItems[9][3] = I.buildItem('weed', 1, 3, {}) end
+ok, err = intent(7, request({ inventory = 'player:9', slot = 3 }))
+H.equal(ok, false, 'the slot changing during the bar refuses the open')
+bar.hook = nil
+playersItems[9][3] = carriedBag
+
+-- openTime = 0 skips the bar altogether.
+view = search()
+local callsBefore = #bar.calls
+Config.kora_inventory.search.openTime = 0
+ok = intent(7, request({ inventory = 'player:9', slot = 3 }))
+H.ok(ok, 'openTime 0 opens immediately')
+H.equal(#bar.calls, callsBefore, 'without running a bar')
+I.close(7, 'test')
+Config.kora_inventory.search.openTime = 2000
+view = search()
+H.ok(intent(7, request({ inventory = 'player:9', slot = 3 })), 'the bag opens again after the bar tests')
 
 -- Closing the bag returns to the target's inventory.
 I.close(7, 'requested')
