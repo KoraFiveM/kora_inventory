@@ -19,6 +19,10 @@ local internal =
     assert(inventory and inventory.internal, 'kora_inventory internal authority must load before qb event compatibility')
 local api = assert(inventory.api, 'kora_inventory api must load before qb event compatibility')
 
+local function invokedByResource()
+    return type(GetInvokingResource) == 'function' and GetInvokingResource()
+end
+
 local function reject(src, reason)
     TriggerClientEvent('kora_inventory:client:rejected', src, reason)
     return false, reason
@@ -63,7 +67,7 @@ end
 RegisterNetEvent(
     'qb-inventory:server:SetInventoryData',
     function(fromInventory, toInventory, fromSlot, toSlot, fromAmount, _toAmount)
-        if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+        if invokedByResource() then
             return
         end
         local src = source
@@ -94,14 +98,14 @@ RegisterNetEvent(
 )
 
 RegisterNetEvent('qb-inventory:server:closeInventory', function()
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     internal.close(source, 'requested')
 end)
 
 RegisterNetEvent('qb-inventory:server:useItem', function(item)
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     local src = source
@@ -116,7 +120,7 @@ RegisterNetEvent('qb-inventory:server:useItem', function(item)
 end)
 
 RegisterNetEvent('qb-inventory:server:openDrop', function(dropId)
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     local src = source
@@ -132,7 +136,7 @@ RegisterNetEvent('qb-inventory:server:openDrop', function(dropId)
 end)
 
 RegisterNetEvent('qb-inventory:server:openVending', function()
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     local src = source
@@ -143,7 +147,7 @@ end)
 -- authority state here (it gates every distance check), so this is accepted as
 -- a deliberate no-op rather than a client-writable field.
 RegisterNetEvent('qb-inventory:server:updateDrop', function()
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
 end)
@@ -152,7 +156,7 @@ end)
 -- Granting an item on client say-so is exactly the shape this resource refuses;
 -- a server-side script wanting it can call AddItem directly.
 RegisterNetEvent('qb-inventory:server:snowball', function()
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
 end)
@@ -161,7 +165,7 @@ end)
 -- bare `(item)` form. Same posture as useItem above: only a slot is read, from
 -- the caller's own inventory, and the item is re-resolved from player data.
 local function legacyUse(first, second)
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     local item = second ~= nil and second or first
@@ -185,7 +189,7 @@ RegisterNetEvent('inventory:server:UseItem', legacyUse)
 local legacyOpenTypes = { stash = true, shop = true, drop = true, player = true, otherplayer = true }
 
 local function legacyOpen(invType, id)
-    if type(GetInvokingResource) == 'function' and GetInvokingResource() then
+    if invokedByResource() then
         return
     end
     local src = source
@@ -226,6 +230,3 @@ RegisterNetEvent('inventory:server:OpenInventory', legacyOpen)
 -- these are accepted as no-ops.
 RegisterNetEvent('qb-inventory:server:SetIsOpenState', function() end)
 RegisterNetEvent('inventory:server:SetIsOpenState', function() end)
-
-inventory.compat = inventory.compat or {}
-inventory.compat.koraEvents = { sessionKeyFor = sessionKeyFor }
