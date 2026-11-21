@@ -37,7 +37,7 @@ cfg.mode = Kora.config.enum(cfg.mode, {
 })
 cfg.into = Kora.config.optional(cfg.into, Kora.config.string('', { minLength = 1 }), {
     label = 'Item a damaged item turns into',
-    description = 'Only used when water damage turns items into another item, for example garbage. If it is not set or the item does not exist, damaged items are marked instead of converted. Applies on the next swim report.',
+    description = 'Only used when water damage turns items into another item, for example garbage. If it is not set or the item does not exist, damaged items are marked instead of converted. Warning: swimming is reported by the player’s own client, so a player can trigger this whenever they like. Never choose an item worth more than the original; use junk such as garbage. Applies on the next swim report.',
     scope = 'server',
     live = true,
 })

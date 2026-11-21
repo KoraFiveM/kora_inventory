@@ -310,7 +310,11 @@ Config.kora_inventory = {
         -- 'flag' marks info.waterDamaged (item cannot be used until repaired),
         -- 'convert' turns the item into `into`, 'remove' deletes it.
         mode = 'flag',
-        into = nil, -- item name used by mode = 'convert' (e.g. 'garbage')
+        -- Item name used by mode = 'convert' (e.g. 'garbage'). WARNING: the
+        -- swim report is self-reported (it can only harm the sender, who can
+        -- trigger it at will), so `into` must NEVER be worth more than the
+        -- original item. Use junk such as garbage.
+        into = nil,
         -- Using this item clears the flag from a damaged item (one is consumed).
         repairItem = 'electronickit',
         -- Item names that protect what is stored in them. Portable containers

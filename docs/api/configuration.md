@@ -317,7 +317,7 @@ Electronics damaged by swimming. See [Items and metadata](./items.md).
 | `waterDamage.swimSeconds` | integer | Default `3`. Live. Seconds of swimming before the client reports (1 to 120). The server still accepts one report per player every 10 seconds. |
 | `waterDamage.items` | table | Default `phone`, `iphone`, `samsungphone` at `chance = 1.0` and `radio` at `chance = 0.5`. Live. Item name to `{ chance = 0..1 }`, rolled once per carried stack per report. |
 | `waterDamage.mode` | string | Default `flag`. Live. `flag`, `convert` or `remove`; anything else behaves like `flag`. |
-| `waterDamage.into` | string \| nil | Default `nil`. Live. Item used by `convert`; an unknown or missing item falls back to `flag`. |
+| `waterDamage.into` | string \| nil | Default `nil`. Live. Item used by `convert`; an unknown or missing item falls back to `flag`. Swimming is self-reported, so never use an item worth more than the original (use junk such as garbage). |
 | `waterDamage.repairItem` | string | Default `electronickit`. Live. Using it repairs the first water damaged pocket item and consumes one. |
 | `waterDamage.protectedBy` | table | Default `{ 'paperbag' }`. Reserved, no effect yet: items inside any portable container are already never damaged. |
 
