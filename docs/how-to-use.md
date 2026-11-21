@@ -32,6 +32,10 @@ Every inventory has a key of the form `kind:id`. The kinds that exist in code ar
 - `confiscation:<source>` — created by the ox compat `ConfiscateInventory`; clients can never open it.
 - Not inventories but part of the same resource: crafting recipes (`RegisterCraftRecipe`), durable player exchanges (`ExecutePlayerExchange`), weapon state and visible weapon carry.
 
+## Pick an inventory layout
+
+The window has four layouts: `classic` (the original three-column window), `loadout` (pockets, a centre column with quick slots and the item inspector, then the other inventory), `compact` (a narrow single column with the inspector as a popover) and `dock` (a full-height panel on the screen edge with Pockets and other-inventory tabs). With kora_hud installed, players choose one in the `/ui` editor under "Inventory layout"; it is applied the next time the inventory opens. Server owners set the default with `Config.kora_inventory.ui.layout`, can switch layouts off with `ui.layouts`, and can stop players choosing with `ui.playerLayoutChoice = false` (see [Configuration](./api/configuration.md)). Every layout uses the same slots, drag and drop and server checks. See [NUI and UI](./api/nui.md) for how each one is arranged.
+
 ## Calling the exports
 
 Many server exports exist under both a capitalised name and a lower-case alias (`AddItem` and `addItem`, `RegisterStash` and `registerStash`) and both resolve to the same function; others exist in one form only (`OpenInventory`, `CraftItem`, `getWeight`). Each function entry shows its exact name and aliases. Client exports are lower-case apart from `HasItem`. Call them like any export:

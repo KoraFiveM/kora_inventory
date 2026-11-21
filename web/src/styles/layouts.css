@@ -1,0 +1,125 @@
+/* Alternative window layouts (web/src/layouts). Everything here is scoped to
+   `.inventory-shell[data-layout="..."]` so the classic window in styles.css is
+   untouched, and uses kora_theme tokens only: no literal colours. Fonts are
+   inherited (kora_theme's body/heading stacks come from styles.css). */
+
+/* ---- shared ------------------------------------------------------------ */
+
+/* The quick-slot strip's wrapper has no frame of its own. A strip that renders
+   nothing leaves it childless, and a childless wrapper must take no room. */
+.inventory-shell[data-layout] .layout-quick { min-width: 0; flex: none; }
+.inventory-shell[data-layout] .layout-quick:empty { display: none; }
+
+/* Panels that stand in for a column: scroll inside themselves, not the shell. */
+.inventory-shell[data-layout] :is(.compact-pane, .dock-pane) { min-height: 0; min-width: 0; display: grid; grid-template-rows: minmax(0, 1fr); }
+.inventory-shell[data-layout] :is(.compact-pane, .dock-pane) > .inventory-panel { height: 100%; }
+
+/* ---- loadout ----------------------------------------------------------- */
+
+.inventory-shell[data-layout="loadout"] { --loadout-pockets: calc(400px * var(--ui-scale, 1)); }
+.inventory-shell[data-layout="loadout"] .loadout-main { min-height: 0; display: grid; grid-template-columns: minmax(310px, 1fr) minmax(250px, 300px) minmax(310px, 1fr); gap: 14px; }
+/* Centre column: quick slots on top, the inspector fills what is left. */
+.inventory-shell[data-layout="loadout"] .loadout-centre { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.inventory-shell[data-layout="loadout"] .loadout-main:not(.loadout-main-solo) .loadout-centre > .item-detail { flex: 1 1 0; min-height: 0; }
+
+/* Solo: pockets plus a centre column that only takes room while it has
+   content. The window is anchored on the pockets (not on its own centre), so
+   selecting an item grows the frame sideways instead of shifting the grid. */
+.inventory-shell[data-layout="loadout"].inventory-shell-solo {
+  width: fit-content;
+  max-width: 96%;
+  transform-origin: calc(14px + var(--loadout-pockets) / 2) 50%;
+  transform: translate(calc(-14px - var(--loadout-pockets) / 2 + var(--layout-x, 0px)), calc(-50% + var(--layout-y, 0px))) scale(var(--layout-scale, 1));
+}
+.inventory-shell[data-layout="loadout"].inventory-shell-solo.inventory-shell-drawer-left {
+  transform-origin: calc(100% - 14px - var(--loadout-pockets) / 2) 50%;
+  transform: translate(calc(-100% + 14px + var(--loadout-pockets) / 2 + var(--layout-x, 0px)), calc(-50% + var(--layout-y, 0px))) scale(var(--layout-scale, 1));
+}
+.inventory-shell[data-layout="loadout"] .loadout-main-solo { grid-template-columns: var(--loadout-pockets) auto; gap: 0; }
+.inventory-shell[data-layout="loadout"].inventory-shell-drawer-left .loadout-main-solo { grid-template-columns: auto var(--loadout-pockets); }
+.inventory-shell[data-layout="loadout"] .loadout-main-solo .loadout-centre { align-self: start; max-height: 70vh; }
+.inventory-shell[data-layout="loadout"] .loadout-main-solo .loadout-centre > * { width: calc(290px * var(--ui-scale, 1)); margin-left: 14px; }
+.inventory-shell[data-layout="loadout"].inventory-shell-drawer-left .loadout-main-solo .loadout-centre > * { margin-left: 0; margin-right: 14px; }
+/* The solo inspector is a drawer by default (absolute, beside the window);
+   here it is simply the second item of the centre column. */
+.inventory-shell[data-layout="loadout"] .item-detail-drawer { position: relative; top: auto; right: auto; left: auto; width: auto; height: auto; max-height: 60vh; flex: 0 1 auto; }
+
+/* ---- compact ----------------------------------------------------------- */
+
+.inventory-shell[data-layout="compact"] {
+  --slot-columns: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: calc(520px * var(--ui-scale, 1));
+  max-width: 96%;
+  height: fit-content;
+  min-height: 0;
+  max-height: 86%;
+  /* The inspector popover sits outside the frame. */
+  overflow: visible;
+}
+.inventory-shell[data-layout="compact"].layout-transfer { height: 86%; }
+.inventory-shell[data-layout="compact"] .slot-grid { grid-template-columns: repeat(var(--slot-columns, 5), minmax(0, 1fr)); }
+.inventory-shell[data-layout="compact"] .inventory-topbar { grid-template-columns: minmax(0, 1fr) auto; }
+.inventory-shell[data-layout="compact"] .search, .inventory-shell[data-layout="compact"] .session-state { display: none; }
+.inventory-shell[data-layout="compact"] .inventory-heading { flex: none; }
+.inventory-shell[data-layout="compact"] .compact-stack { min-height: 0; display: flex; flex-direction: column; flex: 0 1 auto; }
+.inventory-shell[data-layout="compact"].layout-transfer .compact-stack { flex: 1 1 0; }
+/* Each panel scrolls on its own; in transfer view they split the height. */
+.inventory-shell[data-layout="compact"] .compact-pane { flex: 0 1 auto; }
+.inventory-shell[data-layout="compact"].layout-transfer .compact-pane { flex: 1 1 0; }
+.inventory-shell[data-layout="compact"] .compact-divider { flex: none; height: 0; margin: 10px 4px; border-top: 1px solid hsl(var(--border-strong) / .82); }
+.inventory-shell[data-layout="compact"] .shortcut-bar { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 2px 12px; font-size: calc(11px * var(--ui-scale, 1)); flex: none; }
+
+/* Inspector popover: beside the window, top-aligned, never a column. */
+.inventory-shell[data-layout="compact"] .compact-popover { position: absolute; z-index: 3; top: 0; left: calc(100% + 12px); width: calc(290px * var(--ui-scale, 1)); max-height: 70vh; display: grid; grid-template-rows: minmax(0, 1fr); animation: compact-popover-in 160ms ease-out both; }
+.inventory-shell[data-layout="compact"] .compact-popover-left { left: auto; right: calc(100% + 12px); animation-name: compact-popover-in-left; }
+.inventory-shell[data-layout="compact"] .item-detail-drawer { position: relative; top: auto; right: auto; left: auto; width: auto; height: auto; max-height: 70vh; animation: none; }
+@keyframes compact-popover-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes compact-popover-in-left { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ---- dock -------------------------------------------------------------- */
+
+/* Docked to a screen edge instead of centred: --layout-x/-y (centre-based) do
+   not apply, --layout-scale does. The height is divided by the scale so the
+   scaled window still spans the screen, and the width is capped the same way
+   so it cannot run off the other edge. */
+.inventory-shell[data-layout="dock"] {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  top: 12px;
+  width: calc(460px * var(--ui-scale, 1));
+  max-width: calc(100% / var(--layout-scale, 1) - 24px);
+  height: calc((100% - 24px) / var(--layout-scale, 1));
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  transform: scale(var(--layout-scale, 1));
+}
+.inventory-shell[data-layout="dock"].dock-left { left: 12px; right: auto; transform-origin: top left; }
+.inventory-shell[data-layout="dock"].dock-right { left: auto; right: 12px; transform-origin: top right; }
+.inventory-shell[data-layout="dock"] .inventory-heading { flex: none; }
+.inventory-shell[data-layout="dock"] .inventory-topbar { grid-template-columns: auto minmax(0, 1fr) auto; }
+.inventory-shell[data-layout="dock"] .session-state { display: none; }
+.inventory-shell[data-layout="dock"] .search { grid-column: auto; grid-row: auto; }
+.inventory-shell[data-layout="dock"] .shortcut-bar { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 2px 12px; font-size: calc(11px * var(--ui-scale, 1)); flex: none; }
+
+.inventory-shell[data-layout="dock"] .dock-tabs { flex: none; display: flex; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid hsl(var(--border) / .85); }
+.inventory-shell[data-layout="dock"] .dock-tab { flex: 1 1 0; min-width: 0; height: 36px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 10px; border: 1px solid hsl(var(--border)); border-radius: 9px; color: hsl(var(--muted-foreground)); background: hsl(var(--background) / .62); font: inherit; font-size: calc(12px * var(--ui-scale, 1)); font-weight: 750; cursor: pointer; transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
+.inventory-shell[data-layout="dock"] .dock-tab:hover { color: hsl(var(--foreground)); border-color: hsl(var(--brand-border)); }
+.inventory-shell[data-layout="dock"] .dock-tab-active { color: hsl(var(--primary)); border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft)); }
+/* A drag is resting on the tab: it is about to switch. */
+.inventory-shell[data-layout="dock"] .dock-tab-hover { color: hsl(var(--primary)); border-color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.inventory-shell[data-layout="dock"] .dock-tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inventory-shell[data-layout="dock"] .dock-tab-badge { flex: none; min-width: 18px; height: 18px; box-sizing: border-box; padding: 0 5px; border: 1px solid hsl(var(--border-strong)); border-radius: 999px; color: hsl(var(--foreground)); background: hsl(var(--muted)); font-size: calc(10px * var(--ui-scale, 1)); font-weight: 800; line-height: 16px; text-align: center; font-variant-numeric: tabular-nums; }
+.inventory-shell[data-layout="dock"] .dock-tab-active .dock-tab-badge { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--background) / .55); }
+
+.inventory-shell[data-layout="dock"] .dock-body { position: relative; flex: 1 1 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); }
+.inventory-shell[data-layout="dock"] .dock-pane-hidden { display: none; }
+
+/* The inspector slides up over the bottom of the panel. */
+.inventory-shell[data-layout="dock"] .dock-inspector { position: absolute; z-index: 3; right: 0; bottom: 0; left: 0; max-height: 72%; display: grid; grid-template-rows: minmax(0, 1fr); box-shadow: 0 -16px 36px rgb(0 0 0 / .42); border-radius: 14px; animation: dock-inspector-in 170ms ease-out both; }
+.inventory-shell[data-layout="dock"] .item-detail-drawer { position: relative; top: auto; right: auto; left: auto; width: auto; height: auto; max-height: 100%; animation: none; }
+@keyframes dock-inspector-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
