@@ -58,6 +58,16 @@ H.equal(map['+ click: quick transfer'], 21, 'Shift is quick transfer')
 H.equal(map['+ drag: move half'], 36, 'Ctrl drag moves half')
 H.equal(map['+ drag: move one'], 19, 'Alt drag moves one')
 H.equal(all[1].control, 200, 'the list starts with the essentials')
+-- Keyboard controls carry a name for kora_lib to show when GTA has no glyph;
+-- mouse buttons do not need one.
+local function fallbackOf(list, label)
+    for _, button in ipairs(list) do if button.label == label then return button.keyFallback end end
+end
+H.equal(fallbackOf(all, 'Close inventory'), 'Esc', 'Esc is named for the close key')
+H.equal(fallbackOf(all, '+ click: quick transfer'), 'Shift', 'Shift is named')
+H.equal(fallbackOf(all, '+ drag: move half'), 'Ctrl', 'Ctrl is named')
+H.equal(fallbackOf(all, '+ drag: move one'), 'Alt', 'Alt is named')
+H.equal(fallbackOf(all, 'Drag: move / stack'), nil, 'mouse buttons have no fallback')
 for _, button in ipairs(all) do
     H.equal(type(button.label), 'string', 'every button has a label')
     H.ok(button.label ~= '', 'every label is non-empty')
