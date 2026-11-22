@@ -21,6 +21,15 @@ local CONTROL = {
     shift = 21, ctrl = 36, alt = 19,
 }
 
+-- Keyboard names for the controls above. GTA only names some controls in the
+-- instructional overlay; for the rest kora_lib shows no key unless it is told
+-- the name, so these are passed as keyFallback. Mouse buttons resolve to LMB/RMB
+-- on their own and need no entry.
+local KEY_NAME = {
+    [CONTROL.close] = 'Esc', [CONTROL.use] = 'Enter', [CONTROL.shift] = 'Shift',
+    [CONTROL.ctrl] = 'Ctrl', [CONTROL.alt] = 'Alt',
+}
+
 local function defaultText(_, fallback)
     return fallback
 end
@@ -52,7 +61,7 @@ end
 ---order they are drawn: the essentials first, then the optional modifiers.
 ---@param ui table|nil Config.kora_inventory.ui (read by the caller at call time)
 ---@param text fun(key: string, fallback: string): string|nil locale lookup
----@return { label: string, control: integer }[]
+---@return { label: string, control: integer, keyFallback?: string }[]
 local function buttons(ui, text)
     ui = type(ui) == 'table' and ui or {}
     text = text or defaultText
@@ -81,6 +90,9 @@ local function buttons(ui, text)
     if ui.modifierDrag ~= false then
         list[#list + 1] = { label = label('move_half', '+ drag: move half'), control = CONTROL.ctrl }
         list[#list + 1] = { label = label('move_one', '+ drag: move one'), control = CONTROL.alt }
+    end
+    for _, button in ipairs(list) do
+        button.keyFallback = KEY_NAME[button.control]
     end
     return list
 end
