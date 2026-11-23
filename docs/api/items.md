@@ -15,15 +15,16 @@ Namespace: `exports.kora_inventory` · Source: `server.lua (buildItem), shared.l
 Kora's bundled definitions live in four files.
 
 - `data/items.lua` contains general inventory items.
-- `data/weapons.lua` contains ammunition, attachments, and weapon supplies.
+- `data/weapons.lua` contains GTA weapon items, ammunition, attachments, and weapon supplies.
 - `data/food.lua` contains food.
 - `data/dranks.lua` contains drinks.
 
 `data/qb-items.lua` supplies bundled stock QBCore items. Core reads these files
-at startup and publishes the merged records
-through its shared registry and `QBCore.Shared.Items`. Restart kora_core after
-editing the bundled catalogue. Server-specific definitions in core's legacy item
-files continue to work.
+at startup and publishes the merged records through its live registries and
+`QBCore.Shared.Items`. Weapon items go into the `weapons` registry. Ammunition,
+attachments, and supplies go into the `items` registry. Restart kora_core after
+editing the bundled catalogue. Server-specific definitions in Core's legacy item
+and weapon files continue to work.
 
 With grid storage enabled, ordinary items use one cell by default. Set
 `gridWidth` and `gridHeight` as positive whole numbers for larger items. In the
@@ -50,7 +51,7 @@ kora_inventory resolves definitions through kora_core at runtime (`getShared('it
 | Definition | The shared record for an item name: label, weight, type and flags. One per name. |
 | Instance | The table in a slot: name, amount and metadata (also called `info`). Unique items always have `amount = 1`. |
 | Metadata / info | A per-instance table. `info` and `metadata` hold the same data; kora_inventory keeps both in sync and prefers `info`. |
-| Unique item | A definition with `unique = true`. It never stacks; adding N creates N separate slots. Every weapon in kora_core's shipped catalogue is unique. |
+| Unique item | A definition with `unique = true`. It never stacks; adding N creates N separate slots. Every weapon in the bundled catalogue is unique. |
 | Effective item | The label, image, weight and description actually shown: instance metadata wins over the definition. |
 
 ## Item fields
