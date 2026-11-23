@@ -113,7 +113,7 @@ local function reconcile(provider, key, fingerprint)
 end
 
 local function plan(data, terms)
-    local draft = { items = inventory.copy(data.items or {}), slots = Config.kora_inventory.playerSlots, maxWeight = Config.kora_inventory.playerMaxWeight }
+    local draft = { type = 'player', items = inventory.copy(data.items or {}), slots = Config.kora_inventory.playerSlots, maxWeight = Config.kora_inventory.playerMaxWeight }
     local physical = exports.kora_core:isPhysicalCash('cash')
     local cash = Config.kora_inventory.cash
     if physical and (not cash or not cash.asItem or cash.account ~= 'cash' or not internal.itemDef(cash.item)) then return nil, 'Physical cash policy is unavailable.' end

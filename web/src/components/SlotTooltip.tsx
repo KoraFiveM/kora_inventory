@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { formatMetaValue } from "@/lib/format"
+import { gridPlacementSize } from "@/lib/grid"
 import { useLocale } from "@/lib/locales"
 import type { InventoryItem } from "@/lib/types"
 import { JammedBadge } from "./JammedBadge"
@@ -9,8 +10,9 @@ const MARGIN = 8
 const OFFSET = 16
 
 /** Hover details for a filled slot: label, amount, weight, description, durability, display rows. */
-export function SlotTooltip({ item, x, y, decimals }: { item: InventoryItem; x: number; y: number; decimals: number }) {
+export function SlotTooltip({ item, x, y, decimals, showGridSize }: { item: InventoryItem; x: number; y: number; decimals: number; showGridSize?: boolean }) {
     const t = useLocale()
+    const footprint = showGridSize ? gridPlacementSize(item) : undefined
     const ref = useRef<HTMLDivElement>(null)
     const [pos, setPos] = useState({ left: x + OFFSET, top: y + OFFSET })
     // Placed near the cursor, then clamped so it never leaves the viewport.
@@ -28,6 +30,7 @@ export function SlotTooltip({ item, x, y, decimals }: { item: InventoryItem; x: 
             <dl>
                 <dt>{t("ui.amount")}</dt><dd>×{item.amount}</dd>
                 <dt>{t("ui.weight")}</dt><dd>{item.weight ?? 0} g</dd>
+                {footprint && <><dt>{t("ui.grid_size")}</dt><dd>{footprint.width} × {footprint.height}</dd></>}
                 {typeof item.durability === "number" && <><dt>{t("ui.durability")}</dt><dd>{Math.round(item.durability)}%</dd></>}
                 {item.jammed === true && <><dt>{t("ui.jammed")}</dt><dd><JammedBadge item={item} /></dd></>}
                 {item.displayMeta?.map((meta, index) => <div key={index} className="slot-tooltip-row"><dt>{meta.label}</dt><dd>{formatMetaValue(meta.value, decimals)}</dd></div>)}

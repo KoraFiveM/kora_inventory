@@ -3,6 +3,7 @@
 
 local config = Config.kora_inventory
 local inventory = KoraInventory
+local grid = inventory.grid
 local resourceName = GetCurrentResourceName()
 
 local inventories = {}
@@ -493,6 +494,9 @@ local function secondary(kind, id, opts)
         policyOwner = opts.policyOwner,
         _suppliedOptions = supplied,
     }
+    if opts.items and grid and not grid.replacement({ type = kind, slots = inv.slots, items = {} }, inv.items, itemDef) then
+        return nil, false, 'item footprints overlap or exceed inventory bounds'
+    end
     inventories[inventoryKey] = inv
     if persistence and persistence.markDirty then
         persistence.markDirty(inv)
@@ -894,7 +898,7 @@ function decayHelpers.settings()
     return { cfg = cfg, now = os.time(), inspector = inspector }
 end
 
-local function viewItems(source, searched, shelf)
+local function viewItems(source, searched, shelf, shapes)
     local items = inventory.copy(source or {})
     -- Shelf stock (shops) never ages, so it carries no decay fields.
     local decayView = not shelf and decayHelpers.settings() or nil
@@ -914,7 +918,8 @@ local function viewItems(source, searched, shelf)
         return def or nil
     end
     local ammoSettings = ammoInfoConfig()
-    for _, item in pairs(items) do
+    local gridEnabled = grid and grid.enabled()
+    for slot, item in pairs(items) do
         -- Trusted server integrations may attach bookkeeping to durable stock.
         -- It is authority state, not item metadata, and must never reach NUI.
         item.serverData = nil
@@ -925,6 +930,17 @@ local function viewItems(source, searched, shelf)
         -- Older player records may predate the definition image filename. Resolve
         -- it from the current core registry at render time without a migration.
         local def = cachedDef(item.name)
+        local shape = shapes and shapes[slot]
+        local rotated = item.gridRotated == true
+        item.gridWidth, item.gridHeight, item.gridRotated = nil, nil, nil
+        item.gridBaseWidth, item.gridBaseHeight = nil, nil
+        if shape then
+            item.gridWidth, item.gridHeight, item.gridRotated = shape[1], shape[2], rotated
+        end
+        if gridEnabled then
+            item.gridBaseWidth, item.gridBaseHeight = grid.size(def)
+            if rotated then item.gridRotated = true end
+        end
         if def then
             item.image = def.image or item.image
             item.imageUrl = def.imageUrl or item.imageUrl
@@ -975,7 +991,10 @@ local function view(inventoryKey, viewer)
     if decayRuntime and decayRuntime.refresh(inventoryKey, inv) then
         inv = getInventory(inventoryKey) or inv
     end
-    local items = viewItems(inv.items, ext.searchedBy(inv, viewer), inv.type == 'shop')
+    local columns = grid and grid.columns(inv)
+    local _, shapes
+    if columns then _, shapes = grid.layout(inv.items, inv.slots, columns) end
+    local items = viewItems(inv.items, ext.searchedBy(inv, viewer), inv.type == 'shop', shapes)
     -- The omnipack's stock IS its items table: never send ~1000 rows twice.
     local stock
     if not inv.omnipack then
@@ -987,6 +1006,7 @@ local function view(inventoryKey, viewer)
         type = inv.type,
         label = inv.label,
         slots = inv.slots,
+        gridColumns = columns,
         maxWeight = inv.maxWeight,
         weight = inventory.totalWeight(inv.items),
         revision = revision(inventoryKey),
@@ -994,6 +1014,27 @@ local function view(inventoryKey, viewer)
         stock = stock,
         omnipack = inv.omnipack == true or nil,
     }
+end
+
+function ext.placement(inv, item, slot, count, rotated, ignoreSlot)
+    local columns = grid and grid.columns(inv)
+    if not columns then
+        if count == 1 then return { slot or inventory.firstFreeSlot(inv.items, inv.slots) } end
+        return inventory.reserveFreeSlots(inv.items, inv.slots, count)
+    end
+    grid.shape(item, itemDef(item.name), rotated)
+    return grid.reserve(inv.items, inv.slots, columns, item, slot, count, ignoreSlot)
+end
+
+function ext.capacity(inv, item, slot, rotated, exactSlot)
+    if slot then
+        slot = inventory.validSlot(slot, inv.slots)
+        if not slot then return false end
+    end
+    if not item.unique and (slot and inventory.canStack(inv.items[slot], item)
+        or not exactSlot and inventory.stackSlot(inv.items, item)) then return true end
+    local count = item.unique and item.amount or 1
+    return #ext.placement(inv, item, slot, count, rotated) == count
 end
 
 local function patchView(inventoryKey, viewer)
@@ -1058,12 +1099,13 @@ end
 -- `exactSlot` is for moves between slots: it stops an empty target slot falling
 -- back to "merge into any matching stack", which would put a split stack
 -- straight back onto the stack it was split from.
-local function addSecondary(inv, name, amount, slot, metadata, exactSlot)
+local function addSecondary(inv, name, amount, slot, metadata, exactSlot, rotated)
     if inv.blocked then return false, 'inventory is locked' end
     if inv.durablePending then return false, 'inventory recovery is being reconciled' end
     if slot then
         slot = inventory.validSlot(slot, inv.slots)
         if not slot then return false, 'invalid slot' end
+        if grid and grid.columns(inv) then exactSlot = true end
     else
         slot = nil
     end
@@ -1077,7 +1119,7 @@ local function addSecondary(inv, name, amount, slot, metadata, exactSlot)
         return false, 'over weight'
     end
     if item.unique and amount > 1 then
-        local freeSlots = inventory.reserveFreeSlots(inv.items, inv.slots, amount)
+        local freeSlots = ext.placement(inv, item, slot, amount, rotated)
         if #freeSlots < amount then
             return false, 'no free slot'
         end
@@ -1097,7 +1139,7 @@ local function addSecondary(inv, name, amount, slot, metadata, exactSlot)
         inv.items[stack].amount = inv.items[stack].amount + amount
         return true, stack
     end
-    slot = slot or inventory.firstFreeSlot(inv.items, inv.slots)
+    slot = ext.placement(inv, item, slot, 1, rotated)[1]
     if not slot or inv.items[slot] then
         return false, 'no free slot'
     end
@@ -1144,7 +1186,7 @@ local function removeSecondary(inv, slot, amount)
     return true, nil, removed
 end
 
-local function addPlayer(src, name, amount, slot, metadata, _, exactSlot)
+local function addPlayer(src, name, amount, slot, metadata, _, exactSlot, rotated)
     if slot then
         slot = inventory.validSlot(slot, config.playerSlots)
         if not slot then return false, 'invalid slot' end
@@ -1172,11 +1214,13 @@ local function addPlayer(src, name, amount, slot, metadata, _, exactSlot)
         return false, err
     end
     decayHelpers.place(item, nil)
+    local inv = { type = 'player', slots = config.playerSlots, items = items }
+    if slot and grid and grid.columns(inv) then exactSlot = true end
     if inventory.totalWeight(items) + inventory.itemWeight(item) > config.playerMaxWeight then
         return false, 'over weight'
     end
     if item.unique and amount > 1 then
-        local freeSlots = inventory.reserveFreeSlots(items, config.playerSlots, amount)
+        local freeSlots = ext.placement(inv, item, slot, amount, rotated)
         if #freeSlots < amount then
             return false, 'no free slot'
         end
@@ -1221,7 +1265,7 @@ local function addPlayer(src, name, amount, slot, metadata, _, exactSlot)
         local ok, err = playerSetPath(src, { 'items', stack }, nextItem)
         return ok, err, ok and nextItem or nil
     end
-    slot = slot or inventory.firstFreeSlot(items, config.playerSlots)
+    slot = ext.placement(inv, item, slot, 1, rotated)[1]
     if not slot or items[slot] then
         return false, 'no free slot'
     end
@@ -1457,7 +1501,7 @@ end
 -- (generic transfer, the ox adapter, and anything added later) funnels
 -- through addTo/removeFrom, so the read-only guard lives here once instead
 -- of being re-asserted (and risking drifting error strings) at every caller.
-local function addTo(inventoryKey, name, amount, slot, metadata, reason, exactSlot)
+local function addTo(inventoryKey, name, amount, slot, metadata, reason, exactSlot, rotated)
     local inv = getInventory(inventoryKey)
     if not inv then
         return false, 'inventory not found'
@@ -1466,10 +1510,24 @@ local function addTo(inventoryKey, name, amount, slot, metadata, reason, exactSl
         return false, 'shop inventory is read only'
     end
     if inv.type == 'player' then
-        local ok, err = addPlayer(inv.source, name, amount, slot, metadata, reason, exactSlot)
+        local ok, err = addPlayer(inv.source, name, amount, slot, metadata, reason, exactSlot, rotated)
         return ok, err
     end
-    return addSecondary(inv, name, amount, slot, metadata, exactSlot)
+    return addSecondary(inv, name, amount, slot, metadata, exactSlot, rotated)
+end
+
+function ext.restoreRemoved(inventoryKey, slot, removed)
+    local inv = getInventory(inventoryKey)
+    if not inv then return false, 'inventory not found' end
+    local original = inventory.copy(removed)
+    local remaining = inv.items[slot]
+    original.slot = slot
+    original.amount = original.amount + (remaining and remaining.amount or 0)
+    if inv.type == 'player' then
+        return playerSetPath(inv.source, { 'items', slot }, original)
+    end
+    inv.items[slot] = original
+    return true
 end
 
 ---Removes `amount` from `slot` of any inventory.
@@ -2022,6 +2080,15 @@ local function transfer(src, request)
         return false, 'shop inventory is read only'
     end
     local fromSlot, toSlot = math.floor(tonumber(request.fromSlot) or 0), tonumber(request.toSlot)
+    local rotated = request.rotated
+    local toColumns = grid and grid.columns(to)
+    local shapedMove = toColumns or grid and grid.columns(from)
+    if shapedMove and (tonumber(request.fromRevision) == nil or tonumber(request.toRevision) == nil) then
+        return false, 'missing inventory revision'
+    end
+    if rotated ~= nil and type(rotated) ~= 'boolean' then
+        return false, 'invalid rotation'
+    end
     local item = from.items[fromSlot]
     local amount = inventory.amount(request.amount, item and item.amount)
     if not item or not amount or amount > item.amount then
@@ -2035,8 +2102,12 @@ local function transfer(src, request)
     end
     -- Dropped back on its own slot: nothing to move. Answer ok at once, before
     -- hooks and locks, so a no-op can never hold the client's request open.
-    if fromKey == toKey and toSlot == fromSlot then
+    local rotateInPlace = toColumns and fromKey == toKey and toSlot == fromSlot and rotated ~= nil
+    if fromKey == toKey and toSlot == fromSlot and not rotateInPlace then
         return true, { fromRevision = revision(fromKey), toRevision = revision(toKey) }
+    end
+    if rotateInPlace and amount ~= item.amount then
+        return false, 'cannot rotate part of a stack'
     end
     -- A spoiled item is converted/removed instead of moved; the committed
     -- change is broadcast, so the client re-syncs from the patch.
@@ -2067,7 +2138,7 @@ local function transfer(src, request)
         count = amount,
         metadata = inventory.copy(item.info),
     }
-    local hookTarget = toSlot and to.items[toSlot] or nil
+    local hookTarget = not rotateInPlace and toSlot and to.items[toSlot] or nil
     local hookStacks = hookTarget
         and hookTarget.name == item.name
         and not hookTarget.unique
@@ -2111,6 +2182,21 @@ local function transfer(src, request)
                 broadcast(toKey)
             end
         end
+        if rotateInPlace then
+            local turned = inventory.copy(currentItem)
+            local free = ext.placement(currentFrom, turned, fromSlot, 1, rotated, fromSlot)
+            if #free == 0 then return false, 'no free slot' end
+            if currentFrom.type == 'player' then
+                local ok, err = playerSetPath(currentFrom.source, { 'items', fromSlot }, turned)
+                if not ok then return false, err end
+            else
+                currentFrom.items[fromSlot] = turned
+            end
+            commitBoth()
+            return true, { fromRevision = revision(fromKey), toRevision = revision(toKey) }
+        end
+        local orientation = rotated
+        if orientation == nil then orientation = currentItem.gridRotated end
         local target = toSlot and currentTo.items[toSlot] or nil
         local stacks = target
             and target.name == currentItem.name
@@ -2124,6 +2210,9 @@ local function transfer(src, request)
         if target and not stacks then
             if amount ~= currentItem.amount then
                 return false, 'cannot partially swap occupied slots'
+            end
+            if shapedMove and (currentItem.unique and currentItem.amount > 1 or target.unique and target.amount > 1) then
+                return false, 'cannot swap a legacy stack of unique items'
             end
             -- A swap also moves the target into the source inventory, so the
             -- portable-container rule applies to that direction too (e.g. a
@@ -2149,22 +2238,23 @@ local function transfer(src, request)
             end
             local targetOK, targetErr, targetItem = removeFrom(toKey, toSlot, target.amount)
             if not targetOK then
-                addTo(fromKey, sourceItem.name, sourceItem.amount, fromSlot, sourceItem.info, 'swap-rollback')
+                ext.restoreRemoved(fromKey, fromSlot, sourceItem)
                 return false, targetErr
             end
             local placeSource, placeSourceErr =
-                addTo(toKey, sourceItem.name, sourceItem.amount, toSlot, sourceItem.info, 'swap')
+                addTo(toKey, sourceItem.name, sourceItem.amount, toSlot, sourceItem.info, 'swap', toColumns ~= nil, orientation)
             if not placeSource then
-                addTo(toKey, targetItem.name, targetItem.amount, toSlot, targetItem.info, 'swap-rollback')
-                addTo(fromKey, sourceItem.name, sourceItem.amount, fromSlot, sourceItem.info, 'swap-rollback')
+                ext.restoreRemoved(toKey, toSlot, targetItem)
+                ext.restoreRemoved(fromKey, fromSlot, sourceItem)
                 return false, placeSourceErr
             end
             local placeTarget, placeTargetErr =
-                addTo(fromKey, targetItem.name, targetItem.amount, fromSlot, targetItem.info, 'swap')
+                addTo(fromKey, targetItem.name, targetItem.amount, fromSlot, targetItem.info, 'swap',
+                    grid and grid.columns(currentFrom) ~= nil, targetItem.gridRotated)
             if not placeTarget then
                 removeFrom(toKey, toSlot, sourceItem.amount)
-                addTo(toKey, targetItem.name, targetItem.amount, toSlot, targetItem.info, 'swap-rollback')
-                addTo(fromKey, sourceItem.name, sourceItem.amount, fromSlot, sourceItem.info, 'swap-rollback')
+                ext.restoreRemoved(toKey, toSlot, targetItem)
+                ext.restoreRemoved(fromKey, fromSlot, sourceItem)
                 return false, placeTargetErr
             end
             commitBoth()
@@ -2176,9 +2266,9 @@ local function transfer(src, request)
         if not removedOK then
             return false, removedErr
         end
-        local addedOK, addedErr = addTo(toKey, removed.name, amount, toSlot, removed.info, 'transfer', toSlot ~= nil)
+        local addedOK, addedErr = addTo(toKey, removed.name, amount, toSlot, removed.info, 'transfer', toSlot ~= nil, orientation)
         if not addedOK then
-            addTo(fromKey, removed.name, amount, fromSlot, removed.info, 'transfer-rollback')
+            ext.restoreRemoved(fromKey, fromSlot, removed)
             return false, addedErr
         end
         commitBoth()
@@ -2354,7 +2444,7 @@ local function intentDrop(src, request)
             end
             local addedOK, addedErr = addSecondary(target, taken.name, taken.amount, nil, taken.info)
             if not addedOK then
-                addPlayer(src, taken.name, taken.amount, slot, taken.info, 'drop-rollback')
+                ext.restoreRemoved(session.primary, slot, taken)
                 finishHooks(mergeHandle, false)
                 return false, addedErr
             end
@@ -2516,6 +2606,10 @@ local function intentGive(src, request)
         if inventory.totalWeight(inv.items) + inventory.itemWeight(incoming) > inv.maxWeight then
             return false, 'recipient is over weight'
         end
+        if grid and grid.columns(inv) then
+            if ext.capacity(inv, incoming, nil, sourceItem.gridRotated) then return true end
+            return false, 'recipient has no free slot'
+        end
         if incoming.unique then
             local free = 0
             for candidate = 1, inv.slots do
@@ -2592,10 +2686,11 @@ local function intentGive(src, request)
             finishHooks(giveHandle, false)
             return false, removedErr
         end
-        local addedOK, addedErr, added = addPlayer(target, removed.name, amount, nil, removed.info, 'give')
+        local addedOK, addedErr, added = addPlayer(target, removed.name, amount, nil, removed.info, 'give',
+            nil, removed.gridRotated)
         if not addedOK then
             finishHooks(giveHandle, false)
-            local rollbackOK, rollbackErr = addPlayer(src, removed.name, amount, slot, removed.info, 'give-rollback')
+            local rollbackOK, rollbackErr = ext.restoreRemoved(playerKey(src), slot, removed)
             if not rollbackOK then
                 Kora.logging.error('give.rollback_failed', 'Give rollback failed', { inventoryKey = session.primary, error = tostring(rollbackErr) })
             end
@@ -2967,12 +3062,26 @@ local function intentOrganize(src, request)
         if current.type == 'player' and settings.keepHotbar ~= false then
             keep = math.max(0, math.min(current.slots, math.floor(tonumber(config.hotbarSlots) or 5)))
         end
-        local plan, planErr = inventory.organize.plan(current.items, current.slots, mode, {
+        local organizeItems, place = current.items, nil
+        local columns = grid and grid.columns(current)
+        if columns and mode == 'sort' then
+            organizeItems = inventory.copy(organizeItems)
+            local _, shapes = grid.layout(current.items, current.slots, columns)
+            for slot, shape in pairs(shapes) do
+                local entry = organizeItems[slot]
+                entry.gridWidth, entry.gridHeight, entry.gridRotated = shape[1], shape[2], shape[3] or nil
+            end
+            place = function(placed, item, firstSlot)
+                return grid.reserve(placed, current.slots, columns, item, nil, 1, nil, firstSlot)[1]
+            end
+        end
+        local plan, planErr = inventory.organize.plan(organizeItems, current.slots, mode, {
             keepSlots = keep,
             order = type(settings.sortOrder) == 'table' and settings.sortOrder or nil,
             classify = organizeCategory,
             maxStack = organizeMaxStack,
             merge = decayHelpers.merge,
+            place = place,
         })
         if not plan then
             return false, planErr
@@ -3181,6 +3290,10 @@ canCarry = function(src, name, amount)
     if inventory.totalWeight(inv.items) + inventory.itemWeight(item) > inv.maxWeight then
         return false, 'over weight'
     end
+    if grid and grid.columns(inv) then
+        if ext.capacity(inv, item) then return true end
+        return false, 'no free slot'
+    end
     if def.unique then
         local free = 0
         for slot = 1, inv.slots do
@@ -3386,7 +3499,11 @@ end
 ---@param src integer
 ---@return integer|nil slot
 local function getFreeSlot(src)
-    return inventory.firstFreeSlot(playerItems(src), config.playerSlots)
+    local items = playerItems(src)
+    if grid and grid.enabled() then
+        return ext.placement({ type = 'player', items = items, slots = config.playerSlots }, {}, nil, 1)[1]
+    end
+    return inventory.firstFreeSlot(items, config.playerSlots)
 end
 ---@param src integer
 ---@param fromSlot integer
@@ -3394,7 +3511,7 @@ end
 ---@param amount number|nil
 ---@return boolean moved
 ---@return string|nil reason
-local function moveItem(src, fromSlot, toSlot, amount)
+local function moveItem(src, fromSlot, toSlot, amount, rotated)
     local from = getItemBySlot(src, fromSlot)
     if not from then
         return false, 'empty source slot'
@@ -3404,24 +3521,27 @@ local function moveItem(src, fromSlot, toSlot, amount)
     if toSlot < 1 or toSlot > config.playerSlots or not amount or amount > from.amount then
         return false, 'invalid move'
     end
-    if fromSlot == toSlot then
-        return true
-    end
+    local inv = getInventory(playerKey(src))
+    if rotated ~= nil and type(rotated) ~= 'boolean' then return false, 'invalid rotation' end
+    local turn = grid and inv and grid.columns(inv) and fromSlot == toSlot and rotated ~= nil
+    if fromSlot == toSlot and not turn then return true end
+    if turn and amount ~= from.amount then return false, 'cannot rotate part of a stack' end
     local target = getItemBySlot(src, toSlot)
     if
-        target
+        not turn and target
         and (target.name ~= from.name or target.unique or from.unique or not inventory.sameInfo(target.info, from.info))
     then
         return false, 'destination occupied'
     end
     return lock({ playerKey(src) }, function()
+        if rotated == nil then rotated = from.gridRotated end
         local removed, removeErr, moved = removePlayer(src, fromSlot, amount)
         if not removed then
             return false, removeErr
         end
-        local added, addErr = addPlayer(src, moved.name, amount, toSlot, moved.info, 'move', true)
+        local added, addErr = addPlayer(src, moved.name, amount, toSlot, moved.info, 'move', true, rotated)
         if not added then
-            addPlayer(src, moved.name, amount, fromSlot, moved.info, 'move-rollback')
+            ext.restoreRemoved(playerKey(src), fromSlot, moved)
             return false, addErr
         end
         bump(playerKey(src))
@@ -3510,7 +3630,7 @@ end
 ---@param newItems table<integer, table>
 ---@return boolean replaced
 ---@return string|nil reason
-local function replacePlayerItems(src, newItems)
+local function replacePlayerItems(src, newItems, restoring)
     if type(newItems) ~= 'table' then
         return false, 'items must be a table'
     end
@@ -3533,6 +3653,10 @@ local function replacePlayerItems(src, newItems)
         return false, 'over weight'
     end
     return lock({ playerKey(src) }, function()
+        local inv = getInventory(playerKey(src))
+        if inv and grid and not grid.replacement(inv, checked, itemDef, restoring) then
+            return false, 'item footprints overlap or exceed inventory bounds'
+        end
         if cashItemsActive then
             local policy = cashPolicy()
             -- Trusted item mutations may rebuild slots, but only the cash
@@ -4061,7 +4185,8 @@ end
 local function createTemporaryStash(properties)
     properties = properties or {}
     properties.temporary = true
-    local inv = secondary('temporary', properties.id or ('tmp-%d'):format(now()), properties)
+    local inv, _, err = secondary('temporary', properties.id or ('tmp-%d'):format(now()), properties)
+    if not inv then return false, err end
     return inv.key
 end
 
@@ -4422,7 +4547,7 @@ local function resolveInventoryRef(reference, preferredType)
     return nil, nil
 end
 
-canAddToInventory = function(reference, name, amount, slot, metadata)
+canAddToInventory = function(reference, name, amount, slot, metadata, rotated)
     local inventoryKey, inv = resolveInventoryRef(reference)
     local count = inventory.amount(amount, 1)
     local item, err
@@ -4439,6 +4564,10 @@ canAddToInventory = function(reference, name, amount, slot, metadata)
     end
     if inventory.totalWeight(inv.items) + inventory.itemWeight(item) > inv.maxWeight then
         return false, 'weight'
+    end
+    if grid and grid.columns(inv) then
+        if ext.capacity(inv, item, slot, rotated, slot ~= nil) then return true end
+        return false, 'slots'
     end
     if item.unique then
         local free = 0
@@ -4539,7 +4668,7 @@ local function removeSecondaryInventory(reference)
     return true
 end
 
-setInventoryItems = function(reference, items)
+setInventoryItems = function(reference, items, restoring)
     local inventoryKey, inv = resolveInventoryRef(reference)
     if not inventoryKey or not inv then
         return false, 'inventory not found'
@@ -4550,7 +4679,7 @@ setInventoryItems = function(reference, items)
         return false, 'items must be a table'
     end
     if inv.type == 'player' then
-        return replacePlayerItems(inv.source, items)
+        return replacePlayerItems(inv.source, items, restoring)
     end
     local checked = {}
     for rawSlot, rawItem in pairs(items) do
@@ -4573,6 +4702,9 @@ setInventoryItems = function(reference, items)
     if not (inv.type == 'shop' and inv.weightLimit == false)
         and inventory.totalWeight(checked) > inv.maxWeight then
         return false, 'over weight'
+    end
+    if grid and not grid.replacement(inv, checked, itemDef) then
+        return false, 'item footprints overlap or exceed inventory bounds'
     end
     inv.items = checked
     if inv.type == 'shop' then
@@ -4597,6 +4729,8 @@ inventory.internal = {
     canAdd = canAddToInventory,
     addTo = addTo,
     addSecondary = addSecondary,
+    restoreRemoved = ext.restoreRemoved,
+    placement = ext.placement,
     auditAdd = ext.auditAdd,
     removeFrom = removeFrom,
     buildItem = buildItem,
@@ -4888,11 +5022,13 @@ local function phoneItemTransaction(src, request)
                     or handset.info.phoneSimInfo.simId ~= request.simId then
                     return false, 'inserted SIM changed'
                 end
-                local freeSlot = inventory.firstFreeSlot(items, config.playerSlots)
-                if not freeSlot then return false, 'no free slot' end
                 local err
-                returnedSim, err = buildItem('phone_sim', 1, freeSlot, handset.info.phoneSimInfo)
+                returnedSim, err = buildItem('phone_sim', 1, nil, handset.info.phoneSimInfo)
                 if not returnedSim or not returnedSim.unique then return false, err or 'unsupported SIM item' end
+                local freeSlot = ext.placement({ type = 'player', items = items, slots = config.playerSlots },
+                    returnedSim, nil, 1)[1]
+                if not freeSlot then return false, 'no free slot' end
+                returnedSim.slot = freeSlot
                 items[freeSlot] = returnedSim
                 handset.info.phoneSimId, handset.info.phoneSimInfo = nil, nil
             end

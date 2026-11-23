@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useDragDropManager } from "react-dnd"
 import { DEFAULT_UI_CONFIG, type ResolvedUiConfig } from "@/context"
 import type { ActiveItemBox } from "@/components/ItemBoxStack"
 import { sanitizeHotbarQuick, type HotbarState } from "@/components/HotbarHud"
@@ -14,6 +15,7 @@ import { createMoveQueue, isNoopMove, type MoveJob, type MoveQueue } from "@/lib
 import { useLocale } from "@/lib/locales"
 import { modifierDragAmount } from "@/lib/modifierDrag"
 import { pickTransferSlot } from "@/lib/quickTransfer"
+import { firstEmptySlot, gridDropFootprint, gridPlacementSize, gridSize, hasGrid, type GridDropPreview } from "@/lib/grid"
 import { copyText, itemCopyText } from "@/lib/clipboard"
 import { clampGiveAmount } from "@/lib/giveAmount"
 import { findCombination, mergeCombine, type CombineRecipe } from "@/lib/combine"
@@ -23,6 +25,7 @@ import { mergeDecayConfig } from "@/lib/decay"
 import { EMPTY_QUICK_SLOTS, normalizeQuickSlots, type QuickSlotsState } from "@/lib/quickSlots"
 import { mergeTradeConfig } from "@/lib/trade"
 import type { SlotUi } from "@/slotUi"
+import { SLOT_DRAG_TYPE } from "@/components/dnd"
 
 // Drags that may wait behind an unanswered request before further ones are refused.
 const MAX_QUEUED_MOVES = 8
@@ -76,6 +79,9 @@ function mergeControls(current: ResolvedUiConfig["controls"], pushed: UiConfig["
  */
 export function useInventorySession() {
     const t = useLocale()
+    const dragMonitor = useDragDropManager().getMonitor()
+    const [dragRotation, setDragRotation] = useState<{ source: DragSlot; rotated: boolean }>()
+    const endDrag = useCallback(() => setDragRotation(undefined), [])
     const [session, setSession] = useState<SessionSnapshot | null>(null)
     const [selected, setSelected] = useState<Selection | undefined>()
     const [query, setQuery] = useState("")
@@ -97,7 +103,7 @@ export function useInventorySession() {
     const [menu, setMenu] = useState<MenuTarget | undefined>()
     // With instant moves the inventory never locks behind the server: a drag made
     // while a move is in flight is queued and sent when that move settles.
-    const unlocked = uiConfig.optimisticMoves && uiConfig.queueMoves
+    const unlocked = uiConfig.optimisticMoves && uiConfig.queueMoves && !hasGrid(session)
     const locked = movePending && !unlocked
     const selectedMax = Math.max(1, Math.floor(selected?.item.amount ?? 1))
     const selectedCount = Math.min(Math.max(1, selectedAmount), selectedMax)
@@ -242,7 +248,7 @@ export function useInventorySession() {
     type Built = { intent: Parameters<typeof sendIntent>[0]["intent"]; payload: Record<string, unknown>; awaiting?: string[]; prediction?: Prediction }
     const enqueueRequest = useCallback((build: (current: SessionSnapshot) => Built | string | undefined) => {
         const config = configRef.current
-        const unlockedNow = config.optimisticMoves && config.queueMoves
+        const unlockedNow = config.optimisticMoves && config.queueMoves && !hasGrid(sessionRef.current)
         if (queue.pending && !unlockedNow) return
         const outcome = queue.enqueue((): MoveJob | undefined => {
             const current = sessionRef.current
@@ -287,14 +293,13 @@ export function useInventorySession() {
     const submit = useCallback((intent: Built["intent"], payload: Record<string, unknown> = {}, awaiting?: string[]) => {
         enqueueRequest(() => ({ intent, payload, awaiting }))
     }, [enqueueRequest])
-    const move = useCallback((fromId: string, fromSlot: number, toId: string, toSlot: number, requestedAmount?: number) => {
+    const move = useCallback((fromId: string, fromSlot: number, toId: string, toSlot: number, requestedAmount?: number, rotated?: boolean) => {
         enqueueRequest((current) => {
             const from = findInventory(current, fromId)
             const to = findInventory(current, toId)
             const item = findItem(from, fromSlot)
             if (!from || !to || !item || !Number.isFinite(item.amount) || item.amount < 1) return t("ui.item_unavailable")
-            // Dropped back on its own slot: nothing to ask the server, nothing to lock.
-            if (isNoopMove({ id: from.id, slot: fromSlot }, { id: to.id, slot: toSlot })) return undefined
+            if (rotated === undefined && isNoopMove({ id: from.id, slot: fromSlot }, { id: to.id, slot: toSlot })) return undefined
             if (from.type === "shop") {
                 if (current.player.id !== to.id) return t("ui.shop_player_only")
                 const prediction = configRef.current.optimisticMoves ? predictBuy(current, { shopInventory: from.id, slot: fromSlot, amount: 1 }) : undefined
@@ -306,31 +311,71 @@ export function useInventorySession() {
             const prediction = configRef.current.optimisticMoves ? predictMove(current, { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount }) : undefined
             return {
                 intent: "move",
-                payload: { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount, revision: current.revision, secondaryRevision: current.secondaryRevision },
+                payload: { fromInventory: from.id, fromSlot, toInventory: to.id, toSlot, amount, revision: current.revision, secondaryRevision: current.secondaryRevision, ...(rotated === undefined ? {} : { rotated }) },
                 awaiting: [from.id, to.id],
                 prediction,
             }
         })
     }, [enqueueRequest, t])
 
-    const canDropSlot = useCallback((source: DragSlot, target: SlotTarget) => {
-        if (!source || !session || locked || isNoopMove({ id: source.inventoryId, slot: source.slot }, { id: target.inventoryId, slot: target.slot })) return false
+    const rotate = useCallback((inventory: InventoryView, item: InventoryItem) => {
+        move(inventory.id, item.slot, inventory.id, item.slot, undefined, !item.gridRotated)
+    }, [move])
+
+    const rotationFor = useCallback((source: DragSlot) => dragRotation?.source === source ? dragRotation?.rotated : undefined, [dragRotation])
+    const dragAmount = useCallback((source: DragSlot, item: InventoryItem) =>
+        (uiConfig.modifierDrag ? modifierDragAmount(source.modifiers, item.amount) : undefined)
+            ?? (selected?.inventory.id === source.inventoryId && selected.item.slot === source.slot ? selectedCount : undefined),
+    [selected, selectedCount, uiConfig.modifierDrag])
+
+    const describeDrop = useCallback((source: DragSlot, target: SlotTarget): boolean | GridDropPreview => {
+        if (!source || !session || locked) return false
         const sourceInventory = findInventory(session, source.inventoryId)
         const targetInventory = findInventory(session, target.inventoryId)
-        if (!findItem(sourceInventory, source.slot) || !targetInventory) return false
-        if (sourceInventory?.type === "shop") return targetInventory.id === session.player.id
-        return targetInventory.type !== "shop"
-    }, [locked, session])
+        const item = findItem(sourceInventory, source.slot)
+        if (!sourceInventory || !item || !targetInventory) return false
+        if (sourceInventory.type === "shop") return targetInventory.id === session.player.id
+        if (targetInventory.type === "shop") return false
+        const sameInventory = source.inventoryId === target.inventoryId
+        const sameAnchor = sameInventory && source.slot === target.slot
+        if (!targetInventory.gridColumns) return !sameAnchor
+        const rotated = rotationFor(source)
+        const turn = rotated !== undefined && rotated !== Boolean(item.gridRotated)
+        if (sameAnchor && !turn) return false
+        const wholeStack = (dragAmount(source, item) ?? item.amount) === item.amount
+        const targetItem = sameAnchor ? undefined : findItem(targetInventory, target.slot)
+        if (targetItem) {
+            const combine = !turn && target.inventoryId === session.player.id && sameInventory && findCombination(item, targetItem, uiConfig.combine)
+            // The server decides whether same-name stacks have matching metadata.
+            const mayStack = item.name === targetItem.name && !item.unique && !targetItem.unique
+            if (combine || mayStack) return gridDropFootprint(targetInventory, target.slot, gridSize(targetItem), [target.slot])
+        }
+        const ignore = sameInventory && wholeStack ? [source.slot] : []
+        if (targetItem && wholeStack) ignore.push(target.slot)
+        const preview = gridDropFootprint(targetInventory, target.slot, gridPlacementSize(item, rotated), ignore)
+        if (preview.status !== "fit" || !targetItem || !sourceInventory.gridColumns) return preview
+        const reverse = gridDropFootprint(sourceInventory, source.slot, gridPlacementSize(targetItem), sameInventory ? ignore : [source.slot], sameInventory ? preview.cells : [])
+        return reverse.status === "fit" ? preview : { ...preview, status: reverse.status }
+    }, [dragAmount, locked, rotationFor, session, uiConfig.combine])
+    const canDropSlot = useCallback((source: DragSlot, target: SlotTarget) => {
+        const drop = describeDrop(source, target)
+        return typeof drop === "boolean" ? drop : drop.status === "fit"
+    }, [describeDrop])
+    const previewGridDrop = useCallback((source: DragSlot, target: SlotTarget) => {
+        const drop = describeDrop(source, target)
+        return typeof drop === "object" ? drop : undefined
+    }, [describeDrop])
     const dropSlot = useCallback((source: DragSlot, target: SlotTarget) => {
         if (!source || !session || !canDropSlot(source, target)) return
         const sourceInventory = findInventory(session, source.inventoryId)
         const targetInventory = findInventory(session, target.inventoryId)
         const sourceItem = findItem(sourceInventory, source.slot)
-        const modified = configRef.current.modifierDrag && sourceItem ? modifierDragAmount(source.modifiers, sourceItem.amount) : undefined
+        const rotated = targetInventory?.gridColumns ? rotationFor(source) : undefined
+        const turn = rotated !== undefined && rotated !== Boolean(sourceItem?.gridRotated)
         // Two different items in the player's own inventory that a recipe pairs:
         // ask instead of swapping. No recipe (or combining off) falls through to
         // the ordinary move/swap/stack below, exactly as before.
-        if (sourceInventory && targetInventory && sourceItem && sourceInventory.id === session.player.id && targetInventory.id === session.player.id) {
+        if (!turn && sourceInventory && targetInventory && sourceItem && sourceInventory.id === session.player.id && targetInventory.id === session.player.id) {
             const targetItem = findItem(targetInventory, target.slot)
             const recipe = findCombination(sourceItem, targetItem, configRef.current.combine)
             if (recipe && targetItem) {
@@ -339,9 +384,26 @@ export function useInventorySession() {
                 return
             }
         }
-        const amount = modified ?? (selected?.inventory.id === source.inventoryId && selected.item.slot === source.slot ? selectedCount : undefined)
-        if (sourceInventory && targetInventory) move(sourceInventory.id, source.slot, targetInventory.id, target.slot, amount)
-    }, [canDropSlot, move, selected, selectedCount, session])
+        if (sourceInventory && targetInventory && sourceItem) move(sourceInventory.id, source.slot, targetInventory.id, target.slot, dragAmount(source, sourceItem), turn ? rotated : undefined)
+    }, [canDropSlot, dragAmount, move, rotationFor, session])
+
+    useEffect(() => {
+        if (!session || !hasGrid(session)) return
+        const onRotateDrag = (event: KeyboardEvent) => {
+            if (event.key.toLowerCase() !== "r" || event.repeat || event.ctrlKey || event.altKey || event.metaKey
+                || !dragMonitor.isDragging() || dragMonitor.getItemType() !== SLOT_DRAG_TYPE) return
+            const source = dragMonitor.getItem() as DragSlot
+            const inventory = findInventory(session, source.inventoryId)
+            const item = findItem(inventory, source.slot)
+            if (!item || inventory?.type === "shop" || locked) return
+            const { width, height } = gridPlacementSize(item)
+            if (width === height) return
+            event.preventDefault()
+            setDragRotation((current) => ({ source, rotated: !(current && current.source === source ? current.rotated : item.gridRotated) }))
+        }
+        window.addEventListener("keydown", onRotateDrag)
+        return () => window.removeEventListener("keydown", onRotateDrag)
+    }, [dragMonitor, locked, session])
 
     // Combine / Cancel on the popover. Only the two slots and the revision go to
     // the server, which finds the recipe in its own registry and re-reads both
@@ -370,8 +432,8 @@ export function useInventorySession() {
                 detail.error = t("ui.shop_item_unavailable")
                 return
             }
-            const destination = Object.values(target.items).find(entry => entry?.name === item.name)?.slot ??
-                Array.from({ length: target.slots }, (_, index) => index + 1).find(slot => !Object.values(target.items).some(entry => entry?.slot === slot))
+            const destination = target.gridColumns ? pickTransferSlot(target, item) : Object.values(target.items).find(entry => entry?.name === item.name)?.slot ??
+                firstEmptySlot(target, item)
             if (!destination) { detail.error = t("ui.no_destination_slot"); return }
             const source = { inventoryId: shop.id, slot: item.slot }
             const dest = { inventoryId: target.id, slot: destination }
@@ -439,7 +501,7 @@ export function useInventorySession() {
     const split = useCallback((inventory: InventoryView, item: InventoryItem, requestedAmount?: number) => {
         if (!session || inventory.type === "shop" || item.amount < 2) return
         const amount = Math.floor(requestedAmount ?? selectedCount)
-        const emptySlot = Array.from({ length: inventory.slots }, (_, index) => index + 1).find((slot) => !findItem(inventory, slot))
+        const emptySlot = firstEmptySlot(inventory, item)
         if (!Number.isFinite(amount) || amount < 1 || amount >= item.amount) { setError(t("ui.choose_split_amount", { amount: item.amount - 1 })); return }
         if (!emptySlot) { setError(t("ui.no_empty_slot")); return }
         move(inventory.id, item.slot, inventory.id, emptySlot, amount)
@@ -531,7 +593,7 @@ export function useInventorySession() {
             if (event.key === "Escape" && combineTarget) { setCombineTarget(undefined); return }
             if (event.key === "Escape" && menu) return
             if (event.key === "Escape" || event.key === "Tab") close()
-            if (event.key === "Enter" && selected && !locked && !movePending && !combineTarget) activateSelected(selected)
+            if (event.key === "Enter" && selected && !locked && !movePending && !combineTarget && !(event.target instanceof Element && event.target.closest("[data-grid-action]"))) activateSelected(selected)
         }
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
@@ -586,7 +648,7 @@ export function useInventorySession() {
         selectedMax, selectedCount, setSelectedAmount, copyState, copySelected,
         splitTarget, confirmSplit, cancelSplit: () => setSplitTarget(undefined),
         combineTarget, confirmCombine, cancelCombine,
-        canDropSlot, dropSlot, dropOut, organize, quickTransfer, selectSlot, promptSplit, activateItem,
+        canDropSlot, previewGridDrop, dropSlot, dropOut, endDrag, rotationFor, organize, quickTransfer, selectSlot, promptSplit, activateItem, rotate,
         split, use, openBag, buy, submit, close, clearSelection: () => setSelected(undefined),
     }
 }

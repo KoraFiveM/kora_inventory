@@ -28,9 +28,6 @@ import { LAYOUTS, resolveLayout } from "@/layouts"
 import type { LayoutProps } from "@/layouts/types"
 import { PackageOpen } from "lucide-react"
 
-// One stable reference: an inline arrow is a new useDrag dependency every render.
-const noop = () => undefined
-
 function InventoryApp() {
     const t = useLocale()
     const s = useInventorySession()
@@ -48,7 +45,7 @@ function InventoryApp() {
     const layoutId = resolveLayout(uiConfig, shell.playerLayout)
     const Layout = LAYOUTS[layoutId]
 
-    const panelHandlers = { selected, busy: locked, canDropSlot: s.canDropSlot, onDrop: s.dropSlot, onDragEnd: noop, onSelect: s.selectSlot, onActivate: s.activateItem, onSplit: s.promptSplit, onQuickTransfer: s.quickTransfer, onOrganize: s.organize, pending: s.movePending }
+    const panelHandlers = { selected, busy: locked, canDropSlot: s.canDropSlot, previewGridDrop: s.previewGridDrop, onDrop: s.dropSlot, onDragEnd: s.endDrag, onSelect: s.selectSlot, onActivate: s.activateItem, onSplit: s.promptSplit, onQuickTransfer: s.quickTransfer, onOrganize: s.organize, pending: s.movePending }
     // While trading, Shift+click on your own stack offers it instead of moving it.
     const playerHandlers = trading
         ? { ...panelHandlers, onQuickTransfer: uiConfig.quickTransfer ? (_inventory: unknown, item: Parameters<typeof trade.offerItem>[0]) => trade.offerItem(item) : undefined }
@@ -75,6 +72,7 @@ function InventoryApp() {
             onUse={s.use}
             onOpenBag={s.openBag}
             onSplitSelected={s.split}
+            onRotate={s.rotate}
             onSubmit={s.submit}
         />
     const layoutProps: LayoutProps = {
@@ -92,7 +90,7 @@ function InventoryApp() {
         ...panelHandlers,
         onClose: s.close,
         onClearSelection: s.clearSelection,
-        dragPreview: <DragPreview session={session} />,
+        dragPreview: <DragPreview session={session} rotationFor={s.rotationFor} busy={locked} />,
         topbar: <TopBar transfer={Boolean(session.secondary)} trading={trading} query={s.query} onQueryChange={s.setQuery} error={s.error} onClose={s.close} onTrade={tradeButton} />,
         playerPanel: <InventoryPanel inventory={session.player} isPlayer query={s.query} offered={offered} {...playerHandlers} />,
         // Solo layout starts as the player's inventory alone. Its inspector is a

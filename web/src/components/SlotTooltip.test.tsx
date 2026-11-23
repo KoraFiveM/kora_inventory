@@ -19,4 +19,14 @@ describe("SlotTooltip", () => {
         expect(parseFloat(tip.style.left)).toBeLessThan(99999)
         expect(parseFloat(tip.style.top)).toBeLessThan(99999)
     })
+
+    it("shows the placement footprint of a legacy item in grid mode", () => {
+        const host = document.createElement("div")
+        document.body.appendChild(host)
+        const root = createRoot(host)
+        const item = { slot: 1, name: "repairkit", amount: 1, weight: 2500, gridWidth: 1, gridHeight: 1, gridBaseWidth: 3, gridBaseHeight: 2 }
+        act(() => root.render(<LocaleProvider><SlotTooltip decimals={1} x={0} y={0} item={item} showGridSize /></LocaleProvider>))
+        expect(document.body.querySelector(".slot-tooltip")?.textContent).toContain("Grid size3 × 2")
+        act(() => root.unmount())
+    })
 })

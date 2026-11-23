@@ -69,6 +69,16 @@ World presentation at the bundled shops. None of this affects what the server al
 | `ShopClerks.radius` | number | Default `40.0` metres. The clerk spawns when a player comes this close and is deleted when they leave. |
 | `ShopClerks.interactionDistance` | number | Default `3.0`. kora_target distance to the clerk. |
 
+### Grid placement
+
+Set `Config.kora_inventory.grid.enabled = true` in `config.lua` and restart the resource to test multi-cell item placement. The default is `false`. Set `grid.columns` to change the number of columns. The default is six. The inventory's slot count is the total number of cells, including a partial final row when applicable.
+
+Items can occupy rectangular footprints. Drag an item to the cell where its upper-left corner should sit. The preview outlines the cells the item would occupy and shows whether the edge or another item blocks it. Press **R** while dragging to rotate the footprint, or select a rectangular item and choose **Rotate item** to turn it in place. Weight limits still apply. Shops and ground drops use their usual one-slot layout.
+
+Hover over a grid item to see its placement dimensions. The grid shows cell numbers on the player's hotbar. Classic panels keep their usual slot numbers.
+
+Existing saved items keep their slots and take on their authored footprint when successfully placed. If you change the column count or re-enable the grid after using classic mode, a saved footprint uses one cell while it conflicts with the new grid or another item.
+
 ### Capacity, sessions and requests (Config.kora_inventory)
 
 Core limits and session behaviour.

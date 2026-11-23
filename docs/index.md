@@ -14,6 +14,7 @@ Player items are never stored by this resource: `kora_core` owns the slot-keyed 
 ## Features
 
 - **Player inventory** - 41 slots and 120 kg by default (`Config.kora_inventory.playerSlots`, `playerMaxWeight`), drag and drop, split, give, drop, use. See [Exports](./exports.md).
+- **Shaped inventory grid** - optional multi-cell item placement in player inventories and storage. Off by default. See [Grid placement](./api/configuration.md#grid-placement).
 - **Stashes** - shared, per-citizen (template) and policy-guarded stashes, plus temporary stashes. See [Stashes and drops](./api/stashes.md).
 - **Ground drops** - dropped items become a bag on the floor; nearby drops merge. See [Stashes and drops](./api/stashes.md).
 - **Shops** - bundled 24/7, liquor, Ammu-Nation and vending machine shops, plus `RegisterShop` for your own. See [Shops](./api/shops.md).

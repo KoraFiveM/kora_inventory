@@ -260,6 +260,12 @@ local class = KoraInventory.vehicles.modelClass(GetEntityModel(vehicle))
 
 With `vehicles.trunkCargo.enabled = true`, the items in a trunk are drawn as props inside the vehicle's boot for nearby players. It is presentation only and off by default.
 
+Item definitions in the bundled catalogue can set `dropProp` for their trunk prop.
+The bundled water bottle, sandwich, phone, bandage and cash have their own
+models. Set `vehicles.trunkCargo.models` to override any item model on your
+server. Weapons use their weapon model when there is no override. Other items
+without a model use `vehicles.trunkCargo.fallbackModel`.
+
 - **Server** (`server/trunk_cargo.lua`): once a second it scans vehicles whose plate maps to a loaded `trunk:<PLATE>` inventory, takes a snapshot of the slot numbers and item names under the inventory lock, and publishes it on the vehicle's replicated state bag `kora_inventory:trunkCargo`. The bag is cleared with `false` when the trunk empties, the vehicle changes or the resource stops. When two vehicles share a plate, nothing is published for either, so cargo never shows on the wrong car. No item metadata is published.
 - **Client** (`client/trunk_cargo.lua`): renders the bag for vehicles within `drawDistance`. It checks the bag against the live vehicle's model and plate and ignores a malformed or mismatched bag. Prop models come from the item definition through `KoraInventory.cargoVisual`, never from the bag. The props are local, non-networked, collision-free and attached to the vehicle.
 - **Shared** (`shared/trunk_cargo.lua`): `cargoVisual(name)` picks a prop or weapon model, `cargoBounds(...)` estimates the boot cavity from the model dimensions and wheel and seat bones (or uses a `bounds` override), and `cargoLayout(volume, entries)` packs props onto shelves. A prop that does not fit is not drawn; inventory capacity is never affected.

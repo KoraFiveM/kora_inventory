@@ -2,6 +2,7 @@ import { Check, ClipboardCopy, PackageOpen, X } from "lucide-react"
 import { Fragment } from "react"
 import { quickAmounts } from "@/lib/quickAmounts"
 import { clampGiveAmount } from "@/lib/giveAmount"
+import { gridPlacementSize } from "@/lib/grid"
 import { formatMetaValue } from "@/lib/format"
 import { useLocale } from "@/lib/locales"
 import { canOpenBag, isClosedBag } from "@/lib/search"
@@ -35,12 +36,14 @@ interface InspectorProps {
     /** Open a closed bag in a searched player's inventory (openTargetContainer intent). */
     onOpenBag?: (inventory: InventoryView, item: InventoryItem) => void
     onSplitSelected: (inventory: InventoryView, item: InventoryItem) => void
+    onRotate?: (inventory: InventoryView, item: InventoryItem) => void
     onSubmit: (intent: "drop" | "give", payload: Record<string, unknown>) => void
 }
 
 /** The `item-detail` aside: header, artwork, details and the item's actions. */
-export function Inspector({ inspected, selected, solo, playerId, movePending, giveAvailable, inspectorCopy, quickAmounts: showQuickAmounts, inspectorDecimals, copyState, selectedMax, selectedCount, onAmountChange, onCopy, onCloseDrawer, onBuy, onUse, onOpenBag, onSplitSelected, onSubmit }: InspectorProps) {
+export function Inspector({ inspected, selected, solo, playerId, movePending, giveAvailable, inspectorCopy, quickAmounts: showQuickAmounts, inspectorDecimals, copyState, selectedMax, selectedCount, onAmountChange, onCopy, onCloseDrawer, onBuy, onUse, onOpenBag, onSplitSelected, onRotate, onSubmit }: InspectorProps) {
     const t = useLocale()
+    const footprint = inspected?.inventory.gridColumns ? gridPlacementSize(inspected.item) : undefined
     const presets = showQuickAmounts && selectedMax > 1 ? <div className="quick-amounts" role="group" aria-label={t("ui.quick_amounts")}>{quickAmounts(selectedMax).map((entry) => <button key={entry.key} type="button" className={`quick-amount${entry.value === selectedCount ? " quick-amount-active" : ""}`} disabled={movePending} onClick={() => onAmountChange(entry.value)}>{entry.key === "half" ? "½" : entry.key === "all" ? t("ui.all") : entry.key}</button>)}</div> : null
     return <aside className={`item-detail${solo ? " item-detail-drawer" : ""}${inspected ? "" : " item-detail-empty"}${inspected && inspectorCopy ? " item-detail-copyable" : ""}`} aria-label={t("ui.selected_item_actions")}>
                 <header className="detail-header"><span>{t("ui.item_inspector")}</span><span className="detail-header-actions"><em>{inspected ? t("ui.selected") : t("ui.select_an_item")}</em>{inspected && inspectorCopy && <button className={`detail-copy${copyState === "idle" ? "" : ` detail-copy-${copyState}`}`} onClick={() => void onCopy(inspected)} aria-label={t("ui.copy_item_details")} title={`${t("ui.copy_item_details")} (JSON)`}>{copyState === "copied" ? <Check size={12} /> : <ClipboardCopy size={12} />}<span>{copyState === "copied" ? t("ui.copied") : copyState === "failed" ? t("ui.copy_failed") : t("ui.copy")}</span></button>}{solo && <button className="detail-close" onClick={onCloseDrawer} aria-label={t("ui.close_item_drawer")}><X size={14} /></button>}</span></header>
@@ -60,6 +63,7 @@ export function Inspector({ inspected, selected, solo, playerId, movePending, gi
                     {selectedMax > 1 && <div className="amount-picker"><input className="amount-slider" type="range" min={1} max={selectedMax} step={1} value={selectedCount} disabled={movePending} aria-label={t("ui.amount_to_move", { amount: selectedMax })} onChange={(event) => onAmountChange(Number(event.target.value))} /><input className="amount-input" type="number" min={1} max={selectedMax} value={selectedCount} disabled={movePending} aria-label={t("ui.amount_to_move", { amount: selectedMax })} onChange={(event) => onAmountChange(Number(event.target.value))} /></div>}
                     {presets}
                     {selectedMax > 1 && <button className="quiet-action" disabled={movePending} onClick={() => onSplitSelected(inspected.inventory, inspected.item)}>{t("ui.split_amount", { amount: selectedCount, remaining: selectedMax - selectedCount })}</button>}
+                    {onRotate && footprint && footprint.width !== footprint.height && <button type="button" data-grid-action="rotate" className="quiet-action" disabled={movePending} onClick={() => onRotate(inspected.inventory, inspected.item)}>{t("ui.rotate_item")}</button>}
                     {inspected.inventory.id === playerId && <>
                         <div className="amount-action">
                             <button className="quiet-action" disabled={movePending} onClick={() => onSubmit("drop", { inventory: inspected.inventory.id, slot: inspected.item.slot, amount: selectedCount })}>{t("ui.drop_amount", { amount: selectedCount })}</button>

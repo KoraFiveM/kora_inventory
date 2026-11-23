@@ -1,4 +1,5 @@
 import { asSlots } from "./inventory"
+import { firstEmptySlot } from "./grid"
 import type { InventoryItem, InventoryView } from "./types"
 
 const sameMeta = (a: InventoryItem, b: InventoryItem) =>
@@ -18,7 +19,5 @@ export function pickTransferSlot(target: InventoryView, item: InventoryItem): nu
             .sort((a, b) => a.slot - b.slot)[0]
         if (stackable) return stackable.slot
     }
-    const taken = new Set(items.map((other) => other.slot))
-    for (let slot = 1; slot <= target.slots; slot++) if (!taken.has(slot)) return slot
-    return undefined
+    return firstEmptySlot(target, item, items)
 }

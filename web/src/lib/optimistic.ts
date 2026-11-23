@@ -1,4 +1,5 @@
 import { asSlots } from "./inventory"
+import { hasGrid } from "./grid"
 import type { InventoryItem, InventoryView, SessionPatch, SessionSnapshot } from "./types"
 
 /**
@@ -45,6 +46,7 @@ function view(source: InventoryView, items: InventoryItem[], weight: number): In
 }
 
 export function predictMove(session: SessionSnapshot, request: MoveRequest): Prediction | undefined {
+    if (hasGrid(session)) return undefined
     const find = (id: string) => session.player.id === id ? session.player : session.secondary?.id === id ? session.secondary : undefined
     const from = find(request.fromInventory)
     const to = find(request.toInventory)
@@ -139,6 +141,7 @@ interface BuyRequest {
  * browser holds (unknown weight, over weight, no room, a unique multi-buy).
  */
 export function predictBuy(session: SessionSnapshot, request: BuyRequest): Prediction | undefined {
+    if (hasGrid(session)) return undefined
     const shop = session.secondary
     const player = session.player
     if (!shop || shop.type !== "shop" || shop.id !== request.shopInventory) return undefined

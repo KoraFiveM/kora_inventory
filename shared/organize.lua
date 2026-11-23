@@ -232,6 +232,7 @@ end
 ---   merge fun(into, from)  called with the two (copied) items for every stack folded
 ---                     into another, so per-stack metadata (decay stamps) is combined
 ---                     by the same rule a normal merge uses (default none)
+---   place fun(items, item, firstSlot): integer|nil  find the next shaped placement for Sort
 ---@return table|nil result { items = slot -> item, changed = boolean }
 ---@return string|nil err
 function organize.plan(items, slots, mode, opts)
@@ -281,8 +282,18 @@ function organize.plan(items, slots, mode, opts)
             if a.sortName ~= b.sortName then return a.sortName < b.sortName end
             return a.slot < b.slot
         end)
-        for index, entry in ipairs(movable) do
-            entry.slot = keep + index
+        if opts.place then
+            local placed = {}
+            for _, entry in ipairs(fixed) do placed[entry.slot] = entry.item end
+            for _, entry in ipairs(movable) do
+                entry.slot = opts.place(placed, entry.item, keep + 1)
+                if not entry.slot then return nil, 'item footprints do not fit' end
+                placed[entry.slot] = entry.item
+            end
+        else
+            for index, entry in ipairs(movable) do
+                entry.slot = keep + index
+            end
         end
         list = {}
         for _, entry in ipairs(fixed) do list[#list + 1] = entry end
