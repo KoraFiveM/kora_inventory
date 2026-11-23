@@ -75,6 +75,8 @@ Set `Config.kora_inventory.grid.enabled = true` in `config.lua` and restart the 
 
 Items can occupy rectangular footprints. Drag an item to the cell where its upper-left corner should sit. The preview outlines the cells the item would occupy and shows whether the edge or another item blocks it. Press **R** while dragging to rotate the footprint, or select a rectangular item and choose **Rotate item** to turn it in place. Weight limits still apply. Shops and ground drops use their usual one-slot layout.
 
+Bundled weapons declare their footprints in `data/weapons.lua`. Set `gridWidth` and `gridHeight` on a weapon definition to customize its footprint.
+
 Hover over a grid item to see its placement dimensions. The grid shows cell numbers on the player's hotbar. Classic panels keep their usual slot numbers.
 
 Existing saved items keep their slots and take on their authored footprint when successfully placed. If you change the column count or re-enable the grid after using classic mode, a saved footprint uses one cell while it conflicts with the new grid or another item.
