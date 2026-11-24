@@ -260,7 +260,7 @@ local class = KoraInventory.vehicles.modelClass(GetEntityModel(vehicle))
 
 With `vehicles.trunkCargo.enabled = true`, the items in a trunk are drawn as props inside the vehicle's boot for nearby players. It is presentation only and off by default.
 
-Item definitions in the bundled catalogue can set `dropProp` for their trunk prop.
+Item definitions in Kora Core's bundled catalogue can set `dropProp` for their trunk prop.
 The bundled water bottle, sandwich, phone, bandage and cash have their own
 models. Set `vehicles.trunkCargo.models` to override any item model on your
 server. Weapons use their weapon model when there is no override. Other items

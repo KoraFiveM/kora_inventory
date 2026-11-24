@@ -12,10 +12,9 @@ Namespace: `exports.kora_inventory` · Source: `server/crafting.lua (weapons tab
 
 ## Weapon catalogue
 
-Edit `data/weapons.lua` to change the bundled GTA weapon items, ammunition,
-attachments, or supplies. kora_core reads this file at startup and publishes
-weapon definitions to its live `weapons` registry. Restart kora_core after
-editing the file.
+Edit `kora_core/shared/weapons.lua` for bundled GTA weapon items and
+`kora_core/shared/items.lua` for ammunition, attachments, and supplies. Restart
+kora_core to reload the definitions into its live registries.
 
 ## How it works
 

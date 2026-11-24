@@ -8,23 +8,19 @@ sidebar_position: 3
 
 An item has two parts: a definition (what kind of thing it is) kept in kora_core's shared `items` or `weapons` registry, and instances (the actual stack in a slot) with their own amount and metadata. This page lists every definition field kora_inventory reads, every field an instance carries, the metadata keys that change how an instance behaves, and the one export that imports ox_inventory item data.
 
-Namespace: `exports.kora_inventory` · Source: `server.lua (buildItem), shared.lua, server/compat (ox item mapping), data/`
+Namespace: `exports.kora_inventory` · Source: `server.lua (buildItem), shared.lua, server/compat (ox item mapping)`
 
 ## Bundled catalogue
 
-Kora's bundled definitions live in four files.
+Kora Core owns the bundled catalogue.
 
-- `data/items.lua` contains general inventory items.
-- `data/weapons.lua` contains GTA weapon items, ammunition, attachments, and weapon supplies.
-- `data/food.lua` contains food.
-- `data/dranks.lua` contains drinks.
+- `kora_core/shared/items.lua` contains general inventory items, food, drinks, ammunition, attachments, and weapon supplies.
+- `kora_core/shared/weapons.lua` contains GTA weapon items.
+- `kora_core/shared/upstream/items.lua` contains stock QBCore definitions.
 
-`data/qb-items.lua` supplies bundled stock QBCore items. Core reads these files
-at startup and publishes the merged records through its live registries and
-`QBCore.Shared.Items`. Weapon items go into the `weapons` registry. Ammunition,
-attachments, and supplies go into the `items` registry. Restart kora_core after
-editing the bundled catalogue. Server-specific definitions in Core's legacy item
-and weapon files continue to work.
+Core loads these files at startup and publishes the merged records through its
+live registries and `QBCore.Shared.Items`. Restart kora_core after editing the
+bundled catalogue.
 
 With grid storage enabled, ordinary items use one cell by default. Set
 `gridWidth` and `gridHeight` as positive whole numbers for larger items. In the
@@ -171,7 +167,7 @@ Weight is `weight * amount` per slot using the effective weight (metadata overri
 
 ## Where definitions come from
 
-The inventory resource ships the bundled item catalogue in `data/`. Core ships the GTA weapon registry in `shared/weapons.lua`. The item defaults include food and drink, ammunition packs with `ammoType` and `rounds`, craft materials, `backpack`, `phone`, `id_card`, `vehiclekey`, `weaponlicense`, and `cash`. Any resource can add more with `exports.kora_core:registerShared` (or `Kora.shared.register` after loading `@kora_core/init.lua`).
+Core's item defaults include food and drink, ammunition packs with `ammoType` and `rounds`, craft materials, `backpack`, `phone`, `id_card`, `vehiclekey`, `weaponlicense`, and `cash`. Any resource can add more with `exports.kora_core:registerShared` (or `Kora.shared.register` after loading `@kora_core/init.lua`).
 
 ## ox_inventory mapping
 
