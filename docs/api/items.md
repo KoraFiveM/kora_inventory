@@ -16,7 +16,7 @@ Kora Core owns the bundled catalogue.
 
 - `kora_core/shared/items.lua` contains general inventory items, food, drinks, ammunition, attachments, and weapon supplies.
 - `kora_core/shared/weapons.lua` contains GTA weapon items.
-- `kora_core/shared/upstream/items.lua` contains stock QBCore definitions.
+- `kora_core/shared/upstream/items.lua` is an optional import for definitions from an older QB installation. The bundled defaults live in Core's native lists.
 
 Core loads these files at startup and publishes the merged records through its
 live registries and `QBCore.Shared.Items`. Restart kora_core after editing the
