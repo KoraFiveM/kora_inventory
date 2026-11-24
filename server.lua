@@ -2238,14 +2238,23 @@ local function transfer(src, request)
             end
             local targetOK, targetErr, targetItem = removeFrom(toKey, toSlot, target.amount)
             if not targetOK then
-                ext.restoreRemoved(fromKey, fromSlot, sourceItem)
+                if grid and grid.enabled() then
+                    ext.restoreRemoved(fromKey, fromSlot, sourceItem)
+                else
+                    addTo(fromKey, sourceItem.name, sourceItem.amount, fromSlot, sourceItem.info, 'swap-rollback')
+                end
                 return false, targetErr
             end
             local placeSource, placeSourceErr =
                 addTo(toKey, sourceItem.name, sourceItem.amount, toSlot, sourceItem.info, 'swap', toColumns ~= nil, orientation)
             if not placeSource then
-                ext.restoreRemoved(toKey, toSlot, targetItem)
-                ext.restoreRemoved(fromKey, fromSlot, sourceItem)
+                if grid and grid.enabled() then
+                    ext.restoreRemoved(toKey, toSlot, targetItem)
+                    ext.restoreRemoved(fromKey, fromSlot, sourceItem)
+                else
+                    addTo(toKey, targetItem.name, targetItem.amount, toSlot, targetItem.info, 'swap-rollback')
+                    addTo(fromKey, sourceItem.name, sourceItem.amount, fromSlot, sourceItem.info, 'swap-rollback')
+                end
                 return false, placeSourceErr
             end
             local placeTarget, placeTargetErr =
@@ -2253,8 +2262,13 @@ local function transfer(src, request)
                     grid and grid.columns(currentFrom) ~= nil, targetItem.gridRotated)
             if not placeTarget then
                 removeFrom(toKey, toSlot, sourceItem.amount)
-                ext.restoreRemoved(toKey, toSlot, targetItem)
-                ext.restoreRemoved(fromKey, fromSlot, sourceItem)
+                if grid and grid.enabled() then
+                    ext.restoreRemoved(toKey, toSlot, targetItem)
+                    ext.restoreRemoved(fromKey, fromSlot, sourceItem)
+                else
+                    addTo(toKey, targetItem.name, targetItem.amount, toSlot, targetItem.info, 'swap-rollback')
+                    addTo(fromKey, sourceItem.name, sourceItem.amount, fromSlot, sourceItem.info, 'swap-rollback')
+                end
                 return false, placeTargetErr
             end
             commitBoth()
@@ -2268,7 +2282,11 @@ local function transfer(src, request)
         end
         local addedOK, addedErr = addTo(toKey, removed.name, amount, toSlot, removed.info, 'transfer', toSlot ~= nil, orientation)
         if not addedOK then
-            ext.restoreRemoved(fromKey, fromSlot, removed)
+            if grid and grid.enabled() then
+                ext.restoreRemoved(fromKey, fromSlot, removed)
+            else
+                addTo(fromKey, removed.name, amount, fromSlot, removed.info, 'transfer-rollback')
+            end
             return false, addedErr
         end
         commitBoth()
@@ -2444,7 +2462,11 @@ local function intentDrop(src, request)
             end
             local addedOK, addedErr = addSecondary(target, taken.name, taken.amount, nil, taken.info)
             if not addedOK then
-                ext.restoreRemoved(session.primary, slot, taken)
+                if grid and grid.enabled() then
+                    ext.restoreRemoved(session.primary, slot, taken)
+                else
+                    addPlayer(src, taken.name, taken.amount, slot, taken.info, 'drop-rollback')
+                end
                 finishHooks(mergeHandle, false)
                 return false, addedErr
             end
@@ -2690,7 +2712,12 @@ local function intentGive(src, request)
             nil, removed.gridRotated)
         if not addedOK then
             finishHooks(giveHandle, false)
-            local rollbackOK, rollbackErr = ext.restoreRemoved(playerKey(src), slot, removed)
+            local rollbackOK, rollbackErr
+            if grid and grid.enabled() then
+                rollbackOK, rollbackErr = ext.restoreRemoved(playerKey(src), slot, removed)
+            else
+                rollbackOK, rollbackErr = addPlayer(src, removed.name, amount, slot, removed.info, 'give-rollback')
+            end
             if not rollbackOK then
                 Kora.logging.error('give.rollback_failed', 'Give rollback failed', { inventoryKey = session.primary, error = tostring(rollbackErr) })
             end
@@ -3541,7 +3568,11 @@ local function moveItem(src, fromSlot, toSlot, amount, rotated)
         end
         local added, addErr = addPlayer(src, moved.name, amount, toSlot, moved.info, 'move', true, rotated)
         if not added then
-            ext.restoreRemoved(playerKey(src), fromSlot, moved)
+            if grid and grid.enabled() then
+                ext.restoreRemoved(playerKey(src), fromSlot, moved)
+            else
+                addPlayer(src, moved.name, amount, fromSlot, moved.info, 'move-rollback')
+            end
             return false, addErr
         end
         bump(playerKey(src))

@@ -573,7 +573,18 @@ local function moveEvidence(action, source, target, evidenceId, slot, amount, ta
             removedItem.gridRotated
         )
         if not added then
-            inventoryApi.restoreRemoved(fromKey, slot, removedItem)
+            if KoraInventory.grid and KoraInventory.grid.enabled() then
+                inventoryApi.restoreRemoved(fromKey, slot, removedItem)
+            else
+                inventoryApi.addTo(
+                    fromKey,
+                    removedItem.name,
+                    amount,
+                    slot,
+                    removedItem.info or removedItem.metadata,
+                    'evidence-rollback'
+                )
+            end
             return false, addError
         end
         inventoryApi.bump(fromKey)

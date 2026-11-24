@@ -368,7 +368,7 @@ local function commit(src, key, fromSlot, toSlot, recipe, fromSnap, toSnap)
             for index = #removed, 1, -1 do
                 local entry = removed[index]
                 local restored, restoreErr
-                if internal.restoreRemoved then
+                if inventory.grid and inventory.grid.enabled() then
                     restored, restoreErr = internal.restoreRemoved(key, entry.slot, entry.item)
                 else
                     restored, restoreErr = internal.addTo(

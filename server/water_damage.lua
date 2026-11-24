@@ -183,7 +183,12 @@ local function rollItems(src)
                     end
                     if not ok then
                         -- Could not place the replacement: put the original back.
-                        inventoryApi.restoreRemoved(playerKey, slot, removedItem)
+                        if KoraInventory.grid and KoraInventory.grid.enabled() then
+                            inventoryApi.restoreRemoved(playerKey, slot, removedItem)
+                        else
+                            inventoryApi.addTo(playerKey, removedItem.name, amount, slot,
+                                removedItem.info or removedItem.metadata, 'water-damage-rollback')
+                        end
                     end
                 end
             end
