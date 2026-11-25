@@ -840,7 +840,7 @@ raw client open request through as a third `opts` argument to any shop's
 `access(source, inventory, opts)` callback, so any future shop with the same
 "no fixed location list" shape can reuse the pattern.
 
-Stock reuses this project's own item catalog (`water_bottle`, `soda`) rather
+Stock reuses Kora Core's item catalogue (`water_bottle`, `soda`) rather
 than porting upstream's `kurkakola` name verbatim -- the registry already
 departs from upstream naming elsewhere (e.g. `water_bottle` is labelled
 "Water", not upstream's "Bottle of Water").

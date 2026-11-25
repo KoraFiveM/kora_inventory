@@ -456,6 +456,7 @@ local function submitIntent(intent)
         toInventory = to,
         fromSlot = payload.fromSlot,
         toSlot = payload.toSlot,
+        rotated = payload.rotated,
         amount = payload.amount,
         fromRevision = fromView and fromView.revision,
         toRevision = toView and toView.revision,

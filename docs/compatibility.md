@@ -46,4 +46,4 @@ kora_inventory provides `qb-weapons` so resources that only depend on it keep st
 | ox `SetMetadata` | Accepts `metadata.weight`. | Rejects it. |
 | ox `addCash`, `removeCash`, `getBank`, `getCards`, `giveCard` | Work on `money` or card items. | Routed to kora_core accounts. |
 
-Item definitions for the ox identity come from kora_core's registry, not `data/items.lua`; use `ImportOxItems` to bring ox definitions over (see [Items](./api/items.md)).
+The ox identity serves item definitions from kora_core's registry. Use `ImportOxItems` to bring definitions over from an ox_inventory installation (see [Items](./api/items.md)).

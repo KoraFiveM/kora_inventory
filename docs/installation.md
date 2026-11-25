@@ -12,6 +12,7 @@ Kora Inventory is the server-authoritative inventory for the Kora framework. It 
 
 - FiveM server artifact with `lua54 'yes'` support (the manifest requires it) and a MySQL/MariaDB database.
 - The five resources named in `fxmanifest.lua` as `dependency`: `kora_theme`, `kora_lib`, `kora_sql`, `kora_core` and `kora_target`. FiveM starts them first even if your `server.cfg` lists kora_inventory earlier.
+- Update kora_core before updating kora_inventory to pick up the bundled grid footprints and trunk cargo models. Move any local catalogue edits from the old Inventory `data/` files into Core's [seed files](./api/items.md#bundled-catalogue).
 - `kora_sql` needs your database connection string (`set mysql_connection_string ...`). Kora Inventory creates its own tables through kora_sql at startup, so there is no SQL file to import.
 - No other inventory resource may be running. `server/compat/providers.lua` raises an error at startup if a separate `qb-inventory`, `ox_inventory` or `qb-weapons` resource is already started, because kora_inventory provides those identities itself.
 

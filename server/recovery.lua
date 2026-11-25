@@ -89,10 +89,11 @@ local function claim(source, id, operationKey)
             end
             data = exports.kora_core:getPlayerData(source)
             if not data or data.citizenid ~= cid then return reject('Your character changed. Try again.') end
-            local destination = { items = inventory.copy(data.items or {}), slots = Config.kora_inventory.playerSlots, maxWeight = Config.kora_inventory.playerMaxWeight }
+            local destination = { type = 'player', items = inventory.copy(data.items or {}), slots = Config.kora_inventory.playerSlots, maxWeight = Config.kora_inventory.playerMaxWeight }
             local count = 0
             for _, item in pairs(inv.items) do
-                local added, addErr = internal.addSecondary(destination, item.name, item.amount, nil, item.info or item.metadata)
+                local added, addErr = internal.addSecondary(destination, item.name, item.amount, nil, item.info or item.metadata,
+                    nil, item.gridRotated)
                 if not added then return reject(addErr) end
                 count = count + item.amount
             end

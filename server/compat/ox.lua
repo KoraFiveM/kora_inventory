@@ -1128,7 +1128,7 @@ function ox.ReturnInventory(source)
         return
     end
     core.lock({ key }, function()
-        if core.setInventoryItems(key, copy(stash.items)) then
+        if core.setInventoryItems(key, copy(stash.items), true) then
             core.removeSecondary(stashKey)
         end
     end)

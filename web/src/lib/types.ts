@@ -8,6 +8,13 @@ export interface NuiWireMessage<T = unknown> {
 
 export interface InventoryItem {
     slot: number
+    /** Current footprint when placed in a shaped grid. */
+    gridWidth?: number
+    gridHeight?: number
+    gridRotated?: boolean
+    /** Authored footprint, including when the item is in a classic inventory. */
+    gridBaseWidth?: number
+    gridBaseHeight?: number
     name: string
     label?: string
     amount: number
@@ -66,6 +73,8 @@ export interface DecayConfig {
 
 export interface InventoryView {
     id: string
+    /** When present, slots are row-major grid cells and item slots are anchors. */
+    gridColumns?: number
     label?: string
     type?: string
     slots: number

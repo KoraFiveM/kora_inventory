@@ -86,6 +86,10 @@ Config.ShopClerks = {
 
 Config.kora_inventory = {
     playerSlots = 41,
+    grid = {
+        enabled = false, -- Shape items by footprint in player and storage inventories.
+        columns = 6, -- Slot capacities are cell counts and may end in a partial row.
+    },
     playerMaxWeight = 120000,
     -- Weapons that stack in one slot instead of taking a slot each (no serial
     -- is issued for them). Remove an entry or set it to false to make that
@@ -692,13 +696,7 @@ Config.kora_inventory = {
             drawDistance = 35.0,
             maxProps = 24,
             fallbackModel = 'prop_med_bag_01b',
-            models = {
-                water_bottle = 'prop_ld_flow_bottle',
-                sandwich = 'prop_sandwich_01',
-                phone = 'prop_npc_phone_02',
-                bandage = 'prop_ld_health_pack',
-                cash = 'prop_cash_pile_01',
-            },
+            models = {},
             bounds = {},
         },
 

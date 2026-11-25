@@ -10,6 +10,12 @@ kora_inventory owns the weapon lifecycle: weapon items carry canonical server me
 
 Namespace: `exports.kora_inventory` · Source: `server/crafting.lua (weapons table), server/weaponcarry.lua, server/useables.lua`
 
+## Weapon catalogue
+
+Edit `kora_core/shared/weapons.lua` for bundled GTA weapon items and
+`kora_core/shared/items.lua` for ammunition, attachments, and supplies. Restart
+kora_core to reload the definitions into its live registries.
+
 ## How it works
 
 Using a weapon item asks the client to play a draw or holster animation (`drawTime`, `holsterTime`, plus `concealedDrawTime` when the weapon sits outside the hotbar in `hotbar` visibility mode). Only after the client confirms with `kora_inventory:server:weaponToggled` for the slot the server asked about, and the item is still in that slot, does the server record the weapon as equipped and republish the carried list on the replicated player state bag `kora_inventory:weaponCarry`. Shots are reported by the client with no payload; the server rate-limits them (`ballistics.shotCooldown`), removes the first recorded round from `info.loadedBullets`, applies configured durability wear, and fires `kora_inventory:server:weaponRoundFired`. Ammunition is only ever added by loading a magazine on the server. All weapon state writes go through one locked path that re-validates the metadata with `PrepareWeaponMetadata`, saves it to the item and fires `kora_inventory:server:weaponStateChanged`.

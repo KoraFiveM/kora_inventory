@@ -367,9 +367,14 @@ local function commit(src, key, fromSlot, toSlot, recipe, fromSnap, toSnap)
         local function rollback()
             for index = #removed, 1, -1 do
                 local entry = removed[index]
-                local restored, restoreErr = internal.addTo(
-                    key, entry.item.name, entry.item.amount, entry.slot, entry.item.info, 'combine-rollback', true
-                )
+                local restored, restoreErr
+                if inventory.grid and inventory.grid.enabled() then
+                    restored, restoreErr = internal.restoreRemoved(key, entry.slot, entry.item)
+                else
+                    restored, restoreErr = internal.addTo(
+                        key, entry.item.name, entry.item.amount, entry.slot, entry.item.info, 'combine-rollback', true
+                    )
+                end
                 if not restored then
                     Kora.logging.error('combine.rollback_failed', 'Combine rollback failed', {
                         playerId = src, item = entry.item.name, error = tostring(restoreErr),

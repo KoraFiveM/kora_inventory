@@ -553,7 +553,8 @@ local function moveEvidence(action, source, target, evidenceId, slot, amount, ta
         if not item or amount > (tonumber(item.amount) or 0) then
             return false, 'item changed'
         end
-        local canAdd, addReason = inventoryApi.canAdd(toKey, item.name, amount, targetSlot, item.info or item.metadata)
+        local canAdd, addReason = inventoryApi.canAdd(toKey, item.name, amount, targetSlot, item.info or item.metadata,
+            item.gridRotated)
         if not canAdd then
             return false, addReason
         end
@@ -567,17 +568,23 @@ local function moveEvidence(action, source, target, evidenceId, slot, amount, ta
             amount,
             targetSlot,
             removedItem.info or removedItem.metadata,
-            'evidence-' .. action
+            'evidence-' .. action,
+            nil,
+            removedItem.gridRotated
         )
         if not added then
-            inventoryApi.addTo(
-                fromKey,
-                removedItem.name,
-                amount,
-                slot,
-                removedItem.info or removedItem.metadata,
-                'evidence-rollback'
-            )
+            if KoraInventory.grid and KoraInventory.grid.enabled() then
+                inventoryApi.restoreRemoved(fromKey, slot, removedItem)
+            else
+                inventoryApi.addTo(
+                    fromKey,
+                    removedItem.name,
+                    amount,
+                    slot,
+                    removedItem.info or removedItem.metadata,
+                    'evidence-rollback'
+                )
+            end
             return false, addError
         end
         inventoryApi.bump(fromKey)

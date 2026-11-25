@@ -8,11 +8,30 @@ sidebar_position: 3
 
 An item has two parts: a definition (what kind of thing it is) kept in kora_core's shared `items` or `weapons` registry, and instances (the actual stack in a slot) with their own amount and metadata. This page lists every definition field kora_inventory reads, every field an instance carries, the metadata keys that change how an instance behaves, and the one export that imports ox_inventory item data.
 
-Namespace: `exports.kora_inventory` · Source: `server.lua (buildItem), shared.lua, server/compat (ox item mapping), kora_core shared/items.lua`
+Namespace: `exports.kora_inventory` · Source: `server.lua (buildItem), shared.lua, server/compat (ox item mapping)`
+
+## Bundled catalogue
+
+Kora Core owns the bundled catalogue.
+
+- `kora_core/shared/items.lua` contains general inventory items, food, drinks, ammunition, attachments, and weapon supplies.
+- `kora_core/shared/weapons.lua` contains GTA weapon items.
+- `kora_core/shared/upstream/items.lua` is an optional import for definitions from an older QB installation. The bundled defaults live in Core's native lists.
+
+Core loads these files at startup and publishes the merged records through its
+live registries and `QBCore.Shared.Items`. Restart kora_core after editing the
+bundled catalogue.
+
+With grid storage enabled, ordinary items use one cell by default. Set
+`gridWidth` and `gridHeight` as positive whole numbers for larger items. In the
+bundled catalogue, a backpack uses 2 × 2 cells, an advanced repair kit uses
+3 × 2, and a fishing pole uses 4 × 1. Set `dropProp` for a trunk cargo model.
+A model configured in `vehicles.trunkCargo.models` takes precedence for that
+item.
 
 ## How it works
 
-kora_inventory never stores definitions. Each time it needs one it asks kora_core (`getShared('items', name)`, falling back to `weapons`), so an item registered a moment ago works immediately and an item removed from the registry stops being usable. Names are matched lower-case. When an item is added, `buildItem` copies the relevant definition fields onto the instance, and `viewItems` refreshes label, image, weight and description from the live definition and metadata every time an inventory is sent to a player.
+kora_inventory resolves definitions through kora_core at runtime (`getShared('items', name)`, falling back to `weapons`), so an item registered a moment ago works immediately and an item removed from the registry stops being usable. Names are matched lower-case. When an item is added, `buildItem` copies the relevant definition fields onto the instance, and `viewItems` refreshes label, image, weight and description from the live definition and metadata every time an inventory is sent to a player.
 
 ## Adding a new item
 
@@ -28,7 +47,7 @@ kora_inventory never stores definitions. Each time it needs one it asks kora_cor
 | Definition | The shared record for an item name: label, weight, type and flags. One per name. |
 | Instance | The table in a slot: name, amount and metadata (also called `info`). Unique items always have `amount = 1`. |
 | Metadata / info | A per-instance table. `info` and `metadata` hold the same data; kora_inventory keeps both in sync and prefers `info`. |
-| Unique item | A definition with `unique = true`. It never stacks; adding N creates N separate slots. Every weapon in kora_core's shipped catalogue is unique. |
+| Unique item | A definition with `unique = true`. It never stacks; adding N creates N separate slots. Every weapon in the bundled catalogue is unique. |
 | Effective item | The label, image, weight and description actually shown: instance metadata wins over the definition. |
 
 ## Item fields
@@ -51,6 +70,8 @@ Read by kora_inventory through `buildItem`, `effectiveItem`, the use flow, ammo 
 | `preventClose` | boolean | kora_inventory's own field with the opposite sense: `true` leaves the panel open after use. Set implicitly when `shouldClose = false`. |
 | `useTime` | integer | Milliseconds of kora_lib progress bar the client runs before a use is sent (hotbar and NUI). 0 or absent means immediate. A cancelled bar sends nothing to the server. |
 | `image` | string | Local artwork file name, for example `water_bottle.png`. |
+| `gridWidth`, `gridHeight` | integer | Width and height of the stack in inventory cells. |
+| `dropProp` | string or integer | Trunk cargo prop model name or hash. An entry in `vehicles.trunkCargo.models` overrides it. |
 | `imageUrl` | string | Legacy data field. The built-in UI does not use it as an artwork source. |
 | `description` | string | Shown in the inspector. Overridable by `metadata.description`. |
 | `container` | boolean | Marks an item as a container for the UI. Set automatically on views of items whose definition has `container = true` (the shipped `backpack`). Opening is driven by `Config.kora_inventory.containers.items`, not by this flag. |
@@ -146,7 +167,7 @@ Weight is `weight * amount` per slot using the effective weight (metadata overri
 
 ## Where definitions come from
 
-kora_core ships the default catalogue in `shared/items.lua` and `shared/weapons.lua`: food and drink, ammunition packs with `ammoType` and `rounds`, craft materials, the unique `backpack`, `phone`, `id_card`, `vehiclekey`, `weaponlicense`, `cash`, and the vanilla weapon list. Any resource can add more with `exports.kora_core:registerShared` (or `Kora.shared.register` after loading `@kora_core/init.lua`).
+Core's item defaults include food and drink, ammunition packs with `ammoType` and `rounds`, craft materials, `backpack`, `phone`, `id_card`, `vehiclekey`, `weaponlicense`, and `cash`. Any resource can add more with `exports.kora_core:registerShared` (or `Kora.shared.register` after loading `@kora_core/init.lua`).
 
 ## ox_inventory mapping
 
@@ -213,7 +234,7 @@ The record owner is the resource that registered it; stopping that resource remo
 
 Facts below were written from the current code of this resource; they add to, and where noted refine, the reference above.
 
-kora_inventory does not define items. Definitions live in kora_core's `items` registry and are looked up each time an operation runs; the legacy `QBCore.Shared.Items` map is never cached. Definitions can therefore be registered, updated or removed at runtime, and the built-in weapon and ammunition handlers pick up changes without a restart.
+kora_inventory looks up definitions in kora_core's live `items` registry each time an operation runs. Definitions can be registered, updated or removed at runtime, and the built-in weapon and ammunition handlers pick up changes without a restart.
 
 ### Fields kora_inventory reads
 

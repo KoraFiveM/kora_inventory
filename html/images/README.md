@@ -14,7 +14,7 @@ images/pistol_ammo.png
 images/lockpick.gif
 ```
 
-The filename should match the item's `image` in `kora_core/shared/items.lua` (or
+The filename should match the item's `image` in Kora Core's catalogue (or
 the item name when its definition has no image), not its label. Extensions are
 tried in the order set by
 `Config.kora_inventory.ui.images.extensions` -- `webp`, `png`, `gif`, `jpg` by

@@ -84,6 +84,7 @@ local function stock()
 end
 
 local failAddOnce
+local rollbackAdds, rollbackRestores = {}, 0
 KoraInventory = {
     internal = {
         copy = copy,
@@ -120,6 +121,9 @@ KoraInventory = {
         end,
         addTo = function(_, name, amount, slot, info, reason, exact)
             if failAddOnce and reason == 'combine' then failAddOnce = nil return false, 'simulated failure' end
+            if reason == 'combine-rollback' then
+                rollbackAdds[#rollbackAdds + 1] = { slot = slot, exact = exact }
+            end
             if not defs[name] then return false, 'invalid item' end
             if weightOf(inv.items) + defs[name].weight * amount > inv.maxWeight then return false, 'over weight' end
             local stack = slot and inv.items[slot] and inv.items[slot].name == name and sameInfo(inv.items[slot].info, info) and slot
@@ -134,9 +138,17 @@ KoraInventory = {
             inv.items[slot] = { slot = slot, name = name, amount = amount, info = copy(info or {}) }
             return true, slot
         end,
+        restoreRemoved = function(_, slot, item)
+            rollbackRestores = rollbackRestores + 1
+            local restored = copy(item)
+            restored.amount = restored.amount + (inv.items[slot] and inv.items[slot].amount or 0)
+            inv.items[slot] = restored
+            return true
+        end,
     },
 }
 dofile('shared.lua')
+dofile('server/grid.lua')
 dofile('server/combine.lua')
 local combine = KoraInventory.combine
 
@@ -293,9 +305,24 @@ H.ok(noBusy(), 'the slots are released')
 reset(stock())
 settings.recipes = { { a = 'rolling_paper', b = 'weed', result = 'joint', consumeA = 3, consumeB = 2, time = 0, label = 'Roll' } }
 before = snapshotOf()
+rollbackAdds = {}
 failAddOnce = true
 H.equal(go(1, 2), false, 'a failing add is reported')
 H.ok(same(before, snapshotOf()), 'and the whole stacks are put back')
+H.equal(rollbackRestores, 0, 'classic rollback never uses the grid restore path')
+H.equal(#rollbackAdds, 2, 'classic rollback uses the combine-rollback add reason')
+H.ok(rollbackAdds[1].slot == 2 and rollbackAdds[1].exact and rollbackAdds[2].slot == 1 and rollbackAdds[2].exact,
+    'classic rollback restores both exact slots in reverse removal order')
+
+Config.kora_inventory.grid = { enabled = true }
+inv.items[1].gridRotated = true
+before = snapshotOf()
+failAddOnce = true
+H.equal(go(1, 2), false, 'a failing grid add is reported')
+H.ok(same(before, snapshotOf()), 'grid rollback restores the original records')
+H.equal(rollbackRestores, 2, 'grid rollback uses the record restore path for both items')
+H.equal(#rollbackAdds, 2, 'grid rollback does not use the classic add path')
+Config.kora_inventory.grid = nil
 
 -- no free slot
 reset({

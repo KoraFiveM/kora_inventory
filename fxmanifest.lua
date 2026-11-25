@@ -51,6 +51,7 @@ server_scripts {
     'server/persistence.lua',
     -- Item-creation audit log. Before server.lua: the export wrappers there
     -- capture the invoking resource through it.
+    'server/grid.lua',
     'server/audit_log.lua',
     'server.lua',
     -- Admin tools: the omnipack catalogue/open path and the /invaudit and

@@ -124,6 +124,13 @@ h2 { margin-bottom: 0; font-size: calc(15px * var(--ui-scale, 1)); font-weight: 
 .weight i, .durability { height: 4px; overflow: hidden; border-radius: 999px; background: hsl(var(--muted)); }
 .weight b, .durability i { display: block; height: 100%; border-radius: inherit; background: hsl(var(--primary)); }
 .slot-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; align-content: start; }
+.slot-grid-shaped { grid-auto-rows: minmax(0, 1fr); }
+.slot-grid-shaped > .slot { aspect-ratio: auto; }
+.grid-cell-sizer { grid-column: 1; aspect-ratio: 1; visibility: hidden; pointer-events: none; }
+.grid-drop-cell { position: relative; z-index: 3; min-width: 0; min-height: 0; pointer-events: none; color: hsl(148 75% 67%); border: 2px solid currentColor; border-radius: 9px; background: hsl(148 64% 47% / .17); }
+.grid-drop-edge { color: hsl(38 95% 70%); border-style: dashed; background: hsl(38 92% 50% / .18); }
+.grid-drop-blocked { color: hsl(0 95% 76%); background: hsl(0 80% 62% / .2); }
+.grid-drop-reason { position: absolute; bottom: 3px; left: 3px; padding: 1px 4px; border-radius: 4px; background: hsl(var(--background) / .94); font-size: calc(9px * var(--ui-scale, 1)); font-weight: 700; white-space: nowrap; }
 .slot { position: relative; min-width: 0; min-height: 0; aspect-ratio: 1 / 1; padding: 4px; overflow: hidden; border: var(--slot-border-width, 1px) solid hsl(var(--border)); border-radius: 9px; color: hsl(var(--muted-foreground)); background: linear-gradient(145deg, hsl(var(--background)), hsl(var(--card))); cursor: grab; text-align: left; display: grid; grid-template-rows: calc(17px * var(--ui-scale, 1)) minmax(0, 1fr) auto; gap: 2px; touch-action: none; -webkit-user-select: none; user-select: none; transition: border-color 120ms ease, background-color 120ms ease; }
 .slot:hover, .slot:focus-visible { outline: 0; border-color: hsl(var(--brand-border)); background: hsl(var(--surface-hover)); }
 .inventory-shell .slot:focus-visible { border-color: hsl(var(--border)); }
@@ -189,6 +196,8 @@ h2 { margin-bottom: 0; font-size: calc(15px * var(--ui-scale, 1)); font-weight: 
    rather than the newer individual `translate` property because CEF builds
    can otherwise ignore the -50% offset. */
 .inventory-drag-preview { position: fixed; z-index: 1000; width: clamp(56px, 7vw, 86px); min-width: 0; min-height: 0; aspect-ratio: 1 / 1; transform: translate(-50%, -50%); border-color: hsl(var(--brand-border)); background: linear-gradient(145deg, hsl(var(--surface-raised)), hsl(var(--background))); box-shadow: 0 10px 28px rgb(0 0 0 / .48); pointer-events: none; }
+.inventory-drag-preview-grid { transform: translate(12px, 12px); opacity: .85; }
+.grid-rotate-hint { position: fixed; z-index: 1001; transform: translate(12px, -100%); margin: 0; padding: 3px 7px; border: 1px solid hsl(var(--brand-border)); border-radius: 6px; background: hsl(var(--surface-raised)); color: hsl(var(--foreground)); font-size: calc(11px * var(--ui-scale, 1)); font-weight: 650; white-space: nowrap; pointer-events: none; }
 .item-box-stack { position: fixed; z-index: 1100; right: 20px; bottom: 20px; display: grid; width: min(260px, calc(100vw - 32px)); gap: 6px; pointer-events: none; }
 .item-box { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 46px; overflow: hidden; border-radius: 7px; padding: 5px 10px 5px 5px; color: hsl(var(--foreground)); background: hsl(var(--surface-raised)); box-shadow: 0 10px 28px rgb(0 0 0 / .48); animation: item-box-in 150ms ease-out both; border: 1px solid hsl(var(--border)); border-left: 3px solid hsl(var(--primary)); }
 .item-box-art { display: grid; place-items: center; width: 36px; height: 36px; overflow: hidden; border-radius: 5px; padding: 3px; color: hsl(var(--primary)); background: hsl(var(--brand-soft)); font-weight: 800; }

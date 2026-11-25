@@ -366,8 +366,8 @@ machine = TradeState.new({
         return policy and policy.item or nil
     end,
     cashBalance = cashBalance,
-    draftAdd = function(draft, name, amount, info)
-        return internal.addSecondary(draft, name, amount, nil, info)
+    draftAdd = function(draft, name, amount, info, rotated)
+        return internal.addSecondary(draft, name, amount, nil, info, nil, rotated)
     end,
     lock = function(a, b, fn)
         return internal.lock({ playerKey(a), playerKey(b) }, fn)

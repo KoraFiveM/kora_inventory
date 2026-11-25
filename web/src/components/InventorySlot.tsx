@@ -3,6 +3,7 @@ import { Droplets, Lock } from "lucide-react"
 import { useDrag, useDragDropManager, useDrop } from "react-dnd"
 import { UiConfigContext } from "@/context"
 import { slotDecay } from "@/lib/decay"
+import { gridPosition, gridSize, type GridDropPreview } from "@/lib/grid"
 import { useLocale } from "@/lib/locales"
 import { isClosedBag, isWaterDamaged } from "@/lib/search"
 import { SlotUiContext } from "@/slotUi"
@@ -21,6 +22,7 @@ interface SlotProps {
     selected: boolean
     busy: boolean
     canDropSlot: (source: DragSlot, target: SlotTarget) => boolean
+    previewGridDrop?: (source: DragSlot, target: SlotTarget) => GridDropPreview | undefined
     onDrop: (source: DragSlot, target: SlotTarget) => void
     onDragEnd: () => void
     onSelect: (item?: InventoryItem) => void
@@ -41,7 +43,7 @@ interface SlotProps {
 /** React DnD's TouchBackend uses global CEF input listeners for both touch and
  * mouse. Unlike HTML5 DnD or source pointer-capture, it resolves the actual
  * destination slot after the cursor leaves the source element. */
-export function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, dimmed, offered }: SlotProps) {
+export function InventorySlot({ item, index, inventory, selected, busy, hotbar, lastHotbar, canDropSlot, previewGridDrop, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, dimmed, offered }: SlotProps) {
     const { quickTransfer, modifierDrag, tooltips, inspectorDecimals, decay: decayConfig } = useContext(UiConfigContext)
     const dndManager = useDragDropManager()
     // Ctrl/Alt as they were when the gesture began; read when the drag item is built.
@@ -52,6 +54,9 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
     const hideTip = useCallback(() => { window.clearTimeout(tipTimer.current); setTip(undefined) }, [])
     useEffect(() => () => window.clearTimeout(tipTimer.current), [])
     const t = useLocale()
+    const grid = inventory.gridColumns ? gridPosition(index, inventory.gridColumns) : undefined
+    const { width, height } = gridSize(item)
+    const slotLabel = item ? t("ui.slot_item", { item: item.label ?? item.name, slot: index }) : t("ui.empty_slot", { slot: index })
     // Freshness bar for decaying items (server-computed `item.decay`; shops never carry it).
     const decay = inventory.type === "shop" ? undefined : slotDecay(item, decayConfig, t)
     const slotUi = useContext(SlotUiContext)
@@ -78,8 +83,13 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
             onDrop(source, target)
             return target
         },
-        collect: (monitor) => ({ isOver: monitor.isOver({ shallow: true }), canDrop: monitor.canDrop() }),
+        collect: (monitor) => {
+            const isOver = monitor.isOver({ shallow: true })
+            return { isOver, canDrop: isOver && monitor.canDrop() }
+        },
     }), [busy, canDropSlot, onDrop, target])
+    const drag = isOver && grid ? dndManager.getMonitor().getItem() as DragSlot | undefined : undefined
+    const footprint = drag ? previewGridDrop?.(drag, target) : undefined
     const setSlotRef = useCallback((node: HTMLButtonElement | null) => {
         dragRef(node)
         dropRef(node)
@@ -102,16 +112,17 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
         // Quick slot click: pulse the real slot. The parity class restarts the animation on a repeat.
         flashing && `slot-flash slot-flash-${(slotUi.flash?.nonce ?? 0) % 2}`,
         item && slotUi.isCompatible(item) && "slot-compatible",
-        isOver && canDrop && "slot-move-target", isOver && !canDrop && "slot-drop-invalid",
+        isOver && !footprint && canDrop && "slot-move-target", isOver && !footprint && !canDrop && "slot-drop-invalid",
         item && offered && "slot-offered",
     ].filter(Boolean).join(" ")
 
-    return <button
+    return <><button
         ref={setSlotRef}
         className={classes}
+        style={grid ? { gridColumn: `${grid.column} / span ${width}`, gridRow: `${grid.row} / span ${height}` } : undefined}
         data-fft-kind={inventory.type === "shop" ? "shop-item" : inventory.type === "player" ? "player-slot" : undefined}
         data-fft-item={item?.name}
-        aria-label={item ? t("ui.slot_item", { item: item.label ?? item.name, slot: index }) : t("ui.empty_slot", { slot: index })}
+        aria-label={grid && (width > 1 || height > 1) ? t("ui.grid_slot_item", { item: slotLabel, width, height }) : slotLabel}
         aria-pressed={selected || undefined}
         aria-disabled={busy || undefined}
         data-pending={item?.pending || undefined}
@@ -164,7 +175,7 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
             if (!busy) onSelect(item)
         }}
     >
-        <span className="slot-number">{index}</span>
+        {(!grid || hotbar) && <span className="slot-number">{index}</span>}
         {item && <>
             <ItemArtwork item={item} className="item-art" />
             <span className="item-footer">
@@ -179,6 +190,14 @@ export function InventorySlot({ item, index, inventory, selected, busy, hotbar, 
             {offered ? <span className="slot-offered-badge" title={t("ui.trade_offered", { amount: offered })}>{offered}</span> : null}
             {typeof item.durability === "number" && <DurabilityBar value={item.durability} />}
         </>}
-        {tip && item && !isDragging && <SlotTooltip item={item} x={tip.x} y={tip.y} decimals={inspectorDecimals} />}
+        {tip && item && !isDragging && <SlotTooltip item={item} x={tip.x} y={tip.y} decimals={inspectorDecimals} showGridSize={Boolean(grid)} />}
     </button>
+    {footprint?.cells.map((cell) => {
+        const { column, row } = gridPosition(cell, inventory.gridColumns!)
+        const reason = cell === index && footprint.status !== "fit" ? t(`ui.grid_drop_${footprint.status}`) : undefined
+        return <div key={cell} className={`grid-drop-cell grid-drop-${footprint.status}`} style={{ gridColumn: column, gridRow: row }} aria-hidden={!reason}>
+            {reason && <span className="grid-drop-reason" role="status">{reason}</span>}
+        </div>
+    })}
+    </>
 }

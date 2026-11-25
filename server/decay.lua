@@ -107,7 +107,7 @@ local function expire(inventoryKey, inv, entry, cfg, now)
         -- A unique/weapon target cannot take a whole stack in one slot.
         if intoDef and not intoDef.unique and intoDef.type ~= 'weapon' then
             local fresh = I.buildItem(rule.into, amount, slot, {})
-            if fresh then
+            if fresh and (not I.placement or #I.placement(inv, fresh, slot, 1, item.gridRotated, slot) == 1) then
                 D.placeItem(fresh, D.paused(cfg, inv.type), now)
                 local ok = write(inv, slot, fresh)
                 if not ok then

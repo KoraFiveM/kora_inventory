@@ -436,15 +436,15 @@ local function insertOutput(items, slots, output, preserveMetadata)
     if not one then
         return false, err
     end
+    local function findSlot(item)
+        if internal.placement then
+            return internal.placement({ type = 'player', items = items, slots = slots }, item, nil, 1)[1]
+        end
+        return inventory.firstFreeSlot(items, slots)
+    end
     if one.unique then
         for _ = 1, output.amount do
-            local slot
-            for candidate = 1, slots do
-                if not items[candidate] then
-                    slot = candidate
-                    break
-                end
-            end
+            local slot = findSlot(one)
             if not slot then
                 return false, 'no free slot for recipe output'
             end
@@ -473,12 +473,11 @@ local function insertOutput(items, slots, output, preserveMetadata)
             return true
         end
     end
-    for slot = 1, slots do
-        if not items[slot] then
-            one.slot = slot
-            items[slot] = one
-            return true
-        end
+    local slot = findSlot(one)
+    if slot then
+        one.slot = slot
+        items[slot] = one
+        return true
     end
     return false, 'no free slot for recipe output'
 end

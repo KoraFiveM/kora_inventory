@@ -690,7 +690,7 @@ function TradeState.new(deps)
         local drafts, legs = {}, { [trade.a] = {}, [trade.b] = {} }
         for _, src in ipairs({ trade.a, trade.b }) do
             local slots, maxWeight = deps.capacity(src)
-            drafts[src] = { items = copy(originals[src]), slots = slots, maxWeight = maxWeight }
+            drafts[src] = { type = 'player', items = copy(originals[src]), slots = slots, maxWeight = maxWeight }
         end
         for _, src in ipairs({ trade.a, trade.b }) do
             local draft, side = drafts[src], trade.sides[src]
@@ -699,7 +699,10 @@ function TradeState.new(deps)
                 if not item or item.amount < offer.amount then
                     return nil, 'offered item changed'
                 end
-                legs[src][#legs[src] + 1] = { slot = offer.slot, name = item.name, amount = offer.amount, info = copy(metadataOf(item)) }
+                legs[src][#legs[src] + 1] = {
+                    slot = offer.slot, name = item.name, amount = offer.amount, info = copy(metadataOf(item)),
+                    rotated = item.gridRotated,
+                }
                 if item.amount == offer.amount then
                     draft.items[offer.slot] = nil
                 else
@@ -731,7 +734,7 @@ function TradeState.new(deps)
             local receiver = other(trade, src)
             local draft = drafts[receiver]
             for _, leg in ipairs(legs[src]) do
-                local added, addErr = deps.draftAdd(draft, leg.name, leg.amount, copy(leg.info))
+                local added, addErr = deps.draftAdd(draft, leg.name, leg.amount, copy(leg.info), leg.rotated)
                 if not added then
                     return nil, (addErr == 'over weight' or addErr == 'no free slot')
                         and ('partner cannot carry that: ' .. addErr) or (addErr or 'cannot receive item')

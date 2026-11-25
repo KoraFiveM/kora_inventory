@@ -31,10 +31,7 @@ Config.kora_inventory.shops.vendingmachine = {
         'prop_vend_coffe_01',
     },
 
-    -- Reuses this project's own item catalogue (kora_core/shared/items.lua)
-    -- rather than porting upstream's `kurkakola` name verbatim -- this
-    -- registry already departs from upstream naming elsewhere (e.g.
-    -- `water_bottle` is labelled "Water", not "Bottle of Water").
+    -- Stock Kora Core's bundled water and soda.
     inventory = {
         { name = 'water_bottle', amount = 50, price = 4 },
         { name = 'soda', amount = 50, price = 5 },

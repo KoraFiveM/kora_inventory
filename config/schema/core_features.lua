@@ -18,8 +18,22 @@ local ammoInfo = ensure(weapons, 'ammoInfo')
 local trunkCargo = ensure(vehicles, 'trunkCargo')
 local layouts = ensure(ui, 'layouts')
 local weightWarnings = ensure(ui, 'weightWarnings')
+local grid = ensure(cfg, 'grid')
 
 -- Inventory layouts ---------------------------------------------------------
+
+grid.enabled = K.boolean(grid.enabled, {
+    label = 'Use shaped inventory grids',
+    description = 'Items take up their configured footprint in player and storage grids. Applies after kora_inventory restarts.',
+    scope = 'server',
+})
+grid.columns = K.integer(grid.columns, {
+    label = 'Shaped grid columns',
+    description = 'Sets the row width of shaped inventory grids. Existing slot limits determine the total cell count. Applies after kora_inventory restarts.',
+    min = 1,
+    max = 64,
+    scope = 'server',
+})
 
 ui.layout = K.enum(ui.layout, {
     label = 'Default inventory layout',

@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react"
 import { ArrowDownWideNarrow, Layers, Search } from "lucide-react"
 import { UiConfigContext } from "@/context"
 import { asSlots, type DragSlot, type Selection, type SlotTarget } from "@/lib/inventory"
+import { occupiedGridCells, type GridDropPreview } from "@/lib/grid"
 import type { InventoryItem, InventoryView } from "@/lib/types"
 import { CATEGORY_FILTERS, isDimmed, matchesQuery, type CategoryFilter } from "@/lib/categories"
 import { useLocale } from "@/lib/locales"
@@ -11,11 +12,12 @@ import { InventorySlot } from "./InventorySlot"
 
 const OMNIPACK_PAGE = 120
 
-export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, onOrganize, pending, query, offered }: {
+export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlot, previewGridDrop, onDrop, onDragEnd, onSelect, onActivate, onSplit, onQuickTransfer, onOrganize, pending, query, offered }: {
     inventory: InventoryView
     selected?: Selection
     busy: boolean
     canDropSlot: (source: DragSlot, target: SlotTarget) => boolean
+    previewGridDrop?: (source: DragSlot, target: SlotTarget) => GridDropPreview | undefined
     onDrop: (source: DragSlot, target: SlotTarget) => void
     onDragEnd: () => void
     onSelect: (inventory: InventoryView, item: InventoryItem | undefined, slot: number) => void
@@ -54,6 +56,8 @@ export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlo
     const level = weightWarnings.enabled ? weightLevel(inventory.weight ?? 0, inventory.maxWeight ?? 0, weightWarnings.warnAt, weightWarnings.dangerAt) : "ok"
     const items = asSlots(inventory.items)
     const bySlot = new Map(items.map((item) => [item.slot, item]))
+    const columns = inventory.gridColumns
+    const occupied = columns ? occupiedGridCells(inventory, items) : undefined
     const omniSlice = omnipack ? sliceOmnipack(items, omniQuery, omniLimit) : undefined
     const percentage = inventory.maxWeight ? Math.min(100, Math.round(((inventory.weight ?? 0) / inventory.maxWeight) * 100)) : 0
 
@@ -77,11 +81,13 @@ export function InventoryPanel({ inventory, selected, busy, isPlayer, canDropSlo
         {filters && !omnipack && <div className="category-chips" role="group" aria-label={t("ui.filter_items")}>
             {CATEGORY_FILTERS.map((id) => <button key={id} type="button" className={`category-chip${category === id ? " category-chip-active" : ""}`} aria-pressed={category === id} onClick={() => setCategory(id)}>{t(`ui.filter_${id}`)}</button>)}
         </div>}
-        <div className="slot-grid">
+        <div className={`slot-grid${columns ? " slot-grid-shaped" : ""}`} style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}>
+            {columns && Array.from({ length: Math.ceil(inventory.slots / columns) }, (_, row) => <div key={`row-${row}`} className="grid-cell-sizer" style={{ gridRow: row + 1 }} aria-hidden="true" />)}
             {omniSlice ? omniSlice.shown.map((entry) => <InventorySlot key={entry.slot} index={entry.slot} inventory={inventory} item={entry} selected={selected?.inventory.id === inventory.id && selected.item.slot === entry.slot} busy={busy} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, entry.slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} onSplit={onSplit} onQuickTransfer={onQuickTransfer} />) : Array.from({ length: inventory.slots }, (_, offset) => {
                 const slot = offset + 1
                 const item = bySlot.get(slot)
-                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} hotbar={slot <= hotbarCount} lastHotbar={slot === hotbarCount} canDropSlot={canDropSlot} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} onSplit={onSplit} onQuickTransfer={onQuickTransfer} dimmed={(filters && isDimmed(item, category, query ?? "")) || (showSearch && Boolean(item) && !matchesQuery(item!, panelQuery))} offered={offered?.get(slot)} />
+                if (!item && occupied?.has(slot)) return null
+                return <InventorySlot key={slot} index={slot} inventory={inventory} item={item} selected={selected?.inventory.id === inventory.id && selected.item.slot === slot} busy={busy} hotbar={slot <= hotbarCount} lastHotbar={slot === hotbarCount} canDropSlot={canDropSlot} previewGridDrop={previewGridDrop} onDrop={onDrop} onDragEnd={onDragEnd} onSelect={(slotItem) => onSelect(inventory, slotItem, slot)} onActivate={(slotItem) => onActivate(inventory, slotItem)} onSplit={onSplit} onQuickTransfer={onQuickTransfer} dimmed={(filters && isDimmed(item, category, query ?? "")) || (showSearch && Boolean(item) && !matchesQuery(item!, panelQuery))} offered={offered?.get(slot)} />
             })}
         </div>
         {omniSlice && omniSlice.total === 0 && <p className="omnipack-empty">{t("ui.omnipack_empty")}</p>}
