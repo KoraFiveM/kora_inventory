@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "[ALT] Toko",
     },
+    drop_hints = {
+        hint = "Tekan Alt untuk berinteraksi",
+    },
     vehicle_doors = {
         hood_close = "Tutup kap",
         trunk_close = "Tutup batang",

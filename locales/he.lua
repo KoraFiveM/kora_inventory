@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "חנות",
     },
+    drop_hints = {
+        hint = "לחץ Alt כדי לבצע",
+    },
     vehicle_doors = {
         hood_close = "קרוב",
         trunk_close = "תא המטען סגור",

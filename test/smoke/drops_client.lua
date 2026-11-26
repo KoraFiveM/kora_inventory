@@ -1,11 +1,26 @@
 -- Run from kora_inventory: lua test/smoke/drops_client.lua [client-source]
 -- Actual client code; model/callback waits and all host effects are controlled.
 local H = dofile('test/harness.lua')
-local function setup()
-    local f = { events = {}, threads = {}, zones = {}, entities = {}, removedZones = {}, removedEntities = {}, opened = {} }
+local function setup(opts)
+    opts = opts or {}
+    local f = {
+        events = {}, threads = {}, zones = {}, entities = {},
+        removedZones = {}, removedEntities = {}, opened = {},
+        proximityZones = {}, removedProximity = {},
+    }
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
-    env.Config = { kora_inventory = { drops = { placeOnGround = false } } }
+    env.Config = {
+        kora_inventory = {
+            drops = {
+                placeOnGround = false,
+                interact = opts.interact or 'target',
+                interactionDistance = 1.5,
+                label = 'Pick up',
+                icon = 'package',
+            },
+        },
+    }
     env.GetCurrentResourceName = function() return 'kora_inventory' end
     env.GetInvokingResource = function() return f.invoker end
     env.NetworkIsSessionStarted = function() return true end
@@ -13,6 +28,23 @@ local function setup()
     env.CreateThread = function(fn) f.threads[#f.threads + 1] = coroutine.create(fn) end
     env.RegisterNetEvent = function(name, cb) f.events[name] = cb end
     env.AddEventHandler = function(name, cb) f.events[name] = cb end
+    env.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
+    env.PlayerPedId = function() return 1 end
+    env.GetEntityCoords = function() return { x = 0.0, y = 0.0, z = 0.0 } end
+    env.IsPauseMenuActive = function() return false end
+    env.IsNuiFocused = function() return false end
+    env.DisableControlAction = function() end
+    env.IsDisabledControlJustPressed = function() return f.altPressed == true end
+    env.GetScreenCoordFromWorldCoord = function() return true, 0.5, 0.5 end
+    env.DrawRect = function() end
+    env.SetTextFont = function() end
+    env.SetTextScale = function() end
+    env.SetTextColour = function() end
+    env.SetTextCentre = function() end
+    env.SetTextDropshadow = function() end
+    env.BeginTextCommandDisplayText = function() end
+    env.AddTextComponentSubstringPlayerName = function() end
+    env.EndTextCommandDisplayText = function() end
     local nextZone, nextEntity = 0, 0
     env.exports = {
         kora_target = {
@@ -42,6 +74,22 @@ local function setup()
             H.equal(name, 'kora_inventory:server:drops')
             return coroutine.yield('hydrate')
         end },
+        zones = {
+            sphere = function(options)
+                local zone = {
+                    options = options,
+                    remove = function()
+                        f.removedProximity[#f.removedProximity + 1] = true
+                    end,
+                }
+                f.proximityZones[#f.proximityZones + 1] = zone
+                return zone
+            end,
+        },
+        lang = function(key)
+            H.equal(key, 'drop_hints.hint')
+            return 'Press Alt to interact'
+        end,
     }
     assert(loadfile(arg[1] or 'client/drops.lua', 't', env))()
     function f.resume(co, value)
@@ -67,17 +115,24 @@ local function setup()
         H.equal(f.resume(f.threads[1]), 'hydrate', 'callback response held')
         return f.threads[1]
     end
+    function f.enter(index)
+        f.proximityZones[index].options.onEnter()
+    end
+    function f.exit(index)
+        f.proximityZones[index].options.onExit()
+    end
     return f
 end
 local function count(values) local n = 0; for _ in pairs(values) do n = n + 1 end; return n end
 local a, b, c = { x = 1, y = 2, z = 3 }, { x = 4, y = 5, z = 6 }, { x = 7, y = 8, z = 9 }
 
--- Full snapshots add/remove bags, clean props+targets, and tolerate duplicates.
+-- Proximity mode: sphere zones, no kora_target, Alt opens the bag.
 do
-    local f = setup()
+    local f = setup({ interact = 'proximity' })
     f.holdModels = true
     f.emit('dropsUpdated', { { id = 1, coords = a }, { id = 2, coords = b } })
-    H.equal(count(f.zones), 2, 'snapshot registers all targets before model waits')
+    H.equal(#f.proximityZones, 2, 'snapshot registers proximity zones before model waits')
+    H.equal(count(f.zones), 0, 'proximity mode registers no kora_target zones')
     H.equal(count(f.entities), 0, 'entity creation is deferred')
     f.holdModels = false; f.models()
     H.equal(count(f.entities), 2)
@@ -85,24 +140,58 @@ do
     f.emit('dropCreated', '1', a)
     f.emit('dropsUpdated', { { id = '1', coords = a }, { id = 2, coords = b } })
     H.equal(#f.threads, threadCount, 'duplicate events schedule no extra props')
-    H.equal(count(f.zones), 2)
+    H.equal(#f.proximityZones, 2)
+    f.emit('dropsUpdated', { { id = 2, coords = b }, { id = 3, coords = c } })
+    H.equal(#f.removedProximity, 1); H.equal(#f.removedEntities, 1)
+    f.models(); H.equal(count(f.entities), 2); H.equal(#f.proximityZones - #f.removedProximity, 2)
+    -- Enter the remaining zone for drop 3 (last registered) and press Alt.
+    local drop3Zone = f.proximityZones[#f.proximityZones]
+    drop3Zone.options.onEnter()
+    local loop
+    for index = threadCount + 1, #f.threads do
+        if coroutine.status(f.threads[index]) ~= 'dead' then
+            loop = f.threads[index]
+            break
+        end
+    end
+    H.ok(loop, 'entering a proximity zone starts the hint/input loop')
+    f.altPressed = true
+    f.resume(loop)
+    H.equal(f.opened[1].kind, 'drop'); H.equal(f.opened[1].id, '3', 'Alt opens the nearest in-range drop')
+    drop3Zone.options.onExit()
+    f.altPressed = false
+    f.resume(loop)
+    H.equal(coroutine.status(loop), 'dead', 'leaving the last zone ends the proximity loop')
+    f.emit('dropsUpdated', {})
+    H.equal(count(f.entities), 0)
+    H.equal(#f.removedEntities, 3)
+    f.emit('dropRemoved', 1); f.emit('dropsUpdated', {})
+    H.equal(#f.removedEntities, 3, 'duplicate cleanup removes nothing twice')
+end
+
+-- Default target mode keeps the classic kora_target spheres.
+do
+    local f = setup()
+    f.holdModels = true
+    f.emit('dropsUpdated', { { id = 1, coords = a }, { id = 2, coords = b } })
+    H.equal(count(f.zones), 2, 'target mode registers kora_target zones')
+    H.equal(#f.proximityZones, 0, 'target mode registers no proximity zones')
+    f.holdModels = false; f.models()
     f.emit('dropsUpdated', { { id = 2, coords = b }, { id = 3, coords = c } })
     H.equal(#f.removedZones, 1); H.equal(#f.removedEntities, 1)
-    f.models(); H.equal(count(f.entities), 2); H.equal(count(f.zones), 2)
+    f.models(); H.equal(count(f.zones), 2)
     for _, zone in pairs(f.zones) do
         if zone.coords == c then zone.options[1].onSelect() end
     end
     H.equal(f.opened[1].kind, 'drop'); H.equal(f.opened[1].id, '3', 'target uses server drop id')
     f.emit('dropsUpdated', {})
     H.equal(count(f.zones), 0); H.equal(count(f.entities), 0)
-    H.equal(#f.removedZones, 3); H.equal(#f.removedEntities, 3)
-    f.emit('dropRemoved', 1); f.emit('dropsUpdated', {})
-    H.equal(#f.removedZones, 3); H.equal(#f.removedEntities, 3, 'duplicate cleanup removes nothing twice')
 end
 
 -- An old model completion must not attach to a replacement with the same id.
 do
-    local f = setup(); f.holdModels = true
+    local f = setup()
+    f.holdModels = true
     f.emit('dropCreated', 'race', a)
     H.equal(f.resume(f.threads[2]), 'model')
     f.emit('dropRemoved', 'race')
@@ -115,7 +204,7 @@ do
     H.equal(#f.removedEntities, 1)
     for _, coords in pairs(f.entities) do H.equal(coords, b, 'replacement prop survives') end
     f.emit('dropRemoved', 'race')
-    H.equal(count(f.entities), 0); H.equal(count(f.zones), 0)
+    H.equal(count(f.entities), 0)
     H.equal(#f.removedEntities, 2, 'replacement record owns the correct prop')
 end
 
@@ -126,7 +215,6 @@ for _, visible in ipairs({ {}, { { id = 'current', coords = b } } }) do
     f.resume(hydrate, { { id = 'old-bucket', coords = a } }); f.models()
     H.equal(count(f.zones), #visible, 'stale hydration cannot restore prior-bucket targets')
     H.equal(count(f.entities), #visible, 'stale hydration cannot restore prior-bucket props')
-    for _, zone in pairs(f.zones) do H.equal(zone.coords, b) end
 end
 
 -- Hydration is add-only: a delayed response cannot delete a newer live bag.
@@ -137,7 +225,7 @@ do
     H.equal(count(f.zones), 2, 'hydration keeps live additions outside its earlier list')
     H.equal(count(f.entities), 2)
     f.emit('dropRemoved', 'new-live'); f.emit('dropRemoved', 'existing')
-    H.equal(count(f.zones), 0); H.equal(count(f.entities), 0)
+    H.equal(count(f.entities), 0)
 end
 
 -- Preserve the local-invocation guard on every presentation event.
@@ -145,8 +233,8 @@ do
     local f = setup(); f.emit('dropCreated', 1, a); f.models()
     f.invoker = 'other-resource'
     f.emit('dropCreated', 2, b); f.emit('dropRemoved', 1); f.emit('dropsUpdated', {})
-    H.equal(count(f.zones), 1); H.equal(count(f.entities), 1)
+    H.equal(count(f.entities), 1)
     f.invoker = nil; f.emit('dropRemoved', 1)
-    H.equal(count(f.zones), 0); H.equal(count(f.entities), 0)
+    H.equal(count(f.entities), 0)
 end
 H.finish()

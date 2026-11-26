@@ -364,6 +364,12 @@ Config.kora_inventory = {
         -- Metres. Kept at or below dropDistance so the prompt can never appear
         -- at a range the server will refuse to open the drop from.
         interactionDistance = 1.5,
+        -- How players open a ground bag:
+        --   'target'    — classic kora_target eye (hold Alt, select Pick up).
+        --   'proximity' — target-style "Pick up / Press Alt…" card in range;
+        --                 pressing Alt opens the bag (no kora_target eye).
+        -- Needs a resource restart: live bags keep the mode they were registered with.
+        interact = 'target',
         label = 'Pick up',
         icon = 'package',
     },
@@ -1310,6 +1316,12 @@ if Kora and Kora.config and Kora.config.adopt then
         max = 1.0,
         step = 0.01,
         live = true,
+    })
+
+    Config.kora_inventory.drops.interact = Kora.config.enum(Config.kora_inventory.drops.interact, {
+        label = 'Ground bag interact mode',
+        description = 'How players open a dropped bag. Proximity shows a target-style Pick up card in range and opens on Alt with no eye menu. Target keeps the classic kora_target eye (hold Alt, select Pick up). Needs a resource restart.',
+        options = { 'proximity', 'target' },
     })
 
     Config.showTargetHints = Kora.config.optional(Config.showTargetHints, Kora.config.boolean(false), {

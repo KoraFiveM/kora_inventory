@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "[ALT] Shop",
     },
+    drop_hints = {
+        hint = "Tryk Alt for at interagere",
+    },
     vehicle_doors = {
         hood_close = "Luk hætte",
         trunk_close = "Luk bagagerummet",

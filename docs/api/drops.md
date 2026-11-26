@@ -6,7 +6,7 @@ sidebar_position: 7
 
 # Drops
 
-A drop is a temporary ground inventory (`drop:<id>`) created when a player drops an item or when your script calls `dropCreate`. Every client draws a local bag prop with a pick-up target; opening it goes through the normal access, distance and bucket checks. Drops disappear when emptied and are not saved unless `persistence.persistDrops` is on.
+A drop is a temporary ground inventory (`drop:<id>`) created when a player drops an item or when your script calls `dropCreate`. Every client draws a local bag prop and a pick-up prompt (`drops.interact`: proximity hint or kora_target eye); opening it goes through the normal access, distance and bucket checks. Drops disappear when emptied and are not saved unless `persistence.persistDrops` is on.
 
 Namespace: `exports.kora_inventory` · Source: `server.lua (dropCreate, dropTake, intentDrop, findMergeDrop), client/drops.lua`
 
@@ -19,7 +19,7 @@ A UI drop removes the item from the player, then either merges it into the neare
 1. **Drop intent** — The UI sends the `drop` intent with a slot and amount from the player's own inventory.
 2. **Validation** — Session token and revision, the slot and amount, the slot not being busy, and the player entity existing.
 3. **Merge or create** — The server looks for a nearby drop that can take the item; if none, it reserves a new id, runs the `swapItems` hook (`toInventory = 'newdrop'`) and creates the drop.
-4. **Presentation** — Every client in range creates a local prop and a kora_target sphere that calls `openInventory('drop', id)`.
+4. **Presentation** — Every client in range creates a local prop. With `drops.interact = 'target'` (default) it registers a kora_target sphere; with `'proximity'` it shows a target-style Pick up card inside `interactionDistance` and opens on Alt. Both call `openInventory('drop', id)`.
 
 ## Terms used on this page
 
@@ -104,7 +104,7 @@ taken = true, result = { fromRevision = 12, toRevision = 31 }. If the drop is no
 
 ## Limits and related APIs
 
-Drops live only in memory unless `persistDrops` is true, so they are lost on restart by default. `dropCreate` does not validate or normalise items. Players must be within `dropDistance` (2.0) of the drop; the target prompt radius `drops.interactionDistance` should stay at or below it. `bucket` limits who sees and opens the drop.
+Drops live only in memory unless `persistDrops` is true, so they are lost on restart by default. `dropCreate` does not validate or normalise items. Players must be within `dropDistance` (2.0) of the drop; the interact radius `drops.interactionDistance` should stay at or below it. `bucket` limits who sees and opens the drop.
 
 ## Related guides
 
@@ -116,7 +116,7 @@ Drops live only in memory unless `persistDrops` is true, so they are lost on res
 
 Facts below were written from the current code of this resource; they add to, and where noted refine, the reference above.
 
-Dropping an item creates a temporary `drop` inventory at the player's position and a bag prop (`Config.kora_inventory.drops`). The prop is presentation only: a local, non-networked object created independently on each client. Interacting with it calls the normal open path with the drop id; the server re-checks existence, distance and routing bucket, so removing or faking the prop gains nothing. A drop within `mergeRadius` of an existing drop in the same bucket joins it.
+Dropping an item creates a temporary `drop` inventory at the player's position and a bag prop (`Config.kora_inventory.drops`). The prop is presentation only: a local, non-networked object created independently on each client. By default (`interact = 'target'`) it uses the classic kora_target eye; set `interact = 'proximity'` for a dark target-style Pick up card inside `interactionDistance` that opens on Alt without the eye. Both paths call the normal open with the drop id; the server re-checks existence, distance and routing bucket, so removing or faking the prop gains nothing. A drop within `mergeRadius` of an existing drop in the same bucket joins it.
 
 Player-created drops belong to the player's routing bucket (`requireSameBucket`). `kora_inventory:server:drops` and the legacy drop list return ids and coordinates only. After a bucket change the five-second session cleanup closes old drop sessions and refreshes local bags.
 

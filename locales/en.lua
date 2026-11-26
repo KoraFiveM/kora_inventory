@@ -94,6 +94,9 @@ return {
     shop_hints = {
         text = '[ALT] Shop',
     },
+    drop_hints = {
+        hint = 'Press Alt to interact',
+    },
     ui = {
         jammed = 'Jammed',
         inventory_label = 'Inventory',

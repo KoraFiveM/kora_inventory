@@ -631,7 +631,7 @@ Opening, transferring and receiving item updates recheck that bucket.
 `kora_inventory:server:drops` and the legacy drop list return matching drop ids and
 coordinates; **contents are never included**. Live creation reaches matching
 players. After a bucket change, the existing five-second session cleanup tick
-closes old drop sessions and refreshes the local bags and interaction targets.
+closes old drop sessions and refreshes the local bags and pick-up prompts.
 
 Trusted server calls to `dropCreate(coords, items)` retain their global scope.
 Its optional third `bucket` argument restricts a drop; ox-compatible

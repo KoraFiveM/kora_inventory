@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "فروشگاه (ALT)",
     },
+    drop_hints = {
+        hint = "Alt را برای تعامل فشار دهید",
+    },
     vehicle_doors = {
         hood_close = "دانلود زیرنویس Close hood",
         trunk_close = "نزدیک تنه",

@@ -34,6 +34,9 @@ return {
     shop_hints = {
         text = '[ALT] Магазин',
     },
+    drop_hints = {
+        hint = 'Нажми Alt для взаимодействия',
+    },
     ui = {
         inventory_label = 'Инвентарь',
         slot_item = '%{item}, слот %{slot}',

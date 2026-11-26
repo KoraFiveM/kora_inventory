@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "Winkel",
     },
+    drop_hints = {
+        hint = "Druk op Alt om te interacteren",
+    },
     vehicle_doors = {
         hood_close = "Sluiten kap",
         trunk_close = "Sluit de kofferbak",
