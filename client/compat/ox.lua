@@ -344,7 +344,7 @@ local ox = {
         end
         -- Upstream (src/modules/utils/client.lua:Utils.Notify) moves `text`
         -- onto `description` before notifying; this file passed `data` straight
-        -- to Kora.notify.send, whose body field is `message`, so the notification
+        -- to Kora.bridge.sendNotify, whose body field is `message`, so the notification
         -- rendered title-only and the text was silently lost. Both ox spellings
         -- are folded onto `message`. The caller's table is never mutated
         -- (upstream mutates it, which is its own small bug).
@@ -360,7 +360,7 @@ local ox = {
         if payload.position ~= nil then
             payload.position = NOTIFY_POSITIONS[payload.position]
         end
-        return Kora.notify.send(payload)
+        return Kora.bridge.sendNotify(payload)
     end,
     -- Upstream: `local success = lib.progressBar(options); if completed then
     -- completed(not success) end`. The callback argument is CANCELLED, not

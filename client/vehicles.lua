@@ -42,7 +42,7 @@ local function settings()
 end
 
 local function notify(key, fallback)
-    Kora.notify.send({
+    Kora.bridge.sendNotify({
         title = localeText('vehicle_doors.title', 'Vehicle'),
         message = localeText(key, fallback),
         type = 'error',

@@ -30,7 +30,7 @@ local function lang(key, vars, fallback)
 end
 
 local function notify(message, kind)
-    pcall(Kora.notify.send, { title = lang('inventory.title', nil, 'Inventory'), message = message, type = kind or 'error' })
+    pcall(Kora.bridge.sendNotify, { title = lang('inventory.title', nil, 'Inventory'), message = message, type = kind or 'error' })
 end
 
 ---------------------------------------------------------------------------

@@ -103,7 +103,7 @@ Opens a stash or typed inventory for a player from server code. Without `opts.ty
 -- open a per-citizen apartment stash registered earlier with owner = true
 local opened, result = exports.kora_inventory:OpenInventory(src, 'apartment_5')
 if not opened then
-    Kora.notify.send(src, { title = 'Apartment', message = tostring(result), type = 'error' })
+    Kora.bridge.sendNotify(src, { title = 'Apartment', message = tostring(result), type = 'error' })
 end
 
 -- open a registered shop by type

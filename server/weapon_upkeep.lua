@@ -63,10 +63,10 @@ local function text(key, fallback, vars)
 end
 
 local function notify(src, key, fallback, vars, kind)
-    if not (Kora and Kora.notify and Kora.notify.send) then
+    if not (Kora and Kora.notify and Kora.bridge.sendNotify) then
         return
     end
-    pcall(Kora.notify.send, src, {
+    pcall(Kora.bridge.sendNotify, src, {
         title = text('inventory.title', 'Inventory'),
         message = text(key, fallback, vars),
         type = kind or 'error',

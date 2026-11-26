@@ -40,7 +40,7 @@ end
 
 local function notifyDenied(src, key, fallback)
     local text = inventory.text and inventory.text(key, fallback) or fallback
-    Kora.notify.send(src, { title = inventory.text and inventory.text('inventory.title', 'Inventory') or 'Inventory', message = text, type = 'error' })
+    Kora.bridge.sendNotify(src, { title = inventory.text and inventory.text('inventory.title', 'Inventory') or 'Inventory', message = text, type = 'error' })
 end
 
 ---Parses `player=CID item=bread resource=name range=1h page=2` console/chat args.

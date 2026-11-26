@@ -58,7 +58,7 @@ Adds an item to a player (alias `addItem`). Checks capacity, runs the `createIte
 ```lua
 local added, reason = exports.kora_inventory:AddItem(src, 'lockpick', 3, nil, { batch = 'A12' }, 'hardware-reward')
 if not added then
-    Kora.notify.send(src, { title = 'Inventory', message = 'Could not receive item: ' .. tostring(reason), type = 'error' })
+    Kora.bridge.sendNotify(src, { title = 'Inventory', message = 'Could not receive item: ' .. tostring(reason), type = 'error' })
 end
 ```
 

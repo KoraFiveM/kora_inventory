@@ -542,7 +542,7 @@ AddEventHandler('kora_inventory:ui:rejected', function(payload)
         return
     end
     lastNotice.reason, lastNotice.at = text, stamp
-    Kora.notify.send({
+    Kora.bridge.sendNotify({
         title = KoraInventory.text('inventory.title', 'Inventory'),
         message = tostring(reason or 'Action rejected'),
         type = 'error',

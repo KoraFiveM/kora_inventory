@@ -21,7 +21,7 @@ H.ok(source:find("send('kora_inventory:nui:locales', locales)", 1, true),
 local localeManifest = assert(io.open('fxmanifest.lua', 'r')):read('*a')
 H.ok(localeManifest:find("'locales/*.lua'", 1, true),
     'the English Lua locale is included in the resource files')
-H.ok(source:find("Kora.notify.send({", 1, true),
+H.ok(source:find("Kora.bridge.sendNotify({", 1, true),
     'rejected inventory actions are presented as notifications')
 
 Config = {}

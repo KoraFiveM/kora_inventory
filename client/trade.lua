@@ -19,7 +19,7 @@ local function enabled()
 end
 
 local function notify(message, kind)
-    Kora.notify.send({ title = KoraInventory.text('inventory.trade_title', 'Trade'), message = message, type = kind or 'info' })
+    Kora.bridge.sendNotify({ title = KoraInventory.text('inventory.trade_title', 'Trade'), message = message, type = kind or 'info' })
 end
 
 local function send(action, data)
