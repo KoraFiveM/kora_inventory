@@ -63,7 +63,7 @@ local function text(key, fallback, vars)
 end
 
 local function notify(src, key, fallback, vars, kind)
-    if not (Kora and Kora.notify and Kora.bridge.sendNotify) then
+    if not (Kora and Kora.bridge and Kora.bridge.sendNotify) then
         return
     end
     pcall(Kora.bridge.sendNotify, src, {

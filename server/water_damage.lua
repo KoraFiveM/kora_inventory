@@ -33,7 +33,7 @@ local function substitute(text, vars)
 end
 
 local function say(src, key, fallback, vars, kind)
-    if not (Kora and Kora.notify and Kora.bridge.sendNotify) then
+    if not (Kora and Kora.bridge and Kora.bridge.sendNotify) then
         return
     end
     local text = KoraInventory.text and KoraInventory.text(key, fallback, vars) or fallback

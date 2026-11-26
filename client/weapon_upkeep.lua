@@ -62,7 +62,7 @@ local function showHint()
     if hintId then
         return
     end
-    local ok, id = pcall(Kora.bridge.drawTextText, lang('inventory.weapon_jammed_hint', nil, 'Weapon jammed — hold R to clear'), {
+    local ok, id = pcall(Kora.bridge.drawText, lang('inventory.weapon_jammed_hint', nil, 'Weapon jammed — hold R to clear'), {
         key = 'R',
         icon = 'TriangleAlert',
         position = 'bottom-center',
