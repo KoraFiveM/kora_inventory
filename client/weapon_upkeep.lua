@@ -53,7 +53,7 @@ end
 
 local function hideHint()
     if hintId then
-        pcall(Kora.textui.hide, hintId)
+        pcall(Kora.bridge.hideText, hintId)
         hintId = nil
     end
 end
@@ -62,7 +62,7 @@ local function showHint()
     if hintId then
         return
     end
-    local ok, id = pcall(Kora.textui.show, lang('inventory.weapon_jammed_hint', nil, 'Weapon jammed — hold R to clear'), {
+    local ok, id = pcall(Kora.bridge.drawTextText, lang('inventory.weapon_jammed_hint', nil, 'Weapon jammed — hold R to clear'), {
         key = 'R',
         icon = 'TriangleAlert',
         position = 'bottom-center',

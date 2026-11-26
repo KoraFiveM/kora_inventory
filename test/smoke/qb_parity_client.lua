@@ -34,6 +34,6 @@ H.ok(ui:find('policy.enabled ~= true', 1, true), 'legacy boxes obey the itemBoxe
 H.ok(ui:find("getShared('items', name)", 1, true), 'legacy box label and art come from the registry, not the payload')
 H.ok(ui:find('takeSeen(seenReceipts.legacy, key)', 1, true) and ui:find('takeSeen(seenReceipts.native, key)', 1, true), 'native and legacy receipts de-duplicate each other')
 H.ok(compat:find("RegisterNetEvent('qb-inventory:client:requiredItems', showRequiredItems)", 1, true), 'requiredItems shows a hint')
-H.ok(compat:find('Kora.textui.show', 1, true) and compat:find('exports.kora_core:getShared', 1, true), 'hint text is built from registry labels')
+H.ok(compat:find('Kora.bridge.drawText', 1, true) and compat:find('exports.kora_core:getShared', 1, true), 'hint text is built from registry labels')
 H.ok(not compat:find('SendNUIMessage', 1, true), 'compat bridge still has no NUI authority')
 H.finish()
