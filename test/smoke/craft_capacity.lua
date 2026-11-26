@@ -112,7 +112,7 @@ job.KoraJobCreator = {
     logs = { record = function(_, entry) logs[#logs + 1] = entry end },
 }
 job.exports, job.Kora = exportRealm('kora_jobcreator'), inv.Kora
-job.Kora.notify = { send = function(_, payload) notifications[#notifications + 1] = payload end }
+job.Kora.bridge = { sendNotify = function(_, payload) notifications[#notifications + 1] = payload end }
 -- kora_jobcreator is a sibling resource that is optional for this repo's checkout.
 -- KORA_JOB_CRAFT_SOURCE overrides the path; when the file is absent the parts that
 -- need the real jobcreator craft code are SKIPPED (loudly, below), not failed.
