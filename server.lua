@@ -95,7 +95,7 @@ function ext.notifyBlocked(src, stamps, langKey)
         return
     end
     stamps[src] = now
-    Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = Kora.lang(langKey), type = 'error' })
+    Kora.bridge.sendNotify(src, { title = Kora.lang('inventory.title'), message = Kora.lang(langKey), type = 'error' })
 end
 local lastCuffedNotify = {}
 local function notifyCuffedBlocked(src)
@@ -2415,8 +2415,8 @@ local function notifyGive(src, target, name, amount)
     local def = itemDef(name)
     local vars = { amount = amount, item = def and def.label or tostring(name) }
     local title = Kora.lang('inventory.title')
-    Kora.notify.send(src, { title = title, message = ext.langFormat('inventory.gave_item', vars), type = 'success' })
-    Kora.notify.send(target, { title = title, message = ext.langFormat('inventory.received_item', vars), type = 'success' })
+    Kora.bridge.sendNotify(src, { title = title, message = ext.langFormat('inventory.gave_item', vars), type = 'success' })
+    Kora.bridge.sendNotify(target, { title = title, message = ext.langFormat('inventory.received_item', vars), type = 'success' })
 end
 
 -- Toast the buyer after a committed shop purchase (Config.kora_inventory.purchaseNotify):
@@ -2449,7 +2449,7 @@ local function notifyPurchase(src, shop, name, amount, total)
     }
     local langKey = (tonumber(total) or 0) > 0 and 'inventory.purchased_item' or 'inventory.purchased_item_free'
     local message = ext.langFormat(langKey, vars)
-    Kora.notify.send(src, { title = Kora.lang('inventory.title'), message = message, type = 'success' })
+    Kora.bridge.sendNotify(src, { title = Kora.lang('inventory.title'), message = message, type = 'success' })
 end
 
 -- Giving is deliberately a separate intent from an inventory transfer.  The

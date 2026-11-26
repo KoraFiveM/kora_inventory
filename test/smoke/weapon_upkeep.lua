@@ -13,6 +13,7 @@ Kora = {
         return value
     end },
     logging = { error = function() end, warn = function() end },
+    bridge = {},
     lang = function(key) return key end,
 }
 
@@ -127,7 +128,7 @@ Kora.callback = {
     register = function(name, fn) registeredCallbacks[name] = fn end,
 }
 local notices = {}
-Kora.notify = { send = function(_, payload) notices[#notices + 1] = payload end }
+Kora.bridge.sendNotify = function(_, payload) notices[#notices + 1] = payload end
 
 local removals, removeResult = {}, true
 KoraInventory = {

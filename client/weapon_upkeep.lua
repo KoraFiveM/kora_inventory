@@ -30,7 +30,7 @@ local function lang(key, vars, fallback)
 end
 
 local function notify(message, kind)
-    pcall(Kora.notify.send, { title = lang('inventory.title', nil, 'Inventory'), message = message, type = kind or 'error' })
+    pcall(Kora.bridge.sendNotify, { title = lang('inventory.title', nil, 'Inventory'), message = message, type = kind or 'error' })
 end
 
 ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ end
 
 local function hideHint()
     if hintId then
-        pcall(Kora.textui.hide, hintId)
+        pcall(Kora.bridge.hideText, hintId)
         hintId = nil
     end
 end
@@ -62,7 +62,7 @@ local function showHint()
     if hintId then
         return
     end
-    local ok, id = pcall(Kora.textui.show, lang('inventory.weapon_jammed_hint', nil, 'Weapon jammed — hold R to clear'), {
+    local ok, id = pcall(Kora.bridge.drawText, lang('inventory.weapon_jammed_hint', nil, 'Weapon jammed — hold R to clear'), {
         key = 'R',
         icon = 'TriangleAlert',
         position = 'bottom-center',

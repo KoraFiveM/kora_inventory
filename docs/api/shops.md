@@ -183,7 +183,7 @@ Server-side purchase on behalf of a player: opens the shop for them (which runs 
 ```lua
 local ok, reason = exports.kora_inventory:BuyItem(src, 'hardware', 1, 2)
 if not ok then
-    Kora.notify.send(src, { title = 'Shop', message = tostring(reason), type = 'error' })
+    Kora.bridge.sendNotify(src, { title = 'Shop', message = tostring(reason), type = 'error' })
 end
 ```
 

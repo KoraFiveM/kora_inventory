@@ -406,7 +406,7 @@ Local event raised after a weapon's metadata is rewritten by `SetWeaponState`, a
 
 ```lua
 AddEventHandler('kora_inventory:server:weaponStateChanged', function(src, slot, info)
-    if info.durability <= 0 then Kora.notify.send(src, { title = 'Weapon', message = 'Your weapon is broken.', type = 'warning' }) end
+    if info.durability <= 0 then Kora.bridge.sendNotify(src, { title = 'Weapon', message = 'Your weapon is broken.', type = 'warning' }) end
 end)
 ```
 

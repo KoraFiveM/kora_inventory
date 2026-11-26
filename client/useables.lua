@@ -65,7 +65,7 @@ Kora.callback.register('kora_inventory:client:useParachute', function(request)
     local chute = joaat('gadget_parachute')
     local ped = Kora.cache.ped()
     if HasPedGotWeapon(ped, chute, false) then
-        Kora.notify.send({
+        Kora.bridge.sendNotify({
             title = Kora.lang('inventory.title'),
             message = Kora.lang('inventory.parachute_equipped'),
             type = 'error',

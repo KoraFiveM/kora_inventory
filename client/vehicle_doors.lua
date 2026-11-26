@@ -63,7 +63,7 @@ local function text(key)
 end
 
 local function notify(key, kind)
-    Kora.notify.send({ title = text('vehicle_doors.title'), message = text(key), type = kind or 'error' })
+    Kora.bridge.sendNotify({ title = text('vehicle_doors.title'), message = text(key), type = kind or 'error' })
 end
 
 local function storage()

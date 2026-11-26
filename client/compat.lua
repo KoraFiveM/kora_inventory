@@ -170,7 +170,7 @@ local requiredHint
 
 local function hideRequiredHint()
     if requiredHint then
-        Kora.textui.hide(requiredHint)
+        Kora.bridge.hideText(requiredHint)
         requiredHint = nil
     end
 end
@@ -195,7 +195,7 @@ local function showRequiredItems(items, show)
         return
     end
     table.sort(labels)
-    requiredHint = Kora.textui.show('Required: ' .. table.concat(labels, ', '), { position = 'left-center' }, GetCurrentResourceName())
+    requiredHint = Kora.bridge.drawText('Required: ' .. table.concat(labels, ', '), { position = 'left-center' }, GetCurrentResourceName())
 end
 
 RegisterNetEvent('qb-inventory:client:requiredItems', showRequiredItems)

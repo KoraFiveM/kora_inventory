@@ -220,7 +220,7 @@ RegisterNetEvent('workbench:server:craft', function(stationId)
     if not isAtStation(src, stationId) then return end     -- your own server-side check
     local ok, result = exports.kora_inventory:CraftItem(src, 'workbench.repairkit', { station = 'workbench', benchId = stationId }, 1)
     if not ok then
-        Kora.notify.send(src, { title = 'Workbench', message = tostring(result), type = 'error' })
+        Kora.bridge.sendNotify(src, { title = 'Workbench', message = tostring(result), type = 'error' })
     end
 end)
 ```

@@ -60,7 +60,7 @@ local function notify(src, key, fallback, kind, vars)
     if not Kora.notify then
         return
     end
-    Kora.notify.send(src, {
+    Kora.bridge.sendNotify(src, {
         title = text('inventory.trade_title', 'Trade'),
         message = text(key, fallback, vars),
         type = kind or 'info',

@@ -73,7 +73,7 @@ RegisterNetEvent('scrapjob:server:finish', function(token)
 
     local ok, why = exports.kora_inventory:canCarry(src, job.item, job.amount)
     if not ok then
-        Kora.notify.send(src, { title = 'Scrap job', message = 'You cannot carry that: ' .. tostring(why), type = 'error' })
+        Kora.bridge.sendNotify(src, { title = 'Scrap job', message = 'You cannot carry that: ' .. tostring(why), type = 'error' })
         return
     end
     local added, err = exports.kora_inventory:AddItem(src, job.item, job.amount, nil, { source = 'scrapjob' }, 'scrapjob-reward')

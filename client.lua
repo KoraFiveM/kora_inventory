@@ -149,7 +149,7 @@ local function rateLimitedNotifier(messageKey)
             return
         end
         lastNotify = now
-        Kora.notify.send({ title = Kora.lang('inventory.title'), message = Kora.lang(messageKey), type = 'error' })
+        Kora.bridge.sendNotify({ title = Kora.lang('inventory.title'), message = Kora.lang(messageKey), type = 'error' })
     end
 end
 
