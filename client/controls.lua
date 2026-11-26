@@ -69,13 +69,30 @@ local function buttons(ui, text)
         return text('inventory.controls_' .. key, fallback)
     end
 
-    local list = {
-        { label = label('close', 'Close inventory'), control = CONTROL.close },
-        { label = label('use', 'Use selected item'), control = CONTROL.use },
-        { label = label('drag', 'Drag: move / stack'), control = CONTROL.mouseLeft },
-        { label = label('drag_out', 'Drag outside: drop'), control = CONTROL.mouseLeft },
-        { label = label('double_click', 'Double-click: use'), control = CONTROL.mouseLeft },
-    }
+    -- Dual-keycap modifier chords first so the legend's key column aligns;
+    -- Use selected sits last as a single-keycap closer.
+    local list = {}
+
+    -- Modifier chords: same label twice so kora_lib merges them into one row
+    -- as Shift+LMB / Ctrl+LMB / Alt+LMB (keycap + click/drag), not a bare "+".
+    if ui.quickTransfer ~= false then
+        local quick = label('quick_transfer', 'Quick transfer')
+        list[#list + 1] = { label = quick, control = CONTROL.shift }
+        list[#list + 1] = { label = quick, control = CONTROL.mouseLeft }
+    end
+    if ui.modifierDrag ~= false then
+        local half = label('move_half', 'Move half')
+        local one = label('move_one', 'Move one')
+        list[#list + 1] = { label = half, control = CONTROL.ctrl }
+        list[#list + 1] = { label = half, control = CONTROL.mouseLeft }
+        list[#list + 1] = { label = one, control = CONTROL.alt }
+        list[#list + 1] = { label = one, control = CONTROL.mouseLeft }
+    end
+
+    list[#list + 1] = { label = label('close', 'Close inventory'), control = CONTROL.close }
+    list[#list + 1] = { label = label('drag', 'Drag: move / stack'), control = CONTROL.mouseLeft }
+    list[#list + 1] = { label = label('drag_out', 'Drag outside: drop'), control = CONTROL.mouseLeft }
+    list[#list + 1] = { label = label('double_click', 'Double-click: use'), control = CONTROL.mouseLeft }
 
     local mode = rightClick(ui)
     if mode == 'split' then
@@ -84,13 +101,8 @@ local function buttons(ui, text)
         list[#list + 1] = { label = label('item_menu', 'Item menu'), control = CONTROL.mouseRight }
     end
 
-    if ui.quickTransfer ~= false then
-        list[#list + 1] = { label = label('quick_transfer', '+ click: quick transfer'), control = CONTROL.shift }
-    end
-    if ui.modifierDrag ~= false then
-        list[#list + 1] = { label = label('move_half', '+ drag: move half'), control = CONTROL.ctrl }
-        list[#list + 1] = { label = label('move_one', '+ drag: move one'), control = CONTROL.alt }
-    end
+    list[#list + 1] = { label = label('use', 'Use selected item'), control = CONTROL.use }
+
     for _, button in ipairs(list) do
         button.keyFallback = KEY_NAME[button.control]
     end

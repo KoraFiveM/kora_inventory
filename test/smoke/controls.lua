@@ -44,30 +44,45 @@ H.equal(controls.settings({ controls = { button = false } }).button, false, 'but
 H.equal(controls.settings({ controls = { defaultVisible = true } }).defaultVisible, true, 'defaultVisible = true is honoured')
 H.equal(controls.settings({ controls = 'bad' }).button, true, 'a malformed controls value falls back to the defaults')
 
--- Full list with everything on.
+-- Full list with everything on. Modifier actions are two entries each so the
+-- overlay can merge them into Shift+LMB / Ctrl+LMB / Alt+LMB.
 local all = controls.buttons(Config.kora_inventory.ui)
 local map = byLabel(all)
-H.equal(#all, 9, 'every feature on lists nine buttons')
+H.equal(#all, 12, 'every feature on lists twelve buttons (three modifier chords)')
 H.equal(map['Close inventory'], 200, 'Esc closes (INPUT_FRONTEND_PAUSE_ALTERNATE)')
 H.equal(map['Use selected item'], 201, 'Enter uses the selection (INPUT_FRONTEND_ACCEPT)')
 H.equal(map['Drag: move / stack'], 24, 'left mouse drags')
 H.equal(map['Drag outside: drop'], 24, 'left mouse drops outside the window')
 H.equal(map['Double-click: use'], 24, 'double-click uses')
 H.equal(map['Split stack'], 25, 'right mouse splits with the default rightClick mode')
-H.equal(map['+ click: quick transfer'], 21, 'Shift is quick transfer')
-H.equal(map['+ drag: move half'], 36, 'Ctrl drag moves half')
-H.equal(map['+ drag: move one'], 19, 'Alt drag moves one')
-H.equal(all[1].control, 200, 'the list starts with the essentials')
+local function controlsOf(list, label)
+    local out = {}
+    for _, button in ipairs(list) do if button.label == label then out[#out + 1] = button.control end end
+    return out
+end
+H.equal(controlsOf(all, 'Quick transfer')[1], 21, 'Shift is the first half of quick transfer')
+H.equal(controlsOf(all, 'Quick transfer')[2], 24, 'LMB is the click half of quick transfer')
+H.equal(controlsOf(all, 'Move half')[1], 36, 'Ctrl is the first half of move half')
+H.equal(controlsOf(all, 'Move half')[2], 24, 'LMB is the drag half of move half')
+H.equal(controlsOf(all, 'Move one')[1], 19, 'Alt is the first half of move one')
+H.equal(controlsOf(all, 'Move one')[2], 24, 'LMB is the drag half of move one')
+H.equal(all[1].control, 21, 'the list starts with the dual-keycap modifier chords')
+H.equal(all[#all].control, 201, 'Use selected closes the list')
 -- Keyboard controls carry a name for kora_lib to show when GTA has no glyph;
 -- mouse buttons do not need one.
-local function fallbackOf(list, label)
-    for _, button in ipairs(list) do if button.label == label then return button.keyFallback end end
+local function fallbackOf(list, label, control)
+    for _, button in ipairs(list) do
+        if button.label == label and (control == nil or button.control == control) then
+            return button.keyFallback
+        end
+    end
 end
 H.equal(fallbackOf(all, 'Close inventory'), 'Esc', 'Esc is named for the close key')
-H.equal(fallbackOf(all, '+ click: quick transfer'), 'Shift', 'Shift is named')
-H.equal(fallbackOf(all, '+ drag: move half'), 'Ctrl', 'Ctrl is named')
-H.equal(fallbackOf(all, '+ drag: move one'), 'Alt', 'Alt is named')
+H.equal(fallbackOf(all, 'Quick transfer', 21), 'Shift', 'Shift is named')
+H.equal(fallbackOf(all, 'Move half', 36), 'Ctrl', 'Ctrl is named')
+H.equal(fallbackOf(all, 'Move one', 19), 'Alt', 'Alt is named')
 H.equal(fallbackOf(all, 'Drag: move / stack'), nil, 'mouse buttons have no fallback')
+H.equal(fallbackOf(all, 'Quick transfer', 24), nil, 'the click half of a chord has no fallback')
 for _, button in ipairs(all) do
     H.equal(type(button.label), 'string', 'every button has a label')
     H.ok(button.label ~= '', 'every label is non-empty')
@@ -78,11 +93,11 @@ end
 
 -- Feature toggles.
 local noQuick = controls.buttons({ quickTransfer = false })
-H.ok(not has(noQuick, '+ click: quick transfer'), 'quickTransfer = false drops the Shift button')
-H.ok(has(noQuick, '+ drag: move half'), 'modifier drag stays listed')
+H.ok(not has(noQuick, 'Quick transfer'), 'quickTransfer = false drops the Shift chord')
+H.ok(has(noQuick, 'Move half'), 'modifier drag stays listed')
 local noMod = controls.buttons({ modifierDrag = false })
-H.ok(not has(noMod, '+ drag: move half') and not has(noMod, '+ drag: move one'), 'modifierDrag = false drops Ctrl and Alt')
-H.ok(has(noMod, '+ click: quick transfer'), 'quick transfer stays listed')
+H.ok(not has(noMod, 'Move half') and not has(noMod, 'Move one'), 'modifierDrag = false drops Ctrl and Alt chords')
+H.ok(has(noMod, 'Quick transfer'), 'quick transfer stays listed')
 local bare = controls.buttons({ quickTransfer = false, modifierDrag = false, rightClick = 'none' })
 H.equal(#bare, 5, 'with every optional feature off only the basics remain')
 
@@ -129,7 +144,7 @@ controls.hide()
 H.equal(hidden, 0, 'hiding when nothing is shown is a no-op')
 H.equal(controls.show({ quickTransfer = false }), true, 'show succeeds')
 H.equal(controls.isVisible(), true, 'visible after show')
-H.equal(#shown[1], 8, 'the list is built from the config passed at call time')
+H.equal(#shown[1], 10, 'the list is built from the config passed at call time (modifier chords are two entries)')
 H.equal(controls.show({ quickTransfer = false, modifierDrag = false }), true, 'showing again refreshes instead of stacking a second display')
 H.equal(handleSeq, 1, 'only one display is created')
 H.equal(updated, 1, 'the existing display is updated')

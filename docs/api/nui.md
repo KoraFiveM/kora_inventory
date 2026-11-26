@@ -169,7 +169,7 @@ The page asks to show or hide GTA's native instructional buttons (the controls o
 | --- | --- | --- |
 | `data` | table | `{ show }`. Only the boolean `true` shows the overlay; anything else hides it. |
 
-The button list is built from the current config at call time, so only enabled features appear: Esc (close), Enter (use selected), left mouse (drag to move or stack, drag outside to drop, double-click to use), right mouse (split stack or item menu, per `ui.rightClick`; omitted for `none`), Shift (quick transfer, with `ui.quickTransfer`), and Ctrl and Alt (move half and move one, with `ui.modifierDrag`). Labels come from `inventory.controls_*` in `locales/en.lua`.
+The button list is built from the current config at call time, so only enabled features appear: Esc (close), Enter (use selected), left mouse (drag to move or stack, drag outside to drop, double-click to use), right mouse (split stack or item menu, per `ui.rightClick`; omitted for `none`), and modifier chords Shift+LMB (quick transfer, with `ui.quickTransfer`), Ctrl+LMB (move half) and Alt+LMB (move one, with `ui.modifierDrag`). Labels come from `inventory.controls_*` in `locales/en.lua`.
 
 The overlay is always hidden when the inventory session closes, when the `/ui` editor opens and when the resource stops. The page keeps the player's choice in its own `localStorage` key `kora_inventory:controlsVisible` and asks again after each session opens.
 
