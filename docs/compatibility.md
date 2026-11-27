@@ -5,7 +5,7 @@ sidebar_position: 7
 
 # Compatibility identities
 
-`fxmanifest.lua` declares `provide 'qb-inventory'`, `provide 'ox_inventory'` and `provide 'qb-weapons'`. Resources calling those names reach kora_inventory. The qb and ox surfaces are published as separate identities by `server/compat/providers.lua` (a namespace distinct from kora_inventory's own exports), so same-named functions keep their different upstream signatures and return shapes. A compat module never calls `exports()` itself.
+`fxmanifest.lua` declares `provide 'qb-inventory'`, `provide 'ox_inventory'` and `provide 'qb-weapons'`. Resources calling those names reach kora_inventory. The qb and ox surfaces are published as separate identities by `server/compat/providers.lua` (a namespace distinct from kora_inventory's own exports), so same-named functions keep their different upstream signatures and return shapes. A compat module never calls `exports()` itself. An image-only resource named `qb-inventory` or `ox_inventory` may run alongside Kora Inventory when its manifest sets `kora_inventory_image_stub 'yes'`; a real inventory with either name still conflicts.
 
 The exact names are pinned in `test/contracts/upstream.lua` (qb-inventory commit `5edddc3`, ox_inventory commit `ce8ad4c`) and checked by `test/smoke/provider_contract.lua`.
 

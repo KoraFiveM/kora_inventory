@@ -6,11 +6,16 @@ local inventory = assert(KoraInventory, 'kora_inventory authority missing')
 local qb = assert(inventory.compat and inventory.compat.qb, 'qb compatibility missing')
 local ox = assert(inventory.compat and inventory.compat.ox, 'ox compatibility missing')
 
+local function isImageOnlyStub(name)
+    if name ~= 'qb-inventory' and name ~= 'ox_inventory' then return false end
+    if type(GetResourceMetadata) ~= 'function' then return false end
+    return GetResourceMetadata(name, 'kora_inventory_image_stub', 0) == 'yes'
+end
+
 -- GetResourceState('qb-inventory') resolves `provide 'qb-inventory'` back to
--- THIS resource once kora_inventory has started. Looking it up directly therefore
--- falsely reports a conflict with our own alias. Enumerate real resources by
--- their physical manifest names instead; provided identities are not entries
--- in that list, while a separately ensured qb-inventory/ox_inventory folder is.
+-- THIS resource once kora_inventory has started. Enumerate real resources by
+-- their physical manifest names instead. Explicitly marked image-only resources
+-- may use those names alongside our provider; real inventory resources may not.
 local function conflicting(name)
     if
         type(GetNumResources) ~= 'function'
@@ -24,7 +29,9 @@ local function conflicting(name)
         local resource = GetResourceByFindIndex(index)
         if resource == name then
             local state = GetResourceState(resource)
-            return state == 'started' or state == 'starting'
+            if (state == 'started' or state == 'starting') and not isImageOnlyStub(resource) then
+                return true
+            end
         end
     end
 
