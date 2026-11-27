@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "[ALAT] veikals",
     },
+    drop_hints = {
+        hint = "Nospied Alt, lai mijiedarbotos",
+    },
     vehicle_doors = {
         hood_close = "Aizvērt kapuci",
         trunk_close = "Aizvērt šablonu",

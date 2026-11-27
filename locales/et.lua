@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "[ALT] Pood",
     },
+    drop_hints = {
+        hint = "Vajuta Alt suhtlemiseks",
+    },
     vehicle_doors = {
         hood_close = "Sulge kapuuts",
         trunk_close = "Sulgege pagasiruum",

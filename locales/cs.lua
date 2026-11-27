@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "Obchod",
     },
+    drop_hints = {
+        hint = "Stiskni Alt pro interakci",
+    },
     vehicle_doors = {
         hood_close = "Blízká kapota",
         trunk_close = "Zavřít kufr",

@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "[ALT]商店",
     },
+    drop_hints = {
+        hint = "按下 Alt 互动",
+    },
     vehicle_doors = {
         hood_close = "关闭引擎盖",
         trunk_close = "关闭后备箱",

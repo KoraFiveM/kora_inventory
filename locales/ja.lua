@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "[ALT] ショップ",
     },
+    drop_hints = {
+        hint = "Altで操作",
+    },
     vehicle_doors = {
         hood_close = "クローズフード",
         trunk_close = "クローズトランク",

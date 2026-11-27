@@ -33,9 +33,14 @@ local function run(drops, natives)
     env.GetEntityCoords = function() return { x = 1, y = 2, z = natives.placedZ } end
     env.PlaceObjectOnGroundProperly = function() calls.place = true; return natives.placeOk end
     env.SetEntityCoordsNoOffset = function(_, x, y, z) calls.z = z end
+    env.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
     env.exports = { kora_target = { addSphereZone = function() return 1 end, removeZone = function() end } }
-    env.Kora = { entities = { create = function() return 7 end, remove = function() end },
-        callback = { trigger = function() return {} end } }
+    env.Kora = {
+        entities = { create = function() return 7 end, remove = function() end },
+        callback = { trigger = function() return {} end },
+        zones = { sphere = function() return { remove = function() end } end },
+        lang = function() return 'Press Alt to interact' end,
+    }
     assert(loadfile('client/drops.lua', 't', env))()
     handlers['kora_inventory:client:dropCreated']('a', { x = 1, y = 2, z = 5.0 })
     threads[2]()

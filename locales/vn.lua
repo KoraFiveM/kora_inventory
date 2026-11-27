@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "Cửa hàng",
     },
+    drop_hints = {
+        hint = "Nhấn Alt để tương tác",
+    },
     vehicle_doors = {
         hood_close = "Đóng mũ",
         trunk_close = "Đóng",

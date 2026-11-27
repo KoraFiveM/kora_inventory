@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "[ALT] Trgovina",
     },
+    drop_hints = {
+        hint = "Pritisni Alt za interakcijo",
+    },
     vehicle_doors = {
         hood_close = "Zapri pokrov",
         trunk_close = "Zapri prtljažnik",

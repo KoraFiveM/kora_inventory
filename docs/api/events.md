@@ -1241,7 +1241,7 @@ A "+3 Lockpick" box appears for 2.6 seconds.
 
 #### `RegisterNetEvent('kora_inventory:client:dropCreated', function(id, coords) end)`
 
-Server to client: a ground drop exists. Creates the local bag prop and pick-up target.
+Server to client: a ground drop exists. Creates the local bag prop and pick-up prompt (proximity hint or kora_target, per `drops.interact`).
 
 **Parameters**
 

@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "Magazin",
     },
+    drop_hints = {
+        hint = "Apasă Alt pentru a interacționa",
+    },
     vehicle_doors = {
         hood_close = "Închide capota",
         trunk_close = "Închide portbagajul",

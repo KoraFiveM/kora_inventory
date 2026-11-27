@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "Sklep",
     },
+    drop_hints = {
+        hint = "Naciśnij Alt, aby wejść w interakcję",
+    },
     vehicle_doors = {
         hood_close = "Zamknięty kaptur",
         trunk_close = "Zamknij bagażnik",

@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "[ALT] Κατάστημα",
     },
+    drop_hints = {
+        hint = "Πάτα Alt για αλληλεπίδραση",
+    },
     vehicle_doors = {
         hood_close = "Κλείσιμο κουκούλας",
         trunk_close = "Κλείσιμο κορμού",

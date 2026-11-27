@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "[ALT] Dükkanı",
     },
+    drop_hints = {
+        hint = "Etkilesim icin Alt tusuna bas",
+    },
     vehicle_doors = {
         hood_close = "Close hood",
         trunk_close = "Yakın gövde",

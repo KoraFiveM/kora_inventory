@@ -141,14 +141,15 @@ A dropped item leaves a bag prop to walk up to. The prop is local presentation o
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `drops.enabled` | boolean | Default `true`. Draw bag props and targets. |
+| `drops.enabled` | boolean | Default `true`. Draw bag props and interaction. |
 | `drops.mergeRadius` | number | Default `1.5` metres. An item dropped within this distance of an existing drop (same bucket, with room) goes into that bag. `0` turns merging off. |
 | `drops.model` | string | Default `'prop_med_bag_01b'`. |
 | `drops.placeOnGround` | boolean | Default `true`. Trace down so the bag sits on the floor. |
 | `drops.groundOffset` | number | Default `0.0` metres. Added to the bag height after placement (-1.0 to 1.0, live-editable). Ignored when `placeOnGround` is false. |
-| `drops.interactionDistance` | number | Default `1.5`. Target radius. Keep at or below `dropDistance` so the prompt never appears out of server range. |
-| `drops.label` | string | Default `'Pick up'`. |
-| `drops.icon` | string | Default `'package'`. |
+| `drops.interactionDistance` | number | Default `1.5`. Interact radius. Keep at or below `dropDistance` so the prompt never appears out of server range. |
+| `drops.interact` | string | Default `'target'`. `target` keeps the classic kora_target eye (hold Alt, select Pick up); `proximity` shows a target-style "Pick up / Press Alt to interact" card in range and opens on Alt with no eye menu. Needs a resource restart. |
+| `drops.label` | string | Default `'Pick up'`. Option label when `interact = 'target'`. |
+| `drops.icon` | string | Default `'package'`. Option icon when `interact = 'target'`. |
 
 ### NUI presentation (ui)
 

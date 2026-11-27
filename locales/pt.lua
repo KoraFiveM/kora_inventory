@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "Loja",
     },
+    drop_hints = {
+        hint = "Prima Alt para interagir",
+    },
     vehicle_doors = {
         hood_close = "Fechar a tampa",
         trunk_close = "Fechar tronco",

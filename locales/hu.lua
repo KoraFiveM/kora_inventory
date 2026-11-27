@@ -85,6 +85,9 @@ return {
     shop_hints = {
         text = "Vásárlás",
     },
+    drop_hints = {
+        hint = "Nyomj Alt-ot a művelethez",
+    },
     vehicle_doors = {
         hood_close = "Csuklya",
         trunk_close = "Zárja be a csomagtartót",
